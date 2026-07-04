@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+.git
+.turbo
+**/.turbo
+**/dist
+**/.next
+**/coverage
+.env
+.env.*
+!.env.example
+apps/mobile
+docs
+*.md
+!README.md

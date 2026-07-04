@@ -1,0 +1,7 @@
+{
+  "name": "@gym-saas/typescript-config",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Shared tsconfig presets: base, node (Express API), nextjs, react-library",
+  "files": ["base.json", "node.json", "nextjs.json", "react-library.json"]
+}

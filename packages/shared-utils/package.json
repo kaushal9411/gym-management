@@ -1,0 +1,12 @@
+{
+  "name": "@gym-saas/shared-utils",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint": "echo \"[@gym-saas/shared-utils] scaffold only\"",
+    "typecheck": "echo \"[@gym-saas/shared-utils] scaffold only\"",
+    "test": "echo \"[@gym-saas/shared-utils] scaffold only\""
+  }
+}

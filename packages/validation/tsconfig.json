@@ -1,0 +1,4 @@
+{
+  "extends": "@gym-saas/typescript-config/base.json",
+  "include": ["src"]
+}

@@ -1,0 +1,39 @@
+# ══════════════════════════════════════════════════════════════════════
+# Deploy PRODUCTION — merges to `main` PROMOTE the staging-verified images
+# (no rebuild), gated by a manual environment approval. Post-deploy
+# synthetic checks trigger auto-rollback on failure.
+# ══════════════════════════════════════════════════════════════════════
+name: Deploy Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Promote & Deploy
+    runs-on: ubuntu-latest
+    environment: production   # requires manual approval (environment protection rule)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Promote staging-verified images (placeholder)
+        run: echo "retag $GITHUB_SHA images from staging repo — never rebuild for prod"
+
+      - name: Run migrations (placeholder)
+        run: echo "prisma migrate deploy (expand/contract keeps N and N-1 compatible)"
+
+      - name: Rolling deploy (placeholder)
+        run: echo "ecs update-service with health-check gated rollout"
+
+      - name: Post-deploy synthetics (placeholder)
+        run: echo "login, tenant resolve, socket handshake, webhook echo — fail => rollback"
+
+      - name: Rollback on failure (placeholder)
+        if: failure()
+        run: echo "redeploy previous image tag"

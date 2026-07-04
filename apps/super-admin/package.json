@@ -1,0 +1,12 @@
+{
+  "name": "@gym-saas/super-admin",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"[@gym-saas/super-admin] scaffold only — implemented in a later phase\"",
+    "build": "echo \"[@gym-saas/super-admin] scaffold only — nothing to build yet\"",
+    "lint": "echo \"[@gym-saas/super-admin] scaffold only — nothing to lint yet\"",
+    "typecheck": "echo \"[@gym-saas/super-admin] scaffold only\"",
+    "test": "echo \"[@gym-saas/super-admin] scaffold only — no tests yet\""
+  }
+}

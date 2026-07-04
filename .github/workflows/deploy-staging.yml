@@ -1,0 +1,49 @@
+# ══════════════════════════════════════════════════════════════════════
+# Deploy STAGING — every merge to `develop` builds SHA-tagged images and
+# rolls staging, then runs the e2e suite against it.
+# Placeholder steps activate once AWS infra (terraform) is provisioned.
+# ══════════════════════════════════════════════════════════════════════
+name: Deploy Staging
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build, Push & Deploy
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Build & push images (SHA-tagged) ──
+      # - uses: aws-actions/configure-aws-credentials@v4  (OIDC role)
+      # - uses: aws-actions/amazon-ecr-login@v2
+      # - docker build -f infrastructure/docker/api.Dockerfile -t $ECR/gym-saas-api:$GITHUB_SHA .
+      # - docker build -f infrastructure/docker/web.Dockerfile --build-arg APP=tenant-web ...
+      # - docker push ...
+      - name: Build & push images (placeholder)
+        run: echo "Activated once ECR + terraform environments exist"
+
+      # ── Run DB migrations as a dedicated pre-deploy job ──
+      - name: Run migrations (placeholder)
+        run: echo "prisma migrate deploy — separate job, never at container boot"
+
+      # ── Rolling deploy ──
+      - name: Deploy services (placeholder)
+        run: echo "aws ecs update-service --force-new-deployment (api, webs, realtime, worker)"
+
+  e2e:
+    name: E2E vs Staging
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Playwright suite (placeholder)
+        run: echo "registration → provisioning → subdomain login → CRUD smoke"

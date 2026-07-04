@@ -1,0 +1,12 @@
+{
+  "name": "@gym-saas/landing-web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"[@gym-saas/landing-web] scaffold only — implemented in a later phase\"",
+    "build": "echo \"[@gym-saas/landing-web] scaffold only — nothing to build yet\"",
+    "lint": "echo \"[@gym-saas/landing-web] scaffold only — nothing to lint yet\"",
+    "typecheck": "echo \"[@gym-saas/landing-web] scaffold only\"",
+    "test": "echo \"[@gym-saas/landing-web] scaffold only — no tests yet\""
+  }
+}

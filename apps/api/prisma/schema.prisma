@@ -1,0 +1,18 @@
+// ════════════════════════════════════════════════════════════════════
+// gym-saas-platform — Prisma schema (foundation)
+// Models are added module-by-module in later phases, following
+// docs/architecture/ARCHITECTURE.md §5 (Database Design Strategy):
+//   • UUID v7 primary keys
+//   • every tenant-plane table carries tenant_id (+ composite indexes)
+//   • snake_case tables via @@map, PascalCase models
+//   • soft deletes (deleted_at) on business entities
+// ════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

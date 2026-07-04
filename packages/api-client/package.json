@@ -1,0 +1,12 @@
+{
+  "name": "@gym-saas/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint": "echo \"[@gym-saas/api-client] scaffold only\"",
+    "typecheck": "echo \"[@gym-saas/api-client] scaffold only\"",
+    "test": "echo \"[@gym-saas/api-client] scaffold only\""
+  }
+}

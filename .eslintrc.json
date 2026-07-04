@@ -1,0 +1,5 @@
+{
+  "root": true,
+  "extends": ["@gym-saas/eslint-config"],
+  "ignorePatterns": ["node_modules", "dist", "build", ".next", ".turbo", "coverage", "apps/mobile"]
+}
