@@ -2,13 +2,14 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query';
 
-import { useAppDispatch } from '@/store/hooks';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { authService } from '../services/auth.service';
 import {
   authFailed,
   authStarted,
-  authSucceeded,
   otpChallengeIssued,
+  selectIsAuthenticated,
+  sessionEstablished,
 } from '../store/auth-slice';
 import { AuthServiceError, type LoginPayload, type VerifyOtpPayload } from '../types';
 
@@ -25,7 +26,7 @@ export function useLogin() {
     onMutate: () => dispatch(authStarted()),
     onSuccess: (result) => {
       if (result.kind === 'success') {
-        dispatch(authSucceeded(result.user));
+        dispatch(sessionEstablished({ user: result.user, permissions: result.permissions, tokens: result.tokens }));
       } else {
         dispatch(otpChallengeIssued({ email: result.email, flow: result.flow }));
       }
@@ -49,6 +50,10 @@ export function useResetPassword() {
   return useMutation({ mutationFn: authService.resetPassword.bind(authService) });
 }
 
+export function useChangePassword() {
+  return useMutation({ mutationFn: authService.changePassword.bind(authService) });
+}
+
 export function useVerifyEmail(token: string) {
   return useQuery({
     queryKey: ['auth', 'verify-email', token],
@@ -68,7 +73,7 @@ export function useVerifyOtp() {
   return useMutation({
     mutationFn: (payload: VerifyOtpPayload) => authService.verifyOtp(payload),
     onMutate: () => dispatch(authStarted()),
-    onSuccess: ({ user }) => dispatch(authSucceeded(user)),
+    onSuccess: (session) => dispatch(sessionEstablished(session)),
     onError: (error) => {
       const { code, message } = toAuthError(error);
       dispatch(authFailed({ code, message }));
@@ -91,4 +96,26 @@ export function useInvitation(token: string) {
 
 export function useAcceptInvitation() {
   return useMutation({ mutationFn: authService.acceptInvitation.bind(authService) });
+}
+
+/**
+ * Aggregate auth hook — the one most components should reach for. Combines
+ * session state (Redux) with the login mutation so callers don't need to
+ * wire both up themselves.
+ */
+export function useAuth() {
+  const login = useLogin();
+  const session = useAppSelector((state) => state.auth);
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+
+  return {
+    user: session.user,
+    isAuthenticated,
+    isBootstrapping: session.bootstrapping,
+    status: session.status,
+    error: session.error,
+    login: login.mutate,
+    loginAsync: login.mutateAsync,
+    isLoggingIn: login.isPending,
+  };
 }

@@ -4,8 +4,6 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
@@ -15,8 +13,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LabelledDivider } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
+import { FindGymForm } from '@/features/tenant/components/find-gym-form';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { useAppSelector } from '@/store/hooks';
-import { AUTH_ROUTES } from '../../constants';
+import { AUTH_ROUTES, POST_LOGIN_REDIRECT } from '../../constants';
 import { useLogin, toAuthError } from '../../hooks/use-auth';
 import { loginSchema, type LoginFormValues } from '../../schemas';
 import { getRememberedEmail, setRememberedEmail } from '../../utils/remember-me';
@@ -38,6 +38,7 @@ const REDIRECT_ERRORS: Record<string, string> = {
 export function LoginForm() {
   const router = useRouter();
   const login = useLogin();
+  const tenant = useTenant();
   const authenticatedUser = useAppSelector((state) => state.auth.user);
   const [inlineError, setInlineError] = React.useState<{ locked: boolean; message: string } | null>(null);
 
@@ -66,6 +67,7 @@ export function LoginForm() {
           return;
         }
         toast.success(`Welcome back, ${result.user.name.split(' ')[0]}!`);
+        router.push(POST_LOGIN_REDIRECT);
       },
       onError: (error) => {
         const authError = toAuthError(error);
@@ -83,32 +85,18 @@ export function LoginForm() {
     });
   });
 
-  // Post-login success panel (dashboard ships in a later phase).
-  if (authenticatedUser) {
-    return (
-      <Card>
-        <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
-          <motion.div
-            initial={{ scale: 0.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-            className="flex size-16 items-center justify-center rounded-full bg-success/10 text-success"
-          >
-            <CheckCircle2 className="size-8" aria-hidden />
-          </motion.div>
-          <div className="space-y-1">
-            <h1 className="text-xl font-semibold">You&apos;re signed in</h1>
-            <p className="text-sm text-muted-foreground">
-              Signed in as <span className="font-medium text-foreground">{authenticatedUser.email}</span>.
-              The dashboard arrives in the next phase.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Already signed in (e.g. navigated back to /login manually) — bounce to the dashboard.
+  React.useEffect(() => {
+    if (authenticatedUser) router.replace(POST_LOGIN_REDIRECT);
+  }, [authenticatedUser, router]);
 
   const isSubmitting = login.isPending;
+
+  // No real gym subdomain resolved (bare host/apex domain) — a login form
+  // that can never succeed is worse than no form at all.
+  if (tenant.id === 'platform') {
+    return <FindGymForm />;
+  }
 
   return (
     <div className="space-y-6">

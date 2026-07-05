@@ -23,8 +23,8 @@ export const OTP_EXPIRY_SECONDS = 300;
 
 export const PASSWORD_MIN_LENGTH = 8;
 
-/** Where a successful login will eventually land (dashboard = later phase). */
-export const POST_LOGIN_REDIRECT = '/';
+/** Where a successful login lands — a placeholder dashboard route (see app/(portal)). */
+export const POST_LOGIN_REDIRECT = '/dashboard';
 
 /**
  * ── MOCK SERVICE SCRIPT ──────────────────────────────────────────────────

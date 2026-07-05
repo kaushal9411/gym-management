@@ -1,0 +1,16 @@
+export const ADMIN_ROUTES = {
+  login: '/login',
+  dashboard: '/dashboard',
+  tenants: '/tenants',
+  plans: '/plans',
+  coupons: '/coupons',
+  payments: '/payments',
+  revenue: '/revenue',
+  support: '/support',
+  featureFlags: '/feature-flags',
+  cms: '/cms',
+  notifications: '/notifications',
+  settings: '/settings',
+  auditLogs: '/audit-logs',
+  roles: '/roles',
+} as const;

@@ -5,8 +5,18 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
+  /** Primary role — first entry of `roles`, kept for display convenience. */
   role: UserRole;
+  /** Full role set — a user may hold more than one (e.g. Manager + Trainer). */
+  roles: UserRole[];
   tenantId: string;
+}
+
+/** A logged-in session's tokens — kept separate from AuthUser (profile vs. auth mechanics). */
+export interface SessionTokens {
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpiresAt: string;
 }
 
 /** Finite auth machine — drives every screen's rendering. */
@@ -69,6 +79,11 @@ export interface ResetPasswordPayload {
   password: string;
 }
 
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export interface VerifyOtpPayload {
   email: string;
   code: string;
@@ -86,8 +101,14 @@ export interface AcceptInvitationPayload {
 }
 
 // ── Results ─────────────────────────────────────────────────────────────
+export interface EstablishedSession {
+  user: AuthUser;
+  permissions: string[];
+  tokens: SessionTokens;
+}
+
 export type LoginResult =
-  | { kind: 'success'; user: AuthUser }
+  | ({ kind: 'success' } & EstablishedSession)
   | { kind: 'otp_required'; email: string; flow: OtpFlow };
 
 export interface Invitation {

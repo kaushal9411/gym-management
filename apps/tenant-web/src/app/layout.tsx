@@ -8,7 +8,7 @@ import './globals.css';
 
 export async function generateMetadata(): Promise<Metadata> {
   const headerList = await headers();
-  const tenant = resolveTenant(headerList.get('x-tenant-slug'));
+  const tenant = await resolveTenant(headerList.get('x-tenant-slug'));
   return {
     title: {
       default: tenant.id === 'platform' ? 'FitCloud' : `${tenant.name} · FitCloud`,
@@ -25,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const headerList = await headers();
-  const tenant = resolveTenant(headerList.get('x-tenant-slug'));
+  const tenant = await resolveTenant(headerList.get('x-tenant-slug'));
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -35,6 +35,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             '--primary': tenant.branding.primaryColor,
             '--primary-foreground': tenant.branding.primaryForeground,
             '--ring': tenant.branding.primaryColor,
+            // Deliberately its own custom property, not shadcn's `--secondary`
+            // (that token means something unrelated — the neutral "secondary
+            // button" surface). This is the tenant's brand accent color.
+            '--tenant-secondary': tenant.branding.secondaryColor,
           } as React.CSSProperties
         }
       >

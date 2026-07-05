@@ -6,6 +6,13 @@
  */
 module.exports = {
   parser: '@typescript-eslint/parser',
+  parserOptions: {
+    // Type-aware rules (no-floating-promises) need a tsconfig; `project: true`
+    // auto-discovers the nearest one per linted file so this stays generic
+    // across every workspace that extends this config.
+    project: true,
+    tsconfigRootDir: process.cwd(),
+  },
   plugins: ['@typescript-eslint', 'import'],
   extends: [
     'eslint:recommended',
@@ -16,7 +23,8 @@ module.exports = {
     '@typescript-eslint/no-explicit-any': 'error',
     '@typescript-eslint/no-floating-promises': 'error',
     '@typescript-eslint/consistent-type-imports': 'error',
-    'no-console': ['error', { allow: [] }],
+    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+    'no-console': 'error',
     'import/order': [
       'error',
       {

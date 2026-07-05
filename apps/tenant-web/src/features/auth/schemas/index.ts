@@ -76,6 +76,21 @@ export const resetPasswordSchema = z
     path: ['confirmPassword'],
   });
 
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Current password is required'),
+    newPassword: strongPasswordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  })
+  .refine((data) => data.currentPassword !== data.newPassword, {
+    message: 'New password must be different from the current password',
+    path: ['newPassword'],
+  });
+
 export const otpFormSchema = z.object({
   code: otpSchema,
 });
@@ -101,6 +116,7 @@ export type LoginFormValues = z.infer<typeof loginSchema>;
 export type RegisterGymFormValues = z.infer<typeof registerGymSchema>;
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
+export type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 export type OtpFormValues = z.infer<typeof otpFormSchema>;
 export type ResendOtpFormValues = z.infer<typeof resendOtpSchema>;
 export type AcceptInvitationFormValues = z.infer<typeof acceptInvitationSchema>;

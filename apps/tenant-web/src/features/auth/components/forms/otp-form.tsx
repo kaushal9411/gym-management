@@ -3,13 +3,13 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { AUTH_ROUTES, OTP_LENGTH, OTP_RESEND_COOLDOWN_SECONDS } from '../../constants';
+import { AUTH_ROUTES, OTP_LENGTH, OTP_RESEND_COOLDOWN_SECONDS, POST_LOGIN_REDIRECT } from '../../constants';
 import { toAuthError, useResendOtp, useVerifyOtp } from '../../hooks/use-auth';
 import { useCountdown } from '../../hooks/use-countdown';
 import { otpSchema } from '../../schemas';
@@ -36,7 +36,6 @@ export function OtpForm({ email, flow, variant = 'otp' }: OtpFormProps) {
 
   const [code, setCode] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
-  const [succeeded, setSucceeded] = React.useState(false);
   const [shake, setShake] = React.useState(0);
 
   // Guard: this screen requires a pending challenge context.
@@ -55,8 +54,8 @@ export function OtpForm({ email, flow, variant = 'otp' }: OtpFormProps) {
       { email, code: parsed.data, flow },
       {
         onSuccess: () => {
-          setSucceeded(true);
           toast.success('Verification successful');
+          router.push(POST_LOGIN_REDIRECT);
         },
         onError: (err) => {
           const authError = toAuthError(err);
@@ -78,30 +77,6 @@ export function OtpForm({ email, flow, variant = 'otp' }: OtpFormProps) {
       },
     });
   };
-
-  if (succeeded) {
-    return (
-      <Card>
-        <CardContent className="flex flex-col items-center gap-4 p-8 text-center">
-          <motion.div
-            initial={{ scale: 0.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 18 }}
-            className="flex size-16 items-center justify-center rounded-full bg-success/10 text-success"
-          >
-            <CheckCircle2 className="size-8" aria-hidden />
-          </motion.div>
-          <div className="space-y-1">
-            <h1 className="text-xl font-semibold">You&apos;re verified</h1>
-            <p className="text-sm text-muted-foreground">
-              Signed in as <span className="font-medium text-foreground">{maskEmail(email)}</span>. The
-              dashboard arrives in the next phase.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <div className="space-y-6">

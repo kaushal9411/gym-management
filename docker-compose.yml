@@ -18,7 +18,10 @@ services:
       POSTGRES_PASSWORD: gym
       POSTGRES_DB: gym_saas
     ports:
-      - "5432:5432"
+      # Host port 5433 — this machine already has a native PostgreSQL
+      # service bound to 5432; mapping elsewhere avoids the conflict
+      # without touching that unrelated installation.
+      - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:

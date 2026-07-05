@@ -1,0 +1,9 @@
+{
+  "extends": "@gym-saas/typescript-config/node.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": ["seed.ts"]
+}

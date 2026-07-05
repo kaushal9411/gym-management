@@ -1,4 +1,15 @@
 {
   "extends": "@gym-saas/typescript-config/nextjs.json",
-  "include": ["src"]
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "types": ["node"],
+    "incremental": true,
+    "declaration": false,
+    "declarationMap": false
+  },
+  "include": ["next-env.d.ts", "src/**/*.ts", "src/**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
 }

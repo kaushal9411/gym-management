@@ -1,4 +1,10 @@
 {
   "extends": "@gym-saas/typescript-config/node.json",
-  "include": ["src"]
+  "compilerOptions": {
+    "baseUrl": ".",
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }

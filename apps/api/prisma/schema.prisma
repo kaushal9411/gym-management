@@ -1,11 +1,20 @@
 // ════════════════════════════════════════════════════════════════════
-// gym-saas-platform — Prisma schema (foundation)
-// Models are added module-by-module in later phases, following
-// docs/architecture/ARCHITECTURE.md §5 (Database Design Strategy):
-//   • UUID v7 primary keys
-//   • every tenant-plane table carries tenant_id (+ composite indexes)
-//   • snake_case tables via @@map, PascalCase models
+// gym-saas-platform — Prisma schema
+//
+// Covers: authentication/authorization (Prompt 5), SaaS onboarding + tenant
+// provisioning (Prompt 7), subscription & billing (Prompt 8), and the Super
+// Admin portal (Prompt 9) — a completely separate authority plane (its own
+// AdminUser/AdminRole/AdminPermission catalog, its own JWT audience) from
+// tenant users, since gym owners must never be able to authenticate into
+// the admin portal. Gym OPERATIONS modules (member/trainer/attendance
+// management) remain out of scope and will extend this schema later.
+//
+// Conventions (docs/architecture/ARCHITECTURE.md §5 + coding-guidelines):
+//   • UUID primary keys, snake_case tables via @@map
+//   • every tenant-scoped table carries tenant_id (+ composite indexes)
 //   • soft deletes (deleted_at) on business entities
+//   • RLS policies for tenant tables are added in a follow-up raw-SQL
+//     migration (see prisma/migrations/*_enable_row_level_security)
 // ════════════════════════════════════════════════════════════════════
 
 generator client {
@@ -15,4 +24,1285 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ── Enums ──────────────────────────────────────────────────────────────
+
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+
+  @@map("tenant_status")
+}
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  LOCKED
+  SUSPENDED
+  DEACTIVATED
+
+  @@map("user_status")
+}
+
+enum OtpPurpose {
+  LOGIN_MFA
+  EMAIL_VERIFICATION
+  TWO_FACTOR
+
+  @@map("otp_purpose")
+}
+
+enum OtpChannel {
+  EMAIL
+  SMS
+
+  @@map("otp_channel")
+}
+
+/// Trial → Active → (Renewal Due) PAST_DUE → GRACE → SUSPENDED → back to
+/// ACTIVE on reactivation, or CANCELED / EXPIRED as terminal states. GRACE,
+/// SUSPENDED and EXPIRED were added in Prompt 8 (billing); PAST_DUE/CANCELED
+/// already existed from Prompt 7 and keep their original meaning.
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  GRACE
+  SUSPENDED
+  CANCELED
+  EXPIRED
+
+  @@map("subscription_status")
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  PARTIALLY_REFUNDED
+
+  @@map("payment_status")
+}
+
+enum PaymentGatewayProvider {
+  STRIPE
+  RAZORPAY
+  PAYPAL
+
+  @@map("payment_gateway_provider")
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  VOID
+  UNCOLLECTIBLE
+
+  @@map("invoice_status")
+}
+
+enum CouponType {
+  PERCENTAGE
+  FIXED_AMOUNT
+  TRIAL_EXTENSION
+
+  @@map("coupon_type")
+}
+
+enum CouponScope {
+  ONE_TIME
+  RECURRING
+  REFERRAL
+
+  @@map("coupon_scope")
+}
+
+enum SubscriptionHistoryAction {
+  CREATED
+  UPGRADED
+  DOWNGRADED
+  RENEWED
+  CANCELLED
+  REACTIVATED
+  SUSPENDED
+  EXPIRED
+  TRIAL_STARTED
+  TRIAL_ENDED
+
+  @@map("subscription_history_action")
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+
+  @@map("billing_cycle")
+}
+
+enum DomainType {
+  SUBDOMAIN
+  CUSTOM
+
+  @@map("domain_type")
+}
+
+// ── Platform: tenants ────────────────────────────────────────────────────
+
+/// The gym business. Resolved on every request from the subdomain —
+/// never supplied by the client.
+model Tenant {
+  id                    String       @id @default(uuid()) @db.Uuid
+  slug                  String       @unique @db.VarChar(40)
+  name                  String       @db.VarChar(120)
+  status                TenantStatus @default(TRIAL)
+  trialEndsAt           DateTime?    @map("trial_ends_at")
+  /// End of the PAST_DUE grace window; past this, subscription is hard-expired.
+  subscriptionExpiresAt DateTime?    @map("subscription_expires_at")
+  suspendedAt           DateTime?    @map("suspended_at")
+  maintenanceMode       Boolean      @default(false) @map("maintenance_mode")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  updatedAt             DateTime     @updatedAt @map("updated_at")
+  deletedAt             DateTime?    @map("deleted_at")
+
+  settings            TenantSettings?
+  branding            TenantBranding?
+  limits              TenantLimit?
+  users               User[]
+  roles               Role[]
+  refreshTokens       RefreshToken[]
+  passwordResets      PasswordReset[]
+  emailVerifications  EmailVerification[]
+  otpCodes            OtpCode[]
+  loginHistory        LoginHistory[]
+  userSessions        UserSession[]
+  auditLogs           AuditLog[]
+  domains             TenantDomain[]
+  branches            Branch[]
+  modules             TenantModule[]
+  usage               TenantUsage[]
+  subscriptions       Subscription[]
+  subscriptionHistory SubscriptionHistory[]
+  billingAddress      BillingAddress?
+  paymentMethods      PaymentMethod[]
+  payments            Payment[]
+  invoices            Invoice[]
+  couponRedemptions   CouponRedemption[]
+  supportTickets      SupportTicket[]
+  notifications       TenantNotification[]
+
+  @@map("tenants")
+}
+
+/// Per-tenant branding & preferences — drives email templates and the
+/// tenant-web portal theme (kept in lockstep with the frontend TenantBranding type).
+model TenantSettings {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @unique @map("tenant_id") @db.Uuid
+  /// { primaryColor, primaryForeground, logoUrl?, welcomeMessage }
+  branding         Json     @default("{}")
+  timezone         String   @default("UTC") @db.VarChar(64)
+  currency         String   @default("USD") @db.Char(3)
+  locale           String   @default("en") @db.VarChar(10)
+  emailFromName    String?  @map("email_from_name") @db.VarChar(120)
+  emailFromAddress String?  @map("email_from_address") @db.VarChar(255)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_settings")
+}
+
+// ── Identity ─────────────────────────────────────────────────────────────
+
+/// A staff or member account, always scoped to exactly one tenant.
+/// The same email may exist in different tenants (different gyms).
+model User {
+  id                  String     @id @default(uuid()) @db.Uuid
+  tenantId            String     @map("tenant_id") @db.Uuid
+  name                String     @db.VarChar(120)
+  email               String     @db.VarChar(255)
+  phone               String?    @db.VarChar(20)
+  passwordHash        String     @map("password_hash")
+  status              UserStatus @default(PENDING_VERIFICATION)
+  emailVerifiedAt     DateTime?  @map("email_verified_at")
+  failedLoginAttempts Int        @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime?  @map("locked_until")
+  lastLoginAt         DateTime?  @map("last_login_at")
+  passwordChangedAt   DateTime?  @map("password_changed_at")
+  mfaEnabled          Boolean    @default(false) @map("mfa_enabled")
+  mfaSecret           String?    @map("mfa_secret")
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+  deletedAt           DateTime?  @map("deleted_at")
+
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles          UserRole[]
+  refreshTokens      RefreshToken[]
+  passwordResets     PasswordReset[]
+  emailVerifications EmailVerification[]
+  otpCodes           OtpCode[]
+  loginHistory       LoginHistory[]
+  sessions           UserSession[]
+  auditLogsAsActor   AuditLog[]          @relation("AuditActor")
+
+  @@unique([tenantId, email])
+  @@index([tenantId, status])
+  @@map("users")
+}
+
+/// System roles have tenantId = null (shared catalog: SUPER_ADMIN, OWNER,
+/// MANAGER, TRAINER, RECEPTIONIST, MEMBER). Custom roles (Enterprise,
+/// future) are tenant-scoped.
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String?  @map("tenant_id") @db.Uuid
+  name        String   @db.VarChar(60)
+  description String?
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant          Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@unique([tenantId, name])
+  @@map("roles")
+}
+
+/// Global permission catalog — "resource:action" keys, shared by every tenant.
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique @db.VarChar(80)
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+/// Many-to-many — a user may hold multiple roles (e.g. Manager + Trainer).
+model UserRole {
+  userId     String   @map("user_id") @db.Uuid
+  roleId     String   @map("role_id") @db.Uuid
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ── Sessions & tokens ─────────────────────────────────────────────────────
+
+/// Opaque, rotating refresh tokens. Only the SHA-256 hash is stored.
+/// `family` links every token issued from one original login — reuse of a
+/// replaced token revokes the whole family (theft detection).
+model RefreshToken {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  userId              String    @map("user_id") @db.Uuid
+  tokenHash           String    @unique @map("token_hash")
+  family              String    @db.Uuid
+  userAgent           String?   @map("user_agent")
+  ipAddress           String?   @map("ip_address")
+  expiresAt           DateTime  @map("expires_at")
+  revokedAt           DateTime? @map("revoked_at")
+  replacedByTokenHash String?   @map("replaced_by_token_hash")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([family])
+  @@map("refresh_tokens")
+}
+
+/// A user-visible device/session record (what "logout from this device" acts on).
+/// 1:1 with the refresh token currently backing it.
+model UserSession {
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  refreshTokenId String?   @unique @map("refresh_token_id") @db.Uuid
+  deviceLabel    String?   @map("device_label")
+  ipAddress      String?   @map("ip_address")
+  userAgent      String?   @map("user_agent")
+  lastActiveAt   DateTime  @default(now()) @map("last_active_at")
+  revokedAt      DateTime? @map("revoked_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_sessions")
+}
+
+// ── Verification & recovery ───────────────────────────────────────────────
+
+model PasswordReset {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
+model EmailVerification {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  verifiedAt DateTime? @map("verified_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("email_verifications")
+}
+
+/// 6-digit OTP challenges — login MFA and (future-ready) 2FA. Only the hash
+/// of the code is stored; `attempts` bounds brute-forcing a single code.
+model OtpCode {
+  id          String     @id @default(uuid()) @db.Uuid
+  tenantId    String     @map("tenant_id") @db.Uuid
+  userId      String     @map("user_id") @db.Uuid
+  codeHash    String     @map("code_hash")
+  purpose     OtpPurpose
+  channel     OtpChannel @default(EMAIL)
+  attempts    Int        @default(0)
+  maxAttempts Int        @default(5) @map("max_attempts")
+  expiresAt   DateTime   @map("expires_at")
+  consumedAt  DateTime?  @map("consumed_at")
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@map("otp_codes")
+}
+
+// ── Observability ──────────────────────────────────────────────────────────
+
+/// Every login attempt, success or failure — durable brute-force evidence
+/// alongside the fast Redis counters used for real-time lockout decisions.
+model LoginHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  email     String   @db.VarChar(255)
+  success   Boolean
+  reason    String?  @db.VarChar(60)
+  ipAddress String?  @map("ip_address")
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, email, createdAt])
+  @@map("login_history")
+}
+
+/// Append-only trail of sensitive mutations and authorization denials.
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String?  @map("tenant_id") @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  actorRole   String?  @map("actor_role") @db.VarChar(60)
+  action      String   @db.VarChar(80)
+  entityType  String?  @map("entity_type") @db.VarChar(60)
+  entityId    String?  @map("entity_id")
+  before      Json?
+  after       Json?
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actor  User?   @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+// ── Platform: SaaS onboarding & subscriptions (Prompt 7) ───────────────────
+//
+// Everything below supports automatic tenant provisioning: the plan
+// catalog, a tenant's actual subscription against that catalog, its
+// subdomain (and future custom domain), branding, a starter branch,
+// enabled modules, plan-derived limits, and live usage counters against
+// those limits. `audit_logs` above already covers "tenant_audit_logs" —
+// provisioning writes into that same table rather than a parallel one.
+
+/// Global, tenant-agnostic plan catalog (Starter/Professional/Enterprise).
+/// Seeded once (prisma/seed.ts) — tenants reference a plan, they never own one.
+model SubscriptionPlan {
+  id               String   @id @default(uuid()) @db.Uuid
+  slug             String   @unique @db.VarChar(40)
+  name             String   @db.VarChar(80)
+  description      String?
+  priceMonthly     Decimal  @map("price_monthly") @db.Decimal(10, 2)
+  priceYearly      Decimal  @map("price_yearly") @db.Decimal(10, 2)
+  currency         String   @default("USD") @db.Char(3)
+  trialDays        Int      @default(14) @map("trial_days")
+  maxBranches      Int      @map("max_branches")
+  maxManagers      Int      @map("max_managers")
+  maxTrainers      Int      @map("max_trainers")
+  maxReceptionists Int      @default(0) @map("max_receptionists")
+  maxStaff         Int      @default(0) @map("max_staff")
+  maxMembers       Int      @map("max_members")
+  maxStorageMb     Int      @map("max_storage_mb")
+  isActive         Boolean  @default(true) @map("is_active")
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  features      SubscriptionPlanFeature[]
+  subscriptions Subscription[]
+
+  @@map("subscription_plans")
+}
+
+/// One row per feature toggle a plan grants (e.g. "chat", "custom_roles",
+/// "api_access") — the checklist shown on the pricing/plan-selection step.
+model SubscriptionPlanFeature {
+  id        String   @id @default(uuid()) @db.Uuid
+  planId    String   @map("plan_id") @db.Uuid
+  key       String   @db.VarChar(60)
+  label     String   @db.VarChar(120)
+  included  Boolean  @default(true)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  plan SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, key])
+  @@map("subscription_features")
+}
+
+/// A tenant's actual subscription against the plan catalog — the billing
+/// source of truth. `Tenant.status/trialEndsAt/subscriptionExpiresAt`
+/// remain a denormalized fast-path cache the tenant middleware reads on
+/// every request without a join; this table is the detailed record kept
+/// in sync with it by the provisioning service and (future) billing jobs.
+/// The tenant's billing record. Table name stays `subscriptions` (not the
+/// literal `tenant_subscriptions` some specs use) — this is the same model
+/// Prompt 7's provisioning saga already creates and depends on; renaming it
+/// would break working code for a cosmetic naming difference, and this IS
+/// the "one subscription per tenant" table either name would describe.
+model Subscription {
+  id                    String             @id @default(uuid()) @db.Uuid
+  tenantId              String             @map("tenant_id") @db.Uuid
+  planId                String             @map("plan_id") @db.Uuid
+  couponId              String?            @map("coupon_id") @db.Uuid
+  status                SubscriptionStatus @default(TRIALING)
+  billingCycle          BillingCycle       @default(MONTHLY) @map("billing_cycle")
+  trialEndsAt           DateTime?          @map("trial_ends_at")
+  currentPeriodStart    DateTime           @default(now()) @map("current_period_start")
+  currentPeriodEnd      DateTime?          @map("current_period_end")
+  cancelAtPeriodEnd     Boolean            @default(false) @map("cancel_at_period_end")
+  /// Set when a renewal payment fails — PAST_DUE until this passes, then GRACE.
+  graceEndsAt           DateTime?          @map("grace_ends_at")
+  suspendedAt           DateTime?          @map("suspended_at")
+  cancelledAt           DateTime?          @map("cancelled_at")
+  cancelReason          String?            @map("cancel_reason")
+  gatewayProvider       String?            @map("gateway_provider") @db.VarChar(20)
+  gatewayCustomerId     String?            @map("gateway_customer_id")
+  gatewaySubscriptionId String?            @map("gateway_subscription_id")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+
+  tenant   Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan     SubscriptionPlan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  coupon   Coupon?               @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  history  SubscriptionHistory[]
+  payments Payment[]
+  invoices Invoice[]
+
+  @@index([tenantId])
+  @@map("subscriptions")
+}
+
+/// The subdomain (and, in future, verified custom domain) a tenant is
+/// reachable at. Exactly one SUBDOMAIN row per tenant is created at
+/// provisioning time; CUSTOM rows are a future self-serve feature — the
+/// data model supports it today (isVerified/dnsVerifiedAt gate whether a
+/// custom domain is actually routable) without DNS automation being built.
+model TenantDomain {
+  id            String     @id @default(uuid()) @db.Uuid
+  tenantId      String     @map("tenant_id") @db.Uuid
+  domain        String     @unique @db.VarChar(255)
+  type          DomainType @default(SUBDOMAIN)
+  isPrimary     Boolean    @default(true) @map("is_primary")
+  isVerified    Boolean    @default(true) @map("is_verified")
+  dnsVerifiedAt DateTime?  @map("dns_verified_at")
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("tenant_domains")
+}
+
+/// Visual identity — split out from TenantSettings so branding can evolve
+/// (logo uploads, custom CSS) independently of operational settings.
+model TenantBranding {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @unique @map("tenant_id") @db.Uuid
+  logoUrl           String?  @map("logo_url")
+  faviconUrl        String?  @map("favicon_url")
+  primaryColor      String   @default("oklch(0.51 0.23 277)") @map("primary_color")
+  primaryForeground String   @default("oklch(0.985 0 0)") @map("primary_foreground")
+  /// Accent color for secondary actions/badges — added in Prompt 10 for the
+  /// portal shell's theme; falls back to `primaryColor` at read time for
+  /// tenants provisioned before this field existed.
+  secondaryColor    String?  @map("secondary_color")
+  welcomeMessage    String?  @map("welcome_message")
+  customCss         String?  @map("custom_css")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_branding")
+}
+
+/// The tenant's first location, created automatically at provisioning so
+/// staff/member records always have somewhere to attach to. Branch
+/// MANAGEMENT (create/edit/list more branches) is a future Gym module —
+/// this table + the one default row are the only in-scope pieces here.
+model Branch {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  name      String   @db.VarChar(120)
+  isDefault Boolean  @default(true) @map("is_default")
+  isActive  Boolean  @default(true) @map("is_active")
+  timezone  String   @default("UTC") @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("branches")
+}
+
+/// Which app modules are switched on for a tenant — seeded from the
+/// chosen plan's features at provisioning time. A future admin screen
+/// could override individual toggles without changing the plan.
+model TenantModule {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  key       String   @db.VarChar(60)
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@map("tenant_modules")
+}
+
+/// Snapshot of the tenant's current plan limits — copied from
+/// SubscriptionPlan at provisioning/plan-change time so limit checks
+/// (a future PlanLimitGuard) are a single-row lookup, no join required.
+model TenantLimit {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @unique @map("tenant_id") @db.Uuid
+  maxBranches      Int      @map("max_branches")
+  maxManagers      Int      @map("max_managers")
+  maxTrainers      Int      @map("max_trainers")
+  maxReceptionists Int      @default(0) @map("max_receptionists")
+  maxStaff         Int      @default(0) @map("max_staff")
+  maxMembers       Int      @map("max_members")
+  maxStorageMb     Int      @map("max_storage_mb")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_limits")
+}
+
+/// Live usage counters against `TenantLimit` — one row per metric
+/// ("branches", "managers", "trainers", "members", "storage_mb"),
+/// initialized to zero (or 1, for branches — the default branch already
+/// exists) at provisioning time.
+model TenantUsage {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  metric    String   @db.VarChar(40)
+  value     Int      @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, metric])
+  @@map("tenant_usage")
+}
+
+// ── Platform: subscription & billing (Prompt 8) ────────────────────────────
+//
+// Everything below extends Prompt 7's plan/subscription foundation into a
+// full billing engine: coupons, tax, invoices, payments (provider-pattern
+// gateways), and the audit trail of subscription state transitions. Gym
+// OPERATIONS billing (charging members) is a separate, future concern —
+// this is exclusively the platform charging the gym owner (tenant) for
+// their FitCloud subscription.
+
+/// Append-only trail of every subscription state/plan transition — what
+/// the lifecycle diagram (Trial → Active → Renewal Due → Grace →
+/// Suspended → Reactivated → Cancelled → Expired) actually did, and why.
+model SubscriptionHistory {
+  id             String                    @id @default(uuid()) @db.Uuid
+  tenantId       String                    @map("tenant_id") @db.Uuid
+  subscriptionId String                    @map("subscription_id") @db.Uuid
+  fromPlanId     String?                   @map("from_plan_id") @db.Uuid
+  toPlanId       String?                   @map("to_plan_id") @db.Uuid
+  fromStatus     SubscriptionStatus?       @map("from_status")
+  toStatus       SubscriptionStatus        @map("to_status")
+  action         SubscriptionHistoryAction
+  note           String?
+  createdAt      DateTime                  @default(now()) @map("created_at")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("subscription_history")
+}
+
+/// One row per tenant — used for invoice "bill to" details and tax
+/// jurisdiction lookup (country/state feed `TaxRule`).
+model BillingAddress {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @unique @map("tenant_id") @db.Uuid
+  legalName  String?  @map("legal_name") @db.VarChar(160)
+  line1      String   @db.VarChar(200)
+  line2      String?  @db.VarChar(200)
+  city       String   @db.VarChar(100)
+  state      String   @db.VarChar(100)
+  postalCode String   @map("postal_code") @db.VarChar(20)
+  country    String   @db.VarChar(2)
+  taxId      String?  @map("tax_id") @db.VarChar(40)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("billing_addresses")
+}
+
+/// Flat rate lookup by country (+ optional state/province) — enough for a
+/// single consolidated tax line per invoice without a full tax-jurisdiction
+/// engine. `stateCode = null` is a country-wide fallback rate.
+model TaxRule {
+  id          String   @id @default(uuid()) @db.Uuid
+  countryCode String   @map("country_code") @db.VarChar(2)
+  stateCode   String?  @map("state_code") @db.VarChar(10)
+  label       String   @db.VarChar(80)
+  ratePercent Decimal  @map("rate_percent") @db.Decimal(5, 2)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([countryCode, stateCode])
+  @@map("tax_rules")
+}
+
+/// A discount code. `type` determines which of percentOff/amountOff/
+/// trialExtensionDays applies; `scope` distinguishes a single-use code from
+/// one meant to apply every renewal (RECURRING) or handed out for referrals.
+model Coupon {
+  id                      String      @id @default(uuid()) @db.Uuid
+  code                    String      @unique @db.VarChar(40)
+  type                    CouponType
+  scope                   CouponScope @default(ONE_TIME)
+  percentOff              Decimal?    @map("percent_off") @db.Decimal(5, 2)
+  amountOff               Decimal?    @map("amount_off") @db.Decimal(10, 2)
+  currency                String?     @db.Char(3)
+  trialExtensionDays      Int?        @map("trial_extension_days")
+  maxRedemptions          Int?        @map("max_redemptions")
+  maxRedemptionsPerTenant Int         @default(1) @map("max_redemptions_per_tenant")
+  timesRedeemed           Int         @default(0) @map("times_redeemed")
+  expiresAt               DateTime?   @map("expires_at")
+  isActive                Boolean     @default(true) @map("is_active")
+  createdAt               DateTime    @default(now()) @map("created_at")
+  updatedAt               DateTime    @updatedAt @map("updated_at")
+
+  redemptions   CouponRedemption[]
+  subscriptions Subscription[]
+  invoices      Invoice[]
+
+  @@map("coupons")
+}
+
+/// One row per tenant-redemption — enforces `maxRedemptionsPerTenant`
+/// (usually 1) independently of the coupon's global `maxRedemptions`.
+model CouponRedemption {
+  id         String   @id @default(uuid()) @db.Uuid
+  couponId   String   @map("coupon_id") @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  redeemedAt DateTime @default(now()) @map("redeemed_at")
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("coupon_redemptions")
+}
+
+/// Platform-wide gateway configuration/toggle — NOT per-tenant. All tenants
+/// pay FitCloud through whichever gateways are enabled here; a tenant never
+/// brings their own gateway account. `config` holds non-secret routing
+/// details only (secrets belong in env/secret-manager, never this table).
+model PaymentGateway {
+  id        String                 @id @default(uuid()) @db.Uuid
+  provider  PaymentGatewayProvider @unique
+  isEnabled Boolean                @default(true) @map("is_enabled")
+  config    Json                   @default("{}")
+  createdAt DateTime               @default(now()) @map("created_at")
+  updatedAt DateTime               @updatedAt @map("updated_at")
+
+  @@map("payment_gateways")
+}
+
+/// A tenant's saved, tokenized payment method (card/UPI/etc.) — only the
+/// gateway's own token + display metadata are stored, never raw card data.
+model PaymentMethod {
+  id                String                 @id @default(uuid()) @db.Uuid
+  tenantId          String                 @map("tenant_id") @db.Uuid
+  provider          PaymentGatewayProvider
+  gatewayCustomerId String?                @map("gateway_customer_id")
+  gatewayMethodId   String                 @map("gateway_method_id")
+  brand             String?                @db.VarChar(30)
+  last4             String?                @db.VarChar(4)
+  expiryMonth       Int?                   @map("expiry_month")
+  expiryYear        Int?                   @map("expiry_year")
+  isDefault         Boolean                @default(false) @map("is_default")
+  createdAt         DateTime               @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("payment_methods")
+}
+
+/// One logical charge attempt. `idempotencyKey` is supplied by the caller
+/// (checkout/renewal job) so a retried request can never double-charge —
+/// the unique constraint makes a duplicate insert fail closed, not silently
+/// succeed twice.
+model Payment {
+  id               String                 @id @default(uuid()) @db.Uuid
+  tenantId         String                 @map("tenant_id") @db.Uuid
+  subscriptionId   String?                @map("subscription_id") @db.Uuid
+  invoiceId        String?                @unique @map("invoice_id") @db.Uuid
+  provider         PaymentGatewayProvider
+  status           PaymentStatus          @default(PENDING)
+  amount           Decimal                @db.Decimal(10, 2)
+  currency         String                 @db.Char(3)
+  idempotencyKey   String                 @unique @map("idempotency_key")
+  gatewayReference String?                @map("gateway_reference")
+  failureReason    String?                @map("failure_reason")
+  /// Non-sensitive gateway metadata only (card brand/last4 already live on
+  /// PaymentMethod) — encrypted at rest via the column-level pgcrypto
+  /// convention documented in docs/architecture/ARCHITECTURE.md §9, not
+  /// re-derived here since this environment has no real gateway secrets.
+  metadata         Json                   @default("{}")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription?        @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  invoice      Invoice?             @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  transactions PaymentTransaction[]
+
+  @@index([tenantId, createdAt])
+  @@map("payments")
+}
+
+/// Raw gateway event log backing a Payment — every webhook delivery and
+/// gateway API response, kept verbatim for reconciliation/dispute evidence,
+/// independent of whatever `Payment.status` was derived from it.
+model PaymentTransaction {
+  id             String                 @id @default(uuid()) @db.Uuid
+  paymentId      String                 @map("payment_id") @db.Uuid
+  provider       PaymentGatewayProvider
+  eventType      String                 @map("event_type") @db.VarChar(60)
+  rawPayload     Json                   @map("raw_payload")
+  signatureValid Boolean                @map("signature_valid")
+  processedAt    DateTime?              @map("processed_at")
+  createdAt      DateTime               @default(now()) @map("created_at")
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+  @@map("payment_transactions")
+}
+
+/// A billable document — one per checkout/renewal charge. `subtotal -
+/// discountAmount + taxAmount = total`; `items` gives the line-level
+/// breakdown (plan charge, proration, etc.).
+model Invoice {
+  id             String        @id @default(uuid()) @db.Uuid
+  tenantId       String        @map("tenant_id") @db.Uuid
+  subscriptionId String?       @map("subscription_id") @db.Uuid
+  couponId       String?       @map("coupon_id") @db.Uuid
+  invoiceNumber  String        @unique @map("invoice_number") @db.VarChar(40)
+  status         InvoiceStatus @default(OPEN)
+  subtotal       Decimal       @db.Decimal(10, 2)
+  taxAmount      Decimal       @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  total          Decimal       @db.Decimal(10, 2)
+  currency       String        @db.Char(3)
+  dueDate        DateTime?     @map("due_date")
+  paidAt         DateTime?     @map("paid_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  coupon       Coupon?       @relation(fields: [couponId], references: [id], onDelete: SetNull)
+  items        InvoiceItem[]
+  payment      Payment?
+
+  @@index([tenantId, createdAt])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  invoiceId   String   @map("invoice_id") @db.Uuid
+  description String   @db.VarChar(200)
+  quantity    Int      @default(1)
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(10, 2)
+  amount      Decimal  @db.Decimal(10, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@map("invoice_items")
+}
+
+// ── Platform: Super Admin portal (Prompt 9) ────────────────────────────────
+//
+// A completely separate authority plane from tenant users — its own
+// identity table, its own RBAC catalog, its own JWT audience (see
+// core/security/admin-jwt.service.ts). None of these tables carry RLS:
+// there is no "tenant" to isolate by here, only a single internal SaaS-
+// operator organization. Cross-tenant reads elsewhere in this schema (e.g.
+// `Tenant`, `Subscription`) are exactly what this portal exists to query.
+
+enum AdminUserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+
+  @@map("admin_user_status")
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+
+  @@map("ticket_status")
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+
+  @@map("ticket_priority")
+}
+
+enum AnnouncementAudience {
+  ALL
+  TRIAL
+  ACTIVE
+  SPECIFIC
+
+  @@map("announcement_audience")
+}
+
+enum NotificationChannel {
+  EMAIL
+  PUSH
+  IN_APP
+
+  @@map("notification_channel")
+}
+
+enum CmsPageType {
+  LANDING
+  BLOG
+  FAQ
+  TESTIMONIAL
+  TERMS
+  PRIVACY
+  COOKIE
+
+  @@map("cms_page_type")
+}
+
+/// SUPER_ADMIN/SUPPORT_ADMIN/FINANCE_ADMIN/CONTENT_ADMIN/TECHNICAL_ADMIN are
+/// seeded system roles; anything else created from the portal is a custom role.
+model AdminRole {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique @db.VarChar(60)
+  description String?
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  rolePermissions AdminRolePermission[]
+  adminUsers      AdminUser[]
+
+  @@map("admin_roles")
+}
+
+/// Global permission catalog for the admin portal ("resource:action" keys) —
+/// deliberately a separate catalog from the tenant `permissions` table, since
+/// "tenants:manage" here means something an ordinary gym Owner must never hold.
+model AdminPermission {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique @db.VarChar(80)
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  rolePermissions AdminRolePermission[]
+
+  @@map("admin_permissions")
+}
+
+model AdminRolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       AdminRole       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission AdminPermission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("admin_role_permissions")
+}
+
+/// A SaaS-operator staff account — completely distinct from tenant `User`.
+model AdminUser {
+  id                  String          @id @default(uuid()) @db.Uuid
+  roleId              String          @map("role_id") @db.Uuid
+  name                String          @db.VarChar(120)
+  email               String          @unique @db.VarChar(255)
+  passwordHash        String          @map("password_hash")
+  status              AdminUserStatus @default(ACTIVE)
+  mfaEnabled          Boolean         @default(false) @map("mfa_enabled")
+  mfaSecret           String?         @map("mfa_secret")
+  failedLoginAttempts Int             @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime?       @map("locked_until")
+  lastLoginAt         DateTime?       @map("last_login_at")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+  deletedAt           DateTime?       @map("deleted_at")
+
+  role            AdminRole           @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  refreshTokens   AdminRefreshToken[]
+  auditLogs       AdminAuditLog[]
+  assignedTickets SupportTicket[]     @relation("TicketAssignee")
+  ticketNotes     SupportTicketNote[]
+
+  @@map("admin_users")
+}
+
+/// Mirrors the tenant `RefreshToken` rotation/reuse-detection design, scoped
+/// to admin sessions and signed under a different JWT audience entirely.
+model AdminRefreshToken {
+  id                  String    @id @default(uuid()) @db.Uuid
+  adminUserId         String    @map("admin_user_id") @db.Uuid
+  tokenHash           String    @unique @map("token_hash")
+  family              String    @db.Uuid
+  userAgent           String?   @map("user_agent")
+  ipAddress           String?   @map("ip_address")
+  expiresAt           DateTime  @map("expires_at")
+  revokedAt           DateTime? @map("revoked_at")
+  replacedByTokenHash String?   @map("replaced_by_token_hash")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+  @@index([family])
+  @@map("admin_refresh_tokens")
+}
+
+/// Admin-portal audit trail — login/logout, tenant changes, subscription/
+/// payment changes, system settings changes, admin activity. Separate from
+/// the tenant `audit_logs` table (different actor identity: AdminUser, not
+/// tenant User).
+model AdminAuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  adminUserId String?  @map("admin_user_id") @db.Uuid
+  actorRole   String?  @map("actor_role") @db.VarChar(60)
+  action      String   @db.VarChar(80)
+  entityType  String?  @map("entity_type") @db.VarChar(60)
+  entityId    String?  @map("entity_id")
+  before      Json?
+  after       Json?
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([action])
+  @@map("admin_audit_logs")
+}
+
+/// Key-value system configuration (SMTP, SMS gateway, payment gateway keys,
+/// storage provider, Cloudflare/AWS/Redis/queue settings, maintenance mode).
+/// `value` is `Json` so heterogeneous config shapes share one table instead
+/// of a column-per-setting migration every time a new integration is added.
+model SystemSetting {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique @db.VarChar(100)
+  category  String   @db.VarChar(60)
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
+}
+
+/// Global module toggles (Attendance, Workout, Diet, Reports, Analytics,
+/// Chat, Inventory, POS, White Label, Custom Domain, + future-ready Video
+/// Training/AI Coach/Marketplace) — distinct from per-tenant `TenantModule`
+/// (which reflects what a tenant's PLAN grants); this is a platform-wide
+/// kill switch above that, e.g. to disable a module while it's unstable.
+model FeatureFlag {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique @db.VarChar(60)
+  label     String   @db.VarChar(120)
+  category  String?  @db.VarChar(60)
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("feature_flags")
+}
+
+/// Landing page content, blogs, FAQs, testimonials, and legal pages — one
+/// table, `type` distinguishes them; `content` is `Json` (rich structured
+/// content) rather than a single text blob so the CMS can evolve per type.
+model CmsPage {
+  id          String      @id @default(uuid()) @db.Uuid
+  slug        String      @unique @db.VarChar(160)
+  type        CmsPageType
+  title       String      @db.VarChar(200)
+  content     Json
+  isPublished Boolean     @default(false) @map("is_published")
+  publishedAt DateTime?   @map("published_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  @@map("cms_pages")
+}
+
+/// `tenantId` is nullable — a ticket can come from a prospective customer
+/// (marketing site contact form) with no tenant yet, not only existing gyms.
+model SupportTicket {
+  id              String         @id @default(uuid()) @db.Uuid
+  tenantId        String?        @map("tenant_id") @db.Uuid
+  subject         String         @db.VarChar(200)
+  description     String
+  status          TicketStatus   @default(OPEN)
+  priority        TicketPriority @default(MEDIUM)
+  assignedAdminId String?        @map("assigned_admin_id") @db.Uuid
+  createdByEmail  String         @map("created_by_email") @db.VarChar(255)
+  createdByName   String?        @map("created_by_name") @db.VarChar(120)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  closedAt        DateTime?      @map("closed_at")
+
+  tenant        Tenant?             @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  assignedAdmin AdminUser?          @relation("TicketAssignee", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  notes         SupportTicketNote[]
+
+  @@index([status, priority])
+  @@index([tenantId])
+  @@map("support_tickets")
+}
+
+/// `isInternal = true` notes are staff-only (never shown to the tenant) —
+/// the ticket detail view's equivalent of a private comment thread.
+model SupportTicketNote {
+  id            String   @id @default(uuid()) @db.Uuid
+  ticketId      String   @map("ticket_id") @db.Uuid
+  authorAdminId String   @map("author_admin_id") @db.Uuid
+  note          String
+  isInternal    Boolean  @default(true) @map("is_internal")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  ticket      SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorAdmin AdminUser     @relation(fields: [authorAdminId], references: [id], onDelete: Restrict)
+
+  @@map("support_ticket_notes")
+}
+
+/// A one-way broadcast banner shown inside every tenant portal (not a
+/// per-recipient inbox — see `Notification` for that).
+model Announcement {
+  id          String               @id @default(uuid()) @db.Uuid
+  title       String               @db.VarChar(200)
+  body        String
+  audience    AnnouncementAudience @default(ALL)
+  isActive    Boolean              @default(true) @map("is_active")
+  publishedAt DateTime?            @map("published_at")
+  expiresAt   DateTime?            @map("expires_at")
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+
+  @@map("announcements")
+}
+
+/// A scheduled/sent global message — email, push, or in-app — distinct from
+/// `Announcement`'s persistent banner: this is a one-time dispatch tracked
+/// through `scheduledAt`/`sentAt`, queued the same way onboarding/billing
+/// emails are (see infrastructure/queue).
+model Notification {
+  id          String               @id @default(uuid()) @db.Uuid
+  title       String               @db.VarChar(200)
+  body        String
+  channel     NotificationChannel  @default(EMAIL)
+  audience    AnnouncementAudience @default(ALL)
+  scheduledAt DateTime?            @map("scheduled_at")
+  sentAt      DateTime?            @map("sent_at")
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
+
+model Country {
+  id       String  @id @default(uuid()) @db.Uuid
+  code     String  @unique @db.VarChar(2)
+  name     String  @db.VarChar(100)
+  isActive Boolean @default(true) @map("is_active")
+
+  @@map("countries")
+}
+
+model Currency {
+  id       String  @id @default(uuid()) @db.Uuid
+  code     String  @unique @db.VarChar(3)
+  name     String  @db.VarChar(60)
+  symbol   String  @db.VarChar(8)
+  isActive Boolean @default(true) @map("is_active")
+
+  @@map("currencies")
+}
+
+/// Admin-managed template CATALOG — subject/body/variables are editable
+/// from the portal. NOTE (scope boundary, documented not hidden): the actual
+/// send paths built in Prompts 5/7/8 (auth-templates.ts, onboarding-
+/// templates.ts, billing-templates.ts) still use their own hardcoded TS
+/// template functions; wiring every existing send call site to fetch from
+/// this table instead is a follow-up, not done here. This table lets the
+/// portal manage template CONTENT today without that larger rewire.
+model EmailTemplate {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique @db.VarChar(80)
+  subject   String   @db.VarChar(200)
+  bodyHtml  String   @map("body_html")
+  variables Json     @default("[]")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("email_templates")
+}
+
+model SmsTemplate {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique @db.VarChar(80)
+  body      String
+  variables Json     @default("[]")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("sms_templates")
+}
+
+// ── Platform: Tenant Portal foundation (Prompt 10) ─────────────────────────
+
+enum TenantNotificationCategory {
+  ANNOUNCEMENT
+  SYSTEM
+  SUBSCRIPTION
+  GENERAL
+
+  @@map("tenant_notification_category")
+}
+
+/// The Notification Center's data source — one row per item a tenant's
+/// staff sees (unread/read tracked here, at the TENANT level rather than
+/// per-user, since a shared front-desk login is common for gyms; this is a
+/// deliberate v1 simplification, not an oversight). Populated by:
+///   • admin broadcast Notifications fanning out to matching tenants
+///     (see admin-notifications module's `send()`)
+///   • subscription lifecycle events (trial ending, payment failed/
+///     succeeded, grace period, expired) — written alongside the existing
+///     billing emails, not replacing them
+/// `sourceNotificationId` links back to the admin `Notification` row when
+/// this was a broadcast, for traceability; null for system-generated ones.
+model TenantNotification {
+  id                   String                     @id @default(uuid()) @db.Uuid
+  tenantId             String                     @map("tenant_id") @db.Uuid
+  category             TenantNotificationCategory @default(GENERAL)
+  title                String                     @db.VarChar(200)
+  body                 String
+  sourceNotificationId String?                    @map("source_notification_id") @db.Uuid
+  readAt               DateTime?                  @map("read_at")
+  createdAt            DateTime                   @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("tenant_notifications")
 }
