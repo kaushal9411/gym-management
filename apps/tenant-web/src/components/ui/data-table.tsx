@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 
 export interface DataTableColumn<T> {
   key: string;
-  header: string;
+  header: React.ReactNode;
   render: (row: T) => React.ReactNode;
   className?: string;
 }

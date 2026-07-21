@@ -19,6 +19,7 @@ import { adminTicketRouter } from '../../modules/admin-support/routes/admin-tick
 import { adminTemplateRouter } from '../../modules/admin-templates/routes/admin-template.routes';
 import { adminTenantRouter } from '../../modules/admin-tenants/routes/admin-tenant.routes';
 import { announcementRouter } from '../../modules/announcements/routes/announcement.routes';
+import { attendanceRouter } from '../../modules/attendance/routes/attendance.routes';
 import { auditLogRouter } from '../../modules/audit-logs/routes/audit-log.routes';
 import { authRouter } from '../../modules/authentication/routes/auth.routes';
 import { billingRouter } from '../../modules/billing/routes/billing.routes';
@@ -27,12 +28,16 @@ import { contactRouter } from '../../modules/contact/routes/contact.routes';
 import { couponRouter } from '../../modules/coupon/routes/coupon.routes';
 import { invitationRouter } from '../../modules/invitations/routes/invitation.routes';
 import { invoiceRouter } from '../../modules/invoice/routes/invoice.routes';
+import { memberRouter } from '../../modules/members/routes/member.routes';
+import { membershipPlanRouter } from '../../modules/members/routes/membership-plan.routes';
 import { onboardingRouter } from '../../modules/onboarding/routes/onboarding.routes';
 import { paymentRouter } from '../../modules/payment/routes/payment.routes';
 import { permissionRouter } from '../../modules/permissions/routes/permission.routes';
 import { profileRouter } from '../../modules/profile/routes/profile.routes';
 import { roleRouter } from '../../modules/roles/routes/role.routes';
 import { sessionRouter } from '../../modules/sessions/routes/session.routes';
+import { settingsRouter } from '../../modules/settings/routes/settings.routes';
+import { staffRouter } from '../../modules/staff/routes/staff.routes';
 import { subscriptionRouter } from '../../modules/subscription/routes/subscription.routes';
 import { tenantNotificationRouter } from '../../modules/tenant-notifications/routes/tenant-notification.routes';
 import { tenantService } from '../../modules/tenants/service/tenant.service';
@@ -76,6 +81,11 @@ v1Router.use('/invitations', invitationRouter);
 v1Router.use('/sessions', sessionRouter);
 v1Router.use('/profile', profileRouter);
 v1Router.use('/audit-logs', auditLogRouter);
+v1Router.use('/settings', settingsRouter);
+v1Router.use('/staff', staffRouter);
+v1Router.use('/members', memberRouter);
+v1Router.use('/membership-plans', membershipPlanRouter);
+v1Router.use('/attendance', attendanceRouter);
 // Platform-plane (no tenant check — mounted under /public, see PLATFORM_ROUTE_PREFIXES).
 v1Router.use('/public/contact', contactRouter);
 

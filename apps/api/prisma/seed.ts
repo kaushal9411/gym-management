@@ -10,14 +10,14 @@
  * Idempotent — safe to re-run (upsert throughout).
  */
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
+import bcrypt from '@node-rs/bcrypt';
 
 const prisma = new PrismaClient();
 
 // The seed script's own tsconfig scopes `rootDir` to `prisma/`, so it can't
 // import from `src/core/security/password.service.ts` — hashing is inlined
-// here instead, using the same bcryptjs + cost factor the app itself uses.
-const BCRYPT_SALT_ROUNDS = 12;
+// here instead, using the same @node-rs/bcrypt + cost factor the app itself uses.
+const BCRYPT_SALT_ROUNDS = 10;
 async function hashPassword(plain: string): Promise<string> {
   return bcrypt.hash(plain, BCRYPT_SALT_ROUNDS);
 }
@@ -61,9 +61,58 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   // Communication & self-service
   { key: 'notifications:manage', description: 'Manage notification templates and campaigns' },
   { key: 'chat:use', description: 'Send and receive chat messages' },
+  { key: 'settings:read', description: "View the gym's profile, branding, business and invoice settings" },
   { key: 'settings:manage', description: 'Manage branding, timezone, currency, tax settings' },
   { key: 'profile:read', description: "Read one's own profile" },
   { key: 'profile:update', description: "Update one's own profile" },
+
+  // Staff Management (Prompt 13) — Manager/Trainer/Receptionist only, distinct
+  // from the generic `users:*` IAM keys which cover every account type.
+  { key: 'staff:view', description: 'View the staff list and staff profiles' },
+  { key: 'staff:create', description: 'Add a new staff member' },
+  { key: 'staff:update', description: "Edit a staff member's profile/employment info, or trigger a password reset" },
+  { key: 'staff:delete', description: 'Soft-delete a staff member' },
+  { key: 'staff:restore', description: 'Restore a soft-deleted staff member' },
+  { key: 'staff:activate', description: 'Activate, deactivate, or suspend a staff account' },
+  { key: 'staff:invite', description: 'Send or resend a staff activation invitation' },
+  { key: 'staff:assign-branch', description: "Manage a staff member's branch assignments" },
+  { key: 'staff:assign-role', description: "Change a staff member's role" },
+
+  // Member Management (Prompt 14) — granular keys distinct from the
+  // pre-existing `members:read`/`members:manage` speculative catalog entries.
+  { key: 'members:view', description: 'View the member list and member profiles' },
+  { key: 'members:create', description: 'Add a new member' },
+  { key: 'members:update', description: "Edit a member's profile, address, or medical info" },
+  { key: 'members:delete', description: 'Soft-delete a member' },
+  { key: 'members:restore', description: 'Restore a soft-deleted member' },
+  { key: 'members:import', description: 'Bulk-import members from CSV' },
+  { key: 'members:export', description: 'Export the member list as CSV' },
+  { key: 'members:assign-trainer', description: "Assign or change a member's trainer" },
+  { key: 'members:assign-membership', description: "Assign, renew, upgrade, freeze, or unfreeze a member's membership" },
+
+  // Membership Plans (Prompt 15) — the plan catalog itself, distinct from
+  // `members:assign-membership` (acting on ONE member's subscription) and
+  // from the pre-existing speculative `memberships:manage` catalog entry.
+  { key: 'memberships:view', description: 'View the membership plan catalog' },
+  { key: 'memberships:create', description: 'Create a membership plan' },
+  { key: 'memberships:update', description: 'Edit, duplicate, activate, or deactivate a membership plan' },
+  { key: 'memberships:delete', description: 'Soft-delete a membership plan' },
+  { key: 'memberships:restore', description: 'Restore a soft-deleted membership plan' },
+  { key: 'memberships:assign', description: "Assign a membership plan to a member" },
+  { key: 'memberships:renew', description: "Renew or extend a member's membership" },
+  { key: 'memberships:upgrade', description: "Upgrade, downgrade, or cancel a member's membership" },
+  { key: 'memberships:freeze', description: "Freeze or resume a member's membership" },
+
+  // Attendance Management (Prompt 16) — granular keys distinct from the
+  // pre-existing speculative `attendance:create`/`attendance:read` catalog
+  // entries (left seeded but unused, same precedent as Membership Plans
+  // superseding the old blanket `memberships:manage`).
+  { key: 'attendance:view', description: "View attendance records, history, and the dashboard summary" },
+  { key: 'attendance:checkin', description: 'Check a member in (QR, manual, or a future device method)' },
+  { key: 'attendance:checkout', description: 'Check a member out' },
+  { key: 'attendance:update', description: 'Correct an attendance record (times, notes, status)' },
+  { key: 'attendance:delete', description: 'Soft-delete an attendance record' },
+  { key: 'attendance:export', description: 'Export attendance history as CSV/Excel' },
 ];
 
 const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
@@ -80,14 +129,25 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'trainers:manage', 'workout-plans:manage', 'diet-plans:manage',
     'payments:create', 'payments:read', 'payments:refund',
     'reports:read', 'reports:view-financial',
-    'notifications:manage', 'chat:use', 'settings:manage',
+    'notifications:manage', 'chat:use', 'settings:read', 'settings:manage',
     'billing:manage', 'billing:read',
+    'staff:view', 'staff:create', 'staff:update', 'staff:delete', 'staff:restore',
+    'staff:activate', 'staff:invite', 'staff:assign-branch', 'staff:assign-role',
+    'members:view', 'members:create', 'members:update', 'members:delete', 'members:restore',
+    'members:import', 'members:export', 'members:assign-trainer', 'members:assign-membership',
+    'memberships:view', 'memberships:create', 'memberships:update', 'memberships:delete', 'memberships:restore',
+    'memberships:assign', 'memberships:renew', 'memberships:upgrade', 'memberships:freeze',
+    'attendance:view', 'attendance:checkin', 'attendance:checkout', 'attendance:update', 'attendance:delete', 'attendance:export',
   ],
   TRAINER: [
     'members:read', 'attendance:create', 'attendance:read',
     'classes:read', 'bookings:read',
     'workout-plans:manage', 'diet-plans:manage', 'chat:use',
     'profile:read', 'profile:update',
+    'members:view',
+    'memberships:view',
+    // Trainers can check members in/out for sessions, but not correct/delete/export records.
+    'attendance:view', 'attendance:checkin', 'attendance:checkout',
   ],
   RECEPTIONIST: [
     'members:manage', 'members:read',
@@ -95,6 +155,14 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'memberships:manage', 'classes:read', 'bookings:create', 'bookings:read',
     'payments:create', 'payments:read', 'chat:use',
     'profile:read', 'profile:update',
+    'members:view', 'members:create', 'members:update', 'members:import', 'members:export',
+    'members:assign-membership',
+    // Front-desk operations only — plan CATALOG changes (create/update/delete/restore)
+    // stay a Manager decision, a deliberate tightening vs the old blanket `memberships:manage`.
+    'memberships:view', 'memberships:assign', 'memberships:renew', 'memberships:upgrade', 'memberships:freeze',
+    // Front-desk check-in/out + export, same tightening as above — record
+    // correction/deletion stays a Manager decision.
+    'attendance:view', 'attendance:checkin', 'attendance:checkout', 'attendance:export',
   ],
   MEMBER: ['profile:read', 'profile:update', 'bookings:create', 'bookings:read', 'payments:read', 'chat:use'],
 };

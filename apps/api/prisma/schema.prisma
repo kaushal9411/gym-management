@@ -172,6 +172,8 @@ model Tenant {
 
   settings            TenantSettings?
   branding            TenantBranding?
+  profile             TenantProfile?
+  invoiceSettings     TenantInvoiceSettings?
   limits              TenantLimit?
   users               User[]
   roles               Role[]
@@ -198,12 +200,26 @@ model Tenant {
   userPermissions     UserPermission[]
   userBranches        UserBranch[]
   userInvitations     UserInvitation[]
+  staffProfiles       StaffProfile[]
+  membershipPlans     MembershipPlan[]
+  members             Member[]
+  memberships         Membership[]
+  membershipFreezes   MembershipFreeze[]
+  memberDocuments     MemberDocument[]
+  attendances         Attendance[]
 
   @@map("tenants")
 }
 
 /// Per-tenant branding & preferences — drives email templates and the
 /// tenant-web portal theme (kept in lockstep with the frontend TenantBranding type).
+enum MeasurementUnit {
+  METRIC
+  IMPERIAL
+
+  @@map("measurement_unit")
+}
+
 model TenantSettings {
   id               String   @id @default(uuid()) @db.Uuid
   tenantId         String   @unique @map("tenant_id") @db.Uuid
@@ -214,8 +230,26 @@ model TenantSettings {
   locale           String   @default("en") @db.VarChar(10)
   emailFromName    String?  @map("email_from_name") @db.VarChar(120)
   emailFromAddress String?  @map("email_from_address") @db.VarChar(255)
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  /// Business Settings module (Prompt 12) — regional/display preferences.
+  /// Symbol is stored (not derived) so a tenant can override the default for
+  /// their currency code (e.g. "Fr" vs "CHF").
+  currencySymbol            String          @default("$") @map("currency_symbol") @db.VarChar(8)
+  dateFormat                String          @default("MM/DD/YYYY") @map("date_format") @db.VarChar(20)
+  timeFormat                String          @default("12h") @map("time_format") @db.VarChar(4)
+  /// 0 = Sunday .. 6 = Saturday.
+  weekStartDay              Int             @default(0) @map("week_start_day")
+  measurementUnit           MeasurementUnit @default(METRIC) @map("measurement_unit")
+  /// Notification Preferences (tenant-wide channel defaults — distinct from
+  /// each user's own notificationPreferences on the User model).
+  emailNotificationsEnabled Boolean         @default(true) @map("email_notifications_enabled")
+  pushNotificationsEnabled  Boolean         @default(true) @map("push_notifications_enabled")
+  /// SMS is configuration-only — no provider is wired up (matches the
+  /// no-op Pusher / sandboxed-gateway pattern elsewhere): this just
+  /// records intent + provider config for when a real SMS provider ships.
+  smsNotificationsEnabled   Boolean         @default(false) @map("sms_notifications_enabled")
+  smsProviderConfig         Json?           @map("sms_provider_config")
+  createdAt                 DateTime        @default(now()) @map("created_at")
+  updatedAt                 DateTime        @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -273,6 +307,10 @@ model User {
   userPermissions    UserPermission[]
   userBranches       UserBranch[]
   sentInvitations    UserInvitation[]    @relation("InvitationInviter")
+  staffProfile       StaffProfile?
+  trainerFor         Member[]            @relation("MemberTrainer")
+  attendanceCheckIns  Attendance[]       @relation("AttendanceCheckedInBy")
+  attendanceCheckOuts Attendance[]       @relation("AttendanceCheckedOutBy")
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
@@ -423,6 +461,405 @@ model UserInvitation {
   @@index([tenantId, status])
   @@index([tenantId, email])
   @@map("user_invitations")
+}
+
+/// Staff Management module (Prompt 13). Gender/employment fields for the
+/// three staff types (Manager/Trainer/Receptionist) — the gym Owner already
+/// exists via the OWNER role and never gets a StaffProfile row.
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  PREFER_NOT_TO_SAY
+
+  @@map("gender")
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  INTERN
+
+  @@map("employment_type")
+}
+
+enum SalaryType {
+  MONTHLY
+  HOURLY
+  DAILY
+  PER_SESSION
+
+  @@map("salary_type")
+}
+
+/// Day-to-day work state — distinct from `User.status` (account/login
+/// access). A staff member can be ACTIVE (can log in) but ON_LEAVE this week.
+enum WorkStatus {
+  WORKING
+  ON_LEAVE
+  NOTICE_PERIOD
+  TERMINATED
+
+  @@map("work_status")
+}
+
+/// 1:1 extension of `User` for staff-only fields — kept off the core User
+/// model (used by every account type incl. future Members) to avoid
+/// polluting it with employment data that doesn't apply tenant-wide.
+/// `firstName`/`lastName` are the structured form the Staff UI edits;
+/// `User.name` is kept as the derived "First Last" display string so every
+/// other part of the app (auth, sessions, notifications, audit) keeps
+/// working against the field it already expects.
+model StaffProfile {
+  id                      String         @id @default(uuid()) @db.Uuid
+  tenantId                String         @map("tenant_id") @db.Uuid
+  userId                  String         @unique @map("user_id") @db.Uuid
+  /// Auto-generated on create (e.g. "EMP-0007"), editable afterward.
+  employeeId              String         @map("employee_id") @db.VarChar(40)
+  firstName               String         @map("first_name") @db.VarChar(80)
+  lastName                String         @map("last_name") @db.VarChar(80)
+  gender                  Gender?
+  dateOfBirth             DateTime?      @map("date_of_birth") @db.Date
+  joiningDate             DateTime       @default(now()) @map("joining_date") @db.Date
+  addressLine             String?        @map("address_line") @db.VarChar(200)
+  city                    String?        @db.VarChar(100)
+  state                   String?        @db.VarChar(100)
+  country                 String?        @db.VarChar(100)
+  postalCode              String?        @map("postal_code") @db.VarChar(20)
+  notes                   String?
+  employmentType           EmploymentType @default(FULL_TIME) @map("employment_type")
+  salaryType               SalaryType     @default(MONTHLY) @map("salary_type")
+  salaryAmount             Decimal?       @map("salary_amount") @db.Decimal(12, 2)
+  shift                    String?        @db.VarChar(60)
+  /// Comma-separated weekday names, e.g. "SUNDAY" or "SUNDAY,MONDAY".
+  weeklyOff                String?        @map("weekly_off") @db.VarChar(60)
+  workStatus               WorkStatus     @default(WORKING) @map("work_status")
+  createdAt                DateTime       @default(now()) @map("created_at")
+  updatedAt                DateTime       @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, employeeId])
+  @@index([tenantId])
+  @@map("staff_profiles")
+}
+
+// ── Member Management (Prompt 14) ─────────────────────────────────────────
+//
+// A gym member is a standalone record — NOT a `User` row. Unlike staff, the
+// prompt for this module has no invitation/password/login flow, so members
+// don't get portal accounts here (the `MEMBER` system role + its permissions
+// already seeded in Prompt 5 stay reserved for a future member-facing portal
+// that would create real User rows at that time).
+
+enum BloodGroup {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+  UNKNOWN
+
+  @@map("blood_group")
+}
+
+/// Account-level gate on check-in — distinct from `MembershipStatus`, which
+/// tracks a specific membership period's lifecycle (a member can be ACTIVE
+/// here while their current membership is EXPIRED, e.g. between renewals).
+enum MemberStatus {
+  ACTIVE
+  INACTIVE
+  FROZEN
+
+  @@map("member_status")
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  /// Superseded by a renewal/upgrade — kept for Renewal History, not deleted.
+  SUPERSEDED
+
+  @@map("membership_status")
+}
+
+enum MemberDocumentType {
+  IDENTITY_PROOF
+  ADDRESS_PROOF
+  MEDICAL_CERTIFICATE
+  CONSENT_FORM
+  OTHER
+
+  @@map("member_document_type")
+}
+
+enum DurationType {
+  DAYS
+  WEEKS
+  MONTHS
+  YEARS
+
+  @@map("duration_type")
+}
+
+/// The gym's own membership catalog (e.g. "3-Month Cardio", "Annual Gold") —
+/// distinct from `SubscriptionPlan` (Prompt 7/8), which is FitCloud's plan
+/// catalog for billing the TENANT, not the tenant's own members.
+/// Prompt 15 (Membership Plans module) expanded this from the Prompt 14
+/// scaffold with pricing/feature/rule fields — `durationDays` stays as a
+/// derived display cache (recomputed from `durationValue`/`durationType` on
+/// every write via a fixed day-length approximation); actual start/end date
+/// math for a member's Membership always uses calendar-aware `addDuration()`
+/// against `durationValue`/`durationType` directly, not this cache.
+model MembershipPlan {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  name         String   @db.VarChar(120)
+  /// Auto-generated on create (e.g. "PLAN-0007"), editable afterward.
+  planCode     String   @map("plan_code") @db.VarChar(40)
+  description  String?
+  category     String?  @db.VarChar(60)
+  durationValue Int          @default(1) @map("duration_value")
+  durationType  DurationType @default(MONTHS) @map("duration_type")
+  /// Derived cache — see model doc comment above.
+  durationDays Int      @map("duration_days")
+  price        Decimal  @db.Decimal(10, 2)
+  joiningFee         Decimal @default(0) @map("joining_fee") @db.Decimal(10, 2)
+  taxPercentage      Decimal @default(0) @map("tax_percentage") @db.Decimal(5, 2)
+  discountPercentage Decimal @default(0) @map("discount_percentage") @db.Decimal(5, 2)
+  isActive     Boolean  @default(true) @map("is_active")
+  displayOrder Int      @default(0) @map("display_order")
+  notes        String?
+
+  // ── Plan Features ────────────────────────────────────────────────────
+  /// true = every branch (present + future); false = only `accessBranchIds`.
+  gymAccessAllBranches     Boolean @default(true) @map("gym_access_all_branches")
+  /// JSON array of branch ids, only meaningful when `gymAccessAllBranches` is false.
+  accessBranchIds          Json?   @map("access_branch_ids")
+  ptSessionsIncluded       Int     @default(0) @map("pt_sessions_included")
+  groupClassesIncluded     Int     @default(0) @map("group_classes_included")
+  dietConsultationIncluded Boolean @default(false) @map("diet_consultation_included")
+  lockerAccess             Boolean @default(false) @map("locker_access")
+  guestPasses              Int     @default(0) @map("guest_passes")
+  freezeAllowed            Boolean @default(true) @map("freeze_allowed")
+  /// null = no cap on total freeze days while `freezeAllowed`.
+  freezeDaysLimit          Int?    @map("freeze_days_limit")
+
+  // ── Membership Rules ─────────────────────────────────────────────────
+  /// Window during which this plan itself may be purchased/assigned — null
+  /// on either side means no restriction. Distinct from a Membership's own
+  /// start/end dates (this gates the PLAN, not a specific member's period).
+  validityStart       DateTime? @map("validity_start") @db.Date
+  validityEnd         DateTime? @map("validity_end") @db.Date
+  gracePeriodDays     Int       @default(0) @map("grace_period_days")
+  /// Days before expiry a renewal is allowed; 0 = anytime.
+  renewalWindowDays   Int       @default(0) @map("renewal_window_days")
+  autoRenewalAllowed  Boolean   @default(true) @map("auto_renewal_allowed")
+  minAge              Int?      @map("min_age")
+  maxAge              Int?      @map("max_age")
+
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberships  Membership[]
+
+  @@unique([tenantId, planCode])
+  @@index([tenantId])
+  @@index([tenantId, displayOrder])
+  @@map("membership_plans")
+}
+
+model Member {
+  id                       String       @id @default(uuid()) @db.Uuid
+  tenantId                 String       @map("tenant_id") @db.Uuid
+  /// Auto-generated on create (e.g. "MEM-0007"), editable afterward.
+  memberId                 String       @map("member_id") @db.VarChar(40)
+  firstName                String       @map("first_name") @db.VarChar(80)
+  lastName                 String       @map("last_name") @db.VarChar(80)
+  profilePhotoUrl          String?      @map("profile_photo_url")
+  email                    String?      @db.VarChar(255)
+  phone                    String?      @db.VarChar(20)
+  gender                   Gender?
+  dateOfBirth              DateTime?    @map("date_of_birth") @db.Date
+  bloodGroup               BloodGroup?  @map("blood_group")
+  /// Centimeters / kilograms.
+  height                   Decimal?     @db.Decimal(5, 2)
+  weight                   Decimal?     @db.Decimal(5, 2)
+  occupation               String?      @db.VarChar(120)
+  addressLine              String?      @map("address_line") @db.VarChar(200)
+  city                     String?      @db.VarChar(100)
+  state                    String?      @db.VarChar(100)
+  country                  String?      @db.VarChar(100)
+  postalCode               String?      @map("postal_code") @db.VarChar(20)
+  emergencyContactName     String?      @map("emergency_contact_name") @db.VarChar(120)
+  emergencyContactPhone    String?      @map("emergency_contact_phone") @db.VarChar(20)
+  emergencyContactRelation String?      @map("emergency_contact_relation") @db.VarChar(60)
+  medicalConditions        String?      @map("medical_conditions")
+  allergies                String?
+  fitnessGoals             String?      @map("fitness_goals")
+  joiningDate              DateTime     @default(now()) @map("joining_date") @db.Date
+  branchId                 String       @map("branch_id") @db.Uuid
+  /// The assigned trainer is a staff User holding the TRAINER role — optional.
+  trainerId                String?      @map("trainer_id") @db.Uuid
+  status                   MemberStatus @default(ACTIVE)
+  notes                    String?
+  /// Opaque token encoded into the QR — attendance check-in (future module)
+  /// looks members up by this, never by the human-editable memberId.
+  qrCodeToken              String       @unique @map("qr_code_token")
+  qrCodeImageUrl           String?      @map("qr_code_image_url")
+  createdAt                DateTime     @default(now()) @map("created_at")
+  updatedAt                DateTime     @updatedAt @map("updated_at")
+  deletedAt                DateTime?    @map("deleted_at")
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch      Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  trainer     User?              @relation("MemberTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+  memberships Membership[]
+  freezes     MembershipFreeze[]
+  documents   MemberDocument[]
+  attendances Attendance[]
+
+  @@unique([tenantId, memberId])
+  @@index([tenantId, status])
+  @@index([tenantId, branchId])
+  @@map("members")
+}
+
+/// One row per membership period — renewals/upgrades create a NEW row
+/// (the old one flips to SUPERSEDED) so Renewal History is just this
+/// member's rows ordered by `createdAt`, no separate history table needed.
+model Membership {
+  id                String            @id @default(uuid()) @db.Uuid
+  tenantId          String            @map("tenant_id") @db.Uuid
+  memberId          String            @map("member_id") @db.Uuid
+  planId            String            @map("plan_id") @db.Uuid
+  startDate         DateTime          @map("start_date") @db.Date
+  endDate           DateTime          @map("end_date") @db.Date
+  /// Snapshot from the plan at assignment time — later plan edits don't
+  /// retroactively change a membership someone already bought.
+  durationDays      Int               @map("duration_days")
+  priceAtAssignment Decimal           @map("price_at_assignment") @db.Decimal(10, 2)
+  status            MembershipStatus  @default(ACTIVE)
+  autoRenew         Boolean           @default(false) @map("auto_renew")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member Member         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  plan   MembershipPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  freezes MembershipFreeze[]
+
+  @@index([tenantId, memberId])
+  @@index([tenantId, status])
+  @@map("memberships")
+}
+
+/// Freeze History — `unfrozenAt = null` means still frozen.
+model MembershipFreeze {
+  id           String      @id @default(uuid()) @db.Uuid
+  tenantId     String      @map("tenant_id") @db.Uuid
+  memberId     String      @map("member_id") @db.Uuid
+  membershipId String?     @map("membership_id") @db.Uuid
+  reason       String?
+  frozenAt     DateTime    @default(now()) @map("frozen_at")
+  unfrozenAt   DateTime?   @map("unfrozen_at")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member     Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  membership Membership? @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, memberId])
+  @@map("membership_freezes")
+}
+
+/// Uploaded documents — same no-object-storage, inline data-URL pattern as
+/// staff/avatar uploads elsewhere in this schema (see docs/BACKEND-GUIDE.md).
+model MemberDocument {
+  id          String             @id @default(uuid()) @db.Uuid
+  tenantId    String             @map("tenant_id") @db.Uuid
+  memberId    String             @map("member_id") @db.Uuid
+  type        MemberDocumentType
+  fileName    String             @map("file_name") @db.VarChar(200)
+  fileDataUrl String             @map("file_data_url")
+  uploadedAt  DateTime           @default(now()) @map("uploaded_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, memberId])
+  @@map("member_documents")
+}
+
+/// QR_CODE and MANUAL are the only methods wired up today; the device-based
+/// entries exist so a future biometric/face/NFC/RFID reader integration is
+/// purely additive (new enum value + a device-side caller), no schema or API
+/// reshape — `deviceName`/`deviceId` on `Attendance` are already generic
+/// enough to describe any of them.
+enum AttendanceMethod {
+  QR_CODE
+  MANUAL
+  BIOMETRIC
+  FACE_RECOGNITION
+  NFC
+  RFID
+
+  @@map("attendance_method")
+}
+
+enum AttendanceStatus {
+  CHECKED_IN
+  CHECKED_OUT
+
+  @@map("attendance_status")
+}
+
+/// One row per visit. `checkOutTime = null` means the member is still
+/// inside — a hand-written partial unique index (see the RLS migration)
+/// guarantees at most one open row per member at the DB level, not just in
+/// the service. `attendanceDate` is the check-in's calendar date in the
+/// BRANCH's own timezone (`Branch.timezone`), computed once at write time so
+/// history/summary queries can filter and group on a plain indexed column
+/// instead of re-deriving it per row.
+model Attendance {
+  id             String           @id @default(uuid()) @db.Uuid
+  tenantId       String           @map("tenant_id") @db.Uuid
+  memberId       String           @map("member_id") @db.Uuid
+  branchId       String           @map("branch_id") @db.Uuid
+  checkInTime    DateTime         @map("check_in_time")
+  checkOutTime   DateTime?        @map("check_out_time")
+  attendanceDate DateTime         @map("attendance_date") @db.Date
+  method         AttendanceMethod @default(MANUAL)
+  deviceName     String?          @map("device_name") @db.VarChar(120)
+  deviceId       String?          @map("device_id") @db.VarChar(120)
+  status         AttendanceStatus @default(CHECKED_IN)
+  notes          String?
+  /// Staff user who performed a MANUAL check-in/out; null for member
+  /// self-service methods (QR/biometric/etc).
+  checkedInBy  String?   @map("checked_in_by") @db.Uuid
+  checkedOutBy String?   @map("checked_out_by") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  tenant           Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member           Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  branch           Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  checkedInByUser  User?  @relation("AttendanceCheckedInBy", fields: [checkedInBy], references: [id], onDelete: SetNull)
+  checkedOutByUser User?  @relation("AttendanceCheckedOutBy", fields: [checkedOutBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, memberId])
+  @@index([tenantId, branchId])
+  @@index([tenantId, attendanceDate])
+  @@map("attendance_records")
 }
 
 // ── Sessions & tokens ─────────────────────────────────────────────────────
@@ -694,6 +1131,14 @@ model TenantDomain {
 
 /// Visual identity — split out from TenantSettings so branding can evolve
 /// (logo uploads, custom CSS) independently of operational settings.
+enum ThemePreference {
+  LIGHT
+  DARK
+  SYSTEM
+
+  @@map("theme_preference")
+}
+
 model TenantBranding {
   id                String   @id @default(uuid()) @db.Uuid
   tenantId          String   @unique @map("tenant_id") @db.Uuid
@@ -707,12 +1152,73 @@ model TenantBranding {
   secondaryColor    String?  @map("secondary_color")
   welcomeMessage    String?  @map("welcome_message")
   customCss         String?  @map("custom_css")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  /// Branding module (Prompt 12) additions. `theme` is the tenant's stored
+  /// preference, not yet wired as the ThemeProvider default (that mirror
+  /// lives client-side via next-themes per-browser) — recorded here so the
+  /// setting persists and a future prompt can apply it as the initial value.
+  theme              ThemePreference @default(SYSTEM)
+  loginBackgroundUrl String?         @map("login_background_url")
+  dashboardBannerUrl String?         @map("dashboard_banner_url")
+  emailLogoUrl       String?         @map("email_logo_url")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_branding")
+}
+
+/// Gym Profile, Branding & Business Settings module (Prompt 12) — the
+/// gym's own business identity (legal/tax info, contact, address, hours,
+/// social links). Distinct from `BillingAddress` (Prompt 8), which is the
+/// address FitCloud bills the TENANT at, not the gym's own public address.
+model TenantProfile {
+  id                   String   @id @default(uuid()) @db.Uuid
+  tenantId             String   @unique @map("tenant_id") @db.Uuid
+  legalBusinessName    String?  @map("legal_business_name") @db.VarChar(160)
+  registrationNumber   String?  @map("registration_number") @db.VarChar(60)
+  gstVatNumber         String?  @map("gst_vat_number") @db.VarChar(40)
+  businessType         String?  @map("business_type") @db.VarChar(60)
+  description          String?
+  email                String?  @db.VarChar(255)
+  phone                String?  @db.VarChar(20)
+  alternatePhone       String?  @map("alternate_phone") @db.VarChar(20)
+  website              String?  @db.VarChar(255)
+  addressLine          String?  @map("address_line") @db.VarChar(200)
+  city                 String?  @db.VarChar(100)
+  state                String?  @db.VarChar(100)
+  country              String?  @db.VarChar(100)
+  postalCode           String?  @map("postal_code") @db.VarChar(20)
+  latitude             Decimal? @db.Decimal(9, 6)
+  longitude            Decimal? @db.Decimal(9, 6)
+  /// { monday: { open, close, closed }, ... } — keyed by lowercase weekday name.
+  businessHours         Json?    @map("business_hours")
+  /// { facebook?, instagram?, twitter?, youtube?, linkedin? }
+  socialLinks           Json?    @map("social_links")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_profiles")
+}
+
+/// The gym's OWN invoicing defaults (for future member/customer invoices) —
+/// unrelated to the platform's `Invoice` model (Prompt 8), which is
+/// FitCloud billing the tenant for their subscription.
+model TenantInvoiceSettings {
+  id                     String   @id @default(uuid()) @db.Uuid
+  tenantId               String   @unique @map("tenant_id") @db.Uuid
+  invoicePrefix          String   @default("INV") @map("invoice_prefix") @db.VarChar(20)
+  invoiceFooter          String?  @map("invoice_footer")
+  taxPercentage          Decimal  @default(0) @map("tax_percentage") @db.Decimal(5, 2)
+  defaultPaymentTermsDays Int     @default(15) @map("default_payment_terms_days")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_invoice_settings")
 }
 
 /// The tenant's first location, created automatically at provisioning so
@@ -731,6 +1237,8 @@ model Branch {
 
   tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userBranches UserBranch[]
+  members      Member[]
+  attendances  Attendance[]
 
   @@index([tenantId])
   @@map("branches")

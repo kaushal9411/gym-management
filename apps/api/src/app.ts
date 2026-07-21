@@ -56,7 +56,7 @@ export function createApp(): Express {
         callback(new Error(`Origin not allowed: ${origin}`));
       },
       credentials: true,
-      methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+      methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Slug', 'X-Request-Id'],
       exposedHeaders: ['X-Request-Id'],
     }),

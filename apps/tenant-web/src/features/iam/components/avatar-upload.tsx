@@ -5,23 +5,9 @@ import { Camera, Trash2 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { fileToDataUrl } from '@/lib/image-to-data-url';
 
 const MAX_DIMENSION = 192;
-
-/**
- * Downscales to ≤192px and emits a JPEG data-URL — the platform has no
- * object storage yet, so avatars live inline in users.avatar_url (kept
- * small enough to stay well under the API's 1MB JSON body cap).
- */
-async function fileToDataUrl(file: File): Promise<string> {
-  const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL('image/jpeg', 0.85);
-}
 
 interface AvatarUploadProps {
   name: string;
@@ -50,7 +36,7 @@ export function AvatarUpload({ name, value, onChange, disabled }: AvatarUploadPr
       return;
     }
     try {
-      onChange(await fileToDataUrl(file));
+      onChange(await fileToDataUrl(file, MAX_DIMENSION));
     } catch {
       setError("Couldn't read that image — try another one.");
     }

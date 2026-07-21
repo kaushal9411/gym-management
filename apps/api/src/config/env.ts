@@ -46,7 +46,7 @@ const envSchema = z.object({
   PUSHER_SECRET: z.string().optional(),
   PUSHER_CLUSTER: z.string().optional(),
 
-  BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
+  BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(10).max(15).default(10),
   LOGIN_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
   OTP_LENGTH: z.coerce.number().int().min(4).max(10).default(6),

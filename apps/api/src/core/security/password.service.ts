@@ -1,4 +1,4 @@
-import bcrypt from 'bcryptjs';
+import bcrypt from '@node-rs/bcrypt';
 
 import { env } from '../../config/env';
 import { ValidationError } from '../errors/app-error';
@@ -37,8 +37,11 @@ export function assertPasswordPolicy(password: string): void {
 }
 
 /**
- * bcrypt hashing (bcryptjs — pure-JS, no native build step; functionally
- * equivalent to `bcrypt` and drop-in compatible with its hash format).
+ * bcrypt hashing via @node-rs/bcrypt (Rust/napi-rs, ships prebuilt binaries —
+ * no node-gyp/build-tools needed — and produces the same $2 hash format as
+ * bcrypt/bcryptjs). Replaced bcryptjs (pure-JS) because it was the single
+ * biggest contributor to login/password-endpoint latency (~550-900ms per
+ * compare at cost 12 on dev hardware).
  * Password history is intentionally NOT implemented yet — future-ready
  * only, per scope — but the hash format here is what a history table
  * would store verbatim.

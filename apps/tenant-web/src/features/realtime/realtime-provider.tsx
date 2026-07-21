@@ -33,8 +33,16 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     };
     socket.on('notification:new', handleNewNotification);
 
+    const handleAttendanceEvent = () => {
+      void queryClient.invalidateQueries({ queryKey: ['attendance'] });
+    };
+    socket.on('attendance:checkin', handleAttendanceEvent);
+    socket.on('attendance:checkout', handleAttendanceEvent);
+
     return () => {
       socket.off('notification:new', handleNewNotification);
+      socket.off('attendance:checkin', handleAttendanceEvent);
+      socket.off('attendance:checkout', handleAttendanceEvent);
     };
     // Pusher is left connected across renders (see connectPusher's own
     // singleton); only Socket.IO's per-render listener is cleaned up here.

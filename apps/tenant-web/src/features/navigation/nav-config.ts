@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   Users,
   UserCog,
+  Contact,
   Building2,
   IdCard,
   CalendarCheck,
@@ -16,6 +17,7 @@ import {
   Bell,
   LifeBuoy,
   Settings,
+  Store,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -38,8 +40,16 @@ export interface NavItem {
  */
 export const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { key: 'members', label: 'Members', href: '/members', icon: Users, permission: 'members:read', featureFlag: 'members' },
+  { key: 'members', label: 'Members', href: '/members', icon: Users, permission: 'members:view', featureFlag: 'members' },
   { key: 'staff', label: 'Staff & Access', href: '/users', icon: UserCog, permission: 'users:read', featureFlag: 'staff' },
+  {
+    key: 'staff-management',
+    label: 'Staff',
+    href: '/staff',
+    icon: Contact,
+    permission: 'staff:view',
+    featureFlag: 'staff',
+  },
   { key: 'branches', label: 'Branches', href: '/branches', icon: Building2, permission: 'branches:read', featureFlag: 'branches' },
   {
     key: 'memberships',
@@ -54,7 +64,15 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Attendance',
     href: '/attendance',
     icon: CalendarCheck,
-    permission: 'attendance:read',
+    permission: 'attendance:view',
+    featureFlag: 'attendance',
+  },
+  {
+    key: 'attendance-history',
+    label: 'Attendance History',
+    href: '/attendance/history',
+    icon: CalendarCheck,
+    permission: 'attendance:view',
     featureFlag: 'attendance',
   },
   {
@@ -92,6 +110,13 @@ export const NAV_ITEMS: NavItem[] = [
   },
   { key: 'reports', label: 'Reports', href: '/reports', icon: BarChart3, permission: 'reports:read', featureFlag: 'reports' },
   { key: 'billing', label: 'Billing', href: '/billing', icon: Receipt, permission: 'billing:read' },
+  {
+    key: 'gym-settings',
+    label: 'Gym Settings',
+    href: '/gym-settings/profile',
+    icon: Store,
+    permission: 'settings:read',
+  },
   { key: 'notifications', label: 'Notifications', href: '/notifications', icon: Bell },
   { key: 'support', label: 'Support', href: '/support', icon: LifeBuoy },
   { key: 'settings', label: 'Settings', href: '/settings', icon: Settings, permission: 'settings:manage' },

@@ -12,6 +12,7 @@ import { initSocketServer } from './infrastructure/realtime/socket-server';
 import { registerAuthEmailListeners } from './modules/authentication/events/auth-email.listeners';
 import { registerInvitationEmailListeners } from './modules/invitations/events/invitation-email.listeners';
 import { registerOnboardingEmailListeners } from './modules/onboarding/events/onboarding-email.listeners';
+import { registerStaffEmailListeners } from './modules/staff/events/staff-email.listeners';
 import { registerBillingEmailListeners } from './modules/subscription/events/billing-email.listeners';
 import {
   startSubscriptionBillingJobs,
@@ -23,6 +24,7 @@ async function bootstrap(): Promise<void> {
   registerOnboardingEmailListeners();
   registerBillingEmailListeners();
   registerInvitationEmailListeners();
+  registerStaffEmailListeners();
   startEmailWorker();
   await startSubscriptionBillingJobs();
 

@@ -1,14 +1,13 @@
 import { randomBytes } from 'node:crypto';
 
-import bcrypt from 'bcryptjs';
+import bcrypt from '@node-rs/bcrypt';
 
+import { env } from '../../../config/env';
 import { AppError, ConflictError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
 import { adminUserRepository } from '../../admin-auth/repositories/admin-user.repository';
-
-const BCRYPT_SALT_ROUNDS = 12;
 
 export class AdminRoleService {
   async listPermissions() {
@@ -63,7 +62,7 @@ export class AdminRoleService {
     if (existing) throw new ConflictError(ErrorCode.CONFLICT, 'An admin with this email already exists.');
 
     const temporaryPassword = randomBytes(9).toString('base64url');
-    const passwordHash = await bcrypt.hash(temporaryPassword, BCRYPT_SALT_ROUNDS);
+    const passwordHash = await bcrypt.hash(temporaryPassword, env.security.bcryptSaltRounds);
     const admin = await adminUserRepository.create({ name: input.name, email: input.email, passwordHash, roleId: input.roleId });
 
     await adminAuditLogRepository.record({ adminUserId: actorAdminId, actorRole, action: 'admin.admin_user_created', entityType: 'AdminUser', entityId: admin.id });
