@@ -111,7 +111,15 @@ apiClient.interceptors.response.use(
     // globally so every call site doesn't need its own special case.
     const redirect = TENANT_ERROR_REDIRECTS[authError.code];
     if (redirect && typeof window !== 'undefined') {
-      window.location.assign(redirect);
+      const path = window.location.pathname;
+      // Expiry is recoverable via the billing rescue path: while the user
+      // is on /billing (paying their way back in) or already on the status
+      // page, background 402s must not yank them away mid-checkout.
+      const isExpiryCode = authError.code === 'TRIAL_EXPIRED' || authError.code === 'SUBSCRIPTION_EXPIRED';
+      const inRescueArea = isExpiryCode && path.startsWith('/billing');
+      if (!inRescueArea && path !== redirect) {
+        window.location.assign(redirect);
+      }
       return Promise.reject(authError);
     }
 

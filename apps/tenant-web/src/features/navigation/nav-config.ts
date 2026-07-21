@@ -39,7 +39,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { key: 'members', label: 'Members', href: '/members', icon: Users, permission: 'members:read', featureFlag: 'members' },
-  { key: 'staff', label: 'Staff', href: '/staff', icon: UserCog, permission: 'users:manage', featureFlag: 'staff' },
+  { key: 'staff', label: 'Staff & Access', href: '/users', icon: UserCog, permission: 'users:read', featureFlag: 'staff' },
   { key: 'branches', label: 'Branches', href: '/branches', icon: Building2, permission: 'branches:read', featureFlag: 'branches' },
   {
     key: 'memberships',

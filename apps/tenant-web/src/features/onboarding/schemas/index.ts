@@ -19,8 +19,17 @@ export const accountDetailsSchema = z
     currency: z.string().trim().length(3, 'Use a 3-letter currency code').toUpperCase(),
     gstNumber: z.string().trim().max(30).optional().or(z.literal('')),
     businessRegistrationNumber: z.string().trim().max(40).optional().or(z.literal('')),
-    numberOfBranches: z.coerce.number().int().positive().max(1000).optional(),
-    expectedMembers: z.coerce.number().int().positive().max(1_000_000).optional(),
+    // An untouched <input type="number"> submits '' — plain z.coerce turns
+    // that into 0, which fails .positive() and silently blocks the whole
+    // form (these fields render no error text). Treat empty as "not given".
+    numberOfBranches: z.preprocess(
+      (v) => (v === '' || v === null ? undefined : v),
+      z.coerce.number().int().positive().max(1000).optional(),
+    ),
+    expectedMembers: z.preprocess(
+      (v) => (v === '' || v === null ? undefined : v),
+      z.coerce.number().int().positive().max(1_000_000).optional(),
+    ),
     password: strongPasswordSchema,
     confirmPassword: z.string(),
     acceptTerms: z.boolean().refine((v) => v, 'You must accept the Terms of Service'),

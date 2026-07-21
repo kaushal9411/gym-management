@@ -16,21 +16,6 @@ import {
 
 export const onboardingRouter: Router = Router();
 
-/**
- * Close the TCP connection after every onboarding response instead of
- * keeping it alive. Endpoint-security/antivirus software on some developer
- * machines proxies browser HTTP traffic and buffers keep-alive responses
- * for scanning — observed in the field as the create-tenant response being
- * fully visible in DevTools yet never delivered to page JavaScript (the
- * same request via curl, which such tools don't intercept, always resolved
- * instantly). Closing the socket forces those interceptors to flush.
- * Costs one extra TCP handshake per step of a once-per-tenant wizard.
- */
-onboardingRouter.use((_req, res, next) => {
-  res.setHeader('Connection', 'close');
-  next();
-});
-
 const asyncHandler =
   <T extends (req: never, res: never) => Promise<void>>(fn: T) =>
   (req: Parameters<T>[0], res: Parameters<T>[1], next: (err?: unknown) => void) => {

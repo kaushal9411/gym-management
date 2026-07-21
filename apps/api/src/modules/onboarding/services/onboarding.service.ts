@@ -141,11 +141,11 @@ export class OnboardingService {
     const result = await tenantProvisioningService.provision(session, subdomain.toLowerCase(), device);
 
     // Keep the session (rather than deleting it) so the wizard can confirm
-    // provisioning via GET /onboarding/status even when the create-tenant
-    // response itself is lost in transit (interfering client-side proxies
-    // were observed swallowing it). The password hash is scrubbed here —
-    // no credentials-adjacent data lingers in Redis; the leftover session
-    // is inert progress metadata that expires with the normal TTL.
+    // provisioning via GET /onboarding/status even if the create-tenant
+    // response never reaches it (dropped connection, closed tab, client
+    // bug). The password hash is scrubbed here — no credentials-adjacent
+    // data lingers in Redis; the leftover session is inert progress
+    // metadata that expires with the normal TTL.
     await onboardingSessionService.update(sessionId, {
       step: 'provisioned',
       provisionedTenantId: result.tenantId,

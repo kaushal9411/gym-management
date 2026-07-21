@@ -6,8 +6,9 @@ import { CheckCircle2, Loader2, PartyPopper } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FormAlert } from '@/features/auth/components/form-alert';
 import { StatusScreen } from '@/features/auth/components/status-screen';
-import { toOnboardingError, useCreateTenant } from '../../hooks/use-onboarding';
+import { toOnboardingError } from '../../hooks/use-onboarding';
 import { onboardingService } from '../../services/onboarding.service';
+import type { ProvisioningResult } from '../../types';
 import { buildOnboardingHandoffUrl } from '../../utils/portal-url';
 import { useOnboardingWizard } from '../../store/onboarding-wizard-context';
 
@@ -38,72 +39,68 @@ const PROVISIONING_TASKS = [
  */
 const STUCK_AFTER_MS = 45_000;
 
+/**
+ * Local provisioning state — deliberately NOT useMutation. This is the one
+ * call in the wizard fired from a mount effect rather than a user event,
+ * and under React StrictMode's double-invoked effects the mutation observer
+ * was seen never leaving `pending` even though the mutationFn resolved
+ * (verified with an instrumented headless-browser run: fetch 201, JSON
+ * parsed, promise returned — mutation still pending forever). A plain
+ * promise + setState has no observer layer to lose the result.
+ */
+type Provisioning =
+  | { status: 'pending' }
+  | { status: 'success'; result: ProvisioningResult }
+  | { status: 'error'; message: string };
+
 /** Step 6 — runs automatic provisioning, then hands the owner off to their new portal, already signed in. */
 export function SuccessStep() {
   const { state, dispatch } = useOnboardingWizard();
-  const createTenant = useCreateTenant();
   const ranRef = React.useRef(false);
+  const [provisioning, setProvisioning] = React.useState<Provisioning>({ status: 'pending' });
   const [stuck, setStuck] = React.useState(false);
   /** Set when status-polling confirms the tenant exists but the token response never arrived. */
   const [confirmedSlug, setConfirmedSlug] = React.useState<string | null>(null);
 
   const sessionId = state.sessionId;
   const subdomain = state.subdomain;
+  const isSettled = provisioning.status !== 'pending';
 
   const startOver = React.useCallback(() => {
     ranRef.current = false;
-    createTenant.reset();
+    setProvisioning({ status: 'pending' });
     setStuck(false);
+    setConfirmedSlug(null);
     dispatch({ type: 'RESET' });
-  }, [createTenant, dispatch]);
+  }, [dispatch]);
 
   React.useEffect(() => {
     if (ranRef.current || !sessionId || !subdomain) return;
-    ranRef.current = true;
-    // eslint-disable-next-line no-console
-    console.log('[onboarding] DEBUG calling mutate', { sessionId, subdomain });
-    createTenant.mutate(
-      { sessionId, subdomain },
-      {
-        onSuccess: (data) => {
-          // eslint-disable-next-line no-console
-          console.log('[onboarding] DEBUG onSuccess fired', data);
-        },
-        onError: (err) => {
-          // eslint-disable-next-line no-console
-          console.error('[onboarding] DEBUG onError fired', err);
-        },
-      },
-    );
     // Fires exactly once — provisioning is not idempotent-safe to retry silently.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    ranRef.current = true;
+    onboardingService
+      .createTenant(sessionId, subdomain)
+      .then((result) => setProvisioning({ status: 'success', result }))
+      .catch((error) => setProvisioning({ status: 'error', message: toOnboardingError(error).message }));
   }, [sessionId, subdomain]);
-
-  // eslint-disable-next-line no-console
-  console.log('[onboarding] DEBUG render', {
-    status: createTenant.status,
-    hasData: createTenant.data !== undefined,
-    stuck,
-  });
 
   // Defends against a wedged request (stale/expired session reused from a
   // previous visit, a dropped connection, etc.) that never settles as
   // either success or error — without this, the spinner+checklist above
   // would spin forever with no way out except manually clearing storage.
   React.useEffect(() => {
-    if (!ranRef.current || createTenant.isSuccess || createTenant.isError) return;
+    if (isSettled) return;
     const timer = setTimeout(() => setStuck(true), STUCK_AFTER_MS);
     return () => clearTimeout(timer);
-  }, [createTenant.isSuccess, createTenant.isError]);
+  }, [isSettled]);
 
-  // Recovery path: the create-tenant response has been observed getting
-  // swallowed between server and page JS (interfering local proxies). The
-  // server may well have finished provisioning anyway, so while the
-  // mutation is pending, poll the status endpoint; once it reports
-  // "provisioned", the gym exists — send the owner to their new portal's
-  // login page instead of stranding them behind a lost response.
+  // Recovery path: if the create-tenant response is lost in transit, the
+  // server may well have finished provisioning anyway — poll the status
+  // endpoint while waiting; once it reports "provisioned", the gym exists,
+  // so send the owner to their new portal's login page instead of
+  // stranding them behind a lost response.
   React.useEffect(() => {
-    if (!sessionId || confirmedSlug || createTenant.isSuccess || createTenant.isError) return;
+    if (!sessionId || confirmedSlug || isSettled) return;
     const interval = setInterval(() => {
       if (!ranRef.current) return;
       onboardingService
@@ -116,7 +113,7 @@ export function SuccessStep() {
         .catch(() => undefined); // session gone or still mid-provision — keep waiting
     }, 3000);
     return () => clearInterval(interval);
-  }, [sessionId, confirmedSlug, createTenant.isSuccess, createTenant.isError]);
+  }, [sessionId, confirmedSlug, isSettled]);
 
   if (!sessionId || !subdomain) {
     return <FormAlert variant="error" message="Please complete the previous steps before continuing." />;
@@ -124,7 +121,7 @@ export function SuccessStep() {
 
   // Provisioning confirmed via polling but the token response was lost —
   // the automatic sign-in can't happen, so hand off to a normal login.
-  if (confirmedSlug && !createTenant.isSuccess) {
+  if (confirmedSlug && provisioning.status !== 'success') {
     return (
       <StatusScreen
         icon={PartyPopper}
@@ -139,7 +136,7 @@ export function SuccessStep() {
     );
   }
 
-  if (stuck && !createTenant.isSuccess) {
+  if (stuck && provisioning.status === 'pending') {
     return (
       <div className="space-y-4">
         <FormAlert
@@ -154,10 +151,10 @@ export function SuccessStep() {
     );
   }
 
-  if (createTenant.isError) {
+  if (provisioning.status === 'error') {
     return (
       <div className="space-y-4">
-        <FormAlert variant="error" message={toOnboardingError(createTenant.error).message} />
+        <FormAlert variant="error" message={provisioning.message} />
         <Button type="button" className="w-full" onClick={startOver}>
           Start over
         </Button>
@@ -165,7 +162,7 @@ export function SuccessStep() {
     );
   }
 
-  if (!createTenant.isSuccess) {
+  if (provisioning.status !== 'success') {
     return (
       <div className="space-y-5 py-4">
         <div className="flex flex-col items-center gap-3 text-center">
@@ -184,35 +181,13 @@ export function SuccessStep() {
     );
   }
 
-  const result = createTenant.data;
-
-  // Defensive: if anything about the response shape is unexpected, show the
-  // actual error instead of leaving the caller staring at nothing while the
-  // exception is silently swallowed by React's render-error recovery.
-  try {
-    if (!result || !result.slug || !result.portalUrl || !result.accessToken || !result.refreshToken || !result.accessTokenExpiresAt) {
-      throw new Error(`Incomplete provisioning result: ${JSON.stringify(result)}`);
-    }
-    const handoffUrl = buildOnboardingHandoffUrl(result.slug, result.portalUrl, {
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-      accessTokenExpiresAt: result.accessTokenExpiresAt,
-    });
-    return <ProvisionedRedirect gymName={state.gymName} slug={result.slug} handoffUrl={handoffUrl} />;
-  } catch (renderError) {
-    return (
-      <div className="space-y-4">
-        <FormAlert
-          variant="error"
-          title="Something went wrong finishing setup"
-          message={renderError instanceof Error ? renderError.message : 'Unknown error building the handoff link.'}
-        />
-        <Button type="button" className="w-full" onClick={startOver}>
-          Start over
-        </Button>
-      </div>
-    );
-  }
+  const result = provisioning.result;
+  const handoffUrl = buildOnboardingHandoffUrl(result.slug, result.portalUrl, {
+    accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
+    accessTokenExpiresAt: result.accessTokenExpiresAt,
+  });
+  return <ProvisionedRedirect gymName={state.gymName} slug={result.slug} handoffUrl={handoffUrl} />;
 }
 
 const AUTO_REDIRECT_DELAY_MS = 2500;

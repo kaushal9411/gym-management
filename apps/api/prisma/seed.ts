@@ -24,9 +24,13 @@ async function hashPassword(plain: string): Promise<string> {
 
 const PERMISSIONS: Array<{ key: string; description: string }> = [
   // Identity & access
+  { key: 'users:read', description: 'View staff accounts and their access' },
   { key: 'users:invite', description: 'Invite a new staff member' },
-  { key: 'users:manage', description: 'Update or deactivate staff accounts' },
+  { key: 'users:manage', description: 'Update, suspend, or deactivate staff accounts' },
+  { key: 'users:export', description: 'Export the staff list' },
+  { key: 'roles:read', description: 'View roles and their permissions' },
   { key: 'roles:manage-custom', description: 'Create and edit custom tenant roles (Enterprise)' },
+  { key: 'permissions:read', description: 'View the permission registry and matrix' },
   { key: 'audit:read', description: 'View the audit log' },
 
   // Gym operations
@@ -66,7 +70,8 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
   SUPER_ADMIN: '*',
   OWNER: '*',
   MANAGER: [
-    'users:invite', 'users:manage', 'audit:read',
+    'users:read', 'users:invite', 'users:manage', 'users:export',
+    'roles:read', 'permissions:read', 'audit:read',
     'branches:manage', 'branches:read',
     'members:manage', 'members:read',
     'memberships:manage',

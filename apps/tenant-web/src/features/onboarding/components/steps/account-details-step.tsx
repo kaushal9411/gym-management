@@ -186,11 +186,13 @@ export function AccountDetailsStep() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="numberOfBranches">Number of branches (optional)</Label>
-          <Input id="numberOfBranches" type="number" min={1} disabled={isSubmitting} {...form.register('numberOfBranches')} />
+          <Input id="numberOfBranches" type="number" min={1} invalid={!!fieldError('numberOfBranches')} disabled={isSubmitting} {...form.register('numberOfBranches')} />
+          {fieldError('numberOfBranches') ? <p role="alert" className="text-xs text-destructive">{fieldError('numberOfBranches')}</p> : null}
         </div>
         <div className="space-y-2">
           <Label htmlFor="expectedMembers">Expected members (optional)</Label>
-          <Input id="expectedMembers" type="number" min={1} disabled={isSubmitting} {...form.register('expectedMembers')} />
+          <Input id="expectedMembers" type="number" min={1} invalid={!!fieldError('expectedMembers')} disabled={isSubmitting} {...form.register('expectedMembers')} />
+          {fieldError('expectedMembers') ? <p role="alert" className="text-xs text-destructive">{fieldError('expectedMembers')}</p> : null}
         </div>
       </div>
 

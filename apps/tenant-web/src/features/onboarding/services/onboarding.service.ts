@@ -24,8 +24,6 @@ interface ApiErrorBody {
   errors: Array<{ field?: string; code?: string; message: string }> | null;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
-
 const KNOWN_CODES: OnboardingErrorCode[] = [
   'VALIDATION_ERROR', 'CONFLICT', 'EMAIL_NOT_VERIFIED', 'OTP_INVALID',
   'OTP_EXPIRED', 'SLUG_TAKEN', 'RATE_LIMITED',
@@ -127,67 +125,27 @@ class OnboardingService {
     }
   }
 
-  /**
-   * Deliberately bypasses the shared `apiClient` axios instance for this one
-   * call. In practice, the axios path (custom AbortController + timeout
-   * config applied to every request via the interceptor in api-client.ts)
-   * was observed to hang indefinitely specifically for this endpoint's
-   * response — verified by reproducing the exact same request/response
-   * (including the JWT-bearing payload and credentialed CORS request) via a
-   * raw `fetch()` in the browser console, which resolved correctly every
-   * time, while the axios-based call never settled. A plain `fetch()` here
-   * sidesteps whatever in axios's request pipeline was responsible.
-   */
   async createTenant(sessionId: string, subdomain: string): Promise<ProvisioningResult> {
-    let response: Response;
     try {
-      response = await fetch(`${API_BASE_URL}/onboarding/create-tenant`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, subdomain }),
+      const res = await apiClient.post<ApiEnvelope<ProvisioningResult>>('/onboarding/create-tenant', {
+        sessionId,
+        subdomain,
       });
-    } catch {
-      throw new OnboardingServiceError('UNKNOWN', 'Network error — check your connection and try again.');
+      return res.data.data;
+    } catch (error) {
+      throw toOnboardingServiceError(error);
     }
-
-    const body = (await response.json()) as ApiEnvelope<ProvisioningResult> | ApiErrorBody;
-
-    if (!response.ok || !body.success) {
-      const errorBody = body as ApiErrorBody;
-      const backendCode = errorBody.errors?.[0]?.code;
-      const code: OnboardingErrorCode =
-        backendCode && (KNOWN_CODES as string[]).includes(backendCode)
-          ? (backendCode as OnboardingErrorCode)
-          : response.status === 429
-            ? 'RATE_LIMITED'
-            : 'UNKNOWN';
-      throw new OnboardingServiceError(code, errorBody.message ?? 'Something went wrong. Please try again.');
-    }
-
-    return (body as ApiEnvelope<ProvisioningResult>).data;
   }
 
-  /**
-   * Raw `fetch()` for the same reason as `createTenant` above — this is the
-   * recovery probe the success step polls when the create-tenant response
-   * goes missing, so it must not share whatever transport path lost it.
-   */
   async getStatus(sessionId: string): Promise<OnboardingStatus> {
-    let response: Response;
     try {
-      response = await fetch(`${API_BASE_URL}/onboarding/status?sessionId=${encodeURIComponent(sessionId)}`, {
-        credentials: 'include',
+      const res = await apiClient.get<ApiEnvelope<OnboardingStatus>>('/onboarding/status', {
+        params: { sessionId },
       });
-    } catch {
-      throw new OnboardingServiceError('UNKNOWN', 'Network error — check your connection and try again.');
+      return res.data.data;
+    } catch (error) {
+      throw toOnboardingServiceError(error);
     }
-
-    const body = (await response.json()) as ApiEnvelope<OnboardingStatus> | ApiErrorBody;
-    if (!response.ok || !body.success) {
-      throw new OnboardingServiceError('UNKNOWN', (body as ApiErrorBody).message ?? 'Something went wrong.');
-    }
-    return (body as ApiEnvelope<OnboardingStatus>).data;
   }
 }
 

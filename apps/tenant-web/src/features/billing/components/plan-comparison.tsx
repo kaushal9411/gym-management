@@ -21,8 +21,9 @@ function formatMoney(amount: number, currency: string): string {
 }
 
 interface PlanComparisonProps {
-  currentPlanSlug: string;
-  currentSortOrder: number;
+  /** null = tenant has no subscription yet (legacy/trial tenants) — every plan is offered as a fresh "Choose". */
+  currentPlanSlug: string | null;
+  currentSortOrder: number | null;
   onChanged: () => void;
 }
 
@@ -79,11 +80,13 @@ export function PlanComparison({ currentPlanSlug, currentSortOrder, onChanged }:
                 {!isCurrent ? (
                   <LoadingButton
                     type="button"
-                    variant={plan.sortOrder > currentSortOrder ? 'default' : 'outline'}
+                    variant={currentSortOrder === null || plan.sortOrder > currentSortOrder ? 'default' : 'outline'}
                     className="w-full"
                     onClick={() => setTarget(plan)}
                   >
-                    {plan.sortOrder > currentSortOrder ? 'Upgrade to' : 'Downgrade to'} {plan.name}
+                    {currentSortOrder === null
+                      ? `Choose ${plan.name}`
+                      : `${plan.sortOrder > currentSortOrder ? 'Upgrade to' : 'Downgrade to'} ${plan.name}`}
                   </LoadingButton>
                 ) : null}
               </CardContent>

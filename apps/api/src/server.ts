@@ -10,6 +10,7 @@ import { emailQueue } from './infrastructure/queue/email.queue';
 import { startEmailWorker, stopEmailWorker } from './infrastructure/queue/email.worker';
 import { initSocketServer } from './infrastructure/realtime/socket-server';
 import { registerAuthEmailListeners } from './modules/authentication/events/auth-email.listeners';
+import { registerInvitationEmailListeners } from './modules/invitations/events/invitation-email.listeners';
 import { registerOnboardingEmailListeners } from './modules/onboarding/events/onboarding-email.listeners';
 import { registerBillingEmailListeners } from './modules/subscription/events/billing-email.listeners';
 import {
@@ -21,6 +22,7 @@ async function bootstrap(): Promise<void> {
   registerAuthEmailListeners();
   registerOnboardingEmailListeners();
   registerBillingEmailListeners();
+  registerInvitationEmailListeners();
   startEmailWorker();
   await startSubscriptionBillingJobs();
 

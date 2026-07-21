@@ -92,5 +92,7 @@ export const swaggerSpec = swaggerJsdoc({
       },
     },
   },
-  apis: ['./src/modules/**/routes/*.routes.ts', './dist/modules/**/routes/*.routes.js'],
+  // Match whichever form is actually running — mixing both risks scanning a
+  // stale dist/ build that has drifted from src/ and crashing the YAML parser.
+  apis: [__filename.endsWith('.ts') ? './src/modules/**/routes/*.routes.ts' : './dist/modules/**/routes/*.routes.js'],
 });

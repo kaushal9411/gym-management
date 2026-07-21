@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { AUTH_ROUTES } from '../../constants';
 import { toAuthError, useAcceptInvitation, useInvitation } from '../../hooks/use-auth';
 import { acceptInvitationSchema, type AcceptInvitationFormValues } from '../../schemas';
@@ -33,6 +34,7 @@ const ROLE_LABELS: Record<string, string> = {
 /** Staff/member invitation acceptance: verify token → profile + password → login. */
 export function InvitationView({ token }: { token: string }) {
   const router = useRouter();
+  const tenant = useTenant();
   const invitation = useInvitation(token);
   const acceptInvitation = useAcceptInvitation();
   const [accepted, setAccepted] = React.useState(false);
@@ -85,7 +87,7 @@ export function InvitationView({ token }: { token: string }) {
       <StatusScreen
         icon={CheckCircle2}
         tone="success"
-        title={`Welcome to ${invite.gymName}!`}
+        title={`Welcome to ${tenant.name}!`}
         description="Your account is ready. Sign in with your email and the password you just created."
       >
         <Button asChild className="w-full sm:w-auto">
@@ -123,7 +125,7 @@ export function InvitationView({ token }: { token: string }) {
         <div className="mb-1 flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
           <UserPlus className="size-7" aria-hidden />
         </div>
-        <CardTitle>Join {invite.gymName}</CardTitle>
+        <CardTitle>Join {tenant.name}</CardTitle>
         <CardDescription>
           {invite.invitedBy} invited you to join as{' '}
           <span className="font-medium text-foreground">{ROLE_LABELS[invite.role] ?? invite.role}</span>{' '}

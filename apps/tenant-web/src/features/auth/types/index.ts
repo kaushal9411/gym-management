@@ -113,10 +113,10 @@ export type LoginResult =
 
 export interface Invitation {
   token: string;
-  gymName: string;
   invitedBy: string;
   inviteeEmail: string;
-  role: UserRole;
+  /** Role NAME — may be a custom tenant role, not just the system five. */
+  role: string;
   expiresAt: string;
 }
 

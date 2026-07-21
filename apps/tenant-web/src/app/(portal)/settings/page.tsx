@@ -1,22 +1,36 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { LogOut, MonitorSmartphone } from 'lucide-react';
+import { toast } from 'sonner';
 
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useCurrentUser } from '@/features/auth/hooks/use-current-user';
+import { useLogoutAllDevices } from '@/features/auth/hooks/use-logout';
 import { ChangePasswordForm } from '@/features/auth/components/forms/change-password-form';
+import {
+  toIamError,
+  useActiveSessions,
+  useLoginHistory,
+  useRevokeSession,
+} from '@/features/iam/hooks/use-iam';
 import { useTenant } from '@/features/tenant/tenant-provider';
 
-type SettingsTab = 'account' | 'password' | 'notifications';
+type SettingsTab = 'account' | 'password' | 'notifications' | 'sessions';
 
 const TABS: Array<{ value: SettingsTab; label: string }> = [
   { value: 'account', label: 'Account' },
   { value: 'password', label: 'Password' },
   { value: 'notifications', label: 'Notifications' },
+  { value: 'sessions', label: 'Sessions' },
 ];
 
 const NOTIFICATION_PREFERENCES = [
@@ -29,7 +43,7 @@ export default function SettingsPage() {
   const searchParams = useSearchParams();
   const requested = searchParams.get('tab');
   const [tab, setTab] = React.useState<SettingsTab>(
-    requested === 'password' || requested === 'notifications' ? requested : 'account',
+    requested === 'password' || requested === 'notifications' || requested === 'sessions' ? requested : 'account',
   );
 
   const user = useCurrentUser();
@@ -89,7 +103,13 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Notification preferences</CardTitle>
-            <CardDescription>Choose what you get notified about. Saving preferences arrives with the Notifications module.</CardDescription>
+            <CardDescription>
+              Notification preferences now live on your profile —{' '}
+              <Link href="/profile" className="text-primary underline-offset-4 hover:underline">
+                manage them there
+              </Link>
+              .
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {NOTIFICATION_PREFERENCES.map((pref) => (
@@ -103,6 +123,98 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {tab === 'sessions' && <SessionsPanel />}
+    </div>
+  );
+}
+
+/** Active devices + login history — session revocation runs through the auth API. */
+function SessionsPanel() {
+  const sessions = useActiveSessions();
+  const revokeSession = useRevokeSession();
+  const { logoutAllDevices, isLoggingOut } = useLogoutAllDevices();
+  const history = useLoginHistory({ limit: 10 });
+
+  return (
+    <div className="space-y-5">
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <div>
+            <CardTitle className="text-base">Active sessions</CardTitle>
+            <CardDescription>Devices currently signed in to your account.</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" disabled={isLoggingOut} onClick={() => logoutAllDevices()}>
+            <LogOut className="size-4" /> Sign out everywhere
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {sessions.isPending ? (
+            Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)
+          ) : (sessions.data ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No active sessions.</p>
+          ) : (
+            (sessions.data ?? []).map((session) => (
+              <div key={session.id} className="flex items-center gap-3 rounded-lg border p-3">
+                <MonitorSmartphone className="size-5 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1 text-sm">
+                  <div className="truncate font-medium">
+                    {session.deviceLabel ?? session.userAgent ?? 'Unknown device'}
+                    {session.isCurrent ? <Badge className="ml-2">This device</Badge> : null}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {session.ipAddress ?? 'Unknown IP'} · Active {new Date(session.lastActiveAt).toLocaleString()}
+                  </p>
+                </div>
+                {!session.isCurrent ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={revokeSession.isPending}
+                    onClick={() =>
+                      revokeSession.mutate(session.id, {
+                        onSuccess: () => toast.success('Session revoked'),
+                        onError: (err) => toast.error(toIamError(err).message),
+                      })
+                    }
+                  >
+                    Revoke
+                  </Button>
+                ) : null}
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Login history</CardTitle>
+          <CardDescription>Recent sign-in attempts on your account.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {history.isPending ? (
+            Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
+          ) : (history.data?.items ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground">No login history yet.</p>
+          ) : (
+            (history.data?.items ?? []).map((entry) => (
+              <div key={entry.id} className="flex items-center gap-3 text-sm">
+                <span
+                  className={cn('size-2 shrink-0 rounded-full', entry.success ? 'bg-emerald-500' : 'bg-red-500')}
+                  aria-hidden
+                />
+                <span className="flex-1">
+                  {entry.success ? 'Successful sign-in' : `Failed sign-in${entry.reason ? ` (${entry.reason})` : ''}`}
+                  <span className="block text-xs text-muted-foreground">
+                    {entry.ipAddress ?? 'Unknown IP'} · {new Date(entry.createdAt).toLocaleString()}
+                  </span>
+                </span>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

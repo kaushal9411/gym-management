@@ -87,6 +87,7 @@ function buildFakes() {
     async getPermissionVersion() {
       return 1;
     },
+    async bumpPermissionVersion() {},
   };
 
   const sessions = new Map<string, { sessionId: string; tokenHash: string; family: string; expiresAt: Date; revokedAt: Date | null; userId: string; tenantId: string; refreshTokenId: string }>();

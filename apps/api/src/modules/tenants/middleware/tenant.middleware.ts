@@ -15,6 +15,24 @@ function isPlatformOnlyPath(path: string): boolean {
 }
 
 /**
+ * The billing rescue path: these areas stay reachable when the tenant's
+ * trial/subscription has EXPIRED (not suspended), so an owner can log in
+ * and pay their way back in. Everything else keeps returning 402.
+ */
+const EXPIRY_EXEMPT_PREFIXES = [
+  `/api/${env.apiVersion}/auth`,
+  `/api/${env.apiVersion}/subscription`,
+  `/api/${env.apiVersion}/billing`,
+  `/api/${env.apiVersion}/payment`,
+  `/api/${env.apiVersion}/coupon`,
+  `/api/${env.apiVersion}/invoice`,
+];
+
+function isExpiryExemptPath(path: string): boolean {
+  return EXPIRY_EXEMPT_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
+/**
  * Extracts the tenant slug from the request. In production this is always
  * the subdomain of Host (`goldgym.fitcloud.com` → `goldgym`); for API
  * clients that can't rely on DNS wildcards (mobile, tests, curl), an
@@ -69,7 +87,7 @@ export function tenantMiddleware(platformRoutePrefixes: string[]) {
         throw new TenantError(ErrorCode.TENANT_NOT_FOUND, `No gym found for "${slug}"`, 404);
       }
 
-      tenantService.assertTenantAccessible(resolved.record);
+      tenantService.assertTenantAccessible(resolved.record, { allowExpired: isExpiryExemptPath(req.path) });
 
       req.tenant = resolved.tenant;
       updateRequestContext({ tenantId: resolved.tenant.id, tenantSlug: resolved.tenant.slug });

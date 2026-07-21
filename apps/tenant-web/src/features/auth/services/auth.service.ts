@@ -225,15 +225,30 @@ class HttpAuthService implements AuthService {
     }
   }
 
-  // Staff/member invitation acceptance has no backend endpoint yet (out of
-  // scope for the authentication phases built so far) — surfacing a clear,
-  // honest error rather than silently no-op'ing or faking success.
-  async getInvitation(): Promise<Invitation> {
-    throw new AuthServiceError('TOKEN_INVALID', 'Invitations are not available yet.');
+  async getInvitation(token: string): Promise<Invitation> {
+    try {
+      const res = await apiClient.get<
+        ApiEnvelope<{ email: string; roleName: string; invitedBy: string; expiresAt: string }>
+      >('/invitations/lookup', { params: { token } });
+      const data = res.data.data;
+      return {
+        token,
+        invitedBy: data.invitedBy,
+        inviteeEmail: data.email,
+        role: data.roleName,
+        expiresAt: data.expiresAt,
+      };
+    } catch (error) {
+      throw toAuthServiceError(error);
+    }
   }
 
-  async acceptInvitation(): Promise<void> {
-    throw new AuthServiceError('TOKEN_INVALID', 'Invitations are not available yet.');
+  async acceptInvitation(payload: AcceptInvitationPayload): Promise<void> {
+    try {
+      await apiClient.post('/invitations/accept', payload);
+    } catch (error) {
+      throw toAuthServiceError(error);
+    }
   }
 }
 
@@ -345,7 +360,6 @@ class MockAuthService implements AuthService {
     if (!token || token === 'invalid') throw new AuthServiceError('TOKEN_INVALID', 'This invitation link is not valid.');
     return {
       token,
-      gymName: "Gold's Gym",
       invitedBy: 'Arjun Mehta (Owner)',
       inviteeEmail: 'new.trainer@example.com',
       role: 'TRAINER',

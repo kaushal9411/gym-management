@@ -24,11 +24,13 @@ export interface IUserRepository {
 export interface IRoleRepository {
   /** Assigns the tenant's copy of a system role (creating the tenant-role link table row). */
   assignSystemRole(tenantId: string, userId: string, roleName: string): Promise<void>;
-  /** Union of permission keys across every role the user holds. */
+  /** Effective permission keys: union across roles, plus per-user GRANTs, minus per-user DENYs. */
   getPermissionKeysForUser(tenantId: string, userId: string): Promise<string[]>;
   getRoleNamesForUser(tenantId: string, userId: string): Promise<string[]>;
-  /** Monotonic version bumped whenever role assignment changes — invalidates the permission cache. */
+  /** Monotonic version bumped whenever role/permission assignment changes — invalidates the permission cache. */
   getPermissionVersion(tenantId: string, userId: string): Promise<number>;
+  /** Bumps the persisted permission version and clears the stale cached permission set. */
+  bumpPermissionVersion(tenantId: string, userId: string): Promise<void>;
 }
 
 export interface CreateSessionInput {

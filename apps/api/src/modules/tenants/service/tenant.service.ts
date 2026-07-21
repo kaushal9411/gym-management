@@ -124,8 +124,13 @@ export class TenantService {
    * Throws the specific AppError for the first failing check, in priority
    * order: not found → maintenance → suspended → trial expired →
    * subscription expired. Passing means the request may proceed.
+   *
+   * `allowExpired` skips ONLY the two expiry checks — the billing rescue
+   * path: an owner whose trial/subscription lapsed must still be able to
+   * log in and pay, otherwise expiry is an unrecoverable dead end.
+   * Suspension (an admin decision) and maintenance always block.
    */
-  assertTenantAccessible(record: ResolvedTenantRecord): void {
+  assertTenantAccessible(record: ResolvedTenantRecord, options?: { allowExpired?: boolean }): void {
     const now = new Date();
 
     if (record.maintenanceMode) {
@@ -134,6 +139,8 @@ export class TenantService {
     if (record.status === 'SUSPENDED' || record.status === 'CANCELLED') {
       throw new TenantError(ErrorCode.TENANT_SUSPENDED, 'This gym account has been suspended', 403);
     }
+    if (options?.allowExpired) return;
+
     if (record.status === 'TRIAL' && record.trialEndsAt && record.trialEndsAt.getTime() < now.getTime()) {
       throw new TenantError(ErrorCode.TRIAL_EXPIRED, 'The free trial for this gym has ended', 402);
     }
