@@ -26,6 +26,8 @@ import { billingRouter } from '../../modules/billing/routes/billing.routes';
 import { branchRouter } from '../../modules/branches/routes/branch.routes';
 import { contactRouter } from '../../modules/contact/routes/contact.routes';
 import { couponRouter } from '../../modules/coupon/routes/coupon.routes';
+import { dietPlanRouter } from '../../modules/diet/routes/diet-plan.routes';
+import { foodRouter } from '../../modules/diet/routes/food.routes';
 import { invitationRouter } from '../../modules/invitations/routes/invitation.routes';
 import { invoiceRouter } from '../../modules/invoice/routes/invoice.routes';
 import { memberRouter } from '../../modules/members/routes/member.routes';
@@ -43,6 +45,8 @@ import { tenantNotificationRouter } from '../../modules/tenant-notifications/rou
 import { tenantService } from '../../modules/tenants/service/tenant.service';
 import { userRouter } from '../../modules/users/routes/user.routes';
 import { webhookRouter } from '../../modules/webhook/routes/webhook.routes';
+import { exerciseRouter } from '../../modules/workouts/routes/exercise.routes';
+import { workoutPlanRouter } from '../../modules/workouts/routes/workout-plan.routes';
 
 export const v1Router: Router = Router();
 
@@ -86,6 +90,10 @@ v1Router.use('/staff', staffRouter);
 v1Router.use('/members', memberRouter);
 v1Router.use('/membership-plans', membershipPlanRouter);
 v1Router.use('/attendance', attendanceRouter);
+v1Router.use('/exercises', exerciseRouter);
+v1Router.use('/workout-plans', workoutPlanRouter);
+v1Router.use('/foods', foodRouter);
+v1Router.use('/diet-plans', dietPlanRouter);
 // Platform-plane (no tenant check — mounted under /public, see PLATFORM_ROUTE_PREFIXES).
 v1Router.use('/public/contact', contactRouter);
 

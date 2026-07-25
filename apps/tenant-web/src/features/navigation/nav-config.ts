@@ -80,7 +80,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Workout Plans',
     href: '/workout-plans',
     icon: Dumbbell,
-    permission: 'workout-plans:manage',
+    permission: 'workouts:view',
     featureFlag: 'workout_plans',
   },
   {
@@ -88,7 +88,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Diet Plans',
     href: '/diet-plans',
     icon: Apple,
-    permission: 'diet-plans:manage',
+    permission: 'diets:view',
     featureFlag: 'diet_plans',
   },
   { key: 'payments', label: 'Payments', href: '/payments', icon: CreditCard, permission: 'payments:read', featureFlag: 'payments' },

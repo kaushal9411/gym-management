@@ -113,6 +113,28 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'attendance:update', description: 'Correct an attendance record (times, notes, status)' },
   { key: 'attendance:delete', description: 'Soft-delete an attendance record' },
   { key: 'attendance:export', description: 'Export attendance history as CSV/Excel' },
+
+  // Workout Management (Prompt 17) — granular keys distinct from the
+  // pre-existing speculative `workout-plans:manage` catalog entry (left
+  // seeded but unused, same precedent as Attendance/Membership Plans).
+  { key: 'workouts:view', description: 'View the exercise library, workout plans, and member workout progress' },
+  { key: 'workouts:create', description: 'Add an exercise, create a workout plan, or duplicate one' },
+  { key: 'workouts:update', description: "Edit an exercise, a workout plan, its weekly schedule, or a member's assignment details" },
+  { key: 'workouts:delete', description: 'Soft-delete an exercise or a workout plan' },
+  { key: 'workouts:restore', description: 'Restore a soft-deleted exercise or workout plan' },
+  { key: 'workouts:assign', description: 'Assign or remove a workout plan for a member' },
+  { key: 'workouts:progress', description: "Mark a member's workout exercise progress (completed/skipped)" },
+
+  // Diet & Nutrition Management (Prompt 18) — granular keys distinct from
+  // the pre-existing speculative `diet-plans:manage` catalog entry (left
+  // seeded but unused, same precedent as Workout/Attendance/Membership Plans).
+  { key: 'diets:view', description: 'View the food library, diet plans, and member diet progress' },
+  { key: 'diets:create', description: 'Add a food, create a diet plan, or duplicate one' },
+  { key: 'diets:update', description: "Edit a food, a diet plan, its meal builder, or a member's assignment details" },
+  { key: 'diets:delete', description: 'Soft-delete a food or a diet plan' },
+  { key: 'diets:restore', description: 'Restore a soft-deleted food or diet plan' },
+  { key: 'diets:assign', description: 'Assign or remove a diet plan for a member' },
+  { key: 'diets:progress', description: "Update a member's diet progress (daily tracking, water intake, weight)" },
 ];
 
 const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
@@ -138,6 +160,8 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'memberships:view', 'memberships:create', 'memberships:update', 'memberships:delete', 'memberships:restore',
     'memberships:assign', 'memberships:renew', 'memberships:upgrade', 'memberships:freeze',
     'attendance:view', 'attendance:checkin', 'attendance:checkout', 'attendance:update', 'attendance:delete', 'attendance:export',
+    'workouts:view', 'workouts:create', 'workouts:update', 'workouts:delete', 'workouts:restore', 'workouts:assign', 'workouts:progress',
+    'diets:view', 'diets:create', 'diets:update', 'diets:delete', 'diets:restore', 'diets:assign', 'diets:progress',
   ],
   TRAINER: [
     'members:read', 'attendance:create', 'attendance:read',
@@ -148,6 +172,12 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'memberships:view',
     // Trainers can check members in/out for sessions, but not correct/delete/export records.
     'attendance:view', 'attendance:checkin', 'attendance:checkout',
+    // Trainers author/manage plans and assign/track member progress day-to-day;
+    // delete/restore of the catalog itself stays a Manager decision.
+    'workouts:view', 'workouts:create', 'workouts:update', 'workouts:assign', 'workouts:progress',
+    // Trainers/nutritionists author/assign plans and track member progress
+    // day-to-day; delete/restore of the catalog itself stays Manager-only.
+    'diets:view', 'diets:create', 'diets:update', 'diets:assign', 'diets:progress',
   ],
   RECEPTIONIST: [
     'members:manage', 'members:read',
@@ -163,6 +193,12 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     // Front-desk check-in/out + export, same tightening as above — record
     // correction/deletion stays a Manager decision.
     'attendance:view', 'attendance:checkin', 'attendance:checkout', 'attendance:export',
+    // Front-desk can see the exercise library/plans/progress for context, but
+    // authoring/assigning workouts stays a Trainer/Manager decision.
+    'workouts:view',
+    // Same tightening — front-desk can see diet plans/progress for context,
+    // but authoring/assigning diet plans stays a Trainer/Manager decision.
+    'diets:view',
   ],
   MEMBER: ['profile:read', 'profile:update', 'bookings:create', 'bookings:read', 'payments:read', 'chat:use'],
 };

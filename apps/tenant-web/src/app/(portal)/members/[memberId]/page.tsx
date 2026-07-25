@@ -23,6 +23,8 @@ import { BranchSelect } from '@/features/members/components/branch-select';
 import { DocumentUpload } from '@/features/members/components/document-upload';
 import { FreezeHistoryTable, MembershipHistoryTable } from '@/features/members/components/membership-history-table';
 import { MembershipPlanSelect } from '@/features/members/components/membership-plan-select';
+import { MemberWorkoutCard } from '@/features/workouts/components/member-workout-card';
+import { MemberDietCard } from '@/features/diet/components/member-diet-card';
 import { MemberStatusBadge } from '@/features/members/components/member-status-badge';
 import { QrCodeDisplay } from '@/features/members/components/qr-code-display';
 import { TrainerSelect } from '@/features/members/components/trainer-select';
@@ -773,6 +775,10 @@ export default function MemberDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      <MemberWorkoutCard memberId={memberId} />
+
+      <MemberDietCard memberId={memberId} />
 
       <Card>
         <CardHeader>

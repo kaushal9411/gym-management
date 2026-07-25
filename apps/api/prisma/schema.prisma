@@ -170,43 +170,53 @@ model Tenant {
   updatedAt             DateTime     @updatedAt @map("updated_at")
   deletedAt             DateTime?    @map("deleted_at")
 
-  settings            TenantSettings?
-  branding            TenantBranding?
-  profile             TenantProfile?
-  invoiceSettings     TenantInvoiceSettings?
-  limits              TenantLimit?
-  users               User[]
-  roles               Role[]
-  refreshTokens       RefreshToken[]
-  passwordResets      PasswordReset[]
-  emailVerifications  EmailVerification[]
-  otpCodes            OtpCode[]
-  loginHistory        LoginHistory[]
-  userSessions        UserSession[]
-  auditLogs           AuditLog[]
-  domains             TenantDomain[]
-  branches            Branch[]
-  modules             TenantModule[]
-  usage               TenantUsage[]
-  subscriptions       Subscription[]
-  subscriptionHistory SubscriptionHistory[]
-  billingAddress      BillingAddress?
-  paymentMethods      PaymentMethod[]
-  payments            Payment[]
-  invoices            Invoice[]
-  couponRedemptions   CouponRedemption[]
-  supportTickets      SupportTicket[]
-  notifications       TenantNotification[]
-  userPermissions     UserPermission[]
-  userBranches        UserBranch[]
-  userInvitations     UserInvitation[]
-  staffProfiles       StaffProfile[]
-  membershipPlans     MembershipPlan[]
-  members             Member[]
-  memberships         Membership[]
-  membershipFreezes   MembershipFreeze[]
-  memberDocuments     MemberDocument[]
-  attendances         Attendance[]
+  settings              TenantSettings?
+  branding              TenantBranding?
+  profile               TenantProfile?
+  invoiceSettings       TenantInvoiceSettings?
+  limits                TenantLimit?
+  users                 User[]
+  roles                 Role[]
+  refreshTokens         RefreshToken[]
+  passwordResets        PasswordReset[]
+  emailVerifications    EmailVerification[]
+  otpCodes              OtpCode[]
+  loginHistory          LoginHistory[]
+  userSessions          UserSession[]
+  auditLogs             AuditLog[]
+  domains               TenantDomain[]
+  branches              Branch[]
+  modules               TenantModule[]
+  usage                 TenantUsage[]
+  subscriptions         Subscription[]
+  subscriptionHistory   SubscriptionHistory[]
+  billingAddress        BillingAddress?
+  paymentMethods        PaymentMethod[]
+  payments              Payment[]
+  invoices              Invoice[]
+  couponRedemptions     CouponRedemption[]
+  supportTickets        SupportTicket[]
+  notifications         TenantNotification[]
+  userPermissions       UserPermission[]
+  userBranches          UserBranch[]
+  userInvitations       UserInvitation[]
+  staffProfiles         StaffProfile[]
+  membershipPlans       MembershipPlan[]
+  members               Member[]
+  memberships           Membership[]
+  membershipFreezes     MembershipFreeze[]
+  memberDocuments       MemberDocument[]
+  attendances           Attendance[]
+  exercises             Exercise[]
+  workoutPlans          WorkoutPlan[]
+  workoutPlanExercises  WorkoutPlanExercise[]
+  memberWorkoutPlans    MemberWorkoutPlan[]
+  memberWorkoutProgress MemberWorkoutProgress[]
+  foods                 Food[]
+  dietPlans             DietPlan[]
+  dietPlanMeals         DietPlanMeal[]
+  memberDietPlans       MemberDietPlan[]
+  memberDietDailyLogs   MemberDietDailyLog[]
 
   @@map("tenants")
 }
@@ -221,15 +231,15 @@ enum MeasurementUnit {
 }
 
 model TenantSettings {
-  id               String   @id @default(uuid()) @db.Uuid
-  tenantId         String   @unique @map("tenant_id") @db.Uuid
+  id                        String          @id @default(uuid()) @db.Uuid
+  tenantId                  String          @unique @map("tenant_id") @db.Uuid
   /// { primaryColor, primaryForeground, logoUrl?, welcomeMessage }
-  branding         Json     @default("{}")
-  timezone         String   @default("UTC") @db.VarChar(64)
-  currency         String   @default("USD") @db.Char(3)
-  locale           String   @default("en") @db.VarChar(10)
-  emailFromName    String?  @map("email_from_name") @db.VarChar(120)
-  emailFromAddress String?  @map("email_from_address") @db.VarChar(255)
+  branding                  Json            @default("{}")
+  timezone                  String          @default("UTC") @db.VarChar(64)
+  currency                  String          @default("USD") @db.Char(3)
+  locale                    String          @default("en") @db.VarChar(10)
+  emailFromName             String?         @map("email_from_name") @db.VarChar(120)
+  emailFromAddress          String?         @map("email_from_address") @db.VarChar(255)
   /// Business Settings module (Prompt 12) — regional/display preferences.
   /// Symbol is stored (not derived) so a tenant can override the default for
   /// their currency code (e.g. "Fr" vs "CHF").
@@ -261,56 +271,60 @@ model TenantSettings {
 /// A staff or member account, always scoped to exactly one tenant.
 /// The same email may exist in different tenants (different gyms).
 model User {
-  id                  String     @id @default(uuid()) @db.Uuid
-  tenantId            String     @map("tenant_id") @db.Uuid
-  name                String     @db.VarChar(120)
-  email               String     @db.VarChar(255)
-  phone               String?    @db.VarChar(20)
-  passwordHash        String     @map("password_hash")
-  status              UserStatus @default(PENDING_VERIFICATION)
-  emailVerifiedAt     DateTime?  @map("email_verified_at")
-  failedLoginAttempts Int        @default(0) @map("failed_login_attempts")
-  lockedUntil         DateTime?  @map("locked_until")
-  lastLoginAt         DateTime?  @map("last_login_at")
-  passwordChangedAt   DateTime?  @map("password_changed_at")
-  mfaEnabled          Boolean    @default(false) @map("mfa_enabled")
-  mfaSecret           String?    @map("mfa_secret")
+  id                       String     @id @default(uuid()) @db.Uuid
+  tenantId                 String     @map("tenant_id") @db.Uuid
+  name                     String     @db.VarChar(120)
+  email                    String     @db.VarChar(255)
+  phone                    String?    @db.VarChar(20)
+  passwordHash             String     @map("password_hash")
+  status                   UserStatus @default(PENDING_VERIFICATION)
+  emailVerifiedAt          DateTime?  @map("email_verified_at")
+  failedLoginAttempts      Int        @default(0) @map("failed_login_attempts")
+  lockedUntil              DateTime?  @map("locked_until")
+  lastLoginAt              DateTime?  @map("last_login_at")
+  passwordChangedAt        DateTime?  @map("password_changed_at")
+  mfaEnabled               Boolean    @default(false) @map("mfa_enabled")
+  mfaSecret                String?    @map("mfa_secret")
   /// IAM profile fields (Prompt 11). Avatar is a URL or small data-URL —
   /// swap for object storage when a storage provider is configured.
-  avatarUrl                String? @map("avatar_url")
-  emergencyContactName     String? @map("emergency_contact_name") @db.VarChar(120)
-  emergencyContactPhone    String? @map("emergency_contact_phone") @db.VarChar(20)
-  emergencyContactRelation String? @map("emergency_contact_relation") @db.VarChar(60)
+  avatarUrl                String?    @map("avatar_url")
+  emergencyContactName     String?    @map("emergency_contact_name") @db.VarChar(120)
+  emergencyContactPhone    String?    @map("emergency_contact_phone") @db.VarChar(20)
+  emergencyContactRelation String?    @map("emergency_contact_relation") @db.VarChar(60)
   /// Per-user notification preference toggles, e.g. {"email_billing": true}.
-  notificationPreferences Json? @map("notification_preferences")
+  notificationPreferences  Json?      @map("notification_preferences")
   /// Bumped on every role/permission change for this user — part of the
   /// permission-cache key AND the JWT claim, so edits invalidate cached
   /// permission sets. Persisted here (not Redis-only) so it survives
   /// eviction/restarts.
-  permissionVersion Int @default(1) @map("permission_version")
+  permissionVersion        Int        @default(1) @map("permission_version")
   /// Branch access: true = every branch (default; owners/managers), false =
   /// only the branches listed in user_branches.
-  allBranches Boolean   @default(true) @map("all_branches")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
+  allBranches              Boolean    @default(true) @map("all_branches")
+  createdAt                DateTime   @default(now()) @map("created_at")
+  updatedAt                DateTime   @updatedAt @map("updated_at")
+  deletedAt                DateTime?  @map("deleted_at")
 
-  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userRoles          UserRole[]
-  refreshTokens      RefreshToken[]
-  passwordResets     PasswordReset[]
-  emailVerifications EmailVerification[]
-  otpCodes           OtpCode[]
-  loginHistory       LoginHistory[]
-  sessions           UserSession[]
-  auditLogsAsActor   AuditLog[]          @relation("AuditActor")
-  userPermissions    UserPermission[]
-  userBranches       UserBranch[]
-  sentInvitations    UserInvitation[]    @relation("InvitationInviter")
-  staffProfile       StaffProfile?
-  trainerFor         Member[]            @relation("MemberTrainer")
-  attendanceCheckIns  Attendance[]       @relation("AttendanceCheckedInBy")
-  attendanceCheckOuts Attendance[]       @relation("AttendanceCheckedOutBy")
+  tenant                       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles                    UserRole[]
+  refreshTokens                RefreshToken[]
+  passwordResets               PasswordReset[]
+  emailVerifications           EmailVerification[]
+  otpCodes                     OtpCode[]
+  loginHistory                 LoginHistory[]
+  sessions                     UserSession[]
+  auditLogsAsActor             AuditLog[]          @relation("AuditActor")
+  userPermissions              UserPermission[]
+  userBranches                 UserBranch[]
+  sentInvitations              UserInvitation[]    @relation("InvitationInviter")
+  staffProfile                 StaffProfile?
+  trainerFor                   Member[]            @relation("MemberTrainer")
+  attendanceCheckIns           Attendance[]        @relation("AttendanceCheckedInBy")
+  attendanceCheckOuts          Attendance[]        @relation("AttendanceCheckedOutBy")
+  workoutPlansAsTrainer        WorkoutPlan[]       @relation("WorkoutPlanTrainer")
+  memberWorkoutPlansAssignedBy MemberWorkoutPlan[] @relation("MemberWorkoutPlanAssignedBy")
+  dietPlansAsTrainer           DietPlan[]          @relation("DietPlanTrainer")
+  memberDietPlansAssignedBy    MemberDietPlan[]    @relation("MemberDietPlanAssignedBy")
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
@@ -327,13 +341,13 @@ model Role {
   description String?
   isSystem    Boolean  @default(false) @map("is_system")
   /// Hierarchy weight — higher wins when displaying a user's primary role.
-  priority  Int     @default(0)
+  priority    Int      @default(0)
   /// Pre-selected role for new invitations/users in this tenant.
-  isDefault Boolean @default(false) @map("is_default")
+  isDefault   Boolean  @default(false) @map("is_default")
   /// Inactive roles can't be assigned to new users; existing holders keep them.
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   tenant          Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   rolePermissions RolePermission[]
@@ -512,31 +526,31 @@ enum WorkStatus {
 /// other part of the app (auth, sessions, notifications, audit) keeps
 /// working against the field it already expects.
 model StaffProfile {
-  id                      String         @id @default(uuid()) @db.Uuid
-  tenantId                String         @map("tenant_id") @db.Uuid
-  userId                  String         @unique @map("user_id") @db.Uuid
+  id             String         @id @default(uuid()) @db.Uuid
+  tenantId       String         @map("tenant_id") @db.Uuid
+  userId         String         @unique @map("user_id") @db.Uuid
   /// Auto-generated on create (e.g. "EMP-0007"), editable afterward.
-  employeeId              String         @map("employee_id") @db.VarChar(40)
-  firstName               String         @map("first_name") @db.VarChar(80)
-  lastName                String         @map("last_name") @db.VarChar(80)
-  gender                  Gender?
-  dateOfBirth             DateTime?      @map("date_of_birth") @db.Date
-  joiningDate             DateTime       @default(now()) @map("joining_date") @db.Date
-  addressLine             String?        @map("address_line") @db.VarChar(200)
-  city                    String?        @db.VarChar(100)
-  state                   String?        @db.VarChar(100)
-  country                 String?        @db.VarChar(100)
-  postalCode              String?        @map("postal_code") @db.VarChar(20)
-  notes                   String?
-  employmentType           EmploymentType @default(FULL_TIME) @map("employment_type")
-  salaryType               SalaryType     @default(MONTHLY) @map("salary_type")
-  salaryAmount             Decimal?       @map("salary_amount") @db.Decimal(12, 2)
-  shift                    String?        @db.VarChar(60)
+  employeeId     String         @map("employee_id") @db.VarChar(40)
+  firstName      String         @map("first_name") @db.VarChar(80)
+  lastName       String         @map("last_name") @db.VarChar(80)
+  gender         Gender?
+  dateOfBirth    DateTime?      @map("date_of_birth") @db.Date
+  joiningDate    DateTime       @default(now()) @map("joining_date") @db.Date
+  addressLine    String?        @map("address_line") @db.VarChar(200)
+  city           String?        @db.VarChar(100)
+  state          String?        @db.VarChar(100)
+  country        String?        @db.VarChar(100)
+  postalCode     String?        @map("postal_code") @db.VarChar(20)
+  notes          String?
+  employmentType EmploymentType @default(FULL_TIME) @map("employment_type")
+  salaryType     SalaryType     @default(MONTHLY) @map("salary_type")
+  salaryAmount   Decimal?       @map("salary_amount") @db.Decimal(12, 2)
+  shift          String?        @db.VarChar(60)
   /// Comma-separated weekday names, e.g. "SUNDAY" or "SUNDAY,MONDAY".
-  weeklyOff                String?        @map("weekly_off") @db.VarChar(60)
-  workStatus               WorkStatus     @default(WORKING) @map("work_status")
-  createdAt                DateTime       @default(now()) @map("created_at")
-  updatedAt                DateTime       @updatedAt @map("updated_at")
+  weeklyOff      String?        @map("weekly_off") @db.VarChar(60)
+  workStatus     WorkStatus     @default(WORKING) @map("work_status")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -618,24 +632,24 @@ enum DurationType {
 /// math for a member's Membership always uses calendar-aware `addDuration()`
 /// against `durationValue`/`durationType` directly, not this cache.
 model MembershipPlan {
-  id           String   @id @default(uuid()) @db.Uuid
-  tenantId     String   @map("tenant_id") @db.Uuid
-  name         String   @db.VarChar(120)
+  id                 String       @id @default(uuid()) @db.Uuid
+  tenantId           String       @map("tenant_id") @db.Uuid
+  name               String       @db.VarChar(120)
   /// Auto-generated on create (e.g. "PLAN-0007"), editable afterward.
-  planCode     String   @map("plan_code") @db.VarChar(40)
-  description  String?
-  category     String?  @db.VarChar(60)
-  durationValue Int          @default(1) @map("duration_value")
-  durationType  DurationType @default(MONTHS) @map("duration_type")
+  planCode           String       @map("plan_code") @db.VarChar(40)
+  description        String?
+  category           String?      @db.VarChar(60)
+  durationValue      Int          @default(1) @map("duration_value")
+  durationType       DurationType @default(MONTHS) @map("duration_type")
   /// Derived cache — see model doc comment above.
-  durationDays Int      @map("duration_days")
-  price        Decimal  @db.Decimal(10, 2)
-  joiningFee         Decimal @default(0) @map("joining_fee") @db.Decimal(10, 2)
-  taxPercentage      Decimal @default(0) @map("tax_percentage") @db.Decimal(5, 2)
-  discountPercentage Decimal @default(0) @map("discount_percentage") @db.Decimal(5, 2)
-  isActive     Boolean  @default(true) @map("is_active")
-  displayOrder Int      @default(0) @map("display_order")
-  notes        String?
+  durationDays       Int          @map("duration_days")
+  price              Decimal      @db.Decimal(10, 2)
+  joiningFee         Decimal      @default(0) @map("joining_fee") @db.Decimal(10, 2)
+  taxPercentage      Decimal      @default(0) @map("tax_percentage") @db.Decimal(5, 2)
+  discountPercentage Decimal      @default(0) @map("discount_percentage") @db.Decimal(5, 2)
+  isActive           Boolean      @default(true) @map("is_active")
+  displayOrder       Int          @default(0) @map("display_order")
+  notes              String?
 
   // ── Plan Features ────────────────────────────────────────────────────
   /// true = every branch (present + future); false = only `accessBranchIds`.
@@ -655,21 +669,21 @@ model MembershipPlan {
   /// Window during which this plan itself may be purchased/assigned — null
   /// on either side means no restriction. Distinct from a Membership's own
   /// start/end dates (this gates the PLAN, not a specific member's period).
-  validityStart       DateTime? @map("validity_start") @db.Date
-  validityEnd         DateTime? @map("validity_end") @db.Date
-  gracePeriodDays     Int       @default(0) @map("grace_period_days")
+  validityStart      DateTime? @map("validity_start") @db.Date
+  validityEnd        DateTime? @map("validity_end") @db.Date
+  gracePeriodDays    Int       @default(0) @map("grace_period_days")
   /// Days before expiry a renewal is allowed; 0 = anytime.
-  renewalWindowDays   Int       @default(0) @map("renewal_window_days")
-  autoRenewalAllowed  Boolean   @default(true) @map("auto_renewal_allowed")
-  minAge              Int?      @map("min_age")
-  maxAge              Int?      @map("max_age")
+  renewalWindowDays  Int       @default(0) @map("renewal_window_days")
+  autoRenewalAllowed Boolean   @default(true) @map("auto_renewal_allowed")
+  minAge             Int?      @map("min_age")
+  maxAge             Int?      @map("max_age")
 
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  deletedAt    DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at")
 
-  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  memberships  Membership[]
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberships Membership[]
 
   @@unique([tenantId, planCode])
   @@index([tenantId])
@@ -719,13 +733,15 @@ model Member {
   updatedAt                DateTime     @updatedAt @map("updated_at")
   deletedAt                DateTime?    @map("deleted_at")
 
-  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch      Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  trainer     User?              @relation("MemberTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
-  memberships Membership[]
-  freezes     MembershipFreeze[]
-  documents   MemberDocument[]
-  attendances Attendance[]
+  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch       Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  trainer      User?               @relation("MemberTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+  memberships  Membership[]
+  freezes      MembershipFreeze[]
+  documents    MemberDocument[]
+  attendances  Attendance[]
+  workoutPlans MemberWorkoutPlan[]
+  dietPlans    MemberDietPlan[]
 
   @@unique([tenantId, memberId])
   @@index([tenantId, status])
@@ -737,24 +753,24 @@ model Member {
 /// (the old one flips to SUPERSEDED) so Renewal History is just this
 /// member's rows ordered by `createdAt`, no separate history table needed.
 model Membership {
-  id                String            @id @default(uuid()) @db.Uuid
-  tenantId          String            @map("tenant_id") @db.Uuid
-  memberId          String            @map("member_id") @db.Uuid
-  planId            String            @map("plan_id") @db.Uuid
-  startDate         DateTime          @map("start_date") @db.Date
-  endDate           DateTime          @map("end_date") @db.Date
+  id                String           @id @default(uuid()) @db.Uuid
+  tenantId          String           @map("tenant_id") @db.Uuid
+  memberId          String           @map("member_id") @db.Uuid
+  planId            String           @map("plan_id") @db.Uuid
+  startDate         DateTime         @map("start_date") @db.Date
+  endDate           DateTime         @map("end_date") @db.Date
   /// Snapshot from the plan at assignment time — later plan edits don't
   /// retroactively change a membership someone already bought.
-  durationDays      Int               @map("duration_days")
-  priceAtAssignment Decimal           @map("price_at_assignment") @db.Decimal(10, 2)
-  status            MembershipStatus  @default(ACTIVE)
-  autoRenew         Boolean           @default(false) @map("auto_renew")
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
+  durationDays      Int              @map("duration_days")
+  priceAtAssignment Decimal          @map("price_at_assignment") @db.Decimal(10, 2)
+  status            MembershipStatus @default(ACTIVE)
+  autoRenew         Boolean          @default(false) @map("auto_renew")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
 
-  tenant Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  member Member         @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  plan   MembershipPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  tenant  Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member  Member             @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  plan    MembershipPlan     @relation(fields: [planId], references: [id], onDelete: Restrict)
   freezes MembershipFreeze[]
 
   @@index([tenantId, memberId])
@@ -764,14 +780,14 @@ model Membership {
 
 /// Freeze History — `unfrozenAt = null` means still frozen.
 model MembershipFreeze {
-  id           String      @id @default(uuid()) @db.Uuid
-  tenantId     String      @map("tenant_id") @db.Uuid
-  memberId     String      @map("member_id") @db.Uuid
-  membershipId String?     @map("membership_id") @db.Uuid
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  memberId     String    @map("member_id") @db.Uuid
+  membershipId String?   @map("membership_id") @db.Uuid
   reason       String?
-  frozenAt     DateTime    @default(now()) @map("frozen_at")
-  unfrozenAt   DateTime?   @map("unfrozen_at")
-  createdAt    DateTime    @default(now()) @map("created_at")
+  frozenAt     DateTime  @default(now()) @map("frozen_at")
+  unfrozenAt   DateTime? @map("unfrozen_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
 
   tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   member     Member      @relation(fields: [memberId], references: [id], onDelete: Cascade)
@@ -844,11 +860,11 @@ model Attendance {
   notes          String?
   /// Staff user who performed a MANUAL check-in/out; null for member
   /// self-service methods (QR/biometric/etc).
-  checkedInBy  String?   @map("checked_in_by") @db.Uuid
-  checkedOutBy String?   @map("checked_out_by") @db.Uuid
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-  deletedAt    DateTime? @map("deleted_at")
+  checkedInBy    String?          @map("checked_in_by") @db.Uuid
+  checkedOutBy   String?          @map("checked_out_by") @db.Uuid
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+  deletedAt      DateTime?        @map("deleted_at")
 
   tenant           Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   member           Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
@@ -860,6 +876,364 @@ model Attendance {
   @@index([tenantId, branchId])
   @@index([tenantId, attendanceDate])
   @@map("attendance_records")
+}
+
+enum ExerciseDifficultyLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+
+  @@map("exercise_difficulty_level")
+}
+
+/// The gym's own exercise catalog, reused across workout plans via
+/// `WorkoutPlanExercise`. Soft-deletable so a plan that already references an
+/// exercise never breaks even if the catalog entry is later retired.
+model Exercise {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  tenantId             String                  @map("tenant_id") @db.Uuid
+  name                 String                  @db.VarChar(150)
+  category             String?                 @db.VarChar(100)
+  muscleGroup          String?                 @map("muscle_group") @db.VarChar(100)
+  equipment            String?                 @db.VarChar(150)
+  difficultyLevel      ExerciseDifficultyLevel @default(BEGINNER) @map("difficulty_level")
+  instructions         String?
+  imageUrl             String?                 @map("image_url")
+  /// Reference-only — never fetched/embedded server-side, just displayed as a link.
+  videoUrl             String?                 @map("video_url")
+  durationSeconds      Int?                    @map("duration_seconds")
+  defaultSets          Int?                    @map("default_sets")
+  defaultReps          Int?                    @map("default_reps")
+  restSeconds          Int?                    @map("rest_seconds")
+  caloriesBurnEstimate Int?                    @map("calories_burn_estimate")
+  isActive             Boolean                 @default(true) @map("is_active")
+  createdAt            DateTime                @default(now()) @map("created_at")
+  updatedAt            DateTime                @updatedAt @map("updated_at")
+  deletedAt            DateTime?               @map("deleted_at")
+
+  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planExercises WorkoutPlanExercise[]
+  progress      MemberWorkoutProgress[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@map("exercises")
+}
+
+enum WorkoutLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+
+  @@map("workout_level")
+}
+
+/// Day of the weekly schedule an exercise is placed on within a plan.
+enum WeekDay {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+
+  @@map("week_day")
+}
+
+/// The gym's reusable workout-plan catalog (same shape as `MembershipPlan`
+/// for memberships) — authored once, then assigned to many members via
+/// `MemberWorkoutPlan`. Editing a plan's exercises later does NOT
+/// retroactively change a member's already-assigned plan snapshot-in-time;
+/// see `MemberWorkoutPlan` for how assignment history is preserved.
+model WorkoutPlan {
+  id            String       @id @default(uuid()) @db.Uuid
+  tenantId      String       @map("tenant_id") @db.Uuid
+  name          String       @db.VarChar(150)
+  description   String?
+  goal          String?      @db.VarChar(150)
+  level         WorkoutLevel @default(BEGINNER)
+  durationWeeks Int          @map("duration_weeks")
+  /// Author/owner trainer — must be an active User holding the TRAINER role
+  /// (business rule: "only active trainers can create or manage workout
+  /// plans"). Optional so a Manager can author a plan with no trainer yet.
+  trainerId     String?      @map("trainer_id") @db.Uuid
+  isActive      Boolean      @default(true) @map("is_active")
+  notes         String?
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+  deletedAt     DateTime?    @map("deleted_at")
+
+  tenant    Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  trainer   User?                 @relation("WorkoutPlanTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+  exercises WorkoutPlanExercise[]
+  members   MemberWorkoutPlan[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, trainerId])
+  @@map("workout_plans")
+}
+
+/// One row per exercise placed on a plan's weekly schedule. `sortOrder` is
+/// the drag-and-drop ordering WITHIN one (planId, dayOfWeek) — the frontend
+/// reorders items on drop and persists the whole day's new exercise order.
+model WorkoutPlanExercise {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  planId      String   @map("plan_id") @db.Uuid
+  exerciseId  String   @map("exercise_id") @db.Uuid
+  dayOfWeek   WeekDay  @map("day_of_week")
+  sortOrder   Int      @default(0) @map("sort_order")
+  /// Per-plan overrides — fall back to the exercise's own defaults when null.
+  sets        Int?
+  repetitions Int?
+  restSeconds Int?     @map("rest_seconds")
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan     WorkoutPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  exercise Exercise    @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, planId, dayOfWeek])
+  @@map("workout_plan_exercises")
+}
+
+enum MemberWorkoutPlanStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+
+  @@map("member_workout_plan_status")
+}
+
+/// One row per assignment — assigning a new plan (or the same plan again)
+/// while one is ACTIVE flips the old row to CANCELLED and creates a fresh
+/// row, the same "supersede, never mutate" history pattern as `Membership`.
+/// This is what satisfies "members can have multiple workout plans, but only
+/// one active plan" and "preserve workout history after updates" together.
+model MemberWorkoutPlan {
+  id             String                  @id @default(uuid()) @db.Uuid
+  tenantId       String                  @map("tenant_id") @db.Uuid
+  memberId       String                  @map("member_id") @db.Uuid
+  workoutPlanId  String                  @map("workout_plan_id") @db.Uuid
+  assignedDate   DateTime                @default(now()) @map("assigned_date") @db.Date
+  startDate      DateTime                @map("start_date") @db.Date
+  endDate        DateTime?               @map("end_date") @db.Date
+  status         MemberWorkoutPlanStatus @default(ACTIVE)
+  trainerRemarks String?                 @map("trainer_remarks")
+  memberNotes    String?                 @map("member_notes")
+  assignedBy     String?                 @map("assigned_by") @db.Uuid
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+
+  tenant         Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member         Member                  @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  workoutPlan    WorkoutPlan             @relation(fields: [workoutPlanId], references: [id], onDelete: Restrict)
+  assignedByUser User?                   @relation("MemberWorkoutPlanAssignedBy", fields: [assignedBy], references: [id], onDelete: SetNull)
+  progress       MemberWorkoutProgress[]
+
+  @@index([tenantId, memberId])
+  @@index([tenantId, workoutPlanId])
+  @@index([tenantId, status])
+  @@map("member_workout_plans")
+}
+
+enum MemberExerciseProgressStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+
+  @@map("member_exercise_progress_status")
+}
+
+/// Per-exercise completion state for one member's plan assignment — this
+/// backs "Completed Exercises"/"Skipped Exercises"/progress-percent all from
+/// one table (unique per assignment+exercise; marking progress again just
+/// updates the same row's status/notes/timestamp, it doesn't append rows).
+model MemberWorkoutProgress {
+  id                  String                       @id @default(uuid()) @db.Uuid
+  tenantId            String                       @map("tenant_id") @db.Uuid
+  memberWorkoutPlanId String                       @map("member_workout_plan_id") @db.Uuid
+  exerciseId          String                       @map("exercise_id") @db.Uuid
+  status              MemberExerciseProgressStatus @default(PENDING)
+  notes               String?
+  markedAt            DateTime?                    @map("marked_at")
+  createdAt           DateTime                     @default(now()) @map("created_at")
+  updatedAt           DateTime                     @updatedAt @map("updated_at")
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberWorkoutPlan MemberWorkoutPlan @relation(fields: [memberWorkoutPlanId], references: [id], onDelete: Cascade)
+  exercise          Exercise          @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  @@unique([memberWorkoutPlanId, exerciseId])
+  @@index([tenantId, memberWorkoutPlanId])
+  @@map("member_workout_progress")
+}
+
+/// The gym's own food catalog — reused across diet plans via
+/// `DietPlanMeal`. Soft-deletable so a plan that already references a food
+/// never breaks even if the catalog entry is later retired.
+model Food {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  name          String    @db.VarChar(150)
+  category      String?   @db.VarChar(100)
+  servingSize   String?   @map("serving_size") @db.VarChar(100)
+  calories      Int?
+  protein       Decimal?  @db.Decimal(6, 2)
+  carbohydrates Decimal?  @db.Decimal(6, 2)
+  fat           Decimal?  @db.Decimal(6, 2)
+  fiber         Decimal?  @db.Decimal(6, 2)
+  sugar         Decimal?  @db.Decimal(6, 2)
+  sodium        Decimal?  @db.Decimal(7, 2)
+  notes         String?
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  planMeals DietPlanMeal[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+  @@map("foods")
+}
+
+/// Fixed set of daily meal slots (NOT tied to a day-of-week — a diet plan's
+/// meals repeat every day of the plan, unlike a workout plan's weekly
+/// schedule).
+enum MealType {
+  BREAKFAST
+  MORNING_SNACK
+  LUNCH
+  EVENING_SNACK
+  DINNER
+  PRE_WORKOUT
+  POST_WORKOUT
+
+  @@map("meal_type")
+}
+
+/// The gym's reusable diet-plan catalog (same shape as `WorkoutPlan`) —
+/// authored once, then assigned to many members via `MemberDietPlan`.
+/// Editing a plan's meals later does NOT retroactively change a member's
+/// already-assigned plan; see `MemberDietPlan` for how assignment history is
+/// preserved.
+model DietPlan {
+  id            String    @id @default(uuid()) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  name          String    @db.VarChar(150)
+  description   String?
+  goal          String?   @db.VarChar(150)
+  dailyCalories Int?      @map("daily_calories")
+  durationDays  Int       @map("duration_days")
+  /// Author/owner trainer or nutritionist — must be an active User holding
+  /// the TRAINER role (business rule: "only active trainers can create or
+  /// assign diet plans"). Optional so a Manager can author a plan with no
+  /// trainer yet.
+  trainerId     String?   @map("trainer_id") @db.Uuid
+  isActive      Boolean   @default(true) @map("is_active")
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
+  tenant  Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  trainer User?            @relation("DietPlanTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+  meals   DietPlanMeal[]
+  members MemberDietPlan[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, trainerId])
+  @@map("diet_plans")
+}
+
+/// One row per food placed under a meal slot within a plan. `sortOrder` is
+/// the Meal Builder's ordering WITHIN one (planId, mealType).
+model DietPlanMeal {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  planId    String   @map("plan_id") @db.Uuid
+  foodId    String   @map("food_id") @db.Uuid
+  mealType  MealType @map("meal_type")
+  sortOrder Int      @default(0) @map("sort_order")
+  /// Serving multiplier against the food's own base serving — e.g. 1.5x.
+  quantity  Decimal  @default(1) @db.Decimal(5, 2)
+  notes     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan   DietPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  food   Food     @relation(fields: [foodId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, planId, mealType])
+  @@map("diet_plan_meals")
+}
+
+enum MemberDietPlanStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+
+  @@map("member_diet_plan_status")
+}
+
+/// One row per assignment — assigning a new (or the same) plan while one is
+/// ACTIVE flips the old row to COMPLETED and creates a fresh row, the same
+/// "supersede, never mutate" history pattern as `Membership`/`MemberWorkoutPlan`.
+model MemberDietPlan {
+  id             String               @id @default(uuid()) @db.Uuid
+  tenantId       String               @map("tenant_id") @db.Uuid
+  memberId       String               @map("member_id") @db.Uuid
+  dietPlanId     String               @map("diet_plan_id") @db.Uuid
+  assignedDate   DateTime             @default(now()) @map("assigned_date") @db.Date
+  startDate      DateTime             @map("start_date") @db.Date
+  endDate        DateTime?            @map("end_date") @db.Date
+  status         MemberDietPlanStatus @default(ACTIVE)
+  trainerRemarks String?              @map("trainer_remarks")
+  memberNotes    String?              @map("member_notes")
+  assignedBy     String?              @map("assigned_by") @db.Uuid
+  createdAt      DateTime             @default(now()) @map("created_at")
+  updatedAt      DateTime             @updatedAt @map("updated_at")
+
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member         Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  dietPlan       DietPlan             @relation(fields: [dietPlanId], references: [id], onDelete: Restrict)
+  assignedByUser User?                @relation("MemberDietPlanAssignedBy", fields: [assignedBy], references: [id], onDelete: SetNull)
+  dailyLogs      MemberDietDailyLog[]
+
+  @@index([tenantId, memberId])
+  @@index([tenantId, dietPlanId])
+  @@index([tenantId, status])
+  @@map("member_diet_plans")
+}
+
+/// One row per (assignment, calendar date) — "Daily Tracking" + "Water
+/// Intake" + "Weight Tracking" all in one row, upserted by date (logging
+/// again for the same date just overwrites it, it doesn't append rows).
+/// `mealsStatus` is a small Json map of `MealType -> PENDING|COMPLETED|SKIPPED`
+/// for that day (a normalized child table would be one row per meal slot per
+/// day for no real query benefit at this scale — kept as Json deliberately).
+model MemberDietDailyLog {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  memberDietPlanId String   @map("member_diet_plan_id") @db.Uuid
+  date             DateTime @db.Date
+  waterIntakeMl    Int?     @map("water_intake_ml")
+  weightKg         Decimal? @map("weight_kg") @db.Decimal(5, 2)
+  mealsStatus      Json?    @map("meals_status")
+  notes            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  memberDietPlan MemberDietPlan @relation(fields: [memberDietPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([memberDietPlanId, date])
+  @@index([tenantId, memberDietPlanId])
+  @@map("member_diet_daily_logs")
 }
 
 // ── Sessions & tokens ─────────────────────────────────────────────────────
@@ -1140,18 +1514,18 @@ enum ThemePreference {
 }
 
 model TenantBranding {
-  id                String   @id @default(uuid()) @db.Uuid
-  tenantId          String   @unique @map("tenant_id") @db.Uuid
-  logoUrl           String?  @map("logo_url")
-  faviconUrl        String?  @map("favicon_url")
-  primaryColor      String   @default("oklch(0.51 0.23 277)") @map("primary_color")
-  primaryForeground String   @default("oklch(0.985 0 0)") @map("primary_foreground")
+  id                 String          @id @default(uuid()) @db.Uuid
+  tenantId           String          @unique @map("tenant_id") @db.Uuid
+  logoUrl            String?         @map("logo_url")
+  faviconUrl         String?         @map("favicon_url")
+  primaryColor       String          @default("oklch(0.51 0.23 277)") @map("primary_color")
+  primaryForeground  String          @default("oklch(0.985 0 0)") @map("primary_foreground")
   /// Accent color for secondary actions/badges — added in Prompt 10 for the
   /// portal shell's theme; falls back to `primaryColor` at read time for
   /// tenants provisioned before this field existed.
-  secondaryColor    String?  @map("secondary_color")
-  welcomeMessage    String?  @map("welcome_message")
-  customCss         String?  @map("custom_css")
+  secondaryColor     String?         @map("secondary_color")
+  welcomeMessage     String?         @map("welcome_message")
+  customCss          String?         @map("custom_css")
   /// Branding module (Prompt 12) additions. `theme` is the tenant's stored
   /// preference, not yet wired as the ThemeProvider default (that mirror
   /// lives client-side via next-themes per-browser) — recorded here so the
@@ -1173,30 +1547,30 @@ model TenantBranding {
 /// social links). Distinct from `BillingAddress` (Prompt 8), which is the
 /// address FitCloud bills the TENANT at, not the gym's own public address.
 model TenantProfile {
-  id                   String   @id @default(uuid()) @db.Uuid
-  tenantId             String   @unique @map("tenant_id") @db.Uuid
-  legalBusinessName    String?  @map("legal_business_name") @db.VarChar(160)
-  registrationNumber   String?  @map("registration_number") @db.VarChar(60)
-  gstVatNumber         String?  @map("gst_vat_number") @db.VarChar(40)
-  businessType         String?  @map("business_type") @db.VarChar(60)
-  description          String?
-  email                String?  @db.VarChar(255)
-  phone                String?  @db.VarChar(20)
-  alternatePhone       String?  @map("alternate_phone") @db.VarChar(20)
-  website              String?  @db.VarChar(255)
-  addressLine          String?  @map("address_line") @db.VarChar(200)
-  city                 String?  @db.VarChar(100)
-  state                String?  @db.VarChar(100)
-  country              String?  @db.VarChar(100)
-  postalCode           String?  @map("postal_code") @db.VarChar(20)
-  latitude             Decimal? @db.Decimal(9, 6)
-  longitude            Decimal? @db.Decimal(9, 6)
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @unique @map("tenant_id") @db.Uuid
+  legalBusinessName  String?  @map("legal_business_name") @db.VarChar(160)
+  registrationNumber String?  @map("registration_number") @db.VarChar(60)
+  gstVatNumber       String?  @map("gst_vat_number") @db.VarChar(40)
+  businessType       String?  @map("business_type") @db.VarChar(60)
+  description        String?
+  email              String?  @db.VarChar(255)
+  phone              String?  @db.VarChar(20)
+  alternatePhone     String?  @map("alternate_phone") @db.VarChar(20)
+  website            String?  @db.VarChar(255)
+  addressLine        String?  @map("address_line") @db.VarChar(200)
+  city               String?  @db.VarChar(100)
+  state              String?  @db.VarChar(100)
+  country            String?  @db.VarChar(100)
+  postalCode         String?  @map("postal_code") @db.VarChar(20)
+  latitude           Decimal? @db.Decimal(9, 6)
+  longitude          Decimal? @db.Decimal(9, 6)
   /// { monday: { open, close, closed }, ... } — keyed by lowercase weekday name.
-  businessHours         Json?    @map("business_hours")
+  businessHours      Json?    @map("business_hours")
   /// { facebook?, instagram?, twitter?, youtube?, linkedin? }
-  socialLinks           Json?    @map("social_links")
-  createdAt             DateTime @default(now()) @map("created_at")
-  updatedAt             DateTime @updatedAt @map("updated_at")
+  socialLinks        Json?    @map("social_links")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -1207,14 +1581,14 @@ model TenantProfile {
 /// unrelated to the platform's `Invoice` model (Prompt 8), which is
 /// FitCloud billing the tenant for their subscription.
 model TenantInvoiceSettings {
-  id                     String   @id @default(uuid()) @db.Uuid
-  tenantId               String   @unique @map("tenant_id") @db.Uuid
-  invoicePrefix          String   @default("INV") @map("invoice_prefix") @db.VarChar(20)
-  invoiceFooter          String?  @map("invoice_footer")
-  taxPercentage          Decimal  @default(0) @map("tax_percentage") @db.Decimal(5, 2)
-  defaultPaymentTermsDays Int     @default(15) @map("default_payment_terms_days")
-  createdAt              DateTime @default(now()) @map("created_at")
-  updatedAt              DateTime @updatedAt @map("updated_at")
+  id                      String   @id @default(uuid()) @db.Uuid
+  tenantId                String   @unique @map("tenant_id") @db.Uuid
+  invoicePrefix           String   @default("INV") @map("invoice_prefix") @db.VarChar(20)
+  invoiceFooter           String?  @map("invoice_footer")
+  taxPercentage           Decimal  @default(0) @map("tax_percentage") @db.Decimal(5, 2)
+  defaultPaymentTermsDays Int      @default(15) @map("default_payment_terms_days")
+  createdAt               DateTime @default(now()) @map("created_at")
+  updatedAt               DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 

@@ -87,9 +87,9 @@ export default function AttendanceDashboardPage() {
       </div>
 
       {!summary.isPending && (summary.data?.totalCheckInsToday ?? 0) === 0 ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Badge variant="outline">Tip</Badge> Use &ldquo;Check in / out&rdquo; above to record your first visit of the day.
-        </p>
+        </div>
       ) : null}
     </div>
   );

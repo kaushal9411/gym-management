@@ -124,6 +124,16 @@ export class AttendanceService {
     return branch.timezone;
   }
 
+  /** Timezone to anchor "today" by when no specific branch is selected (e.g. the all-branches dashboard) — the tenant's default branch, falling back to any branch, so it never silently drifts to UTC. */
+  private async defaultTimezone(): Promise<string> {
+    const branch = await this.db.branch.findFirst({
+      where: { tenantId: this.tenantId },
+      orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+      select: { timezone: true },
+    });
+    return branch?.timezone ?? 'UTC';
+  }
+
   async validateQrCode(input: ValidateQrCodeInput): Promise<QrValidationResultDto> {
     const member = await this.members.findByQrToken(this.tenantId, input.qrCodeToken);
     if (!member) return { valid: false, reason: 'QR code not recognized.', member: null, alreadyCheckedIn: false };
@@ -257,7 +267,7 @@ export class AttendanceService {
   }
 
   async getToday(branchId?: string): Promise<AttendanceRecordDto[]> {
-    const timezone = branchId ? await this.branchTimezone(branchId) : 'UTC';
+    const timezone = branchId ? await this.branchTimezone(branchId) : await this.defaultTimezone();
     const todayStr = dateInTimezone(timezone);
     const { items } = await this.attendance.list(this.tenantId, {
       page: 1,
@@ -291,7 +301,7 @@ export class AttendanceService {
   }
 
   async getSummary(params: { branchId?: string; dateFrom?: string; dateTo?: string }): Promise<AttendanceSummaryDto> {
-    const timezone = params.branchId ? await this.branchTimezone(params.branchId) : 'UTC';
+    const timezone = params.branchId ? await this.branchTimezone(params.branchId) : await this.defaultTimezone();
     const todayStr = dateInTimezone(timezone);
 
     const [{ checkIns, checkOuts, currentlyInside }, checkInTimes] = await Promise.all([
