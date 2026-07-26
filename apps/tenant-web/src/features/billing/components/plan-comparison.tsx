@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { FormAlert } from '@/features/auth/components/form-alert';
-import { LoadingButton } from '@/features/auth/components/loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { usePlans } from '../hooks/use-billing';
 import type { SubscriptionPlan } from '../types';
 import { CheckoutDialog } from './checkout-dialog';

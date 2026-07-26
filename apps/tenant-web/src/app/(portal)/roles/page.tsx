@@ -111,6 +111,8 @@ export default function RolesPage() {
         rows={roles.data ?? []}
         rowKey={(r) => r.id}
         loading={roles.isPending}
+        error={roles.error}
+        onRetry={() => roles.refetch()}
         emptyMessage="No roles yet."
       />
     </div>

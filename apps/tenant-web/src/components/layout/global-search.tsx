@@ -31,7 +31,7 @@ export function GlobalSearch() {
         placeholder="Search modules…"
       />
       {focused && matches.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border bg-popover shadow-lg">
+        <div className="animate-in fade-in-0 zoom-in-95 duration-150 absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border bg-popover p-1.5 shadow-md">
           {matches.map((item) => (
             <button
               key={item.key}
@@ -40,7 +40,7 @@ export function GlobalSearch() {
                 router.push(item.href);
                 setQuery('');
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
+              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-accent"
             >
               <item.icon className="size-4 text-muted-foreground" />
               {item.label}

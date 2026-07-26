@@ -6,6 +6,20 @@ import { ChartWrapper } from '@/components/ui/chart-wrapper';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useAttendanceTrends, useNewMemberGrowth, useRevenueTrends } from '@/features/reports/hooks/use-reports';
 
+const AXIS_TICK = { fill: 'var(--muted-foreground)', fontSize: 12 };
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    background: 'var(--popover)',
+    color: 'var(--popover-foreground)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-lg)',
+    boxShadow: 'var(--shadow-md)',
+    fontSize: 12,
+  },
+  labelStyle: { color: 'var(--foreground)', fontWeight: 500, marginBottom: 2 },
+  cursor: { fill: 'var(--accent)', opacity: 0.4 },
+};
+
 /** Real 30-day trend series from the Analytics module (Prompt 20) — supersedes the Prompt-10 foundation's empty-data placeholders now that Attendance/Payments/Members all exist. See `/analytics` for the full, filterable Analytics Dashboard. */
 export function ChartsGrid() {
   const { hasPermission } = usePermissions();
@@ -29,11 +43,23 @@ export function ChartsGrid() {
         emptyMessage="No attendance recorded in this period yet."
       >
         <AreaChart data={attendanceData}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="label" fontSize={12} tickLine={false} axisLine={false} />
-          <YAxis allowDecimals={false} fontSize={12} tickLine={false} axisLine={false} width={28} />
-          <Tooltip labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
-          <Area dataKey="value" name="Check-ins" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.2} />
+          <defs>
+            <linearGradient id="fill-attendance" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.28} />
+              <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+          <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} />
+          <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} width={28} />
+          <Tooltip {...TOOLTIP_STYLE} labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
+          <Area
+            dataKey="value"
+            name="Check-ins"
+            stroke="var(--chart-1)"
+            strokeWidth={2}
+            fill="url(#fill-attendance)"
+          />
         </AreaChart>
       </ChartWrapper>
       <ChartWrapper
@@ -44,11 +70,23 @@ export function ChartsGrid() {
         emptyMessage="No revenue recorded in this period yet."
       >
         <AreaChart data={revenueData}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="label" fontSize={12} tickLine={false} axisLine={false} />
-          <YAxis allowDecimals={false} fontSize={12} tickLine={false} axisLine={false} width={40} />
-          <Tooltip labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
-          <Area dataKey="income" name="Revenue" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.2} />
+          <defs>
+            <linearGradient id="fill-revenue" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.28} />
+              <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+          <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} />
+          <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} width={40} />
+          <Tooltip {...TOOLTIP_STYLE} labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
+          <Area
+            dataKey="income"
+            name="Revenue"
+            stroke="var(--chart-1)"
+            strokeWidth={2}
+            fill="url(#fill-revenue)"
+          />
         </AreaChart>
       </ChartWrapper>
       <ChartWrapper
@@ -59,11 +97,11 @@ export function ChartsGrid() {
         emptyMessage="No new members in this period yet."
       >
         <BarChart data={newMemberData}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-          <XAxis dataKey="label" fontSize={12} tickLine={false} axisLine={false} />
-          <YAxis allowDecimals={false} fontSize={12} tickLine={false} axisLine={false} width={28} />
-          <Tooltip labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
-          <Bar dataKey="value" name="New members" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+          <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} />
+          <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} width={28} />
+          <Tooltip {...TOOLTIP_STYLE} labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
+          <Bar dataKey="value" name="New members" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={28} />
         </BarChart>
       </ChartWrapper>
     </div>

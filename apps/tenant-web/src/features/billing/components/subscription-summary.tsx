@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { FormAlert } from '@/features/auth/components/form-alert';
-import { LoadingButton } from '@/features/auth/components/loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { cn } from '@/lib/utils';
 import { toBillingError, useCancelSubscription } from '../hooks/use-billing';
 import type { Subscription } from '../types';

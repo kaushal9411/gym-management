@@ -1889,15 +1889,48 @@ model TenantInvoiceSettings {
 /// staff/member records always have somewhere to attach to. Branch
 /// MANAGEMENT (create/edit/list more branches) is a future Gym module —
 /// this table + the one default row are the only in-scope pieces here.
+/// Prompt 22 (Branch Management) expanded this from Prompt 10's minimal
+/// scaffold (name/isDefault/isActive/timezone) into the full branch record —
+/// additive only, every pre-existing field/consumer (the portal's branch
+/// selector, every other module's `branchId` FK) is untouched.
 model Branch {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  name      String   @db.VarChar(120)
-  isDefault Boolean  @default(true) @map("is_default")
-  isActive  Boolean  @default(true) @map("is_active")
-  timezone  String   @default("UTC") @db.VarChar(64)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id             String    @id @default(uuid()) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  name           String    @db.VarChar(120)
+  /// Auto-generated on create (e.g. "BR-0001"), editable afterward — same
+  /// pattern as `MembershipPlan.planCode`/`Member.memberId`.
+  branchCode     String    @map("branch_code") @db.VarChar(40)
+  email          String?   @db.VarChar(255)
+  phone          String?   @db.VarChar(30)
+  whatsappNumber String?   @map("whatsapp_number") @db.VarChar(30)
+  addressLine1   String?   @map("address_line1") @db.VarChar(200)
+  addressLine2   String?   @map("address_line2") @db.VarChar(200)
+  city           String?   @db.VarChar(100)
+  state          String?   @db.VarChar(100)
+  country        String?   @db.VarChar(100)
+  postalCode     String?   @map("postal_code") @db.VarChar(20)
+  latitude       Decimal?  @db.Decimal(9, 6)
+  longitude      Decimal?  @db.Decimal(9, 6)
+  /// { monday: {open,close,closed}, ... } — same shape as
+  /// `TenantSettings.businessHours` (Prompt 12), one level down at the
+  /// branch. `closed: true` doubles as "Working Days" (a day not marked
+  /// closed is a working day).
+  operatingHours Json?     @map("operating_hours")
+  /// Array of `{date, label}` — one-off closures on top of the weekly
+  /// `operatingHours` pattern. A lightweight JSON list rather than a child
+  /// table since it's never queried/filtered on, only displayed/edited whole.
+  holidays       Json?     @map("holidays")
+  capacity       Int?
+  maxMembers     Int?      @map("max_members")
+  maxStaff       Int?      @map("max_staff")
+  allowCheckIn   Boolean   @default(true) @map("allow_check_in")
+  notes          String?
+  isDefault      Boolean   @default(true) @map("is_default")
+  isActive       Boolean   @default(true) @map("is_active")
+  timezone       String    @default("UTC") @db.VarChar(64)
+  deletedAt      DateTime? @map("deleted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userBranches        UserBranch[]
@@ -1910,6 +1943,8 @@ model Branch {
   scheduledReports    ScheduledReport[]
   tenantAnnouncements TenantAnnouncement[]
 
+  @@unique([tenantId, branchCode])
+  @@unique([tenantId, name])
   @@index([tenantId])
   @@map("branches")
 }

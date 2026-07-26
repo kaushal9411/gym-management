@@ -165,6 +165,16 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'announcements:update', description: 'Edit a draft or scheduled announcement' },
   { key: 'announcements:delete', description: 'Delete an announcement' },
   { key: 'announcements:publish', description: 'Publish an announcement immediately or schedule a future auto-publish time' },
+
+  // Branch Management (Prompt 22) — granular keys distinct from the
+  // pre-existing speculative `branches:read`/`branches:manage` (left seeded
+  // but unused, same precedent as every prior module).
+  { key: 'branches:view', description: 'View the branch list and branch details' },
+  { key: 'branches:create', description: 'Create a new branch' },
+  { key: 'branches:update', description: "Edit a branch's details, operating hours, or settings, or set it as the default branch" },
+  { key: 'branches:delete', description: 'Soft-delete a branch' },
+  { key: 'branches:restore', description: 'Restore a soft-deleted branch' },
+  { key: 'branches:activate', description: 'Activate or deactivate a branch' },
 ];
 
 const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
@@ -196,6 +206,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'finance:income-manage', 'finance:expense-manage',
     'reports:view', 'reports:export', 'analytics:view',
     'notifications:view', 'announcements:view', 'announcements:create', 'announcements:update', 'announcements:delete', 'announcements:publish',
+    'branches:view', 'branches:create', 'branches:update', 'branches:delete', 'branches:restore', 'branches:activate',
   ],
   TRAINER: [
     'members:read', 'attendance:create', 'attendance:read',
@@ -218,6 +229,9 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     // Trainers see the Notification Center and announcements, but authoring/
     // publishing announcements stays a Manager decision.
     'notifications:view', 'announcements:view',
+    // Trainers need to see the branch list/selector, but branch CRUD/
+    // activation/default-setting stays a Manager decision.
+    'branches:view',
   ],
   RECEPTIONIST: [
     'members:manage', 'members:read',
@@ -247,6 +261,9 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     // Front-desk sees the Notification Center and announcements, but
     // authoring/publishing announcements stays a Manager decision.
     'notifications:view', 'announcements:view',
+    // Front-desk needs to see the branch list/selector, but branch CRUD/
+    // activation/default-setting stays a Manager decision.
+    'branches:view',
   ],
   MEMBER: ['profile:read', 'profile:update', 'bookings:create', 'bookings:read', 'payments:read', 'chat:use'],
 };

@@ -12,13 +12,13 @@ interface SearchBarProps extends Omit<React.InputHTMLAttributes<HTMLInputElement
 const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
   ({ className, containerClassName, placeholder = 'Search…', ...props }, ref) => (
     <div className={cn('relative flex w-full items-center', containerClassName)}>
-      <Search className="pointer-events-none absolute left-3 size-4 text-muted-foreground" aria-hidden />
+      <Search className="pointer-events-none absolute left-3 size-4 text-muted-foreground/70 transition-colors" aria-hidden />
       <input
         ref={ref}
         type="search"
         placeholder={placeholder}
         className={cn(
-          'h-9 w-full rounded-md border bg-background pl-9 pr-3 text-sm shadow-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring',
+          'h-9 w-full rounded-lg border bg-background pl-9 pr-3 text-sm shadow-xs outline-none transition-all duration-150 placeholder:text-muted-foreground/70 focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
           className,
         )}
         {...props}

@@ -2,17 +2,27 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SectionLoader } from '@/components/ui/section-loader';
 import { toAttendanceError, useCheckIn, useCheckOut, useManualCheckIn, useManualCheckOut, useValidateQrCode } from '@/features/attendance/hooks/use-attendance';
 import { MemberActionCard } from '@/features/attendance/components/member-action-card';
 import { MemberCheckinSearch } from '@/features/attendance/components/member-checkin-search';
-import { QrScanner } from '@/features/attendance/components/qr-scanner';
 import { extractQrToken } from '@/features/attendance/utils/qr-token';
 import type { MemberListItem } from '@/features/members/types';
+
+// Global Loading & Performance Optimization (Prompt 23) — the camera/QR
+// decode loop has no business being in the initial bundle for the (far
+// more common) manual check-in path on this same page; `ssr:false` since
+// `getUserMedia` only exists in the browser anyway.
+const QrScanner = dynamic(() => import('@/features/attendance/components/qr-scanner').then((m) => m.QrScanner), {
+  ssr: false,
+  loading: () => <SectionLoader label="Loading scanner…" />,
+});
 
 function QrCheckInPanel() {
   const validateQr = useValidateQrCode();

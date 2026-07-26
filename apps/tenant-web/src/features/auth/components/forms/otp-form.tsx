@@ -17,7 +17,7 @@ import type { OtpFlow } from '../../types';
 import { maskEmail } from '../../utils/mask';
 import { AuthHeader } from '../auth-header';
 import { FormAlert } from '../form-alert';
-import { LoadingButton } from '../loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { OtpInput } from '../otp-input';
 
 interface OtpFormProps {

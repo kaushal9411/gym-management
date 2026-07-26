@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { LoadingButton } from '@/components/ui/loading-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -113,9 +114,9 @@ export default function NewUserPage() {
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={createUser.isPending}>
-              {createUser.isPending ? 'Creating…' : 'Create user'}
-            </Button>
+            <LoadingButton type="submit" className="w-full" loading={createUser.isPending} loadingText="Creating…">
+              Create user
+            </LoadingButton>
           </form>
         </CardContent>
       </Card>

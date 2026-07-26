@@ -1,5 +1,7 @@
 'use client';
 
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
+import { useSubmitHandler } from '@/hooks/use-submit-handler';
 import * as React from 'react';
 import Link from 'next/link';
 import { Download, MoreHorizontal, Upload, UserPlus, Users } from 'lucide-react';
@@ -7,6 +9,7 @@ import { toast } from 'sonner';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import {
@@ -60,6 +63,7 @@ function parseCsv(text: string): Array<{ name: string; email: string; phone?: st
 export default function UsersPage() {
   const { hasPermission } = usePermissions();
   const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [status, setStatus] = React.useState<UserStatus | ''>('');
   const [roleId, setRoleId] = React.useState('');
   const [page, setPage] = React.useState(1);
@@ -67,7 +71,7 @@ export default function UsersPage() {
   const users = useUsers({
     page,
     limit: 20,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     status: status || undefined,
     roleId: roleId || undefined,
     includeDeleted: true,
@@ -89,7 +93,7 @@ export default function UsersPage() {
     );
   };
 
-  const exportCsv = async () => {
+  const { isSubmitting: exporting, submit: exportCsv } = useSubmitHandler(async () => {
     try {
       const url = await iamService.exportUsersCsvUrl();
       const a = document.createElement('a');
@@ -100,7 +104,7 @@ export default function UsersPage() {
     } catch (err) {
       toast.error(toIamError(err).message);
     }
-  };
+  });
 
   const handleImportFile = async (file: File | undefined) => {
     if (!file) return;
@@ -207,9 +211,9 @@ export default function UsersPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {hasPermission('users:export') ? (
-            <Button variant="outline" size="sm" onClick={() => void exportCsv()}>
+            <LoadingButton variant="outline" size="sm" loading={exporting} loadingText="Exporting…" onClick={() => void exportCsv()}>
               <Download className="size-4" /> Export
-            </Button>
+            </LoadingButton>
           ) : null}
           {canManage ? (
             <>
@@ -286,6 +290,8 @@ export default function UsersPage() {
         rows={data?.items ?? []}
         rowKey={(u) => u.id}
         loading={users.isPending}
+        error={users.error}
+        onRetry={() => users.refetch()}
         emptyMessage="No users match these filters."
       />
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, MoreHorizontal, Upload, UserPlus, Users } from 'lucide-react';
@@ -56,6 +57,7 @@ function parseCsv(text: string): MemberBulkImportRow[] {
 export default function MembersListPage() {
   const { hasPermission } = usePermissions();
   const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [status, setStatus] = React.useState<MemberStatus | ''>('');
   const [page, setPage] = React.useState(1);
   const [sortBy, setSortBy] = React.useState<SortableColumn>('createdAt');
@@ -70,7 +72,7 @@ export default function MembersListPage() {
   const members = useMemberList({
     page,
     limit: 20,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     status: status || undefined,
     includeDeleted: true,
     sortBy,
@@ -373,7 +375,7 @@ export default function MembersListPage() {
         </div>
       ) : null}
 
-      <DataTable columns={columns} rows={items} rowKey={(m) => m.id} loading={members.isPending} emptyMessage="No members match these filters." />
+      <DataTable columns={columns} rows={items} rowKey={(m) => m.id} loading={members.isPending} error={members.error} onRetry={() => members.refetch()} emptyMessage="No members match these filters." />
 
       {data && data.totalPages > 1 ? (
         <div className="flex items-center justify-between text-sm text-muted-foreground">

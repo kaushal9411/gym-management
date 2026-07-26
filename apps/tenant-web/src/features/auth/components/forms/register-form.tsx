@@ -16,7 +16,7 @@ import { toAuthError, useRegisterGym } from '../../hooks/use-auth';
 import { registerGymSchema, type RegisterGymFormValues } from '../../schemas';
 import { AuthHeader } from '../auth-header';
 import { FormAlert } from '../form-alert';
-import { LoadingButton } from '../loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { PasswordInput } from '../password-input';
 import { PasswordStrengthMeter } from '../password-strength-meter';
 

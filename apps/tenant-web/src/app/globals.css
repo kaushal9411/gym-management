@@ -4,11 +4,12 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ────────────────────────────────────────────────────────────────────
-   Design tokens. --primary/--ring are overridden per tenant at runtime
-   (inline style on <body>, values from tenant branding settings).
+   Design tokens. --primary/--primary-foreground/--ring/--tenant-secondary
+   are overridden per tenant at runtime (inline style on <body>, values
+   from tenant branding settings) — never hardcode a brand color here.
    ──────────────────────────────────────────────────────────────────── */
 :root {
-  --radius: 0.625rem;
+  --radius: 0.75rem;
   --background: oklch(0.985 0.002 275);
   --foreground: oklch(0.16 0.01 275);
   --card: oklch(1 0 0);
@@ -17,6 +18,7 @@
   --popover-foreground: oklch(0.16 0.01 275);
   --primary: oklch(0.51 0.23 277);
   --primary-foreground: oklch(0.985 0 0);
+  --tenant-secondary: oklch(0.62 0.2 277);
   --secondary: oklch(0.955 0.005 275);
   --secondary-foreground: oklch(0.25 0.02 275);
   --muted: oklch(0.955 0.005 275);
@@ -32,6 +34,30 @@
   --border: oklch(0.9 0.007 275);
   --input: oklch(0.9 0.007 275);
   --ring: oklch(0.51 0.23 277);
+
+  /* Soft, layered elevation scale — tinted with the neutral hue rather
+     than pure black, tuned separately per theme (dark needs more opacity,
+     not just "the same shadow on a dark bg"). */
+  --elevation-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --elevation-sm: 0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.05);
+  --elevation-md: 0 4px 8px -2px rgb(15 23 42 / 0.08), 0 2px 4px -2px rgb(15 23 42 / 0.05);
+  --elevation-lg: 0 12px 20px -6px rgb(15 23 42 / 0.1), 0 4px 6px -4px rgb(15 23 42 / 0.06);
+  --elevation-xl: 0 24px 38px -10px rgb(15 23 42 / 0.14), 0 10px 14px -6px rgb(15 23 42 / 0.08);
+
+  /* Categorical chart palette (dataviz skill): slot 1 is the live tenant
+     brand color so the primary series always reads as "ours"; slots 2-8 are
+     a fixed, CVD-validated hex order (`node validate_palette.js` against this
+     app's own light/dark card surfaces — see globals.css history) — never
+     reassign/cycle per-chart, and never reuse a status hue
+     (--success/--warning/--destructive) for a categorical series. */
+  --chart-1: var(--primary);
+  --chart-2: #eb6834; /* orange */
+  --chart-3: #1baf7a; /* aqua */
+  --chart-4: #eda100; /* yellow — sub-3:1 on light surface, pair with a direct label */
+  --chart-5: #e87ba4; /* magenta — sub-3:1 on light surface, pair with a direct label */
+  --chart-6: #008300; /* green */
+  --chart-7: #4a3aa7; /* violet */
+  --chart-8: #e34948; /* red */
 }
 
 .dark {
@@ -43,6 +69,7 @@
   --popover-foreground: oklch(0.96 0.005 275);
   --primary: oklch(0.62 0.2 277);
   --primary-foreground: oklch(0.985 0 0);
+  --tenant-secondary: oklch(0.7 0.16 277);
   --secondary: oklch(0.25 0.015 275);
   --secondary-foreground: oklch(0.96 0.005 275);
   --muted: oklch(0.25 0.015 275);
@@ -58,6 +85,25 @@
   --border: oklch(0.29 0.015 275);
   --input: oklch(0.32 0.015 275);
   --ring: oklch(0.62 0.2 277);
+
+  /* Dark surfaces need more opaque shadows (pure black barely reads
+     against a dark background) rather than the light theme's soft tint. */
+  --elevation-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --elevation-sm: 0 1px 3px 0 rgb(0 0 0 / 0.36), 0 1px 2px -1px rgb(0 0 0 / 0.3);
+  --elevation-md: 0 4px 10px -2px rgb(0 0 0 / 0.42), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --elevation-lg: 0 14px 24px -6px rgb(0 0 0 / 0.48), 0 4px 8px -4px rgb(0 0 0 / 0.36);
+  --elevation-xl: 0 26px 42px -10px rgb(0 0 0 / 0.6), 0 10px 16px -6px rgb(0 0 0 / 0.42);
+
+  /* Same categorical order, stepped for the dark surface — validated
+     separately (dark card surface #12131a), not an automatic flip. */
+  --chart-1: var(--primary);
+  --chart-2: #d95926; /* orange */
+  --chart-3: #199e70; /* aqua */
+  --chart-4: #c98500; /* yellow */
+  --chart-5: #d55181; /* magenta */
+  --chart-6: #008300; /* green */
+  --chart-7: #9085e9; /* violet */
+  --chart-8: #e66767; /* red */
 }
 
 @theme inline {
@@ -69,6 +115,15 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-tenant-secondary: var(--tenant-secondary);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -88,9 +143,21 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 12px);
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    'Noto Sans', sans-serif;
+    var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+  --font-mono:
+    var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono',
+    monospace;
+  --animate-shimmer: shimmer 1.8s ease-in-out infinite;
+
+  /* Soft layered elevation — see :root/.dark for the tuned raw values. */
+  --shadow-xs: var(--elevation-xs);
+  --shadow-sm: var(--elevation-sm);
+  --shadow-md: var(--elevation-md);
+  --shadow-lg: var(--elevation-lg);
+  --shadow-xl: var(--elevation-xl);
 }
 
 @layer base {
@@ -108,5 +175,48 @@
       animation-duration: 0.01ms !important;
       transition-duration: 0.01ms !important;
     }
+  }
+}
+
+@layer utilities {
+  /* Brand-driven gradient — derived from the live tenant CSS vars via
+     color-mix(), so it re-tints automatically with tenant branding and
+     dark/light mode. Never hardcode a second brand hex alongside this. */
+  .gradient-brand {
+    background-image: linear-gradient(
+      135deg,
+      var(--primary) 0%,
+      color-mix(in oklch, var(--primary) 55%, var(--tenant-secondary) 45%) 100%
+    );
+  }
+  .gradient-brand-radial {
+    background-image: radial-gradient(
+      circle at 30% 20%,
+      color-mix(in oklch, var(--primary) 70%, transparent) 0%,
+      transparent 60%
+    );
+  }
+  .text-gradient-brand {
+    background-image: linear-gradient(
+      135deg,
+      var(--primary) 0%,
+      color-mix(in oklch, var(--primary) 55%, var(--tenant-secondary) 45%) 100%
+    );
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+  /* Frosted glass surface — for auth hero panels, floating chrome. */
+  .glass-panel {
+    background-color: color-mix(in oklch, var(--card) 70%, transparent);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
   }
 }

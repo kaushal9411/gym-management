@@ -15,7 +15,7 @@ import { useForgotPassword } from '../../hooks/use-auth';
 import { forgotPasswordSchema, type ForgotPasswordFormValues } from '../../schemas';
 import { maskEmail } from '../../utils/mask';
 import { AuthHeader } from '../auth-header';
-import { LoadingButton } from '../loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { StatusScreen } from '../status-screen';
 
 export function ForgotPasswordForm() {

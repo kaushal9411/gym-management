@@ -9,10 +9,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { FormAlert } from '@/features/auth/components/form-alert';
-import { LoadingButton } from '@/features/auth/components/loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { SUBDOMAIN_DEBOUNCE_MS } from '../../constants';
 import { useCheckSubdomain } from '../../hooks/use-onboarding';
-import { useDebouncedValue } from '../../hooks/use-debounced-value';
 import { subdomainFormSchema, type SubdomainFormValues } from '../../schemas';
 import { useOnboardingWizard } from '../../store/onboarding-wizard-context';
 

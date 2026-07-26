@@ -3,6 +3,7 @@
 import { AlertCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { useUnsavedChangesWarning } from '../hooks/use-unsaved-changes-warning';
 
 interface UnsavedChangesBarProps {
@@ -32,9 +33,9 @@ export function UnsavedChangesBar({ isDirty, saving, onSave, onCancel }: Unsaved
         <Button type="button" variant="outline" size="sm" disabled={!isDirty || saving} onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="button" size="sm" disabled={!isDirty || saving} onClick={onSave}>
-          {saving ? 'Saving…' : 'Save changes'}
-        </Button>
+        <LoadingButton type="button" size="sm" disabled={!isDirty} loading={saving} loadingText="Saving…" onClick={onSave}>
+          Save changes
+        </LoadingButton>
       </span>
     </div>
   );

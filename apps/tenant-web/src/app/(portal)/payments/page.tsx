@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, Plus, Upload } from 'lucide-react';
@@ -29,6 +30,7 @@ export default function PaymentsPage() {
   const canCreate = hasPermission('finance:payment-create');
 
   const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [status, setStatus] = React.useState<MemberPaymentStatus | ''>('');
   const [method, setMethod] = React.useState<MemberPaymentMethod | ''>('');
   const [dateFrom, setDateFrom] = React.useState('');
@@ -41,7 +43,7 @@ export default function PaymentsPage() {
   const params = {
     page,
     limit: 20,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     status: status || undefined,
     method: method || undefined,
     dateFrom: dateFrom || undefined,
@@ -173,7 +175,7 @@ export default function PaymentsPage() {
         </Button>
       </div>
 
-      <DataTable columns={columns} rows={items} rowKey={(p) => p.id} loading={payments.isPending} emptyMessage="No payments match these filters." />
+      <DataTable columns={columns} rows={items} rowKey={(p) => p.id} loading={payments.isPending} error={payments.error} onRetry={() => payments.refetch()} emptyMessage="No payments match these filters." />
 
       {data && data.totalPages > 1 ? (
         <div className="flex items-center justify-between text-sm text-muted-foreground">

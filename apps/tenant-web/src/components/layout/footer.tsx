@@ -7,7 +7,7 @@ export function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t px-4 py-3 text-center text-xs text-muted-foreground">
+    <footer className="border-t px-4 py-3.5 text-center text-xs text-muted-foreground/80">
       &copy; {year} {tenant.name}. Powered by FitCloud
       {tenant.subscription ? ` — ${tenant.subscription.planName} plan` : ''}.
     </footer>

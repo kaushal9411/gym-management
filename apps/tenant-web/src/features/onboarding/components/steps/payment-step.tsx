@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { FormAlert } from '@/features/auth/components/form-alert';
-import { LoadingButton } from '@/features/auth/components/loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { PAYMENT_PROVIDERS } from '../../constants';
 import { toOnboardingError, usePayForPlan } from '../../hooks/use-onboarding';
 import type { PaymentProvider } from '../../types';

@@ -13,7 +13,7 @@ import { AUTH_ROUTES } from '../../constants';
 import { useResendOtp } from '../../hooks/use-auth';
 import { resendOtpSchema, type ResendOtpFormValues } from '../../schemas';
 import { AuthHeader } from '../auth-header';
-import { LoadingButton } from '../loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 
 /** Standalone resend — for users who closed the OTP screen or lost the code. */
 export function ResendOtpForm({ initialEmail }: { initialEmail: string }) {

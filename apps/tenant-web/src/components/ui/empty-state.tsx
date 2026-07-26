@@ -13,12 +13,15 @@ interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
 function EmptyState({ icon: Icon, title, description, action, className, ...props }: EmptyStateProps) {
   return (
     <div
-      className={cn('flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-12 px-6 text-center', className)}
+      className={cn(
+        'animate-in fade-in-0 duration-300 flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed py-14 px-6 text-center',
+        className,
+      )}
       {...props}
     >
       {Icon ? (
-        <div className="flex size-12 items-center justify-center rounded-full bg-muted">
-          <Icon className="size-6 text-muted-foreground" aria-hidden />
+        <div className="flex size-12 items-center justify-center rounded-full bg-primary/8 ring-1 ring-primary/10">
+          <Icon className="size-5 text-primary" aria-hidden />
         </div>
       ) : null}
       <div className="space-y-1">

@@ -16,15 +16,17 @@ export function DateRangeSelector() {
   const dateRange = useAppSelector((state) => state.dashboard.dateRange);
 
   return (
-    <div className="inline-flex rounded-md border p-0.5">
+    <div className="inline-flex rounded-xl bg-muted p-1">
       {OPTIONS.map((option) => (
         <button
           key={option.value}
           type="button"
           onClick={() => dispatch(dateRangeChanged(option.value))}
           className={cn(
-            'rounded px-3 py-1 text-xs font-medium transition-colors',
-            dateRange === option.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent',
+            'rounded-lg px-3 py-1.5 text-xs font-medium transition-all duration-150',
+            dateRange === option.value
+              ? 'bg-background text-foreground shadow-xs'
+              : 'text-muted-foreground hover:text-foreground',
           )}
         >
           {option.label}

@@ -111,7 +111,7 @@ export function OtpInput({
           aria-label={`Digit ${index + 1} of ${length}`}
           aria-invalid={invalid || undefined}
           className={cn(
-            'size-11 rounded-md border border-input bg-background text-center text-lg font-semibold shadow-sm transition-all duration-150 sm:size-12',
+            'size-11 rounded-lg border border-input bg-background text-center text-lg font-semibold shadow-xs transition-all duration-150 sm:size-12',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-ring focus-visible:scale-105',
             'disabled:cursor-not-allowed disabled:opacity-50',
             invalid && 'border-destructive focus-visible:ring-destructive',

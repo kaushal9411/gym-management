@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
 import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Download, MoreHorizontal } from 'lucide-react';
@@ -45,6 +46,7 @@ function toLocalInputValue(iso: string | null): string {
 export default function AttendanceHistoryPage() {
   const { hasPermission } = usePermissions();
   const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [branchId, setBranchId] = React.useState('');
   const [status, setStatus] = React.useState<AttendanceStatus | ''>('');
   const [method, setMethod] = React.useState<AttendanceMethod | ''>('');
@@ -63,7 +65,7 @@ export default function AttendanceHistoryPage() {
   const params: ListAttendanceParams = {
     page,
     limit: 20,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     branchId: branchId || undefined,
     status: status || undefined,
     method: method || undefined,
@@ -292,7 +294,7 @@ export default function AttendanceHistoryPage() {
         />
       </div>
 
-      <DataTable columns={columns} rows={items} rowKey={(r) => r.id} loading={records.isPending} emptyMessage="No attendance records match these filters." />
+      <DataTable columns={columns} rows={items} rowKey={(r) => r.id} loading={records.isPending} error={records.error} onRetry={() => records.refetch()} emptyMessage="No attendance records match these filters." />
 
       {data && data.totalPages > 1 ? (
         <div className="flex items-center justify-between text-sm text-muted-foreground">

@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
 import { ArrowDown, ArrowUp, ArrowUpDown, Copy, Dumbbell, MoreHorizontal, Plus } from 'lucide-react';
@@ -33,6 +34,7 @@ export default function WorkoutPlansPage() {
   const canRestore = hasPermission('workouts:restore');
 
   const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [levelFilter, setLevelFilter] = React.useState<WorkoutLevel | ''>('');
   const [isActiveFilter, setIsActiveFilter] = React.useState<'true' | 'false' | ''>('');
   const [page, setPage] = React.useState(1);
@@ -43,7 +45,7 @@ export default function WorkoutPlansPage() {
   const plans = useWorkoutPlanList({
     page,
     limit: 20,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     level: levelFilter || undefined,
     isActive: isActiveFilter === '' ? undefined : isActiveFilter === 'true',
     includeDeleted: true,
@@ -221,7 +223,7 @@ export default function WorkoutPlansPage() {
         </select>
       </div>
 
-      <DataTable columns={columns} rows={items} rowKey={(p) => p.id} loading={plans.isPending} emptyMessage="No workout plans match these filters." />
+      <DataTable columns={columns} rows={items} rowKey={(p) => p.id} loading={plans.isPending} error={plans.error} onRetry={() => plans.refetch()} emptyMessage="No workout plans match these filters." />
 
       {data && data.totalPages > 1 ? (
         <div className="flex items-center justify-between text-sm text-muted-foreground">

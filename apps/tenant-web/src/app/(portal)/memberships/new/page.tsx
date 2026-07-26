@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { LoadingButton } from '@/components/ui/loading-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DEFAULT_PLAN_FORM_STATE, PlanFormFields, type PlanFormState } from '@/features/members/components/plan-form-fields';
@@ -84,9 +85,9 @@ export default function NewMembershipPlanPage() {
           <form onSubmit={submit} className="space-y-6">
             {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
             <PlanFormFields value={form} onChange={setForm} disabled={createPlan.isPending} />
-            <Button type="submit" className="w-full" disabled={createPlan.isPending}>
-              {createPlan.isPending ? 'Creating…' : 'Create plan'}
-            </Button>
+            <LoadingButton type="submit" className="w-full" loading={createPlan.isPending} loadingText="Creating…">
+              Create plan
+            </LoadingButton>
           </form>
         </CardContent>
       </Card>

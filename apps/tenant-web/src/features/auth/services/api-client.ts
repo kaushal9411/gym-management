@@ -41,6 +41,9 @@ export function toAuthServiceError(error: unknown): AuthServiceError {
   if (error instanceof AuthServiceError) return error;
   if (axios.isAxiosError(error)) {
     const axiosError = error as AxiosError<ApiErrorBody>;
+    if (axiosError.code === 'ECONNABORTED') {
+      return new AuthServiceError('UNKNOWN', 'Request timed out — please try again.');
+    }
     if (!axiosError.response) {
       return new AuthServiceError('UNKNOWN', 'Network error — check your connection and try again.');
     }
@@ -68,6 +71,23 @@ const inFlight = new Map<string, AbortController>();
 
 function requestKey(config: InternalAxiosRequestConfig): string {
   return `${config.method}:${config.url}:${JSON.stringify(config.params ?? {})}`;
+}
+
+// ── Automatic retry for transient network failures (Prompt 23: Global
+// Loading & Performance Optimization) — GET requests only. Retrying a
+// POST/PATCH/PUT/DELETE automatically would risk a duplicate side effect
+// (e.g. double-creating a record) if the original request actually reached
+// the server and only the response was lost; a failed read has no such
+// risk, so only idempotent GETs auto-retry. Exponential backoff, capped at
+// 2 attempts. ──
+const MAX_RETRIES = 2;
+const RETRY_BASE_DELAY_MS = 500;
+
+function isRetriableError(error: AxiosError): boolean {
+  if (error.config?.method?.toLowerCase() !== 'get') return false;
+  if (error.code === 'ECONNABORTED') return true; // client-side timeout
+  if (!error.response) return true; // network failure — no response at all
+  return error.response.status >= 500; // transient server-side failure
 }
 
 export const apiClient = axios.create({
@@ -104,6 +124,17 @@ apiClient.interceptors.response.use(
     }
 
     if (axios.isCancel(error)) return Promise.reject(error);
+
+    if (config && isRetriableError(error)) {
+      const retriableConfig = config as InternalAxiosRequestConfig & { _retryCount?: number };
+      const retryCount = retriableConfig._retryCount ?? 0;
+      if (retryCount < MAX_RETRIES) {
+        retriableConfig._retryCount = retryCount + 1;
+        const delayMs = RETRY_BASE_DELAY_MS * 2 ** retryCount;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        return apiClient(retriableConfig);
+      }
+    }
 
     const authError = toAuthServiceError(error);
 

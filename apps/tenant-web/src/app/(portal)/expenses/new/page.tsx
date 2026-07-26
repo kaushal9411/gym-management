@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { LoadingButton } from '@/components/ui/loading-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -67,9 +68,9 @@ export default function NewExpensePage() {
               </p>
             ) : null}
             <ExpenseFormFields value={form} onChange={setForm} disabled={createExpense.isPending} />
-            <Button type="submit" className="w-full" disabled={createExpense.isPending}>
-              {createExpense.isPending ? 'Saving…' : 'Add expense'}
-            </Button>
+            <LoadingButton type="submit" className="w-full" loading={createExpense.isPending} loadingText="Saving…">
+              Add expense
+            </LoadingButton>
           </form>
         </CardContent>
       </Card>

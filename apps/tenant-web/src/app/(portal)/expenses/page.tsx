@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
 import { Download, MoreHorizontal, Plus, Upload } from 'lucide-react';
@@ -39,6 +40,7 @@ export default function ExpensesPage() {
   const canManage = hasPermission('finance:expense-manage');
 
   const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [category, setCategory] = React.useState<ExpenseCategory | ''>('');
   const [dateFrom, setDateFrom] = React.useState('');
   const [dateTo, setDateTo] = React.useState('');
@@ -48,7 +50,7 @@ export default function ExpensesPage() {
   const params: ListExpensesParams = {
     page,
     limit: 20,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     category: category || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
@@ -160,7 +162,7 @@ export default function ExpensesPage() {
         </Button>
       </div>
 
-      <DataTable columns={columns} rows={items} rowKey={(e) => e.id} loading={expenses.isPending} emptyMessage="No expenses match these filters." />
+      <DataTable columns={columns} rows={items} rowKey={(e) => e.id} loading={expenses.isPending} error={expenses.error} onRetry={() => expenses.refetch()} emptyMessage="No expenses match these filters." />
 
       {data && data.totalPages > 1 ? (
         <div className="flex items-center justify-between text-sm text-muted-foreground">

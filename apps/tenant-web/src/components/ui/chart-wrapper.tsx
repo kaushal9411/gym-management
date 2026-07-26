@@ -31,8 +31,8 @@ function ChartWrapper({
   children,
 }: ChartWrapperProps) {
   return (
-    <Card className={cn(className)}>
-      <CardHeader>
+    <Card className={cn('transition-shadow duration-200 hover:shadow-sm', className)}>
+      <CardHeader className="pb-2">
         <CardTitle className="text-base">{title}</CardTitle>
         {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
       </CardHeader>

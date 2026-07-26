@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { LoadingButton } from '@/components/ui/loading-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -138,9 +139,9 @@ export default function NewStaffPage() {
               <EmploymentInfoFields value={employment} onChange={setEmployment} disabled={createStaff.isPending} />
             </div>
 
-            <Button type="submit" className="w-full" disabled={createStaff.isPending}>
-              {createStaff.isPending ? 'Creating…' : 'Create staff member'}
-            </Button>
+            <LoadingButton type="submit" className="w-full" loading={createStaff.isPending} loadingText="Creating…">
+              Create staff member
+            </LoadingButton>
           </form>
         </CardContent>
       </Card>

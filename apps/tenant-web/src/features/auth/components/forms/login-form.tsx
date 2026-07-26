@@ -22,7 +22,7 @@ import { loginSchema, type LoginFormValues } from '../../schemas';
 import { getRememberedEmail, setRememberedEmail } from '../../utils/remember-me';
 import { AuthHeader } from '../auth-header';
 import { FormAlert } from '../form-alert';
-import { LoadingButton } from '../loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { PasswordInput } from '../password-input';
 import { SocialLoginButtons } from '../social-buttons';
 

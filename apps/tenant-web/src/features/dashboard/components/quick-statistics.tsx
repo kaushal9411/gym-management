@@ -23,9 +23,9 @@ export function QuickStatistics() {
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {stats.map((stat) => (
-          <div key={stat.label}>
+          <div key={stat.label} className="rounded-xl bg-muted/40 p-3.5">
             <p className="text-xs text-muted-foreground">{stat.label}</p>
-            <p className="truncate text-sm font-semibold">{stat.value}</p>
+            <p className="truncate text-base font-semibold tracking-tight">{stat.value}</p>
           </div>
         ))}
       </CardContent>

@@ -23,8 +23,15 @@ export function toGymSettingsError(error: unknown): AuthServiceError {
 
 // ── Gym Profile ─────────────────────────────────────────────────────────
 
+// Settings change rarely relative to how often they're read (every portal
+// load resolves branding/business settings) — a 5-minute staleTime
+// (Prompt 23: Global Loading & Performance Optimization) across every
+// settings query below; each mutation's existing `invalidateQueries` call
+// still forces an immediate refetch after a real change.
+const SETTINGS_STALE_TIME_MS = 5 * 60_000;
+
 export function useGymProfile() {
-  return useQuery({ queryKey: ['gym-settings', 'profile'], queryFn: () => gymSettingsService.getProfile() });
+  return useQuery({ queryKey: ['gym-settings', 'profile'], queryFn: () => gymSettingsService.getProfile(), staleTime: SETTINGS_STALE_TIME_MS });
 }
 
 function useInvalidateProfile() {
@@ -67,7 +74,7 @@ export function useUpdateSocialLinks() {
 // ── Business Settings ─────────────────────────────────────────────────────
 
 export function useBusinessSettings() {
-  return useQuery({ queryKey: ['gym-settings', 'business'], queryFn: () => gymSettingsService.getBusinessSettings() });
+  return useQuery({ queryKey: ['gym-settings', 'business'], queryFn: () => gymSettingsService.getBusinessSettings(), staleTime: SETTINGS_STALE_TIME_MS });
 }
 
 export function useUpdateBusinessSettings() {
@@ -81,7 +88,7 @@ export function useUpdateBusinessSettings() {
 // ── Branding ───────────────────────────────────────────────────────────────
 
 export function useBranding() {
-  return useQuery({ queryKey: ['gym-settings', 'branding'], queryFn: () => gymSettingsService.getBranding() });
+  return useQuery({ queryKey: ['gym-settings', 'branding'], queryFn: () => gymSettingsService.getBranding(), staleTime: SETTINGS_STALE_TIME_MS });
 }
 
 function useInvalidateBranding() {
@@ -122,7 +129,7 @@ export function useUploadBrandingAsset() {
 // ── Invoice Settings ───────────────────────────────────────────────────────
 
 export function useInvoiceSettings() {
-  return useQuery({ queryKey: ['gym-settings', 'invoice'], queryFn: () => gymSettingsService.getInvoiceSettings() });
+  return useQuery({ queryKey: ['gym-settings', 'invoice'], queryFn: () => gymSettingsService.getInvoiceSettings(), staleTime: SETTINGS_STALE_TIME_MS });
 }
 
 export function useUpdateInvoiceSettings() {
@@ -136,7 +143,7 @@ export function useUpdateInvoiceSettings() {
 // ── Email Settings ─────────────────────────────────────────────────────────
 
 export function useEmailSettings() {
-  return useQuery({ queryKey: ['gym-settings', 'email'], queryFn: () => gymSettingsService.getEmailSettings() });
+  return useQuery({ queryKey: ['gym-settings', 'email'], queryFn: () => gymSettingsService.getEmailSettings(), staleTime: SETTINGS_STALE_TIME_MS });
 }
 
 export function useUpdateEmailSettings() {
@@ -154,6 +161,7 @@ export function useTenantNotificationSettings() {
   return useQuery({
     queryKey: ['gym-settings', 'notifications'],
     queryFn: () => gymSettingsService.getNotificationSettings(),
+    staleTime: SETTINGS_STALE_TIME_MS,
   });
 }
 

@@ -43,9 +43,15 @@ export function NotificationPanel() {
       >
         {unreadCount > 0 ? <BellRing className="size-4.5" /> : <Bell className="size-4.5" />}
         {unreadCount > 0 && (
-          <Badge className="absolute -right-1 -top-1 flex h-4.5 min-w-4.5 items-center justify-center rounded-full px-1 text-[10px]">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </Badge>
+          <span className="absolute -right-1 -top-1 flex size-4.5 items-center justify-center">
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-destructive/60" />
+            <Badge
+              variant="destructive"
+              className="relative flex h-4.5 min-w-4.5 items-center justify-center rounded-full border-transparent bg-destructive px-1 text-[10px] text-destructive-foreground"
+            >
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </Badge>
+          </span>
         )}
       </Button>
 

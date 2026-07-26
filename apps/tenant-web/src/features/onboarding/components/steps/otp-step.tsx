@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { FormAlert } from '@/features/auth/components/form-alert';
-import { LoadingButton } from '@/features/auth/components/loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { OtpInput } from '@/features/auth/components/otp-input';
 import { useCountdown } from '@/features/auth/hooks/use-countdown';
 import { OTP_RESEND_COOLDOWN_SECONDS } from '../../constants';

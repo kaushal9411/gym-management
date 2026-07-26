@@ -18,7 +18,7 @@ import { AUTH_ROUTES } from '../../constants';
 import { toAuthError, useAcceptInvitation, useInvitation } from '../../hooks/use-auth';
 import { acceptInvitationSchema, type AcceptInvitationFormValues } from '../../schemas';
 import { FormAlert } from '../form-alert';
-import { LoadingButton } from '../loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { PasswordInput } from '../password-input';
 import { PasswordStrengthMeter } from '../password-strength-meter';
 import { StatusScreen } from '../status-screen';

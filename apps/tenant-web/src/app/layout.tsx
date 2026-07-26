@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
 
+import { InitialLoadOverlay } from '@/components/initial-load-overlay';
 import { AppProviders } from '@/providers/app-providers';
 import { resolveTenant } from '@/features/tenant/resolve';
 
@@ -28,7 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const tenant = await resolveTenant(headerList.get('x-tenant-slug'));
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body
         style={
           {
@@ -42,6 +45,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           } as React.CSSProperties
         }
       >
+        <InitialLoadOverlay />
         <AppProviders tenant={tenant}>{children}</AppProviders>
       </body>
     </html>

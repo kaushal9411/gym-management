@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { toAuthError, useChangePassword } from '../../hooks/use-auth';
 import { changePasswordSchema, type ChangePasswordFormValues } from '../../schemas';
 import { FormAlert } from '../form-alert';
-import { LoadingButton } from '../loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { PasswordInput } from '../password-input';
 import { PasswordStrengthMeter } from '../password-strength-meter';
 

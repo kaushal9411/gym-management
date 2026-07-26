@@ -24,11 +24,14 @@ export function AnnouncementsWidget() {
           <EmptyState icon={Megaphone} title="No announcements" description="Platform announcements will appear here." />
         ) : (
           items.map((announcement) => (
-            <div key={announcement.id} className="rounded-lg border p-3">
+            <div
+              key={announcement.id}
+              className="rounded-xl border bg-card p-3.5 transition-colors hover:bg-accent/30"
+            >
               <p className="text-sm font-medium">{announcement.title}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">{announcement.body}</p>
+              <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{announcement.body}</p>
               {announcement.publishedAt && (
-                <p className="mt-1 text-xs text-muted-foreground">{formatRelativeTime(announcement.publishedAt)}</p>
+                <p className="mt-1.5 text-xs text-muted-foreground/70">{formatRelativeTime(announcement.publishedAt)}</p>
               )}
             </div>
           ))

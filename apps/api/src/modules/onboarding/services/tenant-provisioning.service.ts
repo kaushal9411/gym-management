@@ -96,7 +96,7 @@ export class TenantProvisioningService {
       });
 
       await db.branch.create({
-        data: { tenantId, name: `${session.form.gymName} — Main Branch`, isDefault: true, timezone: session.form.timezone },
+        data: { tenantId, name: `${session.form.gymName} — Main Branch`, branchCode: 'BR-0001', isDefault: true, timezone: session.form.timezone },
       });
 
       const userRepository = new UserRepository(db);

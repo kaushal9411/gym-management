@@ -17,7 +17,7 @@ function Toaster(props: ToasterProps) {
       richColors
       toastOptions={{
         classNames: {
-          toast: 'rounded-lg border shadow-lg',
+          toast: 'rounded-xl border shadow-lg',
         },
       }}
       {...props}

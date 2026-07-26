@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, MoreHorizontal, Upload, UserPlus, Users } from 'lucide-react';
@@ -12,12 +13,14 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { UserStatusBadge } from '@/features/iam/components/status-badge';
 import { staffService } from '@/features/staff/services/staff.service';
 import { toStaffError, useBulkImportStaff, useBulkStaffAction, useStaffList, useStaffStatusAction } from '@/features/staff/hooks/use-staff';
 import type { ListStaffParams, StaffBulkImportRow, StaffListItem, StaffRole, UserStatus, WorkStatus } from '@/features/staff/types';
+import { useSubmitHandler } from '@/hooks/use-submit-handler';
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
@@ -54,6 +57,7 @@ function parseCsv(text: string): StaffBulkImportRow[] {
 export default function StaffListPage() {
   const { hasPermission } = usePermissions();
   const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [status, setStatus] = React.useState<UserStatus | ''>('');
   const [role, setRole] = React.useState<StaffRole | ''>('');
   const [workStatus, setWorkStatus] = React.useState<WorkStatus | ''>('');
@@ -68,7 +72,7 @@ export default function StaffListPage() {
   const staff = useStaffList({
     page,
     limit: 20,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     status: status || undefined,
     role: role || undefined,
     workStatus: workStatus || undefined,
@@ -143,7 +147,7 @@ export default function StaffListPage() {
     setConfirmAction(null);
   };
 
-  const exportCsv = async () => {
+  const { isSubmitting: exporting, submit: exportCsv } = useSubmitHandler(async () => {
     try {
       const url = await staffService.exportCsvUrl();
       const a = document.createElement('a');
@@ -154,7 +158,7 @@ export default function StaffListPage() {
     } catch (err) {
       toast.error(toStaffError(err).message);
     }
-  };
+  });
 
   const handleImportFile = async (file: File | undefined) => {
     if (!file) return;
@@ -293,9 +297,9 @@ export default function StaffListPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {hasPermission('staff:view') ? (
-            <Button variant="outline" size="sm" onClick={() => void exportCsv()}>
+            <LoadingButton variant="outline" size="sm" loading={exporting} loadingText="Exporting…" onClick={() => void exportCsv()}>
               <Download className="size-4" /> Export
-            </Button>
+            </LoadingButton>
           ) : null}
           {canCreate ? (
             <>
@@ -418,6 +422,8 @@ export default function StaffListPage() {
         rows={items}
         rowKey={(s) => s.id}
         loading={staff.isPending}
+        error={staff.error}
+        onRetry={() => staff.refetch()}
         emptyMessage="No staff match these filters."
       />
 

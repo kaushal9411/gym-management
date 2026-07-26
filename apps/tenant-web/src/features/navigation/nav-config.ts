@@ -31,6 +31,8 @@ export interface NavItem {
   permission?: string | string[];
   /** Module key from `tenant.featureFlags` gating this item by subscription plan. Omit for always-available items. */
   featureFlag?: string;
+  /** Purely presentational sidebar grouping (section header) — never affects access/visibility logic. */
+  section?: string;
 }
 
 /**
@@ -41,9 +43,9 @@ export interface NavItem {
  * final so those modules can plug in without touching this file's shape.
  */
 export const NAV_ITEMS: NavItem[] = [
-  { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { key: 'members', label: 'Members', href: '/members', icon: Users, permission: 'members:view', featureFlag: 'members' },
-  { key: 'staff', label: 'Staff & Access', href: '/users', icon: UserCog, permission: 'users:read', featureFlag: 'staff' },
+  { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, section: 'Overview' },
+  { key: 'members', label: 'Members', href: '/members', icon: Users, permission: 'members:view', featureFlag: 'members', section: 'People' },
+  { key: 'staff', label: 'Staff & Access', href: '/users', icon: UserCog, permission: 'users:read', featureFlag: 'staff', section: 'People' },
   {
     key: 'staff-management',
     label: 'Staff',
@@ -51,8 +53,9 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Contact,
     permission: 'staff:view',
     featureFlag: 'staff',
+    section: 'People',
   },
-  { key: 'branches', label: 'Branches', href: '/branches', icon: Building2, permission: 'branches:read', featureFlag: 'branches' },
+  { key: 'branches', label: 'Branches', href: '/branches', icon: Building2, permission: 'branches:view', featureFlag: 'branches', section: 'People' },
   {
     key: 'memberships',
     label: 'Memberships',
@@ -60,6 +63,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: IdCard,
     permission: 'memberships:manage',
     featureFlag: 'membership_plans',
+    section: 'Programs',
   },
   {
     key: 'attendance',
@@ -68,6 +72,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: CalendarCheck,
     permission: 'attendance:view',
     featureFlag: 'attendance',
+    section: 'Programs',
   },
   {
     key: 'attendance-history',
@@ -76,6 +81,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: CalendarCheck,
     permission: 'attendance:view',
     featureFlag: 'attendance',
+    section: 'Programs',
   },
   {
     key: 'workout-plans',
@@ -84,6 +90,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Dumbbell,
     permission: 'workouts:view',
     featureFlag: 'workout_plans',
+    section: 'Programs',
   },
   {
     key: 'diet-plans',
@@ -92,8 +99,9 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Apple,
     permission: 'diets:view',
     featureFlag: 'diet_plans',
+    section: 'Programs',
   },
-  { key: 'payments', label: 'Payments', href: '/payments', icon: CreditCard, permission: 'finance:view', featureFlag: 'payments' },
+  { key: 'payments', label: 'Payments', href: '/payments', icon: CreditCard, permission: 'finance:view', featureFlag: 'payments', section: 'Finance' },
   {
     key: 'income',
     label: 'Income',
@@ -101,6 +109,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: TrendingUp,
     permission: 'finance:view',
     featureFlag: 'income',
+    section: 'Finance',
   },
   {
     key: 'expenses',
@@ -109,18 +118,12 @@ export const NAV_ITEMS: NavItem[] = [
     icon: TrendingDown,
     permission: 'finance:view',
     featureFlag: 'expenses',
+    section: 'Finance',
   },
-  { key: 'reports', label: 'Reports', href: '/reports', icon: BarChart3, permission: 'reports:view', featureFlag: 'reports' },
-  { key: 'analytics', label: 'Analytics', href: '/analytics', icon: PieChart, permission: 'analytics:view', featureFlag: 'reports' },
-  { key: 'billing', label: 'Billing', href: '/billing', icon: Receipt, permission: 'billing:read' },
-  {
-    key: 'gym-settings',
-    label: 'Gym Settings',
-    href: '/gym-settings/profile',
-    icon: Store,
-    permission: 'settings:read',
-  },
-  { key: 'notifications', label: 'Notifications', href: '/notifications', icon: Bell },
+  { key: 'billing', label: 'Billing', href: '/billing', icon: Receipt, permission: 'billing:read', section: 'Finance' },
+  { key: 'reports', label: 'Reports', href: '/reports', icon: BarChart3, permission: 'reports:view', featureFlag: 'reports', section: 'Insights' },
+  { key: 'analytics', label: 'Analytics', href: '/analytics', icon: PieChart, permission: 'analytics:view', featureFlag: 'reports', section: 'Insights' },
+  { key: 'notifications', label: 'Notifications', href: '/notifications', icon: Bell, section: 'Communication' },
   {
     key: 'announcements',
     label: 'Announcements',
@@ -128,7 +131,16 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Megaphone,
     permission: 'announcements:view',
     featureFlag: 'notifications',
+    section: 'Communication',
   },
-  { key: 'support', label: 'Support', href: '/support', icon: LifeBuoy },
-  { key: 'settings', label: 'Settings', href: '/settings', icon: Settings, permission: 'settings:manage' },
+  {
+    key: 'gym-settings',
+    label: 'Gym Settings',
+    href: '/gym-settings/profile',
+    icon: Store,
+    permission: 'settings:read',
+    section: 'Administration',
+  },
+  { key: 'support', label: 'Support', href: '/support', icon: LifeBuoy, section: 'Administration' },
+  { key: 'settings', label: 'Settings', href: '/settings', icon: Settings, permission: 'settings:manage', section: 'Administration' },
 ];

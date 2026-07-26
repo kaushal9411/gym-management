@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FormAlert } from '@/features/auth/components/form-alert';
-import { LoadingButton } from '@/features/auth/components/loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { BillingNav } from '@/features/billing/components/billing-nav';
 import { toBillingError, useBillingAddress, useSaveBillingAddress } from '@/features/billing/hooks/use-billing';
 

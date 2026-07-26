@@ -24,7 +24,11 @@ function useInvalidateStaff() {
 }
 
 export function useStaffList(params: ListStaffParams) {
-  return useQuery({ queryKey: ['staff', 'list', params], queryFn: () => staffService.list(params) });
+  // 1-minute staleTime (Prompt 23: Global Loading & Performance
+  // Optimization) — the staff list is frequently accessed but changes
+  // rarely within a session; mutations still invalidate this key
+  // immediately on any real change.
+  return useQuery({ queryKey: ['staff', 'list', params], queryFn: () => staffService.list(params), staleTime: 60_000 });
 }
 
 export function useStaffDetail(staffId: string | null) {

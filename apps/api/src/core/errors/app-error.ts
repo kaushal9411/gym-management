@@ -42,6 +42,12 @@ export class RateLimitedError extends AppError {
   }
 }
 
+export class RequestTimeoutError extends AppError {
+  constructor(message = 'The request took too long to process. Please try again.') {
+    super(ErrorCode.REQUEST_TIMEOUT, message, 503);
+  }
+}
+
 export class UnauthenticatedError extends AppError {
   constructor(code: ErrorCodeValue = ErrorCode.UNAUTHENTICATED, message = 'Authentication required') {
     super(code, message, 401);

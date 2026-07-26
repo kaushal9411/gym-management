@@ -1,9 +1,11 @@
 'use client';
 
 import * as React from 'react';
+import { AlertTriangle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { LoadingButton } from '@/components/ui/loading-button';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -33,6 +35,11 @@ export function ConfirmDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
+          {destructive ? (
+            <div className="mx-auto flex size-11 items-center justify-center rounded-full bg-destructive/10 sm:mx-0">
+              <AlertTriangle className="size-5 text-destructive" aria-hidden />
+            </div>
+          ) : null}
           <DialogTitle>{title}</DialogTitle>
           {description ? <DialogDescription>{description}</DialogDescription> : null}
         </DialogHeader>
@@ -40,9 +47,9 @@ export function ConfirmDialog({
           <Button type="button" variant="outline" disabled={loading} onClick={() => onOpenChange(false)}>
             {cancelLabel}
           </Button>
-          <Button type="button" variant={destructive ? 'destructive' : 'default'} disabled={loading} onClick={onConfirm}>
-            {loading ? 'Please wait…' : confirmLabel}
-          </Button>
+          <LoadingButton type="button" variant={destructive ? 'destructive' : 'default'} loading={loading} loadingText="Please wait…" onClick={onConfirm}>
+            {confirmLabel}
+          </LoadingButton>
         </div>
       </DialogContent>
     </Dialog>

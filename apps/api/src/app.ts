@@ -12,6 +12,7 @@ import { sendSuccess } from './core/http/response';
 import { errorHandlerMiddleware, notFoundMiddleware } from './core/middleware/error-handler.middleware';
 import { requestContextMiddleware } from './core/middleware/request-context.middleware';
 import { requestLoggerMiddleware } from './core/middleware/request-logger.middleware';
+import { requestTimeoutMiddleware } from './core/middleware/request-timeout.middleware';
 import { swaggerSpec } from './core/swagger/swagger';
 import { tenantMiddleware } from './modules/tenants/middleware/tenant.middleware';
 
@@ -68,6 +69,7 @@ export function createApp(): Express {
 
   app.use(requestContextMiddleware);
   app.use(requestLoggerMiddleware);
+  app.use(requestTimeoutMiddleware());
 
   app.get('/health', (_req, res) => sendSuccess(res, { status: 'ok', uptimeSeconds: process.uptime() }));
   app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));

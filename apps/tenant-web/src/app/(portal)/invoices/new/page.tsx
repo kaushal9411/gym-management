@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { LoadingButton } from '@/components/ui/loading-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -170,9 +171,9 @@ export default function GenerateInvoicePage() {
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={generateInvoice.isPending}>
-              {generateInvoice.isPending ? 'Generating…' : 'Generate invoice'}
-            </Button>
+            <LoadingButton type="submit" className="w-full" loading={generateInvoice.isPending} loadingText="Generating…">
+              Generate invoice
+            </LoadingButton>
           </form>
         </CardContent>
       </Card>

@@ -7,8 +7,10 @@ import { Provider as ReduxProvider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { persistStore } from 'redux-persist';
 
+import { NavigationProgressProvider } from '@/components/navigation-progress-provider';
 import { SessionExpiryModal } from '@/components/session-expiry-modal';
 import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { TopProgressBar } from '@/components/top-progress-bar';
 import { RealtimeProvider } from '@/features/realtime/realtime-provider';
 import { TenantProvider } from '@/features/tenant/tenant-provider';
@@ -58,10 +60,16 @@ export function AppProviders({ tenant, children }: { tenant: Tenant; children: R
               <TenantStoreSync tenant={tenant} />
               <AuthProvider>
                 <RealtimeProvider>
-                  <TopProgressBar />
-                  {children}
-                  <SessionExpiryModal />
-                  <Toaster />
+                  <TooltipProvider delayDuration={200}>
+                    <React.Suspense fallback={null}>
+                      <NavigationProgressProvider>
+                        <TopProgressBar />
+                        {children}
+                      </NavigationProgressProvider>
+                    </React.Suspense>
+                    <SessionExpiryModal />
+                    <Toaster />
+                  </TooltipProvider>
                 </RealtimeProvider>
               </AuthProvider>
             </TenantProvider>

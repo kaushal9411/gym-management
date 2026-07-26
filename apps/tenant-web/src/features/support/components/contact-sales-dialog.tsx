@@ -15,8 +15,10 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { apiClient } from '@/features/auth/services/api-client';
 import { useTenant } from '@/features/tenant/tenant-provider';
+import { useSubmitHandler } from '@/hooks/use-submit-handler';
 import { useAppSelector } from '@/store/hooks';
 import { cn } from '@/lib/utils';
 
@@ -46,8 +48,6 @@ export function ContactSalesDialog({ topic, triggerLabel, triggerVariant = 'outl
   const [name, setName] = React.useState(user?.name ?? '');
   const [email, setEmail] = React.useState(user?.email ?? '');
   const [message, setMessage] = React.useState('');
-  const [submitting, setSubmitting] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
 
   // Late store hydration (redux-persist) — refresh the prefill once known.
   React.useEffect(() => {
@@ -57,26 +57,22 @@ export function ContactSalesDialog({ topic, triggerLabel, triggerVariant = 'outl
     }
   }, [user]);
 
-  const submit = async (e: React.FormEvent) => {
+  const { isSubmitting: submitting, error, submit: runSubmit } = useSubmitHandler(async () => {
+    await apiClient.post('/public/contact', {
+      topic,
+      name,
+      email,
+      gymSlug: tenant.id === 'platform' ? undefined : tenant.slug,
+      message,
+    });
+    toast.success("Message sent — we'll get back to you within one business day.");
+    setOpen(false);
+    setMessage('');
+  });
+
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSubmitting(true);
-    try {
-      await apiClient.post('/public/contact', {
-        topic,
-        name,
-        email,
-        gymSlug: tenant.id === 'platform' ? undefined : tenant.slug,
-        message,
-      });
-      toast.success("Message sent — we'll get back to you within one business day.");
-      setOpen(false);
-      setMessage('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
+    void runSubmit();
   };
 
   return (
@@ -126,10 +122,10 @@ export function ContactSalesDialog({ topic, triggerLabel, triggerVariant = 'outl
               disabled={submitting}
             />
           </div>
-          <Button type="submit" className="w-full" disabled={submitting || message.trim().length < 10}>
+          <LoadingButton type="submit" className="w-full" disabled={message.trim().length < 10} loading={submitting} loadingText="Sending…">
             <Send className="size-4" />
-            {submitting ? 'Sending…' : 'Send message'}
-          </Button>
+            Send message
+          </LoadingButton>
         </form>
       </DialogContent>
     </Dialog>

@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { FormAlert } from '@/features/auth/components/form-alert';
-import { LoadingButton } from '@/features/auth/components/loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { PasswordInput } from '@/features/auth/components/password-input';
 import { PasswordStrengthMeter } from '@/features/auth/components/password-strength-meter';
 import { toOnboardingError, useRegisterOnboarding } from '../../hooks/use-onboarding';

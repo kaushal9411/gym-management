@@ -38,14 +38,17 @@ export function RecentActivity() {
           items.map((item) => {
             const Icon = ICONS[item.type];
             return (
-              <div key={`${item.type}-${item.id}`} className="flex items-start gap-3 text-sm">
-                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <div
+                key={`${item.type}-${item.id}`}
+                className="flex items-start gap-3 rounded-lg p-1.5 text-sm transition-colors hover:bg-accent/50"
+              >
+                <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Icon className="size-3.5" aria-hidden />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{item.label}</p>
                   <p className="truncate text-xs text-muted-foreground">{item.detail}</p>
-                  <p className="text-xs text-muted-foreground">{formatRelativeTime(item.occurredAt)}</p>
+                  <p className="text-xs text-muted-foreground/70">{formatRelativeTime(item.occurredAt)}</p>
                 </div>
               </div>
             );

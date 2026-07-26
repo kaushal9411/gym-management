@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
 import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Plus } from 'lucide-react';
@@ -26,6 +27,7 @@ export default function InvoicesPage() {
   const canCreate = hasPermission('finance:payment-create');
 
   const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [status, setStatus] = React.useState<MemberInvoiceStatus | ''>('');
   const [dateFrom, setDateFrom] = React.useState('');
   const [dateTo, setDateTo] = React.useState('');
@@ -36,7 +38,7 @@ export default function InvoicesPage() {
   const invoices = useInvoiceList({
     page,
     limit: 20,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     status: status || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
@@ -133,7 +135,7 @@ export default function InvoicesPage() {
         <Input type="date" aria-label="To date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} />
       </div>
 
-      <DataTable columns={columns} rows={items} rowKey={(inv) => inv.id} loading={invoices.isPending} emptyMessage="No invoices match these filters." />
+      <DataTable columns={columns} rows={items} rowKey={(inv) => inv.id} loading={invoices.isPending} error={invoices.error} onRetry={() => invoices.refetch()} emptyMessage="No invoices match these filters." />
 
       {data && data.totalPages > 1 ? (
         <div className="flex items-center justify-between text-sm text-muted-foreground">

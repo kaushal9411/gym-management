@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AUTH_ROUTES } from '@/features/auth/constants';
 import { FormAlert } from '@/features/auth/components/form-alert';
-import { LoadingButton } from '@/features/auth/components/loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { PasswordInput } from '@/features/auth/components/password-input';
 import { PasswordStrengthMeter } from '@/features/auth/components/password-strength-meter';
 import { StatusScreen } from '@/features/auth/components/status-screen';

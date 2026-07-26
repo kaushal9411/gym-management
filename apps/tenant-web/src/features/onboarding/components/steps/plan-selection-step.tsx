@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { FormAlert } from '@/features/auth/components/form-alert';
-import { LoadingButton } from '@/features/auth/components/loading-button';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { toOnboardingError, usePlans, useSelectPlan } from '../../hooks/use-onboarding';
 import type { BillingCycle, SubscriptionPlan } from '../../types';
 import { useOnboardingWizard } from '../../store/onboarding-wizard-context';

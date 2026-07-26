@@ -21,13 +21,13 @@ export function Sidebar() {
     <>
       <aside
         className={cn(
-          'sticky top-0 hidden h-dvh shrink-0 flex-col border-r bg-background transition-[width] duration-200 md:flex',
-          collapsed ? 'w-16' : 'w-64',
+          'sticky top-0 hidden h-dvh shrink-0 flex-col border-r bg-background transition-[width] duration-300 ease-out md:flex',
+          collapsed ? 'w-17' : 'w-64',
         )}
       >
-        <div className={cn('flex h-14 items-center gap-2 border-b px-3', collapsed && 'justify-center px-0')}>
+        <div className={cn('flex h-16 items-center gap-2.5 border-b px-4', collapsed && 'justify-center px-0')}>
           <TenantLogo size="sm" />
-          {!collapsed && <span className="truncate text-sm font-semibold">{tenant.name}</span>}
+          {!collapsed && <span className="truncate text-sm font-semibold tracking-tight">{tenant.name}</span>}
         </div>
 
         <SidebarNav collapsed={collapsed} />
@@ -35,7 +35,7 @@ export function Sidebar() {
         <button
           type="button"
           onClick={() => dispatch(sidebarToggled())}
-          className="flex items-center justify-center gap-2 border-t py-3 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+          className="flex items-center justify-center gap-2 border-t py-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         >
           {collapsed ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
           {!collapsed && 'Collapse'}
@@ -44,9 +44,9 @@ export function Sidebar() {
 
       <Drawer open={mobileOpen} onOpenChange={(open) => !open && dispatch(mobileSidebarClosed())}>
         <DrawerContent side="left" className="w-64 p-0">
-          <div className="flex h-14 items-center gap-2 border-b px-3">
+          <div className="flex h-16 items-center gap-2.5 border-b px-4">
             <TenantLogo size="sm" />
-            <span className="truncate text-sm font-semibold">{tenant.name}</span>
+            <span className="truncate text-sm font-semibold tracking-tight">{tenant.name}</span>
           </div>
           <SidebarNav collapsed={false} onNavigate={() => dispatch(mobileSidebarClosed())} />
         </DrawerContent>

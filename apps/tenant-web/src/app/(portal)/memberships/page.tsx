@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
 import { ArrowDown, ArrowUp, ArrowUpDown, Copy, MoreHorizontal, Plus } from 'lucide-react';
@@ -37,6 +38,7 @@ export default function MembershipPlansPage() {
   const canRestore = hasPermission('memberships:restore');
 
   const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [isActiveFilter, setIsActiveFilter] = React.useState<'true' | 'false' | ''>('');
   const [page, setPage] = React.useState(1);
   const [sortBy, setSortBy] = React.useState<SortableColumn>('displayOrder');
@@ -46,7 +48,7 @@ export default function MembershipPlansPage() {
   const plans = useMembershipPlanList({
     page,
     limit: 20,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     isActive: isActiveFilter === '' ? undefined : isActiveFilter === 'true',
     includeDeleted: true,
     sortBy,
@@ -202,7 +204,7 @@ export default function MembershipPlansPage() {
         </select>
       </div>
 
-      <DataTable columns={columns} rows={items} rowKey={(p) => p.id} loading={plans.isPending} emptyMessage="No membership plans match these filters." />
+      <DataTable columns={columns} rows={items} rowKey={(p) => p.id} loading={plans.isPending} error={plans.error} onRetry={() => plans.refetch()} emptyMessage="No membership plans match these filters." />
 
       {data && data.totalPages > 1 ? (
         <div className="flex items-center justify-between text-sm text-muted-foreground">

@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Check } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { IamNav } from '@/features/iam/components/iam-nav';
 import { usePermissionMatrix, usePermissionRegistry } from '@/features/iam/hooks/use-iam';
 import { cn } from '@/lib/utils';
+
+const MATRIX_ROW_HEIGHT = 41;
+const MATRIX_VIEWPORT_HEIGHT = 600;
 
 export default function PermissionsPage() {
   const [tab, setTab] = React.useState<'registry' | 'matrix'>('registry');
@@ -71,16 +75,35 @@ function Registry() {
 
 function Matrix() {
   const matrix = usePermissionMatrix();
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const { roles, permissions } = matrix.data ?? { roles: [], permissions: [] };
+
+  // Row virtualization (Prompt 23: Global Loading & Performance
+  // Optimization) — the permission catalog already exceeds 100 rows across
+  // every role column, and only grows as more modules are added. Two spacer
+  // `<tr>`s (top/bottom) sized to the un-rendered rows keep the real
+  // `<table>`/`<tbody>` semantics intact — no `display: grid` override
+  // needed — while only the rows in (and just around) the viewport are
+  // ever mounted.
+  const virtualizer = useVirtualizer({
+    count: permissions.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => MATRIX_ROW_HEIGHT,
+    overscan: 8,
+  });
+
   if (matrix.isPending) return <Skeleton className="h-96 w-full" />;
   if (!matrix.data) return null;
 
-  const { roles, permissions } = matrix.data;
   const roleSets = roles.map((r) => new Set(r.permissionKeys));
+  const virtualRows = virtualizer.getVirtualItems();
+  const topPad = virtualRows[0]?.start ?? 0;
+  const bottomPad = virtualizer.getTotalSize() - (virtualRows[virtualRows.length - 1]?.end ?? 0);
 
   return (
-    <div className="overflow-x-auto rounded-lg border">
+    <div ref={scrollRef} className="overflow-auto rounded-lg border" style={{ maxHeight: MATRIX_VIEWPORT_HEIGHT }}>
       <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="sticky top-0 z-10 border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="sticky left-0 bg-muted/40 px-4 py-2.5 text-left font-medium">Permission</th>
             {roles.map((role) => (
@@ -92,20 +115,25 @@ function Matrix() {
           </tr>
         </thead>
         <tbody className="divide-y">
-          {permissions.map((permission) => (
-            <tr key={permission.key} className="hover:bg-accent/40">
-              <td className="sticky left-0 bg-background px-4 py-2 font-mono text-xs">{permission.key}</td>
-              {roles.map((role, i) => (
-                <td key={role.id} className="px-3 py-2 text-center">
-                  {roleSets[i]!.has(permission.key) ? (
-                    <Check className="mx-auto size-4 text-emerald-600 dark:text-emerald-400" aria-label={`${role.name} has ${permission.key}`} />
-                  ) : (
-                    <span className="text-muted-foreground/40" aria-hidden>—</span>
-                  )}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {topPad > 0 ? <tr aria-hidden style={{ height: topPad }} /> : null}
+          {virtualRows.map((virtualRow) => {
+            const permission = permissions[virtualRow.index]!;
+            return (
+              <tr key={permission.key} className="hover:bg-accent/40">
+                <td className="sticky left-0 bg-background px-4 py-2 font-mono text-xs">{permission.key}</td>
+                {roles.map((role, i) => (
+                  <td key={role.id} className="px-3 py-2 text-center">
+                    {roleSets[i]!.has(permission.key) ? (
+                      <Check className="mx-auto size-4 text-emerald-600 dark:text-emerald-400" aria-label={`${role.name} has ${permission.key}`} />
+                    ) : (
+                      <span className="text-muted-foreground/40" aria-hidden>—</span>
+                    )}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+          {bottomPad > 0 ? <tr aria-hidden style={{ height: bottomPad }} /> : null}
         </tbody>
       </table>
     </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import { Download, MoreHorizontal, Plus, Upload } from 'lucide-react';
 import { toast } from 'sonner';
@@ -36,6 +37,7 @@ export default function IncomePage() {
   const canManage = hasPermission('finance:income-manage');
 
   const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [category, setCategory] = React.useState<IncomeCategory | ''>('');
   const [dateFrom, setDateFrom] = React.useState('');
   const [dateTo, setDateTo] = React.useState('');
@@ -48,7 +50,7 @@ export default function IncomePage() {
   const params: ListIncomeParams = {
     page,
     limit: 20,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
     category: category || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
@@ -180,7 +182,7 @@ export default function IncomePage() {
         </Button>
       </div>
 
-      <DataTable columns={columns} rows={items} rowKey={(i) => i.id} loading={income.isPending} emptyMessage="No income entries match these filters." />
+      <DataTable columns={columns} rows={items} rowKey={(i) => i.id} loading={income.isPending} error={income.error} onRetry={() => income.refetch()} emptyMessage="No income entries match these filters." />
 
       {data && data.totalPages > 1 ? (
         <div className="flex items-center justify-between text-sm text-muted-foreground">

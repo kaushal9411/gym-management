@@ -239,6 +239,8 @@ export default function ReportViewerPage() {
           return `${JSON.stringify(row)}-${index}`;
         }}
         loading={report.isPending}
+        error={report.error}
+        onRetry={() => report.refetch()}
         emptyMessage="No data matches these filters."
       />
 

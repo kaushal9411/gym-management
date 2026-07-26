@@ -99,6 +99,8 @@ export default function InvitationsPage() {
         rows={data?.items ?? []}
         rowKey={(i) => i.id}
         loading={invitations.isPending}
+        error={invitations.error}
+        onRetry={() => invitations.refetch()}
         emptyMessage="No invitations yet — invite your first staff member."
       />
 

@@ -32,7 +32,10 @@ function useInvalidateMembers() {
 }
 
 export function useMemberList(params: ListMembersParams) {
-  return useQuery({ queryKey: ['members', 'list', params], queryFn: () => memberService.list(params) });
+  // 1-minute staleTime (Prompt 23: Global Loading & Performance
+  // Optimization) — frequently accessed, changes on a human timescale;
+  // mutations still invalidate this key immediately on any real change.
+  return useQuery({ queryKey: ['members', 'list', params], queryFn: () => memberService.list(params), staleTime: 60_000 });
 }
 
 export function useMemberDetail(id: string | null) {
@@ -203,11 +206,14 @@ function useInvalidateMembershipPlans() {
 
 /** Active-only, unfiltered — backs Assign/Renew/Upgrade/Downgrade plan dropdowns. */
 export function useAssignablePlans() {
-  return useQuery({ queryKey: ['members', 'plans', 'assignable'], queryFn: () => memberService.listAssignablePlans() });
+  // Same 5-minute staleTime as Branches' own `/assignable`-style dropdown
+  // source (Prompt 23: Global Loading & Performance Optimization) — a
+  // small, rarely-changing reference list.
+  return useQuery({ queryKey: ['members', 'plans', 'assignable'], queryFn: () => memberService.listAssignablePlans(), staleTime: 5 * 60_000 });
 }
 
 export function useMembershipPlanList(params: ListMembershipPlansParams) {
-  return useQuery({ queryKey: ['members', 'plans', 'list', params], queryFn: () => memberService.listPlans(params) });
+  return useQuery({ queryKey: ['members', 'plans', 'list', params], queryFn: () => memberService.listPlans(params), staleTime: 60_000 });
 }
 
 export function useMembershipPlanDetail(planId: string | null) {

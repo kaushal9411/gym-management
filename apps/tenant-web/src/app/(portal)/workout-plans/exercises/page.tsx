@@ -1,5 +1,6 @@
 'use client';
 
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
 import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, MoreHorizontal, Plus } from 'lucide-react';
@@ -60,6 +61,7 @@ export default function ExerciseLibraryPage() {
   const canRestore = hasPermission('workouts:restore');
 
   const [search, setSearch] = React.useState('');
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [page, setPage] = React.useState(1);
   const [sortBy, setSortBy] = React.useState<SortableColumn>('name');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
@@ -68,7 +70,7 @@ export default function ExerciseLibraryPage() {
   const [formError, setFormError] = React.useState<string | null>(null);
   const [confirmAction, setConfirmAction] = React.useState<{ action: 'delete' | 'restore'; exercise: Exercise } | null>(null);
 
-  const exercises = useExerciseList({ page, limit: 20, search: search || undefined, includeDeleted: true, sortBy, sortDir });
+  const exercises = useExerciseList({ page, limit: 20, search: debouncedSearch || undefined, includeDeleted: true, sortBy, sortDir });
   const createExercise = useCreateExercise();
   const updateExercise = useUpdateExercise();
   const statusAction = useExerciseStatusAction();
@@ -250,7 +252,7 @@ export default function ExerciseLibraryPage() {
         }}
       />
 
-      <DataTable columns={columns} rows={items} rowKey={(ex) => ex.id} loading={exercises.isPending} emptyMessage="No exercises match these filters." />
+      <DataTable columns={columns} rows={items} rowKey={(ex) => ex.id} loading={exercises.isPending} error={exercises.error} onRetry={() => exercises.refetch()} emptyMessage="No exercises match these filters." />
 
       {data && data.totalPages > 1 ? (
         <div className="flex items-center justify-between text-sm text-muted-foreground">
