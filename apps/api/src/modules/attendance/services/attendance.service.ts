@@ -9,6 +9,7 @@ import { getBranchAccess } from '../../authentication/middlewares/branch-access.
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
 import { MemberRepository, type MemberRow } from '../../members/repositories/member.repository';
+import { notifyAttendanceCheckIn, notifyAttendanceCheckOut } from '../../tenant-notifications/services/notification-trigger.service';
 import type {
   AttendanceRecordDto,
   AttendanceSummaryDto,
@@ -205,6 +206,7 @@ export class AttendanceService {
 
     const dto = toDto(record);
     emitToTenant(this.tenantId, 'attendance:checkin', dto);
+    await notifyAttendanceCheckIn(this.tenantId, { memberName: dto.member.name, time: dto.checkInTime });
     return dto;
   }
 
@@ -250,6 +252,7 @@ export class AttendanceService {
 
     const dto = toDto((await this.attendance.findById(this.tenantId, record.id, { includeDeleted: true }))!);
     emitToTenant(this.tenantId, 'attendance:checkout', dto);
+    await notifyAttendanceCheckOut(this.tenantId, { memberName: dto.member.name, time: dto.checkOutTime ?? new Date().toISOString() });
     return dto;
   }
 

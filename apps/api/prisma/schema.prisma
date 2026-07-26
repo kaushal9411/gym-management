@@ -217,6 +217,15 @@ model Tenant {
   dietPlanMeals         DietPlanMeal[]
   memberDietPlans       MemberDietPlan[]
   memberDietDailyLogs   MemberDietDailyLog[]
+  memberInvoices        MemberInvoice[]
+  memberInvoiceItems    MemberInvoiceItem[]
+  memberPayments        MemberPayment[]
+  memberPaymentRefunds  MemberPaymentRefund[]
+  incomeEntries         Income[]
+  expenses              Expense[]
+  scheduledReports      ScheduledReport[]
+  tenantAnnouncements   TenantAnnouncement[]
+  notificationTemplates NotificationTemplate[]
 
   @@map("tenants")
 }
@@ -305,7 +314,7 @@ model User {
   updatedAt                DateTime   @updatedAt @map("updated_at")
   deletedAt                DateTime?  @map("deleted_at")
 
-  tenant                       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant                       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userRoles                    UserRole[]
   refreshTokens                RefreshToken[]
   passwordResets               PasswordReset[]
@@ -313,18 +322,24 @@ model User {
   otpCodes                     OtpCode[]
   loginHistory                 LoginHistory[]
   sessions                     UserSession[]
-  auditLogsAsActor             AuditLog[]          @relation("AuditActor")
+  auditLogsAsActor             AuditLog[]            @relation("AuditActor")
   userPermissions              UserPermission[]
   userBranches                 UserBranch[]
-  sentInvitations              UserInvitation[]    @relation("InvitationInviter")
+  sentInvitations              UserInvitation[]      @relation("InvitationInviter")
   staffProfile                 StaffProfile?
-  trainerFor                   Member[]            @relation("MemberTrainer")
-  attendanceCheckIns           Attendance[]        @relation("AttendanceCheckedInBy")
-  attendanceCheckOuts          Attendance[]        @relation("AttendanceCheckedOutBy")
-  workoutPlansAsTrainer        WorkoutPlan[]       @relation("WorkoutPlanTrainer")
-  memberWorkoutPlansAssignedBy MemberWorkoutPlan[] @relation("MemberWorkoutPlanAssignedBy")
-  dietPlansAsTrainer           DietPlan[]          @relation("DietPlanTrainer")
-  memberDietPlansAssignedBy    MemberDietPlan[]    @relation("MemberDietPlanAssignedBy")
+  trainerFor                   Member[]              @relation("MemberTrainer")
+  attendanceCheckIns           Attendance[]          @relation("AttendanceCheckedInBy")
+  attendanceCheckOuts          Attendance[]          @relation("AttendanceCheckedOutBy")
+  workoutPlansAsTrainer        WorkoutPlan[]         @relation("WorkoutPlanTrainer")
+  memberWorkoutPlansAssignedBy MemberWorkoutPlan[]   @relation("MemberWorkoutPlanAssignedBy")
+  dietPlansAsTrainer           DietPlan[]            @relation("DietPlanTrainer")
+  memberDietPlansAssignedBy    MemberDietPlan[]      @relation("MemberDietPlanAssignedBy")
+  memberPaymentsRecorded       MemberPayment[]       @relation("MemberPaymentRecordedBy")
+  memberPaymentRefundsIssued   MemberPaymentRefund[] @relation("MemberPaymentRefundedBy")
+  incomeEntriesRecorded        Income[]              @relation("IncomeRecordedBy")
+  expensesRecorded             Expense[]             @relation("ExpenseRecordedBy")
+  scheduledReportsCreated      ScheduledReport[]     @relation("ScheduledReportCreatedBy")
+  tenantAnnouncementsCreated   TenantAnnouncement[]  @relation("TenantAnnouncementCreatedBy")
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
@@ -742,6 +757,8 @@ model Member {
   attendances  Attendance[]
   workoutPlans MemberWorkoutPlan[]
   dietPlans    MemberDietPlan[]
+  invoices     MemberInvoice[]
+  payments     MemberPayment[]
 
   @@unique([tenantId, memberId])
   @@index([tenantId, status])
@@ -768,10 +785,11 @@ model Membership {
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
 
-  tenant  Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  member  Member             @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  plan    MembershipPlan     @relation(fields: [planId], references: [id], onDelete: Restrict)
-  freezes MembershipFreeze[]
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member   Member             @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  plan     MembershipPlan     @relation(fields: [planId], references: [id], onDelete: Restrict)
+  freezes  MembershipFreeze[]
+  payments MemberPayment[]
 
   @@index([tenantId, memberId])
   @@index([tenantId, status])
@@ -1236,6 +1254,278 @@ model MemberDietDailyLog {
   @@map("member_diet_daily_logs")
 }
 
+/// Gym-operations finance (charging MEMBERS) — deliberately named/mapped
+/// distinctly from the platform `Payment`/`Invoice`/`PaymentMethod` models
+/// above (Prompt 8, FitCloud billing THE TENANT for its own subscription).
+/// Those are a completely separate concern; see the schema comments on
+/// `TenantInvoiceSettings` for the same tenant-vs-platform distinction.
+enum MemberPaymentMethod {
+  CASH
+  UPI
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+  CHEQUE
+  /// Not wired to a real gateway yet — same "ship the enum value now, wire
+  /// the integration later" precedent as Attendance's BIOMETRIC/NFC/etc.
+  ONLINE_GATEWAY
+
+  @@map("member_payment_method")
+}
+
+enum MemberPaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+
+  @@map("member_payment_status")
+}
+
+enum MemberInvoiceStatus {
+  UNPAID
+  PAID
+  PARTIALLY_PAID
+  OVERDUE
+  CANCELLED
+
+  @@map("member_invoice_status")
+}
+
+enum IncomeCategory {
+  MEMBERSHIP_FEE
+  PERSONAL_TRAINING
+  /// Not orderable yet — no product/inventory module exists; the category
+  /// exists now so manual entries can already be classified correctly.
+  PRODUCT_SALES
+  OTHER
+
+  @@map("income_category")
+}
+
+enum ExpenseCategory {
+  RENT
+  SALARY
+  UTILITIES
+  EQUIPMENT
+  MAINTENANCE
+  MARKETING
+  OFFICE_SUPPLIES
+  OTHER
+
+  @@map("expense_category")
+}
+
+/// A bill issued TO a member. May be created standalone ("Generate Invoice",
+/// status UNPAID, e.g. billing an upcoming renewal in advance) or
+/// auto-generated the moment a `MemberPayment` succeeds with no invoice
+/// already attached (business rule: "every successful membership payment
+/// automatically generates an invoice") — see `MemberPaymentService`.
+model MemberInvoice {
+  id             String              @id @default(uuid()) @db.Uuid
+  tenantId       String              @map("tenant_id") @db.Uuid
+  invoiceNumber  String              @map("invoice_number") @db.VarChar(30)
+  memberId       String              @map("member_id") @db.Uuid
+  branchId       String              @map("branch_id") @db.Uuid
+  invoiceDate    DateTime            @map("invoice_date") @db.Date
+  dueDate        DateTime            @map("due_date") @db.Date
+  subtotal       Decimal             @db.Decimal(10, 2)
+  taxAmount      Decimal             @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  discountAmount Decimal             @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  totalAmount    Decimal             @map("total_amount") @db.Decimal(10, 2)
+  status         MemberInvoiceStatus @default(UNPAID)
+  notes          String?
+  createdAt      DateTime            @default(now()) @map("created_at")
+  updatedAt      DateTime            @updatedAt @map("updated_at")
+
+  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member   Member              @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  branch   Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  items    MemberInvoiceItem[]
+  payments MemberPayment[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId, memberId])
+  @@index([tenantId, status])
+  @@map("member_invoices")
+}
+
+model MemberInvoiceItem {
+  id          String  @id @default(uuid()) @db.Uuid
+  tenantId    String  @map("tenant_id") @db.Uuid
+  invoiceId   String  @map("invoice_id") @db.Uuid
+  description String  @db.VarChar(200)
+  quantity    Int     @default(1)
+  unitPrice   Decimal @map("unit_price") @db.Decimal(10, 2)
+  amount      Decimal @db.Decimal(10, 2)
+  sortOrder   Int     @default(0) @map("sort_order")
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoice MemberInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, invoiceId])
+  @@map("member_invoice_items")
+}
+
+/// One row per payment attempt/record from a member. `invoiceId` is
+/// optional: if set at creation, this payment settles THAT invoice (and a
+/// second successful payment against an already-settled invoice is
+/// rejected — "prevent duplicate payments for the same invoice"); if left
+/// unset and the payment succeeds, a new invoice is auto-generated for it.
+model MemberPayment {
+  id                   String              @id @default(uuid()) @db.Uuid
+  tenantId             String              @map("tenant_id") @db.Uuid
+  paymentNumber        String              @map("payment_number") @db.VarChar(30)
+  memberId             String              @map("member_id") @db.Uuid
+  membershipId         String?             @map("membership_id") @db.Uuid
+  invoiceId            String?             @map("invoice_id") @db.Uuid
+  branchId             String              @map("branch_id") @db.Uuid
+  amount               Decimal             @db.Decimal(10, 2)
+  discount             Decimal             @default(0) @db.Decimal(10, 2)
+  tax                  Decimal             @default(0) @db.Decimal(10, 2)
+  finalAmount          Decimal             @map("final_amount") @db.Decimal(10, 2)
+  method               MemberPaymentMethod
+  paymentDate          DateTime            @map("payment_date") @db.Date
+  transactionReference String?             @map("transaction_reference") @db.VarChar(120)
+  status               MemberPaymentStatus @default(SUCCESS)
+  notes                String?
+  recordedBy           String?             @map("recorded_by") @db.Uuid
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+
+  tenant         Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member         Member                @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  membership     Membership?           @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  invoice        MemberInvoice?        @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  branch         Branch                @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  recordedByUser User?                 @relation("MemberPaymentRecordedBy", fields: [recordedBy], references: [id], onDelete: SetNull)
+  refunds        MemberPaymentRefund[]
+  income         Income?
+
+  @@unique([tenantId, paymentNumber])
+  @@index([tenantId, memberId])
+  @@index([tenantId, status])
+  @@index([tenantId, invoiceId])
+  @@map("member_payments")
+}
+
+/// "Refunds must create financial history" — a refund is always a NEW row,
+/// never a mutation/deletion of the original `MemberPayment`, so the
+/// payment's full lifecycle stays visible forever. A payment can have
+/// multiple partial refunds.
+model MemberPaymentRefund {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  paymentId  String   @map("payment_id") @db.Uuid
+  amount     Decimal  @db.Decimal(10, 2)
+  reason     String?
+  refundedBy String?  @map("refunded_by") @db.Uuid
+  refundedAt DateTime @default(now()) @map("refunded_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant         Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payment        MemberPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  refundedByUser User?         @relation("MemberPaymentRefundedBy", fields: [refundedBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, paymentId])
+  @@map("member_payment_refunds")
+}
+
+/// The gym's own revenue ledger. A `MEMBERSHIP_FEE` row is auto-created
+/// whenever a `MemberPayment` succeeds (see `MemberPaymentService`,
+/// `sourcePaymentId` unique — one income row per payment, never duplicated);
+/// every other category is entered manually.
+model Income {
+  id              String         @id @default(uuid()) @db.Uuid
+  tenantId        String         @map("tenant_id") @db.Uuid
+  category        IncomeCategory
+  amount          Decimal        @db.Decimal(10, 2)
+  incomeDate      DateTime       @map("income_date") @db.Date
+  branchId        String?        @map("branch_id") @db.Uuid
+  description     String?
+  sourcePaymentId String?        @unique @map("source_payment_id") @db.Uuid
+  recordedBy      String?        @map("recorded_by") @db.Uuid
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  deletedAt       DateTime?      @map("deleted_at")
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch         Branch?        @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  sourcePayment  MemberPayment? @relation(fields: [sourcePaymentId], references: [id], onDelete: SetNull)
+  recordedByUser User?          @relation("IncomeRecordedBy", fields: [recordedBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, category])
+  @@index([tenantId, incomeDate])
+  @@map("income_entries")
+}
+
+/// The gym's own expense ledger. Receipt upload reuses the exact
+/// no-object-storage data-URL convention as `MemberDocument`.
+model Expense {
+  id              String          @id @default(uuid()) @db.Uuid
+  tenantId        String          @map("tenant_id") @db.Uuid
+  category        ExpenseCategory
+  amount          Decimal         @db.Decimal(10, 2)
+  expenseDate     DateTime        @map("expense_date") @db.Date
+  branchId        String?         @map("branch_id") @db.Uuid
+  description     String?
+  receiptFileName String?         @map("receipt_file_name") @db.VarChar(200)
+  receiptDataUrl  String?         @map("receipt_data_url")
+  recordedBy      String?         @map("recorded_by") @db.Uuid
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  deletedAt       DateTime?       @map("deleted_at")
+
+  tenant         Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch         Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  recordedByUser User?   @relation("ExpenseRecordedBy", fields: [recordedBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, category])
+  @@index([tenantId, expenseDate])
+  @@map("expenses")
+}
+
+enum ReportFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+
+  @@map("report_frequency")
+}
+
+/// "Allow reports to be generated automatically for future email delivery" —
+/// a persisted schedule config; the actual generation + email happens in a
+/// BullMQ repeatable job (`modules/reports/jobs/scheduled-reports.jobs.ts`),
+/// same pattern as `subscription-billing.jobs.ts`. `reportType` is a free
+/// string validated against a fixed catalog in the zod schema rather than a
+/// Prisma enum — the catalog is 18 entries long and only enforced at the API
+/// boundary, not the DB.
+model ScheduledReport {
+  id              String          @id @default(uuid()) @db.Uuid
+  tenantId        String          @map("tenant_id") @db.Uuid
+  name            String          @db.VarChar(150)
+  reportType      String          @map("report_type") @db.VarChar(60)
+  frequency       ReportFrequency
+  recipientEmails String[]        @map("recipient_emails")
+  branchId        String?         @map("branch_id") @db.Uuid
+  filters         Json?
+  isActive        Boolean         @default(true) @map("is_active")
+  lastRunAt       DateTime?       @map("last_run_at")
+  nextRunAt       DateTime        @map("next_run_at")
+  createdBy       String?         @map("created_by") @db.Uuid
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch        Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  createdByUser User?   @relation("ScheduledReportCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, isActive, nextRunAt])
+  @@map("scheduled_reports")
+}
+
 // ── Sessions & tokens ─────────────────────────────────────────────────────
 
 /// Opaque, rotating refresh tokens. Only the SHA-256 hash is stored.
@@ -1609,10 +1899,16 @@ model Branch {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userBranches UserBranch[]
-  members      Member[]
-  attendances  Attendance[]
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userBranches        UserBranch[]
+  members             Member[]
+  attendances         Attendance[]
+  invoices            MemberInvoice[]
+  payments            MemberPayment[]
+  incomeEntries       Income[]
+  expenses            Expense[]
+  scheduledReports    ScheduledReport[]
+  tenantAnnouncements TenantAnnouncement[]
 
   @@index([tenantId])
   @@map("branches")
@@ -2271,6 +2567,15 @@ enum TenantNotificationCategory {
   SYSTEM
   SUBSCRIPTION
   GENERAL
+  /// Added in Prompt 21 (Notifications & Communication) for the new
+  /// business-event triggers — additive, existing values/rows untouched.
+  MEMBER
+  MEMBERSHIP
+  PAYMENT
+  ATTENDANCE
+  WORKOUT
+  DIET
+  STAFF
 
   @@map("tenant_notification_category")
 }
@@ -2300,4 +2605,108 @@ model TenantNotification {
 
   @@index([tenantId, createdAt])
   @@map("tenant_notifications")
+}
+
+enum TenantAnnouncementAudience {
+  ALL
+  MEMBERS
+  STAFF
+
+  @@map("tenant_announcement_audience")
+}
+
+enum TenantAnnouncementStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHED
+  EXPIRED
+
+  @@map("tenant_announcement_status")
+}
+
+/// Prompt 21 — in-gym announcements a Manager/Owner authors and publishes to
+/// their own members/staff (rich-text body from the frontend editor). This is
+/// a DIFFERENT concept from the pre-existing `Announcement` model (a global,
+/// admin-authored platform banner broadcast from the super-admin plane down
+/// to matching tenants by subscription status) — same naming-collision
+/// avoidance precedent as Finance's `MemberPayment` vs. the platform's
+/// `Payment` model. Publishing (immediate or via the scheduler sweep) also
+/// writes a `TenantNotification` row with category `ANNOUNCEMENT` so it shows
+/// up in the same Notification Center feed as everything else.
+model TenantAnnouncement {
+  id          String                     @id @default(uuid()) @db.Uuid
+  tenantId    String                     @map("tenant_id") @db.Uuid
+  branchId    String?                    @map("branch_id") @db.Uuid
+  title       String                     @db.VarChar(200)
+  body        String
+  audience    TenantAnnouncementAudience @default(ALL)
+  status      TenantAnnouncementStatus   @default(DRAFT)
+  publishAt   DateTime?                  @map("publish_at")
+  publishedAt DateTime?                  @map("published_at")
+  expiresAt   DateTime?                  @map("expires_at")
+  createdBy   String                     @map("created_by") @db.Uuid
+  createdAt   DateTime                   @default(now()) @map("created_at")
+  updatedAt   DateTime                   @updatedAt @map("updated_at")
+
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch        Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  createdByUser User    @relation("TenantAnnouncementCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, status])
+  @@map("tenant_announcements")
+}
+
+enum NotificationTemplateType {
+  MEMBERSHIP_EXPIRY
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  MEMBERSHIP_RENEWAL
+  NEW_MEMBER_REGISTRATION
+  ATTENDANCE_CONFIRMATION
+  WORKOUT_ASSIGNMENT
+  DIET_ASSIGNMENT
+  WELCOME_MESSAGE
+  BIRTHDAY_WISHES
+
+  @@map("notification_template_type")
+}
+
+/// Channels a template can fire through. Named `TenantNotificationChannel`
+/// (not bare `NotificationChannel`, which is already a platform-plane enum
+/// on the admin-side `Notification` model with a different value set) — same
+/// naming-collision avoidance precedent as `TenantNotification` itself. Only
+/// IN_APP and EMAIL are actually wired up in this pass — PUSH/SMS are
+/// "(Future)" per the spec, and WHATSAPP is included now purely so the
+/// architecture doesn't need another migration to add it later (same "ship
+/// the enum value now" precedent as MemberPayment's ONLINE_GATEWAY method).
+enum TenantNotificationChannel {
+  IN_APP
+  EMAIL
+  PUSH
+  SMS
+  WHATSAPP
+
+  @@map("tenant_notification_channel")
+}
+
+/// Per-tenant override of the 10 built-in notification templates. A missing
+/// row for a given `type` means "use the hardcoded default" (see
+/// `modules/tenant-notifications/constants/default-templates.ts`) — rows are
+/// only created here when a tenant actually customizes one, not seeded
+/// up front for every tenant.
+model NotificationTemplate {
+  id            String                      @id @default(uuid()) @db.Uuid
+  tenantId      String                      @map("tenant_id") @db.Uuid
+  type          NotificationTemplateType
+  channels      TenantNotificationChannel[]
+  titleTemplate String                      @map("title_template") @db.VarChar(200)
+  bodyTemplate  String                      @map("body_template")
+  isActive      Boolean                     @default(true) @map("is_active")
+  createdAt     DateTime                    @default(now()) @map("created_at")
+  updatedAt     DateTime                    @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, type])
+  @@map("notification_templates")
 }

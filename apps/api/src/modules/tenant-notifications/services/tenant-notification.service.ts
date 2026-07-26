@@ -1,5 +1,6 @@
 import type { TenantNotificationCategory } from '@prisma/client';
 
+import { NotFoundError } from '../../../core/errors/app-error';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { emitToTenant } from '../../../infrastructure/realtime/socket-server';
@@ -11,6 +12,32 @@ export class TenantNotificationService {
     const skip = (params.page - 1) * params.limit;
     const { total, unreadCount, items } = await repository.list(tenantId, { unreadOnly: params.unreadOnly, skip, take: params.limit });
     return { items, unreadCount, page: params.page, limit: params.limit, total, totalPages: Math.ceil(total / params.limit) };
+  }
+
+  async getById(tenantId: string, id: string) {
+    const repository = new TenantNotificationRepository(getTenantScopedClient(tenantId));
+    const notification = await repository.findById(tenantId, id);
+    if (!notification) throw new NotFoundError('Notification not found.');
+    return notification;
+  }
+
+  async unreadCount(tenantId: string): Promise<{ unreadCount: number }> {
+    const repository = new TenantNotificationRepository(getTenantScopedClient(tenantId));
+    return { unreadCount: await repository.countUnread(tenantId) };
+  }
+
+  /** Manual "Create Notification" — an ad-hoc staff-authored notice, distinct from the business-event triggers in `notification-trigger.service.ts`. */
+  async create(tenantId: string, input: { category: TenantNotificationCategory; title: string; body: string }) {
+    const repository = new TenantNotificationRepository(getTenantScopedClient(tenantId));
+    const notification = await repository.create(tenantId, input);
+    emitToTenant(tenantId, 'notification:new', notification);
+    return notification;
+  }
+
+  async remove(tenantId: string, id: string): Promise<void> {
+    await this.getById(tenantId, id);
+    const repository = new TenantNotificationRepository(getTenantScopedClient(tenantId));
+    await repository.remove(tenantId, id);
   }
 
   async markRead(tenantId: string, id: string): Promise<void> {

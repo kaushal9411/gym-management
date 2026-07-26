@@ -10,6 +10,7 @@ import { AuditLogRepository } from '../../authentication/repositories/audit-log.
 import { RoleRepository } from '../../authentication/repositories/role.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
 import { RoleManagementRepository } from '../../roles/repositories/role-management.repository';
+import { notifyStaffInvitation } from '../../tenant-notifications/services/notification-trigger.service';
 import { UserManagementRepository } from '../../users/repositories/user-management.repository';
 import { InvitationRepository, type InvitationWithRelations } from '../repositories/invitation.repository';
 
@@ -104,6 +105,7 @@ export class InvitationService {
 
     await this.audit(actor, 'iam.invitation_sent', invitation.id);
     this.emitCreated(invitation, token);
+    await notifyStaffInvitation(this.tenantId, { email, roleName: role.name });
     return toDto(invitation);
   }
 

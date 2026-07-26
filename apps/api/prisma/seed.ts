@@ -135,6 +135,36 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'diets:restore', description: 'Restore a soft-deleted food or diet plan' },
   { key: 'diets:assign', description: 'Assign or remove a diet plan for a member' },
   { key: 'diets:progress', description: "Update a member's diet progress (daily tracking, water intake, weight)" },
+
+  // Finance Management (Prompt 19) — granular keys distinct from the
+  // pre-existing speculative `payments:create`/`payments:read`/`payments:refund`
+  // catalog entries (left seeded but unused, same precedent as every prior
+  // module). Also distinct from `reports:view-financial`, which stays the
+  // gate for the Reports module (not built yet), not day-to-day finance ops.
+  { key: 'finance:view', description: 'View payments, invoices, income, expenses, and the finance dashboard' },
+  { key: 'finance:payment-create', description: 'Record, update, cancel, or verify a member payment; manually generate an invoice' },
+  { key: 'finance:payment-refund', description: 'Refund a member payment (full or partial)' },
+  { key: 'finance:invoice-view', description: 'View the invoice list and invoice details' },
+  { key: 'finance:invoice-download', description: 'Download an invoice as a PDF or email it to the member' },
+  { key: 'finance:income-manage', description: 'Create, update, or delete an income entry' },
+  { key: 'finance:expense-manage', description: 'Create, update, or delete an expense, including its receipt' },
+
+  // Reports & Analytics (Prompt 20) — granular keys distinct from the
+  // pre-existing speculative `reports:read`/`reports:view-financial` catalog
+  // entries (left seeded but unused, same precedent as every prior module).
+  { key: 'reports:view', description: 'View the dashboard, reports center, and named reports' },
+  { key: 'reports:export', description: 'Export a report as CSV/Excel/PDF, and manage scheduled report email delivery' },
+  { key: 'analytics:view', description: 'View the analytics dashboard (trend charts, branch comparison)' },
+
+  // Notifications & Communication (Prompt 21) — `notifications:view` is new;
+  // `notifications:manage` already existed in the catalog above (previously
+  // unused — this prompt is what finally enforces it on real routes).
+  { key: 'notifications:view', description: 'View the Notification Center feed, unread count, and notification details' },
+  { key: 'announcements:view', description: "View this tenant's in-gym announcements" },
+  { key: 'announcements:create', description: 'Create a draft announcement' },
+  { key: 'announcements:update', description: 'Edit a draft or scheduled announcement' },
+  { key: 'announcements:delete', description: 'Delete an announcement' },
+  { key: 'announcements:publish', description: 'Publish an announcement immediately or schedule a future auto-publish time' },
 ];
 
 const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
@@ -162,6 +192,10 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'attendance:view', 'attendance:checkin', 'attendance:checkout', 'attendance:update', 'attendance:delete', 'attendance:export',
     'workouts:view', 'workouts:create', 'workouts:update', 'workouts:delete', 'workouts:restore', 'workouts:assign', 'workouts:progress',
     'diets:view', 'diets:create', 'diets:update', 'diets:delete', 'diets:restore', 'diets:assign', 'diets:progress',
+    'finance:view', 'finance:payment-create', 'finance:payment-refund', 'finance:invoice-view', 'finance:invoice-download',
+    'finance:income-manage', 'finance:expense-manage',
+    'reports:view', 'reports:export', 'analytics:view',
+    'notifications:view', 'announcements:view', 'announcements:create', 'announcements:update', 'announcements:delete', 'announcements:publish',
   ],
   TRAINER: [
     'members:read', 'attendance:create', 'attendance:read',
@@ -178,6 +212,12 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     // Trainers/nutritionists author/assign plans and track member progress
     // day-to-day; delete/restore of the catalog itself stays Manager-only.
     'diets:view', 'diets:create', 'diets:update', 'diets:assign', 'diets:progress',
+    // Trainers can see reports relevant to their own performance/members, but
+    // not export or the analytics dashboard — a Manager-level view.
+    'reports:view',
+    // Trainers see the Notification Center and announcements, but authoring/
+    // publishing announcements stays a Manager decision.
+    'notifications:view', 'announcements:view',
   ],
   RECEPTIONIST: [
     'members:manage', 'members:read',
@@ -199,6 +239,14 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     // Same tightening — front-desk can see diet plans/progress for context,
     // but authoring/assigning diet plans stays a Trainer/Manager decision.
     'diets:view',
+    // Front-desk records payments and can view/download invoices; refunds
+    // and income/expense ledger management stay a Manager decision.
+    'finance:view', 'finance:payment-create', 'finance:invoice-view', 'finance:invoice-download',
+    // Front-desk can see day-to-day operational reports, but not export or analytics.
+    'reports:view',
+    // Front-desk sees the Notification Center and announcements, but
+    // authoring/publishing announcements stays a Manager decision.
+    'notifications:view', 'announcements:view',
   ],
   MEMBER: ['profile:read', 'profile:update', 'bookings:create', 'bookings:read', 'payments:read', 'chat:use'],
 };

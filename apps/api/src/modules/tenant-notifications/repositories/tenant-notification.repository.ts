@@ -26,4 +26,16 @@ export class TenantNotificationRepository {
   async create(tenantId: string, input: { category: TenantNotificationCategory; title: string; body: string; sourceNotificationId?: string }) {
     return this.db.tenantNotification.create({ data: { tenantId, ...input } });
   }
+
+  async findById(tenantId: string, id: string) {
+    return this.db.tenantNotification.findFirst({ where: { id, tenantId } });
+  }
+
+  async remove(tenantId: string, id: string): Promise<void> {
+    await this.db.tenantNotification.deleteMany({ where: { id, tenantId } });
+  }
+
+  async countUnread(tenantId: string): Promise<number> {
+    return this.db.tenantNotification.count({ where: { tenantId, readAt: null } });
+  }
 }

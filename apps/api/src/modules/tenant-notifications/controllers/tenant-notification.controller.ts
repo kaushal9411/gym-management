@@ -15,6 +15,26 @@ export class TenantNotificationController {
     sendSuccess(res, result);
   }
 
+  async unreadCount(req: Request, res: Response): Promise<void> {
+    const result = await tenantNotificationService.unreadCount(req.tenant!.id);
+    sendSuccess(res, result);
+  }
+
+  async getById(req: Request, res: Response): Promise<void> {
+    const notification = await tenantNotificationService.getById(req.tenant!.id, req.params.notificationId!);
+    sendSuccess(res, notification);
+  }
+
+  async create(req: Request, res: Response): Promise<void> {
+    const notification = await tenantNotificationService.create(req.tenant!.id, req.body);
+    sendSuccess(res, notification, 'Notification created.', 201);
+  }
+
+  async remove(req: Request, res: Response): Promise<void> {
+    await tenantNotificationService.remove(req.tenant!.id, req.params.notificationId!);
+    sendSuccess(res, null, 'Notification deleted.');
+  }
+
   async markRead(req: Request, res: Response): Promise<void> {
     await tenantNotificationService.markRead(req.tenant!.id, req.params.notificationId!);
     sendSuccess(res, null, 'Marked as read.');

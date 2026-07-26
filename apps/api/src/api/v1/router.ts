@@ -28,6 +28,11 @@ import { contactRouter } from '../../modules/contact/routes/contact.routes';
 import { couponRouter } from '../../modules/coupon/routes/coupon.routes';
 import { dietPlanRouter } from '../../modules/diet/routes/diet-plan.routes';
 import { foodRouter } from '../../modules/diet/routes/food.routes';
+import { expenseRouter } from '../../modules/finance/routes/expense.routes';
+import { financeDashboardRouter } from '../../modules/finance/routes/finance-dashboard.routes';
+import { incomeRouter } from '../../modules/finance/routes/income.routes';
+import { memberInvoiceRouter } from '../../modules/finance/routes/member-invoice.routes';
+import { memberPaymentRouter } from '../../modules/finance/routes/member-payment.routes';
 import { invitationRouter } from '../../modules/invitations/routes/invitation.routes';
 import { invoiceRouter } from '../../modules/invoice/routes/invoice.routes';
 import { memberRouter } from '../../modules/members/routes/member.routes';
@@ -36,11 +41,17 @@ import { onboardingRouter } from '../../modules/onboarding/routes/onboarding.rou
 import { paymentRouter } from '../../modules/payment/routes/payment.routes';
 import { permissionRouter } from '../../modules/permissions/routes/permission.routes';
 import { profileRouter } from '../../modules/profile/routes/profile.routes';
+import { analyticsRouter } from '../../modules/reports/routes/analytics.routes';
+import { dashboardRouter } from '../../modules/reports/routes/dashboard.routes';
+import { reportsRouter } from '../../modules/reports/routes/reports.routes';
+import { scheduledReportRouter } from '../../modules/reports/routes/scheduled-report.routes';
 import { roleRouter } from '../../modules/roles/routes/role.routes';
 import { sessionRouter } from '../../modules/sessions/routes/session.routes';
 import { settingsRouter } from '../../modules/settings/routes/settings.routes';
 import { staffRouter } from '../../modules/staff/routes/staff.routes';
 import { subscriptionRouter } from '../../modules/subscription/routes/subscription.routes';
+import { tenantAnnouncementRouter } from '../../modules/tenant-announcements/routes/tenant-announcement.routes';
+import { notificationTemplateRouter } from '../../modules/tenant-notifications/routes/notification-template.routes';
 import { tenantNotificationRouter } from '../../modules/tenant-notifications/routes/tenant-notification.routes';
 import { tenantService } from '../../modules/tenants/service/tenant.service';
 import { userRouter } from '../../modules/users/routes/user.routes';
@@ -75,8 +86,17 @@ v1Router.use('/coupon', couponRouter);
 v1Router.use('/invoice', invoiceRouter);
 v1Router.use('/webhook', webhookRouter);
 v1Router.use('/branches', branchRouter);
+// Notifications & Communication (Prompt 21) — /notifications/templates must
+// be mounted before the general /notifications router so it isn't shadowed
+// by that router's own `/:notificationId` param routes (same reasoning as
+// Reports & Analytics below). `/tenant-announcements` is this tenant's own
+// in-gym announcement authoring — distinct from `/announcements` (the
+// pre-existing platform-plane consumption-only endpoint), see
+// BACKEND-GUIDE.md §Notifications & Communication for the naming rationale.
+v1Router.use('/notifications/templates', notificationTemplateRouter);
 v1Router.use('/notifications', tenantNotificationRouter);
 v1Router.use('/announcements', announcementRouter);
+v1Router.use('/tenant-announcements', tenantAnnouncementRouter);
 // IAM (Prompt 11) — the authorization plane every future module builds on.
 v1Router.use('/users', userRouter);
 v1Router.use('/roles', roleRouter);
@@ -94,6 +114,18 @@ v1Router.use('/exercises', exerciseRouter);
 v1Router.use('/workout-plans', workoutPlanRouter);
 v1Router.use('/foods', foodRouter);
 v1Router.use('/diet-plans', dietPlanRouter);
+v1Router.use('/payments', memberPaymentRouter);
+v1Router.use('/invoices', memberInvoiceRouter);
+v1Router.use('/income', incomeRouter);
+v1Router.use('/expenses', expenseRouter);
+v1Router.use('/finance', financeDashboardRouter);
+// Reports & Analytics (Prompt 20) — /reports/dashboard and /reports/scheduled
+// must be mounted before the general /reports router so their sub-paths
+// aren't shadowed by it (see modules/reports/routes/reports.routes.ts).
+v1Router.use('/reports/dashboard', dashboardRouter);
+v1Router.use('/reports/scheduled', scheduledReportRouter);
+v1Router.use('/reports', reportsRouter);
+v1Router.use('/analytics', analyticsRouter);
 // Platform-plane (no tenant check — mounted under /public, see PLATFORM_ROUTE_PREFIXES).
 v1Router.use('/public/contact', contactRouter);
 

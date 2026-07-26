@@ -1,17 +1,28 @@
 'use client';
 
-import { Activity } from 'lucide-react';
+import { Activity, CreditCard, UserCheck, UserPlus } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatRelativeTime } from '@/lib/format-relative-time';
-import { useNotifications } from '@/features/notifications/hooks/use-notifications';
+import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useRecentActivities } from '@/features/reports/hooks/use-reports';
+import type { RecentActivity as RecentActivityItem } from '@/features/reports/types';
 
-/** Reuses the real tenant-notification feed as the "Recent Activities" widget — genuine data, not a placeholder. */
+const ICONS: Record<RecentActivityItem['type'], typeof UserCheck> = {
+  PAYMENT: CreditCard,
+  CHECK_IN: UserCheck,
+  NEW_MEMBER: UserPlus,
+};
+
+/** "Get Recent Activities" (Prompt 20) — a real merged feed of payments/check-ins/new members, superseding the Prompt-10 foundation's generic-notifications stand-in. */
 export function RecentActivity() {
-  const { data, isLoading } = useNotifications({ limit: 5 });
-  const items = data?.items ?? [];
+  const { hasPermission } = usePermissions();
+  const { data, isPending } = useRecentActivities();
+  const items = data ?? [];
+
+  if (!hasPermission('reports:view')) return null;
 
   return (
     <Card>
@@ -19,20 +30,26 @@ export function RecentActivity() {
         <CardTitle className="text-base">Recent Activities</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {isLoading ? (
+        {isPending ? (
           Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
         ) : items.length === 0 ? (
           <EmptyState icon={Activity} title="No recent activity" />
         ) : (
-          items.map((item) => (
-            <div key={item.id} className="flex items-start gap-3 text-sm">
-              <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{item.title}</p>
-                <p className="text-xs text-muted-foreground">{formatRelativeTime(item.createdAt)}</p>
+          items.map((item) => {
+            const Icon = ICONS[item.type];
+            return (
+              <div key={`${item.type}-${item.id}`} className="flex items-start gap-3 text-sm">
+                <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Icon className="size-3.5" aria-hidden />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{item.label}</p>
+                  <p className="truncate text-xs text-muted-foreground">{item.detail}</p>
+                  <p className="text-xs text-muted-foreground">{formatRelativeTime(item.occurredAt)}</p>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </CardContent>
     </Card>

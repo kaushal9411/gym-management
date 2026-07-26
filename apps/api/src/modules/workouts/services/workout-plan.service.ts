@@ -3,6 +3,7 @@ import { ErrorCode } from '../../../core/errors/error-codes';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
+import { notifyWorkoutAssigned } from '../../tenant-notifications/services/notification-trigger.service';
 import type {
   AssignWorkoutPlanInput,
   CreateWorkoutPlanInput,
@@ -286,6 +287,7 @@ export class WorkoutPlanService {
       assignedBy: actor.userId,
     });
     await this.audit(actor, 'workout_plan.assigned', assignment.id);
+    await notifyWorkoutAssigned(this.tenantId, { memberName: `${member.firstName} ${member.lastName}`.trim(), planName: plan.name });
     return toAssignmentDto(assignment);
   }
 

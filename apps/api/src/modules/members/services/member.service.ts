@@ -6,6 +6,7 @@ import { generateOpaqueToken } from '../../../core/security/token.util';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
+import { notifyMembershipAssigned, notifyMembershipRenewed, notifyNewMemberRegistration } from '../../tenant-notifications/services/notification-trigger.service';
 import {
   type AssignMembershipInput,
   type AssignTrainerInput,
@@ -197,6 +198,11 @@ export class MemberService {
       qrCodeImageUrl,
     });
     await this.audit(actor, 'member.created', member.id);
+    await notifyNewMemberRegistration(this.tenantId, {
+      memberName: `${member.firstName} ${member.lastName}`.trim(),
+      memberCode: member.memberId,
+      memberEmail: member.email,
+    });
     return toDetail(member);
   }
 
@@ -319,6 +325,11 @@ export class MemberService {
       autoRenew: input.autoRenew ?? false,
     });
     await this.audit(actor, 'member.membership_assigned', id);
+    await notifyMembershipAssigned(this.tenantId, {
+      memberName: `${member.firstName} ${member.lastName}`.trim(),
+      planName: plan.name,
+      endDate: endDate.toISOString().slice(0, 10),
+    });
     return this.getById(id);
   }
 
@@ -347,6 +358,12 @@ export class MemberService {
       autoRenew: input.autoRenew ?? current.autoRenew,
     });
     await this.audit(actor, 'member.membership_renewed', id);
+    await notifyMembershipRenewed(this.tenantId, {
+      memberName: `${member.firstName} ${member.lastName}`.trim(),
+      planName: plan.name,
+      endDate: endDate.toISOString().slice(0, 10),
+      memberEmail: member.email,
+    });
     return this.getById(id);
   }
 
