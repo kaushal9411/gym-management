@@ -19,6 +19,7 @@ import { toAttendanceError, useAttendanceList, useDeleteAttendance, useUpdateAtt
 import { attendanceService } from '@/features/attendance/services/attendance.service';
 import type { AttendanceMethod, AttendanceRecord, AttendanceStatus, ListAttendanceParams } from '@/features/attendance/types';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { BranchSelect } from '@/features/members/components/branch-select';
 import { cn } from '@/lib/utils';
 
@@ -45,6 +46,7 @@ function toLocalInputValue(iso: string | null): string {
 
 export default function AttendanceHistoryPage() {
   const { hasPermission } = usePermissions();
+  const { currentBranchId } = useCurrentBranch();
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [branchId, setBranchId] = React.useState('');
@@ -61,6 +63,13 @@ export default function AttendanceHistoryPage() {
   const canUpdate = hasPermission('attendance:update');
   const canDelete = hasPermission('attendance:delete');
   const canExport = hasPermission('attendance:export');
+
+  // Defaults from, and stays in sync with, the header's branch switcher —
+  // still locally overridable (e.g. back to "all branches") for this page view.
+  React.useEffect(() => {
+    setBranchId(currentBranchId ?? '');
+    setPage(1);
+  }, [currentBranchId]);
 
   const params: ListAttendanceParams = {
     page,

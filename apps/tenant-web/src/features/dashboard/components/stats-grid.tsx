@@ -4,12 +4,14 @@ import { CalendarClock, UserCheck, UserPlus, Users, Wallet, Clock3 } from 'lucid
 
 import { StatisticCard } from '@/components/ui/statistic-card';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { useKpis } from '@/features/reports/hooks/use-reports';
 
-/** Real KPIs from the Reports & Analytics module (Prompt 20) — the Prompt-10 foundation's "Coming soon" placeholders finally have data behind them, now that Members/Attendance/Memberships/Payments all exist. */
+/** Real KPIs from the Reports & Analytics module (Prompt 20) — the Prompt-10 foundation's "Coming soon" placeholders finally have data behind them, now that Members/Attendance/Memberships/Payments all exist. Scoped to the header's currently-selected branch (Prompt 24). */
 export function StatsGrid() {
   const { hasPermission } = usePermissions();
-  const kpis = useKpis();
+  const { currentBranchId } = useCurrentBranch();
+  const kpis = useKpis(currentBranchId ?? undefined);
   const data = kpis.data;
 
   const stats = [

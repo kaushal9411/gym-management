@@ -39,6 +39,7 @@
     "pusher": "^5.2.0",
     "qrcode": "^1.5.4",
     "rate-limit-redis": "^4.2.0",
+    "razorpay": "^2.9.8",
     "socket.io": "^4.8.1",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",

@@ -13,6 +13,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useBranches, useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import {
   toMemberError,
   useDuplicateMembershipPlan,
@@ -36,6 +37,12 @@ export default function MembershipPlansPage() {
   const canUpdate = hasPermission('memberships:update');
   const canDelete = hasPermission('memberships:delete');
   const canRestore = hasPermission('memberships:restore');
+  const { currentBranchId } = useCurrentBranch();
+  const { data: branches } = useBranches();
+  const branchNameById = React.useMemo(
+    () => new Map((branches ?? []).map((b) => [b.id, b.name])),
+    [branches],
+  );
 
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -45,11 +52,17 @@ export default function MembershipPlansPage() {
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
   const [confirmAction, setConfirmAction] = React.useState<{ action: StatusAction; plan: MembershipPlan } | null>(null);
 
+  // Header branch switch re-scopes the whole list — back to page 1 like any other filter change.
+  React.useEffect(() => {
+    setPage(1);
+  }, [currentBranchId]);
+
   const plans = useMembershipPlanList({
     page,
     limit: 20,
     search: debouncedSearch || undefined,
     isActive: isActiveFilter === '' ? undefined : isActiveFilter === 'true',
+    branchId: currentBranchId ?? undefined,
     includeDeleted: true,
     sortBy,
     sortDir,
@@ -108,6 +121,14 @@ export default function MembershipPlansPage() {
       ),
     },
     { key: 'planCode', header: sortableHeader('Plan Code', 'planCode'), render: (p) => p.planCode },
+    {
+      key: 'branches',
+      header: 'Branches',
+      render: (p) =>
+        p.gymAccessAllBranches
+          ? 'All'
+          : (p.accessBranchIds ?? []).map((id) => branchNameById.get(id) ?? id).join(', ') || '—',
+    },
     { key: 'duration', header: 'Duration', render: (p) => `${p.durationValue} ${p.durationType.toLowerCase()}` },
     { key: 'price', header: sortableHeader('Price', 'price'), render: (p) => `$${p.price}` },
     { key: 'members', header: 'Members', render: (p) => p.memberCount },

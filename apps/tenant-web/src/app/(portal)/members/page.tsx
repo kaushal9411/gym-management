@@ -15,6 +15,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { MemberStatusBadge } from '@/features/members/components/member-status-badge';
 import { toMemberError, useBulkImportMembers, useBulkMemberAction, useMemberList, useMemberStatusAction } from '@/features/members/hooks/use-members';
 import { memberService } from '@/features/members/services/member.service';
@@ -56,6 +57,7 @@ function parseCsv(text: string): MemberBulkImportRow[] {
 
 export default function MembersListPage() {
   const { hasPermission } = usePermissions();
+  const { currentBranchId } = useCurrentBranch();
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [status, setStatus] = React.useState<MemberStatus | ''>('');
@@ -74,6 +76,7 @@ export default function MembersListPage() {
     limit: 20,
     search: debouncedSearch || undefined,
     status: status || undefined,
+    branchId: currentBranchId ?? undefined,
     includeDeleted: true,
     sortBy,
     sortDir,
@@ -112,6 +115,11 @@ export default function MembersListPage() {
       {label} {sortIcon(column)}
     </button>
   );
+
+  // Header branch switch re-scopes the whole list — back to page 1 like any other filter change.
+  React.useEffect(() => {
+    setPage(1);
+  }, [currentBranchId]);
 
   const runSingleAction = (id: string, action: SingleStatusAction) => {
     statusAction.mutate(

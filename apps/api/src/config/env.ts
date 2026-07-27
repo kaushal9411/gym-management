@@ -46,6 +46,9 @@ const envSchema = z.object({
   PUSHER_SECRET: z.string().optional(),
   PUSHER_CLUSTER: z.string().optional(),
 
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
+
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(10).max(15).default(10),
   LOGIN_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
@@ -116,6 +119,15 @@ export const env = {
     cluster: raw.PUSHER_CLUSTER,
     get isConfigured() {
       return Boolean(raw.PUSHER_APP_ID && raw.PUSHER_KEY && raw.PUSHER_SECRET && raw.PUSHER_CLUSTER);
+    },
+  },
+
+  /** Real gateway credentials for Member Payments' online-payment flow (Finance module) — distinct from the platform Billing module's sandboxed Stripe/Razorpay/PayPal adapters (Prompt 8), which charge tenants for their own FitCloud subscription and are untouched by this. */
+  razorpay: {
+    keyId: raw.RAZORPAY_KEY_ID,
+    keySecret: raw.RAZORPAY_KEY_SECRET,
+    get isConfigured() {
+      return Boolean(raw.RAZORPAY_KEY_ID && raw.RAZORPAY_KEY_SECRET);
     },
   },
 

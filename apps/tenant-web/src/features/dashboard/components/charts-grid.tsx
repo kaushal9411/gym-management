@@ -4,6 +4,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, Tooltip, XAxis, YAxis } 
 
 import { ChartWrapper } from '@/components/ui/chart-wrapper';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { useAttendanceTrends, useNewMemberGrowth, useRevenueTrends } from '@/features/reports/hooks/use-reports';
 
 const AXIS_TICK = { fill: 'var(--muted-foreground)', fontSize: 12 };
@@ -20,12 +21,14 @@ const TOOLTIP_STYLE = {
   cursor: { fill: 'var(--accent)', opacity: 0.4 },
 };
 
-/** Real 30-day trend series from the Analytics module (Prompt 20) — supersedes the Prompt-10 foundation's empty-data placeholders now that Attendance/Payments/Members all exist. See `/analytics` for the full, filterable Analytics Dashboard. */
+/** Real 30-day trend series from the Analytics module (Prompt 20) — supersedes the Prompt-10 foundation's empty-data placeholders now that Attendance/Payments/Members all exist. See `/analytics` for the full, filterable Analytics Dashboard. Scoped to the header's currently-selected branch (Prompt 24). */
 export function ChartsGrid() {
   const { hasPermission } = usePermissions();
-  const attendance = useAttendanceTrends();
-  const revenue = useRevenueTrends();
-  const newMembers = useNewMemberGrowth();
+  const { currentBranchId } = useCurrentBranch();
+  const branchId = currentBranchId ?? undefined;
+  const attendance = useAttendanceTrends(undefined, undefined, branchId);
+  const revenue = useRevenueTrends(undefined, undefined, branchId);
+  const newMembers = useNewMemberGrowth(undefined, undefined, branchId);
 
   if (!hasPermission('analytics:view')) return null;
 

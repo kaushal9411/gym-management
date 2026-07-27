@@ -2,6 +2,7 @@ import { apiClient } from '@/features/auth/services/api-client';
 import type {
   CreateExpensePayload,
   CreateIncomePayload,
+  CreatePaymentLinkPayload,
   CreatePaymentPayload,
   Expense,
   FinanceDashboard,
@@ -15,7 +16,9 @@ import type {
   MemberInvoiceListItem,
   MemberPaymentDetail,
   MemberPaymentListItem,
+  NotifyMedium,
   Paginated,
+  PaymentLinkResult,
   RefundPaymentPayload,
   UpdateExpensePayload,
   UpdateIncomePayload,
@@ -60,6 +63,17 @@ class FinanceService {
   async createPayment(payload: CreatePaymentPayload): Promise<MemberPaymentDetail> {
     const res = await apiClient.post<ApiEnvelope<MemberPaymentDetail>>('/payments', payload);
     return res.data.data;
+  }
+
+  /** Online payment (Razorpay Payment Links) — creates a PENDING payment + a real Payment Link staff can send to the member. Staff never handle card details. */
+  async createPaymentLink(payload: CreatePaymentLinkPayload): Promise<PaymentLinkResult> {
+    const res = await apiClient.post<ApiEnvelope<PaymentLinkResult>>('/payments/razorpay/link', payload);
+    return res.data.data;
+  }
+
+  /** Staff-triggered resend of Razorpay's own Payment Link notification (e.g. "the member says they never got the SMS"). */
+  async resendPaymentLinkNotification(id: string, medium: NotifyMedium): Promise<void> {
+    await apiClient.post(`/payments/${id}/razorpay/notify`, { medium });
   }
 
   async updatePayment(id: string, payload: UpdatePaymentPayload): Promise<MemberPaymentDetail> {

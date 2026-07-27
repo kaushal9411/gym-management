@@ -2,7 +2,14 @@ import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
 import { actorFrom } from '../../authentication/utils/actor.util';
-import type { CreatePaymentInput, ListPaymentsQuery, RefundPaymentInput, UpdatePaymentInput } from '../dto/finance.dto';
+import type {
+  CreatePaymentInput,
+  CreatePaymentLinkInput,
+  ListPaymentsQuery,
+  RefundPaymentInput,
+  ResendPaymentLinkNotificationInput,
+  UpdatePaymentInput,
+} from '../dto/finance.dto';
 import { MemberPaymentService } from '../services/member-payment.service';
 
 function serviceFor(req: Request): MemberPaymentService {
@@ -23,6 +30,16 @@ export class MemberPaymentController {
     sendSuccess(res, payment, 'Payment recorded.', 201);
   }
 
+  async createPaymentLink(req: Request, res: Response): Promise<void> {
+    const link = await serviceFor(req).createPaymentLink(req.body as CreatePaymentLinkInput, actorFrom(req));
+    sendSuccess(res, link, 'Payment link created.', 201);
+  }
+
+  async resendPaymentLinkNotification(req: Request, res: Response): Promise<void> {
+    await serviceFor(req).resendPaymentLinkNotification(req.params.id!, req.body as ResendPaymentLinkNotificationInput, actorFrom(req));
+    sendSuccess(res, null, 'Payment link resent.');
+  }
+
   async update(req: Request, res: Response): Promise<void> {
     const payment = await serviceFor(req).update(req.params.id!, req.body as UpdatePaymentInput, actorFrom(req));
     sendSuccess(res, payment, 'Payment updated.');
@@ -34,7 +51,7 @@ export class MemberPaymentController {
   }
 
   async verifyStatus(req: Request, res: Response): Promise<void> {
-    sendSuccess(res, await serviceFor(req).verifyStatus(req.params.id!));
+    sendSuccess(res, await serviceFor(req).verifyStatus(req.params.id!, actorFrom(req)));
   }
 
   async refund(req: Request, res: Response): Promise<void> {

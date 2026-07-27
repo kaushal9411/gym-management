@@ -16,6 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { LoadingButton } from '@/components/ui/loading-button';
 import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { UserStatusBadge } from '@/features/iam/components/status-badge';
 import { staffService } from '@/features/staff/services/staff.service';
 import { toStaffError, useBulkImportStaff, useBulkStaffAction, useStaffList, useStaffStatusAction } from '@/features/staff/hooks/use-staff';
@@ -56,6 +57,7 @@ function parseCsv(text: string): StaffBulkImportRow[] {
 
 export default function StaffListPage() {
   const { hasPermission } = usePermissions();
+  const { currentBranchId } = useCurrentBranch();
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [status, setStatus] = React.useState<UserStatus | ''>('');
@@ -76,6 +78,7 @@ export default function StaffListPage() {
     status: status || undefined,
     role: role || undefined,
     workStatus: workStatus || undefined,
+    branchId: currentBranchId ?? undefined,
     includeDeleted: true,
     sortBy,
     sortDir,
@@ -90,6 +93,11 @@ export default function StaffListPage() {
   const canActivate = hasPermission('staff:activate');
   const canDelete = hasPermission('staff:delete');
   const canRestore = hasPermission('staff:restore');
+
+  // Header branch switch re-scopes the whole list — back to page 1 like any other filter change.
+  React.useEffect(() => {
+    setPage(1);
+  }, [currentBranchId]);
 
   const data = staff.data;
   const items = data?.items ?? [];

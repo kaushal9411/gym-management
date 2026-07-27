@@ -7,12 +7,14 @@ import { financeService } from '../services/finance.service';
 import type {
   CreateExpensePayload,
   CreateIncomePayload,
+  CreatePaymentLinkPayload,
   CreatePaymentPayload,
   GenerateInvoicePayload,
   ListExpensesParams,
   ListIncomeParams,
   ListInvoicesParams,
   ListPaymentsParams,
+  NotifyMedium,
   RefundPaymentPayload,
   UpdateExpensePayload,
   UpdateIncomePayload,
@@ -59,6 +61,21 @@ export function useCreatePayment() {
   });
 }
 
+export function useCreatePaymentLink() {
+  const invalidatePayments = useInvalidate('payments');
+  return useMutation({
+    mutationFn: (payload: CreatePaymentLinkPayload) => financeService.createPaymentLink(payload),
+    onSuccess: invalidatePayments,
+  });
+}
+
+/** Resends Razorpay's own Payment Link notification (email or SMS) without cancelling/recreating the link. */
+export function useResendPaymentLinkNotification() {
+  return useMutation({
+    mutationFn: ({ id, medium }: { id: string; medium: NotifyMedium }) => financeService.resendPaymentLinkNotification(id, medium),
+  });
+}
+
 export function useUpdatePayment() {
   const invalidate = useInvalidate('payments');
   return useMutation({
@@ -72,8 +89,19 @@ export function useCancelPayment() {
   return useMutation({ mutationFn: (id: string) => financeService.cancelPayment(id), onSuccess: invalidate });
 }
 
+/** For a PENDING online payment, this polls Razorpay's Payment Link and may flip it to SUCCESS/FAILED — invalidate accordingly. */
 export function useVerifyPaymentStatus() {
-  return useMutation({ mutationFn: (id: string) => financeService.verifyPaymentStatus(id) });
+  const invalidatePayments = useInvalidate('payments');
+  const invalidateInvoices = useInvalidate('invoices');
+  const invalidateFinance = useInvalidate('finance');
+  return useMutation({
+    mutationFn: (id: string) => financeService.verifyPaymentStatus(id),
+    onSuccess: () => {
+      invalidatePayments();
+      invalidateInvoices();
+      invalidateFinance();
+    },
+  });
 }
 
 export function useRefundPayment() {

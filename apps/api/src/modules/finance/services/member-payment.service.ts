@@ -8,15 +8,19 @@ import type { IamActor } from '../../authentication/utils/actor.util';
 import { notifyPaymentFailed, notifyPaymentReceived } from '../../tenant-notifications/services/notification-trigger.service';
 import type {
   CreatePaymentInput,
+  CreatePaymentLinkInput,
   ListPaymentsQuery,
   MemberPaymentDetailDto,
   MemberPaymentListItemDto,
+  PaymentLinkDto,
   RefundPaymentInput,
+  ResendPaymentLinkNotificationInput,
   UpdatePaymentInput,
 } from '../dto/finance.dto';
 import { MemberPaymentRepository, type MemberPaymentDetailRow, type MemberPaymentListRow } from '../repositories/member-payment.repository';
 
 import { MemberInvoiceService } from './member-invoice.service';
+import { createPaymentLink, fetchPaymentLink, notifyPaymentLink } from './razorpay-gateway.service';
 
 function toListDto(row: MemberPaymentListRow): MemberPaymentListItemDto {
   return {
@@ -136,6 +140,99 @@ export class MemberPaymentService {
     return toDetailDto((await this.payments.findById(this.tenantId, payment.id))!);
   }
 
+  /**
+   * "Send Payment Link" — real Razorpay integration, distinct from every
+   * other `method` value (CASH/UPI/CREDIT_CARD/DEBIT_CARD/BANK_TRANSFER/
+   * CHEQUE), which stay manual/offline entries recorded directly as
+   * `SUCCESS` by staff (see `create()` above — untouched by this). Staff
+   * never collect card details themselves: this generates a Razorpay
+   * Payment Link the member pays on Razorpay's own hosted page. Creates the
+   * `MemberPayment` row up front as `PENDING` (so an unpaid link is still
+   * visible in the payment list, not silently lost). `verifyStatus` below is
+   * what flips it to `SUCCESS`/`FAILED` once the member has paid.
+   */
+  async createPaymentLink(input: CreatePaymentLinkInput, actor: IamActor): Promise<PaymentLinkDto> {
+    const member = await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null } });
+    if (!member) throw new NotFoundError('Member not found.');
+    if (!member.email && !member.phone) {
+      throw new ValidationError('This member has no email or phone on file — add one before sending a payment link.');
+    }
+    const notifyEmail = input.notifyEmail ?? Boolean(member.email);
+    const notifySms = input.notifySms ?? Boolean(member.phone);
+    if (notifyEmail && !member.email) throw new ValidationError('This member has no email on file — uncheck "Notify by email" or add one first.');
+    if (notifySms && !member.phone) throw new ValidationError('This member has no phone on file — uncheck "Notify by SMS" or add one first.');
+    const branchId = input.branchId ?? member.branchId;
+
+    if (input.membershipId) {
+      const membership = await this.db.membership.findFirst({ where: { tenantId: this.tenantId, id: input.membershipId, memberId: input.memberId } });
+      if (!membership) throw new NotFoundError('Membership not found for this member.');
+    }
+    if (input.invoiceId) {
+      const invoice = await this.db.memberInvoice.findFirst({ where: { tenantId: this.tenantId, id: input.invoiceId } });
+      if (!invoice) throw new NotFoundError('Invoice not found.');
+      const existing = await this.payments.findActiveByInvoice(this.tenantId, input.invoiceId);
+      if (existing) throw new ConflictError(ErrorCode.CONFLICT, 'This invoice already has an active payment recorded against it.');
+    }
+
+    const discount = input.discount ?? 0;
+    const tax = input.tax ?? 0;
+    const finalAmount = Math.max(input.amount - discount + tax, 0);
+    const settings = await this.db.tenantSettings.findUnique({ where: { tenantId: this.tenantId } });
+    const currency = (settings?.currency ?? 'USD').toUpperCase();
+    const paymentNumber = await this.payments.nextPaymentNumber(this.tenantId);
+
+    const payment = await this.payments.create({
+      tenantId: this.tenantId,
+      paymentNumber,
+      memberId: input.memberId,
+      membershipId: input.membershipId,
+      invoiceId: input.invoiceId,
+      branchId,
+      amount: input.amount,
+      discount,
+      tax,
+      finalAmount,
+      method: 'ONLINE_GATEWAY',
+      paymentDate: new Date(),
+      status: 'PENDING',
+      notes: input.notes,
+      recordedBy: actor.userId,
+    });
+
+    const link = await createPaymentLink({
+      amountInSmallestUnit: Math.round(finalAmount * 100),
+      currency,
+      description: `Payment ${payment.paymentNumber}`,
+      referenceId: payment.paymentNumber,
+      customerName: `${member.firstName} ${member.lastName}`.trim(),
+      customerEmail: member.email ?? undefined,
+      customerContact: member.phone ?? undefined,
+      notifyEmail,
+      notifySms,
+      notes: { memberPaymentId: payment.id, tenantId: this.tenantId },
+    });
+    await this.payments.update(payment.id, { transactionReference: link.id });
+    await this.audit(actor, 'member_payment.payment_link_created', payment.id);
+
+    return {
+      payment: toDetailDto((await this.payments.findById(this.tenantId, payment.id))!),
+      shortUrl: link.shortUrl,
+      paymentLinkId: link.id,
+      notifiedEmail: notifyEmail,
+      notifiedSms: notifySms,
+    };
+  }
+
+  /** Staff-triggered resend of Razorpay's own Payment Link notification (e.g. the member says they never got the SMS) — doesn't cancel/recreate the link. */
+  async resendPaymentLinkNotification(id: string, input: ResendPaymentLinkNotificationInput, actor: IamActor): Promise<void> {
+    const payment = await this.mustFind(id);
+    if (payment.method !== 'ONLINE_GATEWAY' || payment.status !== 'PENDING' || !payment.transactionReference) {
+      throw new ConflictError(ErrorCode.CONFLICT, 'This payment has no active payment link to resend.');
+    }
+    await notifyPaymentLink(payment.transactionReference, input.medium);
+    await this.audit(actor, `member_payment.payment_link_resent_${input.medium}`, id);
+  }
+
   async update(id: string, input: UpdatePaymentInput, actor: IamActor): Promise<MemberPaymentDetailDto> {
     const existing = await this.mustFind(id);
     if (existing.status === 'REFUNDED' || existing.status === 'PARTIALLY_REFUNDED') {
@@ -182,13 +279,44 @@ export class MemberPaymentService {
   }
 
   /**
-   * "Verify Payment Status" — for CASH/UPI/etc this is just an authoritative
-   * read of the stored status (there's nothing to poll); ONLINE_GATEWAY is
-   * listed as a future integration, so this is also the seam a real gateway
-   * webhook/poll would eventually update through instead of just reading.
+   * "Check payment status" — for CASH/UPI/etc this is just an authoritative
+   * read of the stored status (there's nothing to poll). For a PENDING
+   * ONLINE_GATEWAY payment (a Payment Link staff sent to a member), this is
+   * the real integration seam: no public webhook URL exists in local dev, so
+   * staff clicking "Check status" polls Razorpay's own record of the
+   * Payment Link and flips the payment to SUCCESS/FAILED accordingly.
    */
-  async verifyStatus(id: string): Promise<{ status: MemberPaymentDetailRow['status']; verifiedAt: string }> {
+  async verifyStatus(id: string, actor: IamActor): Promise<{ status: MemberPaymentDetailRow['status']; verifiedAt: string }> {
     const payment = await this.mustFind(id);
+    if (payment.method !== 'ONLINE_GATEWAY' || payment.status !== 'PENDING' || !payment.transactionReference) {
+      return { status: payment.status, verifiedAt: new Date().toISOString() };
+    }
+
+    const link = await fetchPaymentLink(payment.transactionReference);
+
+    if (link.status === 'paid') {
+      await this.payments.update(id, { status: 'SUCCESS', transactionReference: link.razorpayPaymentId ?? payment.transactionReference });
+      await this.audit(actor, 'member_payment.payment_link_paid', id);
+      const updated = await this.mustFind(id);
+      const member = await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: updated.member.id } });
+      await this.onPaymentSucceeded(updated, member!, updated.branch.id);
+      return { status: 'SUCCESS', verifiedAt: new Date().toISOString() };
+    }
+
+    if (link.status === 'expired' || link.status === 'cancelled') {
+      await this.payments.update(id, { status: 'FAILED' });
+      await this.audit(actor, 'member_payment.payment_link_failed', id);
+      const member = await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: payment.member.id } });
+      if (member) {
+        await notifyPaymentFailed(this.tenantId, {
+          memberName: `${member.firstName} ${member.lastName}`.trim(),
+          amount: Number(payment.finalAmount).toFixed(2),
+          memberEmail: member.email,
+        });
+      }
+      return { status: 'FAILED', verifiedAt: new Date().toISOString() };
+    }
+
     return { status: payment.status, verifiedAt: new Date().toISOString() };
   }
 

@@ -101,6 +101,31 @@ export interface CreatePaymentPayload {
 
 export type UpdatePaymentPayload = Partial<Omit<CreatePaymentPayload, 'memberId' | 'invoiceId'>>;
 
+// ── Razorpay online payment (Payment Links — staff send a link, never handle cards) ──
+
+export interface CreatePaymentLinkPayload {
+  memberId: string;
+  membershipId?: string;
+  invoiceId?: string;
+  branchId?: string;
+  amount: number;
+  discount?: number;
+  tax?: number;
+  notes?: string;
+  notifyEmail?: boolean;
+  notifySms?: boolean;
+}
+
+export interface PaymentLinkResult {
+  payment: MemberPaymentDetail;
+  shortUrl: string;
+  paymentLinkId: string;
+  notifiedEmail: boolean;
+  notifiedSms: boolean;
+}
+
+export type NotifyMedium = 'email' | 'sms';
+
 export interface ListPaymentsParams {
   page: number;
   limit: number;

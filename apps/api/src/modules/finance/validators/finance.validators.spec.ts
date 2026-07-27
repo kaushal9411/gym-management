@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createExpenseSchema,
   createIncomeSchema,
+  createPaymentLinkSchema,
   createPaymentSchema,
   generateInvoiceSchema,
   listExpensesQuerySchema,
@@ -10,6 +11,7 @@ import {
   listInvoicesQuerySchema,
   listPaymentsQuerySchema,
   refundPaymentSchema,
+  resendPaymentLinkNotificationSchema,
   updateExpenseSchema,
   updateIncomeSchema,
   updatePaymentSchema,
@@ -78,6 +80,40 @@ describe('finance validators', () => {
 
     it('rejects a non-positive refund amount', () => {
       expect(refundPaymentSchema.safeParse({ amount: 0 }).success).toBe(false);
+    });
+  });
+
+  describe('createPaymentLinkSchema', () => {
+    const base = { memberId: '11111111-1111-1111-1111-111111111111', amount: 100 };
+
+    it('accepts a minimal valid payload (no method — always ONLINE_GATEWAY)', () => {
+      expect(createPaymentLinkSchema.safeParse(base).success).toBe(true);
+    });
+
+    it('rejects a missing memberId', () => {
+      expect(createPaymentLinkSchema.safeParse({ amount: 100 }).success).toBe(false);
+    });
+
+    it('rejects a non-positive amount', () => {
+      expect(createPaymentLinkSchema.safeParse({ ...base, amount: 0 }).success).toBe(false);
+    });
+
+    it('accepts explicit notifyEmail/notifySms flags', () => {
+      expect(createPaymentLinkSchema.safeParse({ ...base, notifyEmail: true, notifySms: false }).success).toBe(true);
+    });
+  });
+
+  describe('resendPaymentLinkNotificationSchema', () => {
+    it('accepts "email"', () => {
+      expect(resendPaymentLinkNotificationSchema.safeParse({ medium: 'email' }).success).toBe(true);
+    });
+
+    it('accepts "sms"', () => {
+      expect(resendPaymentLinkNotificationSchema.safeParse({ medium: 'sms' }).success).toBe(true);
+    });
+
+    it('rejects an unknown medium', () => {
+      expect(resendPaymentLinkNotificationSchema.safeParse({ medium: 'whatsapp' }).success).toBe(false);
     });
   });
 

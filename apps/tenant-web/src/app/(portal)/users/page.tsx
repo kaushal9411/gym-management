@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { IamNav } from '@/features/iam/components/iam-nav';
 import { InviteDialog } from '@/features/iam/components/invite-dialog';
 import { UserStatusBadge } from '@/features/iam/components/status-badge';
@@ -62,6 +63,7 @@ function parseCsv(text: string): Array<{ name: string; email: string; phone?: st
 
 export default function UsersPage() {
   const { hasPermission } = usePermissions();
+  const { currentBranchId } = useCurrentBranch();
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [status, setStatus] = React.useState<UserStatus | ''>('');
@@ -74,8 +76,14 @@ export default function UsersPage() {
     search: debouncedSearch || undefined,
     status: status || undefined,
     roleId: roleId || undefined,
+    branchId: currentBranchId ?? undefined,
     includeDeleted: true,
   });
+
+  // Header branch switch re-scopes the whole list — back to page 1 like any other filter change.
+  React.useEffect(() => {
+    setPage(1);
+  }, [currentBranchId]);
   const roles = useRoles();
   const statusAction = useUserStatusAction();
   const bulkImport = useBulkImportUsers();

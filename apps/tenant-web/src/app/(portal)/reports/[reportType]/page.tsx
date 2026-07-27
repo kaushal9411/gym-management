@@ -7,6 +7,7 @@ import { ArrowLeft, Printer } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { ExportButtons } from '@/features/reports/components/export-buttons';
 import { ReportFiltersBar, type ReportFilterValue } from '@/features/reports/components/report-filters-bar';
 import { isPaginated, useReportData } from '@/features/reports/hooks/use-reports';
@@ -166,8 +167,16 @@ export default function ReportViewerPage() {
   const reportType = params.reportType as TabularReportType;
   const config = REPORT_VIEW_CONFIG[reportType];
 
+  const { currentBranchId } = useCurrentBranch();
   const [page, setPage] = React.useState(1);
   const [filters, setFilters] = React.useState<ReportFilterValue>({ dateFrom: '', dateTo: '', branchId: '' });
+
+  // Defaults from, and stays in sync with, the header's branch switcher —
+  // still locally overridable (e.g. back to "all branches") for this page view.
+  React.useEffect(() => {
+    setFilters((prev) => ({ ...prev, branchId: currentBranchId ?? '' }));
+    setPage(1);
+  }, [currentBranchId]);
 
   const queryFilters = {
     page,

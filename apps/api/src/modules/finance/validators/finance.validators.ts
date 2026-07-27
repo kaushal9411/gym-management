@@ -59,6 +59,25 @@ export const refundPaymentSchema = z.object({
   reason: z.string().trim().max(1000).optional(),
 });
 
+// ── Razorpay online payment (Payment Links — staff send a link, never handle cards) ──
+
+export const createPaymentLinkSchema = z.object({
+  memberId: z.string().uuid(),
+  membershipId: z.string().uuid().optional(),
+  invoiceId: z.string().uuid().optional(),
+  branchId: z.string().uuid().optional(),
+  amount: z.coerce.number().positive(),
+  discount: z.coerce.number().min(0).optional(),
+  tax: z.coerce.number().min(0).optional(),
+  notes: z.string().trim().max(2000).optional(),
+  notifyEmail: z.coerce.boolean().optional(),
+  notifySms: z.coerce.boolean().optional(),
+});
+
+export const resendPaymentLinkNotificationSchema = z.object({
+  medium: z.enum(['email', 'sms']),
+});
+
 // ── Invoices ─────────────────────────────────────────────────────────────
 
 const invoiceItemSchema = z.object({

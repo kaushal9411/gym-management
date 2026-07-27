@@ -50,7 +50,7 @@ export const createMemberSchema = z.object({
   phone: phoneSchema.optional(),
   memberId: memberCodeSchema.optional(),
   gender: genderSchema.optional(),
-  dateOfBirth: z.string().datetime().optional(),
+  dateOfBirth: z.string().date().optional(),
   bloodGroup: bloodGroupSchema.optional(),
   height: z.coerce.number().min(0).max(300).optional(),
   weight: z.coerce.number().min(0).max(500).optional(),
@@ -66,7 +66,7 @@ export const createMemberSchema = z.object({
   medicalConditions: z.string().trim().max(2000).optional(),
   allergies: z.string().trim().max(2000).optional(),
   fitnessGoals: z.string().trim().max(2000).optional(),
-  joiningDate: z.string().datetime().optional(),
+  joiningDate: z.string().date().optional(),
   branchId: z.string().uuid(),
   trainerId: z.string().uuid().optional(),
   notes: z.string().trim().max(2000).optional(),
@@ -81,7 +81,7 @@ export const updateMemberSchema = z
     memberId: memberCodeSchema.optional(),
     profilePhotoUrl: z.string().max(400_000).nullable().optional(),
     gender: genderSchema.nullable().optional(),
-    dateOfBirth: z.string().datetime().nullable().optional(),
+    dateOfBirth: z.string().date().nullable().optional(),
     bloodGroup: bloodGroupSchema.nullable().optional(),
     height: z.coerce.number().min(0).max(300).nullable().optional(),
     weight: z.coerce.number().min(0).max(500).nullable().optional(),
@@ -103,7 +103,7 @@ export const updateMemberSchema = z
 
 export const assignMembershipSchema = z.object({
   planId: z.string().uuid(),
-  startDate: z.string().datetime().optional(),
+  startDate: z.string().date().optional(),
   autoRenew: z.boolean().optional(),
 });
 
@@ -208,6 +208,7 @@ export const listMembershipPlansQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(100).default(20),
   search: z.string().trim().max(120).optional(),
   category: z.string().trim().max(60).optional(),
+  branchId: z.string().uuid().optional(),
   isActive: z.coerce.boolean().optional(),
   includeDeleted: z.coerce.boolean().default(false),
   sortBy: z.enum(['name', 'planCode', 'price', 'displayOrder', 'createdAt']).default('displayOrder'),
@@ -230,8 +231,8 @@ export const createMembershipPlanSchema = z
     displayOrder: z.coerce.number().int().min(0).max(100_000).optional(),
     notes: z.string().trim().max(2000).optional(),
     freezeDaysLimit: z.coerce.number().int().min(0).max(3650).nullable().optional(),
-    validityStart: z.string().datetime().nullable().optional(),
-    validityEnd: z.string().datetime().nullable().optional(),
+    validityStart: z.string().date().nullable().optional(),
+    validityEnd: z.string().date().nullable().optional(),
     gracePeriodDays: z.coerce.number().int().min(0).max(365).optional(),
     renewalWindowDays: z.coerce.number().int().min(0).max(365).optional(),
     autoRenewalAllowed: z.boolean().optional(),
@@ -242,7 +243,11 @@ export const createMembershipPlanSchema = z
   .refine((data) => data.minAge === undefined || data.maxAge === undefined || data.minAge === null || data.maxAge === null || data.minAge <= data.maxAge, {
     message: 'Minimum age must be less than or equal to maximum age',
     path: ['minAge'],
-  });
+  })
+  .refine(
+    (data) => !data.validityStart || !data.validityEnd || data.validityStart <= data.validityEnd,
+    { message: 'Validity start date must be on or before the validity end date', path: ['validityEnd'] },
+  );
 
 export const updateMembershipPlanSchema = z
   .object({
@@ -260,8 +265,8 @@ export const updateMembershipPlanSchema = z
     displayOrder: z.coerce.number().int().min(0).max(100_000).optional(),
     notes: z.string().trim().max(2000).nullable().optional(),
     freezeDaysLimit: z.coerce.number().int().min(0).max(3650).nullable().optional(),
-    validityStart: z.string().datetime().nullable().optional(),
-    validityEnd: z.string().datetime().nullable().optional(),
+    validityStart: z.string().date().nullable().optional(),
+    validityEnd: z.string().date().nullable().optional(),
     gracePeriodDays: z.coerce.number().int().min(0).max(365).optional(),
     renewalWindowDays: z.coerce.number().int().min(0).max(365).optional(),
     autoRenewalAllowed: z.boolean().optional(),
@@ -269,7 +274,11 @@ export const updateMembershipPlanSchema = z
     maxAge: z.coerce.number().int().min(0).max(150).nullable().optional(),
     ...planFeatureFields,
   })
-  .refine((data) => Object.keys(data).length > 0, { message: 'Provide at least one field to update' });
+  .refine((data) => Object.keys(data).length > 0, { message: 'Provide at least one field to update' })
+  .refine(
+    (data) => !data.validityStart || !data.validityEnd || data.validityStart <= data.validityEnd,
+    { message: 'Validity start date must be on or before the validity end date', path: ['validityEnd'] },
+  );
 
 export const membershipPlanParamSchema = z.object({
   planId: z.string().uuid(),

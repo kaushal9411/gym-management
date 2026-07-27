@@ -93,6 +93,37 @@ export interface CreatePaymentInput {
 
 export type UpdatePaymentInput = Partial<Omit<CreatePaymentInput, 'memberId' | 'invoiceId'>>;
 
+// ── Razorpay online payment (real gateway — distinct from the platform
+// Billing module's sandboxed Stripe/Razorpay/PayPal adapters, which charge
+// TENANTS for their own FitCloud subscription) — staff can only generate a
+// Payment Link and send it to the member; they never see a card-entry UI. ──
+
+export interface CreatePaymentLinkInput {
+  memberId: string;
+  membershipId?: string;
+  invoiceId?: string;
+  branchId?: string;
+  amount: number;
+  discount?: number;
+  tax?: number;
+  notes?: string;
+  /** Whether Razorpay should auto-notify the member at creation time — defaults to true when the corresponding contact detail is on file. */
+  notifyEmail?: boolean;
+  notifySms?: boolean;
+}
+
+export interface PaymentLinkDto {
+  payment: MemberPaymentDetailDto;
+  shortUrl: string;
+  paymentLinkId: string;
+  notifiedEmail: boolean;
+  notifiedSms: boolean;
+}
+
+export interface ResendPaymentLinkNotificationInput {
+  medium: 'email' | 'sms';
+}
+
 export interface ListPaymentsQuery {
   page: number;
   limit: number;

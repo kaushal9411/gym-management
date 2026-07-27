@@ -20,6 +20,7 @@ import {
 
 import { ChartWrapper } from '@/components/ui/chart-wrapper';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { ReportFiltersBar, type ReportFilterValue } from '@/features/reports/components/report-filters-bar';
 import {
   useAttendanceTrends,
@@ -33,15 +34,22 @@ import {
 
 const PIE_COLORS = ['#0ea5e9', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
-function defaultFilters(): ReportFilterValue {
+function defaultFilters(branchId: string): ReportFilterValue {
   const to = new Date().toISOString().slice(0, 10);
   const from = new Date(Date.now() - 29 * 86_400_000).toISOString().slice(0, 10);
-  return { dateFrom: from, dateTo: to, branchId: '' };
+  return { dateFrom: from, dateTo: to, branchId };
 }
 
 export default function AnalyticsDashboardPage() {
   const { hasPermission } = usePermissions();
-  const [filters, setFilters] = React.useState<ReportFilterValue>(defaultFilters);
+  const { currentBranchId } = useCurrentBranch();
+  const [filters, setFilters] = React.useState<ReportFilterValue>(() => defaultFilters(currentBranchId ?? ''));
+
+  // Defaults from, and stays in sync with, the header's branch switcher —
+  // still locally overridable (e.g. back to "all branches") for this page view.
+  React.useEffect(() => {
+    setFilters((prev) => ({ ...prev, branchId: currentBranchId ?? '' }));
+  }, [currentBranchId]);
 
   const revenueTrends = useRevenueTrends(filters.dateFrom, filters.dateTo, filters.branchId || undefined);
   const attendanceTrends = useAttendanceTrends(filters.dateFrom, filters.dateTo, filters.branchId || undefined);

@@ -23,6 +23,31 @@ interface ApiErrorBody {
   errors: Array<{ field?: string; code?: string; message: string }> | null;
 }
 
+/** `validityStart` -> "Validity Start"; `staffProfile.dateOfBirth` -> "Date Of Birth" (last path segment — the leaf is what the user actually typed into). */
+function humanizeField(field: string): string {
+  const leaf = field.split('.').pop() ?? field;
+  return leaf
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+/**
+ * Builds a specific, actionable message from the backend's per-field `errors[]`
+ * (present on every `ValidationError` — see `core/errors/app-error.ts` +
+ * `core/middleware/validate.middleware.ts` on the API) instead of the generic
+ * top-level `message` ("Request validation failed") that collapses every
+ * field into one useless string. Falls back to the top-level message for
+ * non-validation errors (no `field` on any entry) so this is a pure
+ * improvement, not a behavior change, for every other error shape.
+ */
+function buildErrorMessage(data: ApiErrorBody | undefined): string {
+  const fieldErrors = (data?.errors ?? []).filter((e): e is { field: string; code?: string; message: string } => !!e.field);
+  if (fieldErrors.length > 0) {
+    return fieldErrors.map((e) => `${humanizeField(e.field)}: ${e.message}`).join('; ');
+  }
+  return data?.message ?? 'Something went wrong. Please try again.';
+}
+
 /** Extracts the backend's stable error code, falling back to a status-derived guess. */
 function extractErrorCode(error: AxiosError<ApiErrorBody>): AuthErrorCode {
   const backendCode = error.response?.data?.errors?.[0]?.code;
@@ -48,7 +73,7 @@ export function toAuthServiceError(error: unknown): AuthServiceError {
       return new AuthServiceError('UNKNOWN', 'Network error — check your connection and try again.');
     }
     const code = extractErrorCode(axiosError);
-    const message = axiosError.response.data?.message ?? 'Something went wrong. Please try again.';
+    const message = buildErrorMessage(axiosError.response.data);
     return new AuthServiceError(code, message);
   }
   return new AuthServiceError('UNKNOWN', 'Something went wrong. Please try again.');

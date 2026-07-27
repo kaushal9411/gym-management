@@ -14,10 +14,17 @@ function buildWhere(tenantId: string, query: Partial<ListMembershipPlansQuery>):
   if (!query.includeDeleted) where.deletedAt = null;
   if (query.isActive !== undefined) where.isActive = query.isActive;
   if (query.category) where.category = { equals: query.category, mode: 'insensitive' };
+  const and: Prisma.MembershipPlanWhereInput[] = [];
   if (query.search) {
     const contains = { contains: query.search, mode: 'insensitive' as const };
-    where.OR = [{ name: contains }, { planCode: contains }, { description: contains }];
+    and.push({ OR: [{ name: contains }, { planCode: contains }, { description: contains }] });
   }
+  // A plan is visible at a branch if it's flagged for every branch, or that
+  // branch is explicitly in its (JSON) accessBranchIds list.
+  if (query.branchId) {
+    and.push({ OR: [{ gymAccessAllBranches: true }, { accessBranchIds: { array_contains: query.branchId } }] });
+  }
+  if (and.length > 0) where.AND = and;
   return where;
 }
 

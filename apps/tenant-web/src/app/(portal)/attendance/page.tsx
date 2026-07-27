@@ -12,11 +12,19 @@ import { AttendanceSummaryCards } from '@/features/attendance/components/attenda
 import { AttendanceTrendChart } from '@/features/attendance/components/attendance-trend-chart';
 import { useAttendanceSummary, useTodayAttendance } from '@/features/attendance/hooks/use-attendance';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { BranchSelect } from '@/features/members/components/branch-select';
 
 export default function AttendanceDashboardPage() {
   const { hasPermission } = usePermissions();
+  const { currentBranchId } = useCurrentBranch();
   const [branchId, setBranchId] = React.useState('');
+
+  // Defaults from, and stays in sync with, the header's branch switcher —
+  // still locally overridable (e.g. back to "all branches") for this page view.
+  React.useEffect(() => {
+    setBranchId(currentBranchId ?? '');
+  }, [currentBranchId]);
 
   const summary = useAttendanceSummary({ branchId: branchId || undefined });
   const today = useTodayAttendance(branchId || undefined);

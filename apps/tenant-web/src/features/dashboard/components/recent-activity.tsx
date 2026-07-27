@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatRelativeTime } from '@/lib/format-relative-time';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { useRecentActivities } from '@/features/reports/hooks/use-reports';
 import type { RecentActivity as RecentActivityItem } from '@/features/reports/types';
 
@@ -16,10 +17,11 @@ const ICONS: Record<RecentActivityItem['type'], typeof UserCheck> = {
   NEW_MEMBER: UserPlus,
 };
 
-/** "Get Recent Activities" (Prompt 20) — a real merged feed of payments/check-ins/new members, superseding the Prompt-10 foundation's generic-notifications stand-in. */
+/** "Get Recent Activities" (Prompt 20) — a real merged feed of payments/check-ins/new members, superseding the Prompt-10 foundation's generic-notifications stand-in. Scoped to the header's currently-selected branch (Prompt 24). */
 export function RecentActivity() {
   const { hasPermission } = usePermissions();
-  const { data, isPending } = useRecentActivities();
+  const { currentBranchId } = useCurrentBranch();
+  const { data, isPending } = useRecentActivities(currentBranchId ?? undefined);
   const items = data ?? [];
 
   if (!hasPermission('reports:view')) return null;

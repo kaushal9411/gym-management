@@ -4,7 +4,15 @@ import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
 import { memberPaymentController } from '../controllers/member-payment.controller';
-import { createPaymentSchema, idParamSchema, listPaymentsQuerySchema, refundPaymentSchema, updatePaymentSchema } from '../validators/finance.validators';
+import {
+  createPaymentLinkSchema,
+  createPaymentSchema,
+  idParamSchema,
+  listPaymentsQuerySchema,
+  refundPaymentSchema,
+  resendPaymentLinkNotificationSchema,
+  updatePaymentSchema,
+} from '../validators/finance.validators';
 
 export const memberPaymentRouter: Router = Router();
 
@@ -42,6 +50,14 @@ memberPaymentRouter.post(
   asyncHandler(memberPaymentController.create.bind(memberPaymentController)),
 );
 
+/** @openapi { "/payments/razorpay/link": { post: { tags: [Finance], summary: "Generate a Razorpay Payment Link for a member to pay online — staff never handle card details; payment row is created as PENDING", security: [{bearerAuth: []}], responses: { 201: { description: "{ payment, shortUrl, paymentLinkId }" } } } } } */
+memberPaymentRouter.post(
+  '/razorpay/link',
+  requirePermission('finance:payment-create'),
+  validate({ body: createPaymentLinkSchema }),
+  asyncHandler(memberPaymentController.createPaymentLink.bind(memberPaymentController)),
+);
+
 /** @openapi { "/payments/{id}": { get: { tags: [Finance], summary: "One payment's details, including its refund history", security: [{bearerAuth: []}], responses: { 200: { description: Payment } } } } } */
 memberPaymentRouter.get(
   '/:id',
@@ -66,12 +82,20 @@ memberPaymentRouter.post(
   asyncHandler(memberPaymentController.cancel.bind(memberPaymentController)),
 );
 
-/** @openapi { "/payments/{id}/verify": { post: { tags: [Finance], summary: "Verify a payment's current status (a stub seam for a future online gateway)", security: [{bearerAuth: []}], responses: { 200: { description: "{ status, verifiedAt }" } } } } } */
+/** @openapi { "/payments/{id}/verify": { post: { tags: [Finance], summary: "Check a payment's current status — for a PENDING online payment, polls Razorpay's Payment Link and marks it SUCCESS/FAILED", security: [{bearerAuth: []}], responses: { 200: { description: "{ status, verifiedAt }" } } } } } */
 memberPaymentRouter.post(
   '/:id/verify',
-  requirePermission('finance:view'),
+  requirePermission('finance:payment-create'),
   validate({ params: idParamSchema }),
   asyncHandler(memberPaymentController.verifyStatus.bind(memberPaymentController)),
+);
+
+/** @openapi { "/payments/{id}/razorpay/notify": { post: { tags: [Finance], summary: "Resend the Razorpay Payment Link notification by email or SMS", security: [{bearerAuth: []}], responses: { 200: { description: Payment link resent } } } } } */
+memberPaymentRouter.post(
+  '/:id/razorpay/notify',
+  requirePermission('finance:payment-create'),
+  validate({ params: idParamSchema, body: resendPaymentLinkNotificationSchema }),
+  asyncHandler(memberPaymentController.resendPaymentLinkNotification.bind(memberPaymentController)),
 );
 
 /** @openapi { "/payments/{id}/refund": { post: { tags: [Finance], summary: "Refund a payment (full or partial) — creates a new refund history row", security: [{bearerAuth: []}], responses: { 200: { description: Refund recorded } } } } } */

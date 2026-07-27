@@ -274,6 +274,7 @@ export interface ListMembershipPlansParams {
   limit?: number;
   search?: string;
   category?: string;
+  branchId?: string;
   isActive?: boolean;
   includeDeleted?: boolean;
   sortBy?: 'name' | 'planCode' | 'price' | 'displayOrder' | 'createdAt';
