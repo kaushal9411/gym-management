@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from '@/components/ui/input';
 import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { DEFAULT_INCOME_FORM_STATE, IncomeFormFields, type IncomeFormState } from '@/features/finance/components/income-form-fields';
 import { toFinanceError, useCreateIncome, useDeleteIncome, useIncomeList } from '@/features/finance/hooks/use-finance';
 import { financeService } from '@/features/finance/services/finance.service';
@@ -35,6 +36,7 @@ const CATEGORY_LABELS: Record<IncomeCategory, string> = {
 export default function IncomePage() {
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('finance:income-manage');
+  const { currentBranchId } = useCurrentBranch();
 
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -47,6 +49,11 @@ export default function IncomePage() {
   const [formError, setFormError] = React.useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = React.useState<Income | null>(null);
 
+  // Header branch switch re-scopes the whole list — back to page 1 like any other filter change.
+  React.useEffect(() => {
+    setPage(1);
+  }, [currentBranchId]);
+
   const params: ListIncomeParams = {
     page,
     limit: 20,
@@ -54,6 +61,7 @@ export default function IncomePage() {
     category: category || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
+    branchId: currentBranchId ?? undefined,
   };
   const income = useIncomeList(params);
   const createIncome = useCreateIncome();

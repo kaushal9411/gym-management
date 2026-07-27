@@ -10,6 +10,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
 import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { InvoiceStatusBadge } from '@/features/finance/components/finance-badges';
 import { useInvoiceList } from '@/features/finance/hooks/use-finance';
 import type { ListInvoicesParams, MemberInvoiceListItem, MemberInvoiceStatus } from '@/features/finance/types';
@@ -25,6 +26,7 @@ type SortableColumn = NonNullable<ListInvoicesParams['sortBy']>;
 export default function InvoicesPage() {
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('finance:payment-create');
+  const { currentBranchId } = useCurrentBranch();
 
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -35,6 +37,11 @@ export default function InvoicesPage() {
   const [sortBy, setSortBy] = React.useState<SortableColumn>('createdAt');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
 
+  // Header branch switch re-scopes the whole list — back to page 1 like any other filter change.
+  React.useEffect(() => {
+    setPage(1);
+  }, [currentBranchId]);
+
   const invoices = useInvoiceList({
     page,
     limit: 20,
@@ -42,6 +49,7 @@ export default function InvoicesPage() {
     status: status || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
+    branchId: currentBranchId ?? undefined,
     sortBy,
     sortDir,
   });

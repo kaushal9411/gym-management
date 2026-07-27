@@ -10,6 +10,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
 import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { FinanceSummaryCards } from '@/features/finance/components/finance-summary-cards';
 import { PaymentMethodBadge, PaymentStatusBadge } from '@/features/finance/components/finance-badges';
 import { RevenueTrendChart } from '@/features/finance/components/revenue-trend-chart';
@@ -28,6 +29,7 @@ type SortableColumn = NonNullable<ListPaymentsParams['sortBy']>;
 export default function PaymentsPage() {
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('finance:payment-create');
+  const { currentBranchId } = useCurrentBranch();
 
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -39,7 +41,12 @@ export default function PaymentsPage() {
   const [sortBy, setSortBy] = React.useState<SortableColumn>('paymentDate');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
 
-  const dashboard = useFinanceDashboard();
+  // Header branch switch re-scopes the whole page — back to page 1 like any other filter change.
+  React.useEffect(() => {
+    setPage(1);
+  }, [currentBranchId]);
+
+  const dashboard = useFinanceDashboard(currentBranchId ?? undefined);
   const params = {
     page,
     limit: 20,
@@ -48,6 +55,7 @@ export default function PaymentsPage() {
     method: method || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
+    branchId: currentBranchId ?? undefined,
     sortBy,
     sortDir,
   };

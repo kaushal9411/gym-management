@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from '@/components/ui/input';
 import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { toFinanceError, useDeleteExpense, useExpenseList } from '@/features/finance/hooks/use-finance';
 import { financeService } from '@/features/finance/services/finance.service';
 import type { Expense, ExpenseCategory, ListExpensesParams } from '@/features/finance/types';
@@ -38,6 +39,7 @@ const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
 export default function ExpensesPage() {
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('finance:expense-manage');
+  const { currentBranchId } = useCurrentBranch();
 
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -47,6 +49,11 @@ export default function ExpensesPage() {
   const [page, setPage] = React.useState(1);
   const [confirmDelete, setConfirmDelete] = React.useState<Expense | null>(null);
 
+  // Header branch switch re-scopes the whole list — back to page 1 like any other filter change.
+  React.useEffect(() => {
+    setPage(1);
+  }, [currentBranchId]);
+
   const params: ListExpensesParams = {
     page,
     limit: 20,
@@ -54,6 +61,7 @@ export default function ExpensesPage() {
     category: category || undefined,
     dateFrom: dateFrom || undefined,
     dateTo: dateTo || undefined,
+    branchId: currentBranchId ?? undefined,
   };
   const expenses = useExpenseList(params);
   const deleteExpense = useDeleteExpense();
