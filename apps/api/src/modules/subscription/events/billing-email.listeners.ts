@@ -33,7 +33,7 @@ export function registerBillingEmailListeners(): void {
 
     const tenant = await prisma.tenant.findUnique({ where: { id: payload.tenantId } });
     const downloadUrl = tenant ? portalPath(tenant.slug, `/billing/invoices/${payload.invoiceId}`) : '#';
-    const totalFormatted = new Intl.NumberFormat('en-US', { style: 'currency', currency: payload.currency }).format(payload.total);
+    const totalFormatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: payload.currency }).format(payload.total);
     const invoice = invoiceEmail(branding, 'there', payload.invoiceNumber, totalFormatted, downloadUrl);
     await enqueueEmail({ to: payload.email, subject: invoice.subject, html: invoice.html });
 

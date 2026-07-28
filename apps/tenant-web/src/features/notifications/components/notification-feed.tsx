@@ -39,8 +39,10 @@ export function NotificationFeed({ tab, onTabChange, items, isLoading, onMarkRea
             type="button"
             onClick={() => onTabChange(t.value)}
             className={cn(
-              'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-              tab === t.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent',
+              'rounded-full px-3 py-1 text-xs font-medium transition-colors duration-150',
+              tab === t.value
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground',
             )}
           >
             {t.label}
@@ -60,9 +62,9 @@ export function NotificationFeed({ tab, onTabChange, items, isLoading, onMarkRea
               <div
                 key={notification.id}
                 className={cn(
-                  'group flex w-full items-start gap-3 rounded-lg border text-left transition-colors hover:bg-accent',
+                  'group flex w-full items-start gap-3 rounded-lg border border-border text-left shadow-xs transition-all duration-150 hover:border-accent-foreground/20 hover:shadow-sm',
                   compact ? 'p-3' : 'p-4',
-                  !notification.readAt && 'bg-primary/5',
+                  !notification.readAt && 'border-primary/20 bg-primary/5',
                 )}
               >
                 <button
@@ -70,7 +72,12 @@ export function NotificationFeed({ tab, onTabChange, items, isLoading, onMarkRea
                   onClick={() => !notification.readAt && onMarkRead(notification.id)}
                   className="flex min-w-0 flex-1 items-start gap-3 text-left"
                 >
-                  <span className={cn('mt-0.5 flex shrink-0 items-center justify-center rounded-full bg-muted', compact ? 'size-8' : 'size-9')}>
+                  <span
+                    className={cn(
+                      'mt-0.5 flex shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground',
+                      compact ? 'size-8' : 'size-9',
+                    )}
+                  >
                     <Icon className={compact ? 'size-4' : 'size-4.5'} />
                   </span>
                   <span className="min-w-0 flex-1 space-y-0.5">
@@ -85,7 +92,7 @@ export function NotificationFeed({ tab, onTabChange, items, isLoading, onMarkRea
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                  className="size-7 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-destructive"
                   aria-label="Delete notification"
                   onClick={() => onDelete(notification.id)}
                 >

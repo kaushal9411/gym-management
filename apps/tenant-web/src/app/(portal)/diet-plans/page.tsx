@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Pagination } from '@/components/ui/pagination';
 import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { toDietError, useDietPlanList, useDietPlanStatusAction, useDuplicateDietPlan } from '@/features/diet/hooks/use-diet';
@@ -18,8 +19,8 @@ import type { DietPlanListItem, ListDietPlansParams } from '@/features/diet/type
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
-  'h-9 rounded-md border border-input bg-background px-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+  'h-9 rounded-lg border border-input bg-background px-2.5 text-sm shadow-xs transition-all duration-150',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
 );
 
 type SortableColumn = NonNullable<ListDietPlansParams['sortBy']>;
@@ -208,20 +209,8 @@ export default function DietPlansPage() {
 
       <DataTable columns={columns} rows={items} rowKey={(p) => p.id} loading={plans.isPending} error={plans.error} onRetry={() => plans.refetch()} emptyMessage="No diet plans match these filters." />
 
-      {data && data.totalPages > 1 ? (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            Page {data.page} of {data.totalPages} · {data.total} plans
-          </span>
-          <span className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= data.totalPages} onClick={() => setPage((p) => p + 1)}>
-              Next
-            </Button>
-          </span>
-        </div>
+      {data ? (
+        <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
       ) : null}
 
       <ConfirmDialog

@@ -1,6 +1,6 @@
 'use client';
 
-import { LifeBuoy, Mail, MessageSquareText } from 'lucide-react';
+import { HelpCircle, LifeBuoy, Mail, MessageSquareText } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -19,20 +19,28 @@ export default function SupportPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Help Center</h1>
-        <p className="text-muted-foreground">Find answers or reach the FitCloud team.</p>
+      <div className="flex items-start gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+          <LifeBuoy className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Help Center</h1>
+          <p className="text-muted-foreground">Find answers or reach the FitCloud team.</p>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Frequently asked questions</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <HelpCircle className="size-4 text-muted-foreground" aria-hidden />
+            Frequently asked questions
+          </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="divide-y divide-border">
           {FAQS.map((faq) => (
-            <div key={faq.question}>
+            <div key={faq.question} className="py-3.5 first:pt-0 last:pb-0">
               <p className="text-sm font-medium">{faq.question}</p>
-              <p className="text-sm text-muted-foreground">{faq.answer}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{faq.answer}</p>
             </div>
           ))}
         </CardContent>
@@ -57,8 +65,13 @@ export default function SupportPage() {
           <CardTitle className="text-base">Contact us</CardTitle>
         </CardHeader>
         <CardContent>
-          <a href="mailto:support@fitcloud.com" className="flex items-center gap-2 text-sm text-primary hover:underline">
-            <Mail className="size-4" />
+          <a
+            href="mailto:support@fitcloud.com"
+            className="inline-flex items-center gap-2.5 rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm font-medium text-foreground shadow-xs transition-colors duration-150 hover:bg-accent hover:text-accent-foreground"
+          >
+            <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <Mail className="size-3.5" aria-hidden />
+            </span>
             support@fitcloud.com
           </a>
         </CardContent>

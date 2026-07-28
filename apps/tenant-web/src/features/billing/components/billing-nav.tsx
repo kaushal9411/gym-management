@@ -1,9 +1,6 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-
-import { cn } from '@/lib/utils';
+import { RouteTabNav } from '@/components/ui/route-tab-nav';
 
 const TABS = [
   { href: '/billing', label: 'Overview' },
@@ -13,25 +10,5 @@ const TABS = [
 ] as const;
 
 export function BillingNav() {
-  const pathname = usePathname();
-
-  return (
-    <nav className="flex gap-1 border-b border-border" aria-label="Billing sections">
-      {TABS.map((tab) => {
-        const active = pathname === tab.href;
-        return (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            className={cn(
-              'border-b-2 px-3 py-2 text-sm font-medium transition-colors',
-              active ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {tab.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+  return <RouteTabNav tabs={[...TABS]} aria-label="Billing sections" />;
 }

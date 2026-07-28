@@ -33,7 +33,7 @@ function formatMoney(amount: number, currency: string): string {
 export function PaymentStep() {
   const { state, dispatch } = useOnboardingWizard();
   const pay = usePayForPlan();
-  const [provider, setProvider] = React.useState<PaymentProvider>('stripe');
+  const [provider, setProvider] = React.useState<PaymentProvider>('razorpay');
   const [cardNumber, setCardNumber] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
 
@@ -71,7 +71,7 @@ export function PaymentStep() {
 
   return (
     <div className="space-y-5">
-      <div className="rounded-lg border border-input bg-muted/40 p-4">
+      <div className="rounded-xl border border-input bg-muted/40 p-4 shadow-xs">
         <div className="flex items-center justify-between text-sm">
           <span className="font-medium">{plan.name} plan</span>
           <span className="font-semibold">
@@ -109,7 +109,7 @@ export function PaymentStep() {
               type="button"
               onClick={() => setProvider(p.value)}
               className={cn(
-                'flex-1 rounded-md border px-3 py-2 text-xs font-medium transition-colors',
+                'flex-1 rounded-lg border px-3 py-2 text-xs font-medium shadow-xs transition-colors duration-150',
                 provider === p.value ? 'border-primary bg-primary/5 text-foreground' : 'border-input text-muted-foreground hover:bg-accent',
               )}
             >

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { KeyRound } from 'lucide-react';
+import { KeyRound, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AvatarUpload } from '@/features/iam/components/avatar-upload';
 import { toIamError, useIamProfile, useUpdateProfile } from '@/features/iam/hooks/use-iam';
@@ -40,13 +41,18 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">My Profile</h1>
-        <div className="flex flex-wrap items-center gap-1.5 text-muted-foreground">
-          <span>Signed in as {profile.data.email} ·</span>
-          {profile.data.roles.map((r) => (
-            <Badge key={r} variant="secondary">{r}</Badge>
-          ))}
+      <div className="flex items-start gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+          <UserRound className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">My Profile</h1>
+          <div className="flex flex-wrap items-center gap-1.5 text-muted-foreground">
+            <span>Signed in as {profile.data.email} ·</span>
+            {profile.data.roles.map((r) => (
+              <Badge key={r} variant="secondary">{r}</Badge>
+            ))}
+          </div>
         </div>
       </div>
       <ProfileForm profile={profile.data} />
@@ -105,7 +111,7 @@ function ProfileForm({ profile }: { profile: ProfileDto }) {
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="profile-name">Full name</Label>
+            <Label htmlFor="profile-name" required>Full name</Label>
             <Input id="profile-name" value={name} onChange={(e) => setName(e.target.value)} disabled={updateProfile.isPending} />
           </div>
           <div className="space-y-2">
@@ -123,9 +129,15 @@ function ProfileForm({ profile }: { profile: ProfileDto }) {
           </div>
         </div>
 
-        <Button size="sm" onClick={save} disabled={updateProfile.isPending || name.trim().length < 2}>
-          {updateProfile.isPending ? 'Saving…' : 'Save profile'}
-        </Button>
+        <LoadingButton
+          size="sm"
+          onClick={save}
+          disabled={name.trim().length < 2}
+          loading={updateProfile.isPending}
+          loadingText="Saving…"
+        >
+          Save profile
+        </LoadingButton>
       </CardContent>
     </Card>
   );

@@ -8,6 +8,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Download, Plus, Upload } from 'lucide-
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
+import { Pagination } from '@/components/ui/pagination';
 import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
@@ -125,81 +126,73 @@ export default function PaymentsPage() {
         </div>
       </div>
 
-      <FinanceSummaryCards summary={dashboard.data} loading={dashboard.isPending} />
-      <RevenueTrendChart trend={dashboard.data?.revenueTrend} loading={dashboard.isPending} />
-
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchBar
-          containerClassName="max-w-xs"
-          placeholder="Search payment number, member, reference…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-        <select
-          className={selectClassName}
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as MemberPaymentStatus | '');
-            setPage(1);
-          }}
-          aria-label="Filter by status"
-        >
-          <option value="">All statuses</option>
-          <option value="PENDING">Pending</option>
-          <option value="SUCCESS">Success</option>
-          <option value="FAILED">Failed</option>
-          <option value="CANCELLED">Cancelled</option>
-          <option value="REFUNDED">Refunded</option>
-          <option value="PARTIALLY_REFUNDED">Partially refunded</option>
-        </select>
-        <select
-          className={selectClassName}
-          value={method}
-          onChange={(e) => {
-            setMethod(e.target.value as MemberPaymentMethod | '');
-            setPage(1);
-          }}
-          aria-label="Filter by method"
-        >
-          <option value="">All methods</option>
-          <option value="CASH">Cash</option>
-          <option value="UPI">UPI</option>
-          <option value="CREDIT_CARD">Credit Card</option>
-          <option value="DEBIT_CARD">Debit Card</option>
-          <option value="BANK_TRANSFER">Bank Transfer</option>
-          <option value="CHEQUE">Cheque</option>
-          <option value="ONLINE_GATEWAY">Online Gateway</option>
-        </select>
-        <Input type="date" aria-label="From date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} />
-        <Input type="date" aria-label="To date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} />
-        <Button variant="outline" size="sm" onClick={() => void financeService.exportPaymentsCsvUrl(params)}>
-          <Upload className="size-4" /> CSV
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => void financeService.exportPaymentsExcel(params)}>
-          <Download className="size-4" /> Excel
-        </Button>
+      <div className="space-y-5">
+        <FinanceSummaryCards summary={dashboard.data} loading={dashboard.isPending} />
+        <RevenueTrendChart trend={dashboard.data?.revenueTrend} loading={dashboard.isPending} />
       </div>
 
-      <DataTable columns={columns} rows={items} rowKey={(p) => p.id} loading={payments.isPending} error={payments.error} onRetry={() => payments.refetch()} emptyMessage="No payments match these filters." />
-
-      {data && data.totalPages > 1 ? (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            Page {data.page} of {data.totalPages} · {data.total} payments
-          </span>
-          <span className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= data.totalPages} onClick={() => setPage((p) => p + 1)}>
-              Next
-            </Button>
-          </span>
+      <div className="space-y-4 border-t border-border pt-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <SearchBar
+            containerClassName="max-w-xs"
+            placeholder="Search payment number, member, reference…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+          />
+          <select
+            className={selectClassName}
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as MemberPaymentStatus | '');
+              setPage(1);
+            }}
+            aria-label="Filter by status"
+          >
+            <option value="">All statuses</option>
+            <option value="PENDING">Pending</option>
+            <option value="SUCCESS">Success</option>
+            <option value="FAILED">Failed</option>
+            <option value="CANCELLED">Cancelled</option>
+            <option value="REFUNDED">Refunded</option>
+            <option value="PARTIALLY_REFUNDED">Partially refunded</option>
+          </select>
+          <select
+            className={selectClassName}
+            value={method}
+            onChange={(e) => {
+              setMethod(e.target.value as MemberPaymentMethod | '');
+              setPage(1);
+            }}
+            aria-label="Filter by method"
+          >
+            <option value="">All methods</option>
+            <option value="CASH">Cash</option>
+            <option value="UPI">UPI</option>
+            <option value="CREDIT_CARD">Credit Card</option>
+            <option value="DEBIT_CARD">Debit Card</option>
+            <option value="BANK_TRANSFER">Bank Transfer</option>
+            <option value="CHEQUE">Cheque</option>
+            <option value="ONLINE_GATEWAY">Online Gateway</option>
+          </select>
+          <Input type="date" aria-label="From date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} />
+          <Input type="date" aria-label="To date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} />
+          <Button variant="outline" size="sm" onClick={() => void financeService.exportPaymentsCsvUrl(params)}>
+            <Upload className="size-4" /> CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => void financeService.exportPaymentsExcel(params)}>
+            <Download className="size-4" /> Excel
+          </Button>
         </div>
-      ) : null}
+
+        <DataTable columns={columns} rows={items} rowKey={(p) => p.id} loading={payments.isPending} error={payments.error} onRetry={() => payments.refetch()} emptyMessage="No payments match these filters." />
+
+        {data ? (
+          <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
+        ) : null}
+      </div>
     </div>
   );
 }

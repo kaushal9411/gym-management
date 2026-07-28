@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import { Palette } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,8 +26,9 @@ import type { ThemePreference } from '@/features/gym-settings/types';
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
-  'h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+  'flex h-10 w-full items-center rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
+  'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted/40',
 );
 
 interface ColorForm {
@@ -109,9 +111,14 @@ export default function BrandingPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Branding</h1>
-        <p className="text-muted-foreground">Your gym&apos;s colors, logo, and images across the portal, login, and emails.</p>
+      <div className="flex items-start gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+          <Palette className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Branding</h1>
+          <p className="text-muted-foreground">Your gym&apos;s colors, logo, and images across the portal, login, and emails.</p>
+        </div>
       </div>
 
       <GymSettingsNav />
@@ -152,7 +159,7 @@ export default function BrandingPage() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="theme">Theme</Label>
+                  <Label htmlFor="theme" required>Theme</Label>
                   <select
                     id="theme"
                     className={selectClassName}
@@ -183,7 +190,7 @@ export default function BrandingPage() {
               <CardTitle className="text-base">Images</CardTitle>
               <CardDescription>Uploads are resized in your browser and saved immediately.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="divide-y divide-border [&>*+*]:pt-6">
               <ImageUploadField
                 label="Gym logo"
                 description="Shown in the sidebar and login screen."

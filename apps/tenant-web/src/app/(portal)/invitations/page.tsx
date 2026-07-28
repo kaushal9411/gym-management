@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { Pagination } from '@/components/ui/pagination';
 import { IamNav } from '@/features/iam/components/iam-nav';
 import { InviteDialog } from '@/features/iam/components/invite-dialog';
 import { InvitationStatusBadge } from '@/features/iam/components/status-badge';
@@ -13,8 +14,8 @@ import type { InvitationDto, InvitationStatus } from '@/features/iam/types';
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
-  'h-9 rounded-md border border-input bg-background px-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+  'h-9 rounded-lg border border-input bg-background px-2 text-sm shadow-xs',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
 );
 
 export default function InvitationsPage() {
@@ -104,15 +105,8 @@ export default function InvitationsPage() {
         emptyMessage="No invitations yet — invite your first staff member."
       />
 
-      {data && data.totalPages > 1 ? (
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-            Previous
-          </Button>
-          <Button variant="outline" size="sm" disabled={page >= data.totalPages} onClick={() => setPage((p) => p + 1)}>
-            Next
-          </Button>
-        </div>
+      {data ? (
+        <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
       ) : null}
     </div>
   );

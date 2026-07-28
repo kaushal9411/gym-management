@@ -112,9 +112,10 @@ export default function GenerateInvoicePage() {
 
             <div className="space-y-2">
               <Label>Line items</Label>
-              <div className="space-y-2">
-                {items.map((item) => (
-                  <div key={item.key} className="flex items-end gap-2">
+              <div className="space-y-2.5">
+                {items.map((item, index) => (
+                  <div key={item.key} className="flex items-end gap-2 rounded-lg border border-border bg-muted/20 p-2.5">
+                    <span className="mb-2.5 hidden shrink-0 text-xs text-muted-foreground tabular-nums sm:block">{index + 1}</span>
                     <div className="flex-1 space-y-1">
                       <Input placeholder="Description" value={item.description} onChange={(e) => updateItem(item.key, { description: e.target.value })} />
                     </div>
@@ -131,7 +132,15 @@ export default function GenerateInvoicePage() {
                         onChange={(e) => updateItem(item.key, { unitPrice: e.target.value })}
                       />
                     </div>
-                    <Button type="button" variant="ghost" size="icon" aria-label="Remove line item" onClick={() => removeItem(item.key)} disabled={items.length <= 1}>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Remove line item"
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => removeItem(item.key)}
+                      disabled={items.length <= 1}
+                    >
                       <X className="size-4" />
                     </Button>
                   </div>

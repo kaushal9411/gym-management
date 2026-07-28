@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Receipt } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,9 +57,14 @@ export default function InvoiceSettingsPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Invoice Settings</h1>
-        <p className="text-muted-foreground">Defaults applied to invoices your gym issues to members (Payments module, coming soon).</p>
+      <div className="flex items-start gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+          <Receipt className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Invoice Settings</h1>
+          <p className="text-muted-foreground">Defaults applied to invoices your gym issues to members (Payments module, coming soon).</p>
+        </div>
       </div>
 
       <GymSettingsNav />
@@ -86,7 +92,7 @@ export default function InvoiceSettingsPage() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="invoicePrefix">Invoice prefix</Label>
+                  <Label htmlFor="invoicePrefix" required>Invoice prefix</Label>
                   <Input
                     id="invoicePrefix"
                     value={form.invoicePrefix}
@@ -124,7 +130,7 @@ export default function InvoiceSettingsPage() {
                 <Label htmlFor="invoiceFooter">Invoice footer</Label>
                 <textarea
                   id="invoiceFooter"
-                  className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-20 w-full rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm shadow-xs transition-all duration-150 placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted/40"
                   placeholder="e.g. Thank you for your business!"
                   value={form.invoiceFooter ?? ''}
                   disabled={!canManage}

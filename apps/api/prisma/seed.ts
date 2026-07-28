@@ -278,6 +278,7 @@ interface PlanSeed {
   slug: string;
   name: string;
   description: string;
+  currency: string;
   priceMonthly: number;
   priceYearly: number;
   trialDays: number;
@@ -366,8 +367,9 @@ const SUBSCRIPTION_PLANS: PlanSeed[] = [
     slug: 'starter',
     name: 'Starter',
     description: 'For single-location gyms getting started with digital management.',
-    priceMonthly: 29,
-    priceYearly: 290,
+    currency: 'INR',
+    priceMonthly: 2499,
+    priceYearly: 24990,
     trialDays: 14,
     maxBranches: 1,
     maxManagers: 2,
@@ -383,8 +385,9 @@ const SUBSCRIPTION_PLANS: PlanSeed[] = [
     slug: 'professional',
     name: 'Professional',
     description: 'For growing gyms with multiple branches and a full-time team.',
-    priceMonthly: 79,
-    priceYearly: 790,
+    currency: 'INR',
+    priceMonthly: 6999,
+    priceYearly: 69990,
     trialDays: 14,
     maxBranches: 3,
     maxManagers: 5,
@@ -400,8 +403,9 @@ const SUBSCRIPTION_PLANS: PlanSeed[] = [
     slug: 'enterprise',
     name: 'Enterprise',
     description: 'For gym chains that need custom roles, integrations, and white-label branding.',
-    priceMonthly: 199,
-    priceYearly: 1990,
+    currency: 'INR',
+    priceMonthly: 17999,
+    priceYearly: 179990,
     trialDays: 14,
     maxBranches: 9999,
     maxManagers: 9999,
@@ -533,6 +537,7 @@ async function main(): Promise<void> {
         slug: plan.slug,
         name: plan.name,
         description: plan.description,
+        currency: plan.currency,
         priceMonthly: plan.priceMonthly,
         priceYearly: plan.priceYearly,
         trialDays: plan.trialDays,
@@ -548,6 +553,7 @@ async function main(): Promise<void> {
       update: {
         name: plan.name,
         description: plan.description,
+        currency: plan.currency,
         priceMonthly: plan.priceMonthly,
         priceYearly: plan.priceYearly,
         trialDays: plan.trialDays,

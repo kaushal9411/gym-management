@@ -155,7 +155,9 @@ export function ScheduledReportsPanel() {
               </p>
             ) : null}
             <div className="space-y-2">
-              <Label htmlFor="scheduleName">Name</Label>
+              <Label htmlFor="scheduleName" required>
+                Name
+              </Label>
               <Input id="scheduleName" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Weekly revenue summary" />
             </div>
             <div className="space-y-2">
@@ -182,7 +184,9 @@ export function ScheduledReportsPanel() {
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="scheduleRecipients">Recipient emails (comma-separated)</Label>
+              <Label htmlFor="scheduleRecipients" required>
+                Recipient emails (comma-separated)
+              </Label>
               <Input id="scheduleRecipients" value={recipients} onChange={(e) => setRecipients(e.target.value)} placeholder="owner@gym.com, manager@gym.com" />
             </div>
             <Button type="submit" className="w-full" disabled={createSchedule.isPending}>

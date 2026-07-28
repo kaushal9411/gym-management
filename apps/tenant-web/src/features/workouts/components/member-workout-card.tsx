@@ -4,13 +4,12 @@ import * as React from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
-import { ExerciseProgressBadge } from './workout-badges';
+import { ExerciseProgressBadge, WorkoutAssignmentStatusBadge } from './workout-badges';
 import { WorkoutPlanSelect } from './workout-plan-select';
 import {
   toWorkoutError,
@@ -103,7 +102,10 @@ export function MemberWorkoutCard({ memberId }: MemberWorkoutCardProps) {
             {current.progress.length > 0 ? (
               <div className="space-y-1.5">
                 {current.progress.map((p) => (
-                  <div key={p.exerciseId} className="flex flex-wrap items-center justify-between gap-2 border-b pb-1.5 text-sm last:border-0 last:pb-0">
+                  <div
+                    key={p.exerciseId}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 px-2.5 py-2 text-sm"
+                  >
                     <span>
                       {p.exerciseName} <span className="text-xs text-muted-foreground">({p.dayOfWeek[0]}{p.dayOfWeek.slice(1).toLowerCase()})</span>
                     </span>
@@ -114,7 +116,7 @@ export function MemberWorkoutCard({ memberId }: MemberWorkoutCardProps) {
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-7 px-2 text-xs"
+                            className="h-7 px-2 text-xs hover:bg-success/10 hover:text-success"
                             disabled={p.status === 'COMPLETED' || markProgress.isPending}
                             onClick={() => handleMark(p.exerciseId, 'COMPLETED')}
                           >
@@ -123,7 +125,7 @@ export function MemberWorkoutCard({ memberId }: MemberWorkoutCardProps) {
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="h-7 px-2 text-xs"
+                            className="h-7 px-2 text-xs hover:bg-warning/15 hover:text-warning-foreground"
                             disabled={p.status === 'SKIPPED' || markProgress.isPending}
                             onClick={() => handleMark(p.exerciseId, 'SKIPPED')}
                           >
@@ -144,7 +146,7 @@ export function MemberWorkoutCard({ memberId }: MemberWorkoutCardProps) {
         )}
 
         {canAssign && !current ? (
-          <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-muted/20 p-3.5">
             <div className="min-w-48 space-y-1">
               <Label htmlFor="assignWorkoutPlan" className="text-xs">
                 Plan
@@ -165,14 +167,16 @@ export function MemberWorkoutCard({ memberId }: MemberWorkoutCardProps) {
 
         {history.length > 1 ? (
           <details className="text-sm">
-            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Plan history ({history.length})</summary>
+            <summary className="cursor-pointer select-none text-muted-foreground transition-colors hover:text-foreground">
+              Plan history ({history.length})
+            </summary>
             <div className="mt-2 space-y-1.5">
               {history.map((h) => (
-                <div key={h.id} className="flex flex-wrap items-center justify-between gap-2 border-b pb-1.5 last:border-0">
+                <div key={h.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/30 px-2.5 py-2">
                   <span>{h.workoutPlan.name}</span>
                   <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     {new Date(h.startDate).toLocaleDateString()} – {h.endDate ? new Date(h.endDate).toLocaleDateString() : 'now'}
-                    <Badge variant="secondary">{h.status}</Badge>
+                    <WorkoutAssignmentStatusBadge status={h.status} />
                   </span>
                 </div>
               ))}

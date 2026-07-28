@@ -34,7 +34,7 @@ export function HolidaysEditor({ value, onChange, disabled }: HolidaysEditorProp
       ) : (
         <ul className="space-y-1.5">
           {value.map((holiday, index) => (
-            <li key={`${holiday.date}-${index}`} className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm">
+            <li key={`${holiday.date}-${index}`} className="flex items-center justify-between rounded-lg border px-3 py-1.5 text-sm">
               <span>
                 {holiday.date}
                 {holiday.label ? ` — ${holiday.label}` : ''}

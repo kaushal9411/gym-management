@@ -74,11 +74,11 @@ export default function NewMemberPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First name</Label>
+                <Label htmlFor="firstName" required>First name</Label>
                 <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} disabled={createMember.isPending} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last name</Label>
+                <Label htmlFor="lastName" required>Last name</Label>
                 <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={createMember.isPending} />
               </div>
               <div className="space-y-2">
@@ -94,7 +94,7 @@ export default function NewMemberPage() {
                 <Input id="memberId" value={memberId} onChange={(e) => setMemberId(e.target.value)} disabled={createMember.isPending} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="branchId">Branch</Label>
+                <Label htmlFor="branchId" required>Branch</Label>
                 <BranchSelect id="branchId" value={branchId} onChange={setBranchId} disabled={createMember.isPending} />
               </div>
               <div className="space-y-2">

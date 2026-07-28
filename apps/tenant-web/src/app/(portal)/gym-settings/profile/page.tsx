@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -130,9 +131,14 @@ export default function GymProfilePage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Gym Profile</h1>
-        <p className="text-muted-foreground">Your gym&apos;s identity, legal details, contact info, hours and social links.</p>
+      <div className="flex items-start gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+          <Building2 className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Gym Profile</h1>
+          <p className="text-muted-foreground">Your gym&apos;s identity, legal details, contact info, hours and social links.</p>
+        </div>
       </div>
 
       <GymSettingsNav />
@@ -157,7 +163,7 @@ export default function GymProfilePage() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="gymName">Gym name</Label>
+                  <Label htmlFor="gymName" required>Gym name</Label>
                   <Input id="gymName" value={form.gymName} disabled={!canManage} onChange={(e) => set('gymName', e.target.value)} />
                 </div>
                 <div className="space-y-2">
@@ -204,7 +210,7 @@ export default function GymProfilePage() {
                 <Label htmlFor="description">Description</Label>
                 <textarea
                   id="description"
-                  className="flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-24 w-full rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm shadow-xs transition-all duration-150 placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted/40"
                   value={form.description}
                   disabled={!canManage}
                   onChange={(e) => set('description', e.target.value)}

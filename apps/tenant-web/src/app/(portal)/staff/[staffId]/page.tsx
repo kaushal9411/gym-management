@@ -261,13 +261,13 @@ export default function StaffDetailPage() {
           ) : null}
           {data.deletedAt || data.status === 'SUSPENDED' || data.status === 'DEACTIVATED' ? (
             canRestore ? (
-              <Button size="sm" onClick={() => setConfirmStatusAction(data.deletedAt ? 'restore' : 'activate')}>
+              <Button variant="success" size="sm" onClick={() => setConfirmStatusAction(data.deletedAt ? 'restore' : 'activate')}>
                 {data.deletedAt ? 'Restore' : 'Activate'}
               </Button>
             ) : null
           ) : canActivate ? (
             <>
-              <Button variant="outline" size="sm" onClick={() => setConfirmStatusAction('suspend')}>
+              <Button variant="warning" size="sm" onClick={() => setConfirmStatusAction('suspend')}>
                 Suspend
               </Button>
               <Button variant="outline" size="sm" onClick={() => setConfirmStatusAction('deactivate')}>
@@ -303,15 +303,15 @@ export default function StaffDetailPage() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="firstName">First name</Label>
+              <Label htmlFor="firstName" required>First name</Label>
               <Input id="firstName" value={form.firstName} disabled={!canUpdate} onChange={(e) => set('firstName', e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lastName">Last name</Label>
+              <Label htmlFor="lastName" required>Last name</Label>
               <Input id="lastName" value={form.lastName} disabled={!canUpdate} onChange={(e) => set('lastName', e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" required>Email</Label>
               <Input id="email" type="email" value={form.email} disabled={!canUpdate} onChange={(e) => set('email', e.target.value)} />
             </div>
             <div className="space-y-2">
@@ -326,7 +326,7 @@ export default function StaffDetailPage() {
               <Label htmlFor="gender">Gender</Label>
               <select
                 id="gender"
-                className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                className="h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
                 value={form.gender}
                 disabled={!canUpdate}
                 onChange={(e) => set('gender', e.target.value)}
@@ -428,7 +428,7 @@ export default function StaffDetailPage() {
         <CardContent>
           <textarea
             id="notes"
-            className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex min-h-20 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
             value={form.notes}
             disabled={!canUpdate}
             onChange={(e) => set('notes', e.target.value)}

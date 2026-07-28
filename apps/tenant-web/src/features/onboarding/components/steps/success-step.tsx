@@ -4,6 +4,7 @@ import * as React from 'react';
 import { CheckCircle2, Loader2, PartyPopper } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { FormAlert } from '@/features/auth/components/form-alert';
 import { StatusScreen } from '@/features/auth/components/status-screen';
 import { toOnboardingError } from '../../hooks/use-onboarding';
@@ -116,7 +117,13 @@ export function SuccessStep() {
   }, [sessionId, confirmedSlug, isSettled]);
 
   if (!sessionId || !subdomain) {
-    return <FormAlert variant="error" message="Please complete the previous steps before continuing." />;
+    return (
+      <Card>
+        <CardContent className="p-6 sm:p-8">
+          <FormAlert variant="error" message="Please complete the previous steps before continuing." />
+        </CardContent>
+      </Card>
+    );
   }
 
   // Provisioning confirmed via polling but the token response was lost —
@@ -138,46 +145,54 @@ export function SuccessStep() {
 
   if (stuck && provisioning.status === 'pending') {
     return (
-      <div className="space-y-4">
-        <FormAlert
-          variant="error"
-          title="This is taking longer than expected"
-          message="Your registration session may have expired. Start over to try again."
-        />
-        <Button type="button" className="w-full" onClick={startOver}>
-          Start over
-        </Button>
-      </div>
+      <Card>
+        <CardContent className="space-y-4 p-6 sm:p-8">
+          <FormAlert
+            variant="error"
+            title="This is taking longer than expected"
+            message="Your registration session may have expired. Start over to try again."
+          />
+          <Button type="button" className="w-full" onClick={startOver}>
+            Start over
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
   if (provisioning.status === 'error') {
     return (
-      <div className="space-y-4">
-        <FormAlert variant="error" message={provisioning.message} />
-        <Button type="button" className="w-full" onClick={startOver}>
-          Start over
-        </Button>
-      </div>
+      <Card>
+        <CardContent className="space-y-4 p-6 sm:p-8">
+          <FormAlert variant="error" message={provisioning.message} />
+          <Button type="button" className="w-full" onClick={startOver}>
+            Start over
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
   if (provisioning.status !== 'success') {
     return (
-      <div className="space-y-5 py-4">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
-          <p className="text-sm font-medium">Setting up {state.gymName}…</p>
-        </div>
-        <ul className="mx-auto max-w-xs space-y-2 text-sm text-muted-foreground">
-          {PROVISIONING_TASKS.map((task) => (
-            <li key={task} className="flex items-center gap-2">
-              <CheckCircle2 className="size-4 shrink-0 text-success/70" aria-hidden />
-              {task}
-            </li>
-          ))}
-        </ul>
-      </div>
+      <Card>
+        <CardContent className="space-y-5 p-6 py-8 sm:p-8">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div className="flex size-14 items-center justify-center rounded-full bg-primary/10">
+              <Loader2 className="size-6 animate-spin text-primary" aria-hidden />
+            </div>
+            <p className="text-sm font-medium">Setting up {state.gymName}…</p>
+          </div>
+          <ul className="mx-auto max-w-xs space-y-2 text-sm text-muted-foreground">
+            {PROVISIONING_TASKS.map((task) => (
+              <li key={task} className="flex items-center gap-2">
+                <CheckCircle2 className="size-4 shrink-0 text-success/70" aria-hidden />
+                {task}
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
     );
   }
 

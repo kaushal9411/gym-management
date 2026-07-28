@@ -37,26 +37,43 @@ function WizardBody() {
         {copy.subtitle ? <p className="text-sm text-muted-foreground">{copy.subtitle}</p> : null}
       </div>
 
-      <Card>
-        <CardContent className="p-6 sm:p-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={state.step}
-              initial={{ opacity: 0, x: 16 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -16 }}
-              transition={{ duration: 0.25, ease: 'easeOut' }}
-            >
-              {state.step === 'account' ? <AccountDetailsStep /> : null}
-              {state.step === 'otp' ? <OtpStep /> : null}
-              {state.step === 'plan' ? <PlanSelectionStep /> : null}
-              {state.step === 'subdomain' ? <SubdomainStep /> : null}
-              {state.step === 'payment' ? <PaymentStep /> : null}
-              {state.step === 'success' ? <SuccessStep /> : null}
-            </motion.div>
-          </AnimatePresence>
-        </CardContent>
-      </Card>
+      {state.step === 'success' ? (
+        // The success step renders its own card-shaped states (loading
+        // checklist / StatusScreen) — an outer Card here would double up
+        // as a nested card-in-card frame, so it renders unwrapped.
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={state.step}
+            initial={{ opacity: 0, x: 16 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -16 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+          >
+            <SuccessStep />
+          </motion.div>
+        </AnimatePresence>
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="gradient-brand h-1.5 w-full" aria-hidden />
+          <CardContent className="p-6 sm:p-8">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={state.step}
+                initial={{ opacity: 0, x: 16 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -16 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
+              >
+                {state.step === 'account' ? <AccountDetailsStep /> : null}
+                {state.step === 'otp' ? <OtpStep /> : null}
+                {state.step === 'plan' ? <PlanSelectionStep /> : null}
+                {state.step === 'subdomain' ? <SubdomainStep /> : null}
+                {state.step === 'payment' ? <PaymentStep /> : null}
+              </motion.div>
+            </AnimatePresence>
+          </CardContent>
+        </Card>
+      )}
 
       {state.step === 'account' ? (
         <p className="text-center text-sm text-muted-foreground">

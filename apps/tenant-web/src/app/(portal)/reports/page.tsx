@@ -3,8 +3,9 @@
 import Link from 'next/link';
 import { BarChart3 } from 'lucide-react';
 
-import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardInteractive, CardTitle } from '@/components/ui/card';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { cn } from '@/lib/utils';
 import { REPORT_CARDS } from '@/features/reports/components/report-cards';
 import { ScheduledReportsPanel } from '@/features/reports/components/scheduled-reports-panel';
 
@@ -30,7 +31,7 @@ export default function ReportsCenterPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {REPORT_CARDS.map((card) => (
           <Link key={card.reportType} href={`/reports/${card.reportType}`}>
-            <Card className="h-full transition-colors hover:border-primary/50 hover:bg-accent/30">
+            <Card className={cn('h-full hover:border-primary/50', CardInteractive)}>
               <CardHeader className="flex flex-row items-start gap-3 space-y-0">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <card.icon className="size-4.5" aria-hidden />

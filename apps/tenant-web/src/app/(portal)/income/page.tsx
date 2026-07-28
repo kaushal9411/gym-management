@@ -12,6 +12,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
+import { Pagination } from '@/components/ui/pagination';
 import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
@@ -192,20 +193,8 @@ export default function IncomePage() {
 
       <DataTable columns={columns} rows={items} rowKey={(i) => i.id} loading={income.isPending} error={income.error} onRetry={() => income.refetch()} emptyMessage="No income entries match these filters." />
 
-      {data && data.totalPages > 1 ? (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            Page {data.page} of {data.totalPages} · {data.total} entries
-          </span>
-          <span className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= data.totalPages} onClick={() => setPage((p) => p + 1)}>
-              Next
-            </Button>
-          </span>
-        </div>
+      {data ? (
+        <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
       ) : null}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

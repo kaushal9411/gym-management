@@ -52,14 +52,22 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   };
 
   return (
-    <div className="rounded-md border border-input shadow-sm">
-      <div className="flex items-center gap-1 border-b bg-muted/40 p-1">
+    <div className="overflow-hidden rounded-lg border border-input bg-background shadow-xs transition-all duration-150 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/40">
+      <div className="flex items-center gap-0.5 border-b border-border bg-muted/40 p-1">
         {TOOLBAR.map((t) => (
-          <Button key={t.command} type="button" variant="ghost" size="icon" className="size-7" title={t.label} onClick={() => exec(t.command)}>
+          <Button
+            key={t.command}
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-7 rounded-md"
+            title={t.label}
+            onClick={() => exec(t.command)}
+          >
             <t.icon className="size-3.5" />
           </Button>
         ))}
-        <Button type="button" variant="ghost" size="icon" className="size-7" title="Link" onClick={addLink}>
+        <Button type="button" variant="ghost" size="icon" className="size-7 rounded-md" title="Link" onClick={addLink}>
           <LinkIcon className="size-3.5" />
         </Button>
       </div>
@@ -69,7 +77,7 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
         role="textbox"
         aria-multiline="true"
         data-placeholder={placeholder}
-        className="min-h-32 w-full px-3 py-2 text-sm outline-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)]"
+        className="min-h-32 w-full px-3.5 py-2.5 text-sm outline-none empty:before:text-muted-foreground/70 empty:before:content-[attr(data-placeholder)]"
         onInput={(e) => onChange(e.currentTarget.innerHTML)}
         onBlur={(e) => onChange(e.currentTarget.innerHTML)}
       />

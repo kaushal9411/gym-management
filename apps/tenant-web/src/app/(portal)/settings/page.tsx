@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { LogOut, MonitorSmartphone } from 'lucide-react';
+import { LogOut, MonitorSmartphone, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { useCurrentUser } from '@/features/auth/hooks/use-current-user';
 import { useLogoutAllDevices } from '@/features/auth/hooks/use-logout';
@@ -51,80 +52,81 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Account Settings</h1>
-        <p className="text-muted-foreground">Manage your profile, password, and notification preferences.</p>
+      <div className="flex items-start gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+          <Settings2 className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Account Settings</h1>
+          <p className="text-muted-foreground">Manage your profile, password, and notification preferences.</p>
+        </div>
       </div>
 
-      <div className="inline-flex rounded-md border p-0.5">
-        {TABS.map((t) => (
-          <button
-            key={t.value}
-            type="button"
-            onClick={() => setTab(t.value)}
-            className={cn(
-              'rounded px-3 py-1.5 text-sm font-medium transition-colors',
-              tab === t.value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent',
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs value={tab} onValueChange={(value) => setTab(value as SettingsTab)}>
+        <TabsList>
+          {TABS.map((t) => (
+            <TabsTrigger key={t.value} value={t.value}>
+              {t.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      {tab === 'account' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Account details</CardTitle>
-            <CardDescription>Edit your name, email, and photo from the Profile page.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p><span className="text-muted-foreground">Name:</span> {user?.name}</p>
-            <p><span className="text-muted-foreground">Email:</span> {user?.email}</p>
-            <p><span className="text-muted-foreground">Role:</span> {user?.role}</p>
-            <p><span className="text-muted-foreground">Gym:</span> {tenant.name}</p>
-          </CardContent>
-        </Card>
-      )}
+        <TabsContent value="account">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Account details</CardTitle>
+              <CardDescription>Edit your name, email, and photo from the Profile page.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p><span className="text-muted-foreground">Name:</span> {user?.name}</p>
+              <p><span className="text-muted-foreground">Email:</span> {user?.email}</p>
+              <p><span className="text-muted-foreground">Role:</span> {user?.role}</p>
+              <p><span className="text-muted-foreground">Gym:</span> {tenant.name}</p>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {tab === 'password' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Change password</CardTitle>
-            <CardDescription>Changing your password signs you out of every other session.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChangePasswordForm />
-          </CardContent>
-        </Card>
-      )}
+        <TabsContent value="password">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Change password</CardTitle>
+              <CardDescription>Changing your password signs you out of every other session.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ChangePasswordForm />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {tab === 'notifications' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Notification preferences</CardTitle>
-            <CardDescription>
-              Notification preferences now live on your profile —{' '}
-              <Link href="/profile" className="text-primary underline-offset-4 hover:underline">
-                manage them there
-              </Link>
-              .
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {NOTIFICATION_PREFERENCES.map((pref) => (
-              <div key={pref.key} className="flex items-center gap-2">
-                <Checkbox id={pref.key} defaultChecked disabled />
-                <Label htmlFor={pref.key} className="font-normal text-muted-foreground">
-                  {pref.label}
-                </Label>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+        <TabsContent value="notifications">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Notification preferences</CardTitle>
+              <CardDescription>
+                Notification preferences now live on your profile —{' '}
+                <Link href="/profile" className="text-primary underline-offset-4 hover:underline">
+                  manage them there
+                </Link>
+                .
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {NOTIFICATION_PREFERENCES.map((pref) => (
+                <div key={pref.key} className="flex items-center gap-2">
+                  <Checkbox id={pref.key} defaultChecked disabled />
+                  <Label htmlFor={pref.key} className="font-normal text-muted-foreground">
+                    {pref.label}
+                  </Label>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      {tab === 'sessions' && <SessionsPanel />}
+        <TabsContent value="sessions">
+          <SessionsPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

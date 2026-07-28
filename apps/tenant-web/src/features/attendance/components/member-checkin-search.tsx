@@ -44,7 +44,7 @@ export function MemberCheckinSearch({ onSelect, placeholder }: MemberCheckinSear
         />
       </div>
       {open && debounced.length >= 2 ? (
-        <div className="absolute z-10 mt-1 max-h-72 w-full overflow-auto rounded-md border bg-popover shadow-md">
+        <div className="absolute z-10 mt-1.5 max-h-72 w-full overflow-auto rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-md">
           {results.isPending ? (
             <p className="p-3 text-sm text-muted-foreground">Searching…</p>
           ) : items.length === 0 ? (
@@ -54,7 +54,7 @@ export function MemberCheckinSearch({ onSelect, placeholder }: MemberCheckinSear
               <button
                 key={member.id}
                 type="button"
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm hover:bg-accent"
+                className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm transition-colors duration-100 hover:bg-accent"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
                   onSelect(member);

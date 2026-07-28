@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { SlidersHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,8 +25,9 @@ import type { BusinessSettings, EmailSettings, MeasurementUnit, NotificationSett
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
-  'h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+  'flex h-10 w-full items-center rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
+  'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted/40',
 );
 
 type BusinessForm = Omit<BusinessSettings, 'updatedAt'>;
@@ -93,9 +95,14 @@ export default function BusinessSettingsPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Business Settings</h1>
-        <p className="text-muted-foreground">Currency, timezone, formats, outbound email identity, and notification channels.</p>
+      <div className="flex items-start gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+          <SlidersHorizontal className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Business Settings</h1>
+          <p className="text-muted-foreground">Currency, timezone, formats, outbound email identity, and notification channels.</p>
+        </div>
       </div>
 
       <GymSettingsNav />
@@ -119,7 +126,7 @@ export default function BusinessSettingsPage() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="currency">Currency (ISO code)</Label>
+                  <Label htmlFor="currency" required>Currency (ISO code)</Label>
                   <Input
                     id="currency"
                     maxLength={3}
@@ -139,7 +146,7 @@ export default function BusinessSettingsPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="timezone">Timezone</Label>
+                  <Label htmlFor="timezone" required>Timezone</Label>
                   <Input
                     id="timezone"
                     placeholder="America/Los_Angeles"

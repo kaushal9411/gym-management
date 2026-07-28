@@ -4,6 +4,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { TrainerSelect } from '@/features/members/components/trainer-select';
+import { cn } from '@/lib/utils';
+
+const textareaClassName = cn(
+  'flex min-h-16 w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150',
+  'placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50',
+);
 
 export interface DietPlanFormState {
   name: string;
@@ -40,7 +46,7 @@ export function DietPlanFormFields({ value, onChange, disabled }: DietPlanFormFi
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="planName">Plan name</Label>
+          <Label htmlFor="planName" required>Plan name</Label>
           <Input id="planName" value={value.name} disabled={disabled} onChange={(e) => set('name', e.target.value)} />
         </div>
         <div className="space-y-2">
@@ -53,7 +59,7 @@ export function DietPlanFormFields({ value, onChange, disabled }: DietPlanFormFi
         <Label htmlFor="planDescription">Description</Label>
         <textarea
           id="planDescription"
-          className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+          className={textareaClassName}
           value={value.description}
           disabled={disabled}
           onChange={(e) => set('description', e.target.value)}
@@ -73,7 +79,7 @@ export function DietPlanFormFields({ value, onChange, disabled }: DietPlanFormFi
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="planDurationDays">Duration (days)</Label>
+          <Label htmlFor="planDurationDays" required>Duration (days)</Label>
           <Input
             id="planDurationDays"
             type="number"
@@ -93,14 +99,14 @@ export function DietPlanFormFields({ value, onChange, disabled }: DietPlanFormFi
         <Label htmlFor="planNotes">Notes</Label>
         <textarea
           id="planNotes"
-          className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+          className={textareaClassName}
           value={value.notes}
           disabled={disabled}
           onChange={(e) => set('notes', e.target.value)}
         />
       </div>
 
-      <label className="flex items-center gap-1.5 text-sm">
+      <label htmlFor="planIsActive" className="flex items-center gap-2 text-sm">
         <Checkbox id="planIsActive" checked={value.isActive} disabled={disabled} onCheckedChange={(c) => set('isActive', c === true)} />
         Active (visible for assignment)
       </label>

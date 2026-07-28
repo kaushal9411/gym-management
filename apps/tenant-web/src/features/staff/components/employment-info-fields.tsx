@@ -7,8 +7,8 @@ import { cn } from '@/lib/utils';
 import type { EmploymentType, SalaryType, WorkStatus } from '../types';
 
 const selectClassName = cn(
-  'h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+  'h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50',
 );
 
 const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'] as const;

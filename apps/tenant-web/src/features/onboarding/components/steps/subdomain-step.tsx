@@ -49,7 +49,7 @@ export function SubdomainStep() {
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
       <div className="space-y-2">
-        <Label htmlFor="subdomain">Your portal address</Label>
+        <Label htmlFor="subdomain" required>Your portal address</Label>
         <div className="flex items-stretch">
           <Input
             id="subdomain"
@@ -58,7 +58,7 @@ export function SubdomainStep() {
             invalid={!!form.formState.errors.subdomain || (showResult && !check.available)}
             {...form.register('subdomain')}
           />
-          <span className="inline-flex items-center rounded-r-md border border-l-0 border-input bg-muted px-3 text-sm text-muted-foreground">
+          <span className="inline-flex items-center rounded-r-lg border border-l-0 border-input bg-muted px-3 text-sm text-muted-foreground">
             .fitcloud.com
           </span>
         </div>

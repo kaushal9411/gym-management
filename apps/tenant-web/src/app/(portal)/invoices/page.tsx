@@ -8,6 +8,7 @@ import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
+import { Pagination } from '@/components/ui/pagination';
 import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
@@ -145,20 +146,8 @@ export default function InvoicesPage() {
 
       <DataTable columns={columns} rows={items} rowKey={(inv) => inv.id} loading={invoices.isPending} error={invoices.error} onRetry={() => invoices.refetch()} emptyMessage="No invoices match these filters." />
 
-      {data && data.totalPages > 1 ? (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            Page {data.page} of {data.totalPages} · {data.total} invoices
-          </span>
-          <span className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= data.totalPages} onClick={() => setPage((p) => p + 1)}>
-              Next
-            </Button>
-          </span>
-        </div>
+      {data ? (
+        <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
       ) : null}
     </div>
   );

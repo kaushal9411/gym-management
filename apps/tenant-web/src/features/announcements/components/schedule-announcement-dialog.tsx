@@ -55,7 +55,9 @@ export function ScheduleAnnouncementDialog({ announcement, onOpenChange }: Sched
             </p>
           ) : null}
           <div className="space-y-2">
-            <Label htmlFor="announcementPublishAt">Publish at</Label>
+            <Label htmlFor="announcementPublishAt" required>
+              Publish at
+            </Label>
             <Input id="announcementPublishAt" type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
           </div>
           <Button type="submit" className="w-full" disabled={schedule.isPending}>

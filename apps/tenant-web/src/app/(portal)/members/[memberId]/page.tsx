@@ -105,7 +105,13 @@ function toFormState(m: MemberDetail): FormState {
 type StatusActionKind = 'activate' | 'deactivate' | 'restore' | 'delete';
 
 const selectClassName =
-  'h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50';
+  'h-10 w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50';
+
+const textareaClassName =
+  'flex min-h-16 w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted/40';
+
+const notesTextareaClassName =
+  'flex min-h-20 w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted/40';
 
 export default function MemberDetailPage() {
   const params = useParams<{ memberId: string }>();
@@ -450,11 +456,11 @@ export default function MemberDetailPage() {
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="firstName">First name</Label>
+              <Label htmlFor="firstName" required>First name</Label>
               <Input id="firstName" value={form.firstName} disabled={!canUpdate} onChange={(e) => set('firstName', e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lastName">Last name</Label>
+              <Label htmlFor="lastName" required>Last name</Label>
               <Input id="lastName" value={form.lastName} disabled={!canUpdate} onChange={(e) => set('lastName', e.target.value)} />
             </div>
             <div className="space-y-2">
@@ -569,7 +575,7 @@ export default function MemberDetailPage() {
             <Label htmlFor="medicalConditions">Medical conditions</Label>
             <textarea
               id="medicalConditions"
-              className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+              className={textareaClassName}
               value={form.medicalConditions}
               disabled={!canUpdate}
               onChange={(e) => set('medicalConditions', e.target.value)}
@@ -579,7 +585,7 @@ export default function MemberDetailPage() {
             <Label htmlFor="allergies">Allergies</Label>
             <textarea
               id="allergies"
-              className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+              className={textareaClassName}
               value={form.allergies}
               disabled={!canUpdate}
               onChange={(e) => set('allergies', e.target.value)}
@@ -589,7 +595,7 @@ export default function MemberDetailPage() {
             <Label htmlFor="fitnessGoals">Fitness goals</Label>
             <textarea
               id="fitnessGoals"
-              className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+              className={textareaClassName}
               value={form.fitnessGoals}
               disabled={!canUpdate}
               onChange={(e) => set('fitnessGoals', e.target.value)}
@@ -605,7 +611,7 @@ export default function MemberDetailPage() {
         <CardContent>
           <textarea
             id="notes"
-            className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+            className={notesTextareaClassName}
             value={form.notes}
             disabled={!canUpdate}
             onChange={(e) => set('notes', e.target.value)}

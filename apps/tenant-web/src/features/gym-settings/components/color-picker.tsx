@@ -25,15 +25,17 @@ export function ColorPicker({ id, label, value, onChange, disabled }: ColorPicke
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
-      <div className="flex items-center gap-2">
-        <input
-          type="color"
-          aria-label={`${label} swatch`}
-          value={swatchValue}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
-          className="size-10 shrink-0 cursor-pointer rounded-md border border-input bg-background p-1 disabled:cursor-not-allowed disabled:opacity-50"
-        />
+      <div className="flex items-center gap-2.5">
+        <div className="relative shrink-0 overflow-hidden rounded-lg border border-input bg-background shadow-xs ring-1 ring-black/3 transition-shadow duration-150 hover:shadow-sm dark:ring-white/3">
+          <input
+            type="color"
+            aria-label={`${label} swatch`}
+            value={swatchValue}
+            disabled={disabled}
+            onChange={(e) => onChange(e.target.value)}
+            className="size-10 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+          />
+        </div>
         <Input
           id={id}
           value={value}

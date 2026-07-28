@@ -73,7 +73,7 @@ export function BranchFormFields({ value, onChange, disabled, isEditing }: Branc
         <h3 className="text-sm font-medium text-muted-foreground">Branch Information</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="branchName">Branch Name</Label>
+            <Label htmlFor="branchName" required>Branch Name</Label>
             <Input id="branchName" value={value.name} disabled={disabled} onChange={(e) => set('name', e.target.value)} />
           </div>
           <div className="space-y-2">
@@ -181,7 +181,7 @@ export function BranchFormFields({ value, onChange, disabled, isEditing }: Branc
             disabled={disabled}
             onChange={(e) => set('notes', e.target.value)}
             rows={3}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
       </section>

@@ -173,7 +173,7 @@ export default function BranchDetailPage() {
           ) : null}
           {data.deletedAt ? (
             canRestore ? (
-              <Button size="sm" onClick={() => setConfirmStatusAction('restore')}>
+              <Button variant="success" size="sm" onClick={() => setConfirmStatusAction('restore')}>
                 Restore
               </Button>
             ) : null
@@ -183,7 +183,7 @@ export default function BranchDetailPage() {
                 Deactivate
               </Button>
             ) : (
-              <Button variant="outline" size="sm" onClick={() => setConfirmStatusAction('activate')}>
+              <Button variant="success" size="sm" onClick={() => setConfirmStatusAction('activate')}>
                 Activate
               </Button>
             )

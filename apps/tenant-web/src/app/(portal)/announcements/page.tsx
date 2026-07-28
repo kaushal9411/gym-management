@@ -72,8 +72,10 @@ export default function AnnouncementsPage() {
             type="button"
             onClick={() => setTab(t.value)}
             className={cn(
-              'rounded-full px-3 py-1 text-xs font-medium transition-colors',
-              tab === t.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent',
+              'rounded-full px-3 py-1 text-xs font-medium transition-colors duration-150',
+              tab === t.value
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground',
             )}
           >
             {t.label}
@@ -88,7 +90,10 @@ export default function AnnouncementsPage() {
           <EmptyState icon={Send} title="No announcements" description="Create one to broadcast news to your gym." />
         ) : (
           items.map((announcement) => (
-            <div key={announcement.id} className="space-y-2 rounded-lg border p-4">
+            <div
+              key={announcement.id}
+              className="space-y-2 rounded-lg border border-border p-4 shadow-xs transition-shadow duration-150 hover:shadow-sm"
+            >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <div className="flex items-center gap-2">

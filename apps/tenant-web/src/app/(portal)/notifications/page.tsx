@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Settings2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Pagination } from '@/components/ui/pagination';
 import { SearchBar } from '@/components/ui/search-bar';
 import { NotificationFeed } from '@/features/notifications/components/notification-feed';
 import type { NotificationFilterTab } from '@/features/notifications/constants';
@@ -61,19 +62,7 @@ export default function NotificationsPage() {
       />
 
       {data && data.totalPages > 1 ? (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            Page {data.page} of {data.totalPages} · {data.total} notifications
-          </span>
-          <span className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= data.totalPages} onClick={() => setPage((p) => p + 1)}>
-              Next
-            </Button>
-          </span>
-        </div>
+        <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
       ) : null}
     </div>
   );

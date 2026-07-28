@@ -10,8 +10,13 @@ import { cn } from '@/lib/utils';
 import type { DifficultyLevel } from '../types';
 
 const selectClassName = cn(
-  'h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+  'h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs transition-all duration-150',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50',
+);
+
+const textareaClassName = cn(
+  'flex min-h-20 w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150',
+  'placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50',
 );
 
 export interface ExerciseFormState {
@@ -72,7 +77,7 @@ export function ExerciseFormFields({ value, onChange, disabled }: ExerciseFormFi
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="exerciseName">Exercise name</Label>
+          <Label htmlFor="exerciseName" required>Exercise name</Label>
           <Input id="exerciseName" value={value.name} disabled={disabled} onChange={(e) => set('name', e.target.value)} />
         </div>
         <div className="space-y-2">
@@ -111,7 +116,7 @@ export function ExerciseFormFields({ value, onChange, disabled }: ExerciseFormFi
         <Label htmlFor="exerciseInstructions">Instructions</Label>
         <textarea
           id="exerciseInstructions"
-          className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+          className={textareaClassName}
           value={value.instructions}
           disabled={disabled}
           onChange={(e) => set('instructions', e.target.value)}
@@ -146,7 +151,7 @@ export function ExerciseFormFields({ value, onChange, disabled }: ExerciseFormFi
         <div className="flex items-center gap-3">
           {value.imageUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- data-URL, not an optimizable remote image
-            <img src={value.imageUrl} alt="" className="size-16 rounded-md border object-cover" />
+            <img src={value.imageUrl} alt="" className="size-16 rounded-lg border object-cover shadow-xs" />
           ) : null}
           <Input
             id="exerciseImage"
@@ -158,7 +163,7 @@ export function ExerciseFormFields({ value, onChange, disabled }: ExerciseFormFi
         </div>
       </div>
 
-      <label className="flex items-center gap-1.5 text-sm">
+      <label htmlFor="exerciseIsActive" className="flex items-center gap-2 text-sm">
         <Checkbox id="exerciseIsActive" checked={value.isActive} disabled={disabled} onCheckedChange={(c) => set('isActive', c === true)} />
         Active
       </label>

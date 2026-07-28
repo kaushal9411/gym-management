@@ -7,8 +7,15 @@ import { cn } from '@/lib/utils';
 import type { DurationType } from '../types';
 
 const selectClassName = cn(
-  'h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+  'h-10 w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50',
+);
+
+const textareaClassName = cn(
+  'flex min-h-16 w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150',
+  'placeholder:text-muted-foreground/70',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
+  'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted/40',
 );
 
 export interface PlanFormState {
@@ -88,7 +95,7 @@ export function PlanFormFields({ value, onChange, disabled, hidePlanCode }: Plan
         <h3 className="text-sm font-medium">Plan information</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="planName">Plan name</Label>
+            <Label htmlFor="planName" required>Plan name</Label>
             <Input id="planName" value={value.name} disabled={disabled} onChange={(e) => set('name', e.target.value)} />
           </div>
           {!hidePlanCode ? (
@@ -110,7 +117,7 @@ export function PlanFormFields({ value, onChange, disabled, hidePlanCode }: Plan
           <Label htmlFor="planDescription">Description</Label>
           <textarea
             id="planDescription"
-            className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+            className={textareaClassName}
             value={value.description}
             disabled={disabled}
             onChange={(e) => set('description', e.target.value)}
@@ -119,7 +126,7 @@ export function PlanFormFields({ value, onChange, disabled, hidePlanCode }: Plan
 
         <div className="grid gap-4 sm:grid-cols-4">
           <div className="space-y-2">
-            <Label htmlFor="planDurationValue">Duration</Label>
+            <Label htmlFor="planDurationValue" required>Duration</Label>
             <Input id="planDurationValue" type="number" min={1} value={value.durationValue} disabled={disabled} onChange={(e) => set('durationValue', e.target.value)} />
           </div>
           <div className="space-y-2">
@@ -138,7 +145,7 @@ export function PlanFormFields({ value, onChange, disabled, hidePlanCode }: Plan
             </select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="planPrice">Price</Label>
+            <Label htmlFor="planPrice" required>Price</Label>
             <Input id="planPrice" type="number" min={0} step="0.01" value={value.price} disabled={disabled} onChange={(e) => set('price', e.target.value)} />
           </div>
           <div className="space-y-2">
@@ -158,7 +165,7 @@ export function PlanFormFields({ value, onChange, disabled, hidePlanCode }: Plan
           <Label htmlFor="planNotes">Notes</Label>
           <textarea
             id="planNotes"
-            className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+            className={textareaClassName}
             value={value.notes}
             disabled={disabled}
             onChange={(e) => set('notes', e.target.value)}

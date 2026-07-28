@@ -1,62 +1,24 @@
+import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { MembershipStatusBadge } from './member-status-badge';
 import type { MembershipFreezeEntry, MembershipHistoryEntry } from '../types';
 
 export function MembershipHistoryTable({ entries }: { entries: MembershipHistoryEntry[] }) {
-  if (entries.length === 0) return <p className="text-sm text-muted-foreground">No membership history yet.</p>;
-  return (
-    <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2 font-medium">Plan</th>
-            <th className="px-3 py-2 font-medium">Start</th>
-            <th className="px-3 py-2 font-medium">End</th>
-            <th className="px-3 py-2 font-medium">Price</th>
-            <th className="px-3 py-2 font-medium">Status</th>
-            <th className="px-3 py-2 font-medium">Auto-renew</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {entries.map((entry) => (
-            <tr key={entry.id}>
-              <td className="px-3 py-2">{entry.planName}</td>
-              <td className="px-3 py-2">{new Date(entry.startDate).toLocaleDateString()}</td>
-              <td className="px-3 py-2">{new Date(entry.endDate).toLocaleDateString()}</td>
-              <td className="px-3 py-2">${entry.priceAtAssignment}</td>
-              <td className="px-3 py-2">
-                <MembershipStatusBadge status={entry.status} />
-              </td>
-              <td className="px-3 py-2">{entry.autoRenew ? 'Yes' : 'No'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  const columns: DataTableColumn<MembershipHistoryEntry>[] = [
+    { key: 'plan', header: 'Plan', render: (entry) => entry.planName },
+    { key: 'start', header: 'Start', render: (entry) => new Date(entry.startDate).toLocaleDateString() },
+    { key: 'end', header: 'End', render: (entry) => new Date(entry.endDate).toLocaleDateString() },
+    { key: 'price', header: 'Price', render: (entry) => `$${entry.priceAtAssignment}` },
+    { key: 'status', header: 'Status', render: (entry) => <MembershipStatusBadge status={entry.status} /> },
+    { key: 'autoRenew', header: 'Auto-renew', render: (entry) => (entry.autoRenew ? 'Yes' : 'No') },
+  ];
+  return <DataTable columns={columns} rows={entries} rowKey={(entry) => entry.id} emptyMessage="No membership history yet." />;
 }
 
 export function FreezeHistoryTable({ entries }: { entries: MembershipFreezeEntry[] }) {
-  if (entries.length === 0) return <p className="text-sm text-muted-foreground">No freeze history yet.</p>;
-  return (
-    <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2 font-medium">Frozen at</th>
-            <th className="px-3 py-2 font-medium">Unfrozen at</th>
-            <th className="px-3 py-2 font-medium">Reason</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {entries.map((entry) => (
-            <tr key={entry.id}>
-              <td className="px-3 py-2">{new Date(entry.frozenAt).toLocaleString()}</td>
-              <td className="px-3 py-2">{entry.unfrozenAt ? new Date(entry.unfrozenAt).toLocaleString() : 'Still frozen'}</td>
-              <td className="px-3 py-2">{entry.reason ?? '—'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  const columns: DataTableColumn<MembershipFreezeEntry>[] = [
+    { key: 'frozenAt', header: 'Frozen at', render: (entry) => new Date(entry.frozenAt).toLocaleString() },
+    { key: 'unfrozenAt', header: 'Unfrozen at', render: (entry) => (entry.unfrozenAt ? new Date(entry.unfrozenAt).toLocaleString() : 'Still frozen') },
+    { key: 'reason', header: 'Reason', render: (entry) => entry.reason ?? '—' },
+  ];
+  return <DataTable columns={columns} rows={entries} rowKey={(entry) => entry.id} emptyMessage="No freeze history yet." />;
 }

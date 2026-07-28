@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,6 +12,7 @@ import { FormAlert } from '@/features/auth/components/form-alert';
 import { BillingNav } from '@/features/billing/components/billing-nav';
 import { toBillingError, useInvoices } from '@/features/billing/hooks/use-billing';
 import { billingService } from '@/features/billing/services/billing.service';
+import { cn } from '@/lib/utils';
 
 const STATUS_STYLES: Record<string, string> = {
   PAID: 'bg-success/10 text-success',
@@ -75,9 +77,9 @@ export default function InvoicesPage() {
                   <p className="text-xs text-muted-foreground">{new Date(invoice.createdAt).toLocaleDateString()}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[invoice.status] ?? 'bg-muted'}`}>
+                  <Badge className={cn('border-transparent', STATUS_STYLES[invoice.status] ?? 'bg-muted text-muted-foreground')}>
                     {invoice.status}
-                  </span>
+                  </Badge>
                   <span className="font-semibold">{formatMoney(invoice.total, invoice.currency)}</span>
                   <Button
                     variant="outline"

@@ -20,9 +20,9 @@ export function QrCodeDisplay({ memberId, qrCodeImageUrl, canRegenerate }: QrCod
     <div className="flex items-center gap-4">
       {qrCodeImageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- data-URL, not an optimizable remote image
-        <img src={qrCodeImageUrl} alt="Member QR code" className="size-32 rounded-lg border bg-white p-2" />
+        <img src={qrCodeImageUrl} alt="Member QR code" className="size-32 rounded-xl border bg-white p-2 shadow-xs" />
       ) : (
-        <div className="flex size-32 items-center justify-center rounded-lg border text-xs text-muted-foreground">No QR code</div>
+        <div className="flex size-32 items-center justify-center rounded-xl border bg-muted/30 text-xs text-muted-foreground">No QR code</div>
       )}
       {canRegenerate ? (
         <Button

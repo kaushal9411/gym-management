@@ -83,11 +83,15 @@ export function AnnouncementFormDialog({ open, onOpenChange, editing }: Announce
             </p>
           ) : null}
           <div className="space-y-2">
-            <Label htmlFor="announcementTitle">Title</Label>
+            <Label htmlFor="announcementTitle" required>
+              Title
+            </Label>
             <Input id="announcementTitle" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Pool closed for maintenance" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="announcementBody">Body</Label>
+            <Label htmlFor="announcementBody" required>
+              Body
+            </Label>
             <RichTextEditor value={body} onChange={setBody} placeholder="Write your announcement..." />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">

@@ -39,8 +39,8 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Welcome, {user?.name}</h1>
-          <p className="text-muted-foreground">Here&apos;s what&apos;s happening at your gym today.</p>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Welcome, {user?.name?.split(' ')[0]}</h1>
+          <p className="mt-1 text-muted-foreground">Here&apos;s what&apos;s happening at your gym today.</p>
         </div>
         <DateRangeSelector />
       </div>

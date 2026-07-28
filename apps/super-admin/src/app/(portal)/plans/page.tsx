@@ -23,7 +23,7 @@ const EMPTY_FORM: UpsertPlanInput = {
   description: '',
   priceMonthly: 0,
   priceYearly: 0,
-  currency: 'USD',
+  currency: 'INR',
   trialDays: 14,
   maxBranches: 1,
   maxManagers: 2,

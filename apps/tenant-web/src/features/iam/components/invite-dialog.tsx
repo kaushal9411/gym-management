@@ -19,8 +19,8 @@ import { cn } from '@/lib/utils';
 import { toIamError, useCreateInvitation, useRoles } from '../hooks/use-iam';
 
 const selectClassName = cn(
-  'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+  'flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
 );
 
 /** "Invite user" — email + role; the invitee completes their own profile on acceptance. */
@@ -73,7 +73,7 @@ export function InviteDialog() {
         <form onSubmit={submit} className="space-y-4">
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
           <div className="space-y-2">
-            <Label htmlFor="invite-email">Email</Label>
+            <Label htmlFor="invite-email" required>Email</Label>
             <Input
               id="invite-email"
               type="email"
@@ -84,7 +84,7 @@ export function InviteDialog() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="invite-role">Role</Label>
+            <Label htmlFor="invite-role" required>Role</Label>
             <select
               id="invite-role"
               className={selectClassName}

@@ -74,7 +74,7 @@ export function RoleForm({ existing }: { existing?: RoleDto }) {
 
             <div className="grid gap-4 sm:grid-cols-3">
               <div className="space-y-2">
-                <Label htmlFor="role-name">Name</Label>
+                <Label htmlFor="role-name" required>Name</Label>
                 <Input id="role-name" value={name} onChange={(e) => setName(e.target.value)} disabled={isPending} />
               </div>
               <div className="space-y-2 sm:col-span-2">

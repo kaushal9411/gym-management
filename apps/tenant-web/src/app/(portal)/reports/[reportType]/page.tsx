@@ -7,6 +7,7 @@ import { ArrowLeft, Printer } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { Pagination } from '@/components/ui/pagination';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { ExportButtons } from '@/features/reports/components/export-buttons';
 import { ReportFiltersBar, type ReportFilterValue } from '@/features/reports/components/report-filters-bar';
@@ -254,18 +255,14 @@ export default function ReportViewerPage() {
       />
 
       {paginated && paginated.totalPages > 1 ? (
-        <div className="flex items-center justify-between text-sm text-muted-foreground print:hidden">
-          <span>
-            Page {paginated.page} of {paginated.totalPages} · {paginated.total} rows
-          </span>
-          <span className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= paginated.totalPages} onClick={() => setPage((p) => p + 1)}>
-              Next
-            </Button>
-          </span>
+        <div className="print:hidden">
+          <Pagination
+            page={page}
+            totalPages={paginated.totalPages}
+            onPageChange={setPage}
+            totalItems={paginated.total}
+            pageSize={queryFilters.limit}
+          />
         </div>
       ) : null}
     </div>

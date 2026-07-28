@@ -32,7 +32,30 @@ import {
   useRevenueTrends,
 } from '@/features/reports/hooks/use-reports';
 
-const PIE_COLORS = ['#0ea5e9', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+const AXIS_TICK = { fill: 'var(--muted-foreground)', fontSize: 12 };
+const TOOLTIP_STYLE = {
+  contentStyle: {
+    background: 'var(--popover)',
+    color: 'var(--popover-foreground)',
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius-lg)',
+    boxShadow: 'var(--shadow-md)',
+    fontSize: 12,
+  },
+  labelStyle: { color: 'var(--foreground)', fontWeight: 500, marginBottom: 2 },
+  cursor: { fill: 'var(--accent)', opacity: 0.4 },
+};
+/** Fixed CVD-validated categorical order — never reorder/reassign. chart-1 is the brand primary. */
+const PIE_COLORS = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+  'var(--chart-6)',
+  'var(--chart-7)',
+  'var(--chart-8)',
+];
 
 function defaultFilters(branchId: string): ReportFilterValue {
   const to = new Date().toISOString().slice(0, 10);
@@ -70,6 +93,7 @@ export default function AnalyticsDashboardPage() {
   const retentionData = (retention.data ?? []).map((p) => ({ ...p, label: p.date.slice(5) }));
   const collectionData = (paymentCollection.data ?? []).map((p) => ({ ...p, label: p.date.slice(5) }));
   const branchPieData = (branchComparison.data ?? []).filter((b) => b.revenue > 0);
+  const branchPieTotal = branchPieData.reduce((sum, b) => sum + b.revenue, 0);
 
   return (
     <div className="space-y-5">
@@ -88,13 +112,37 @@ export default function AnalyticsDashboardPage() {
           empty={!revenueTrends.isPending && revenueData.every((d) => d.income === 0 && d.expenses === 0)}
         >
           <AreaChart data={revenueData}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="label" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis allowDecimals={false} fontSize={12} tickLine={false} axisLine={false} width={40} />
-            <Tooltip labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
-            <Legend />
-            <Area type="monotone" dataKey="income" name="Income" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.2} />
-            <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#ef4444" fill="#ef4444" fillOpacity={0.15} />
+            <defs>
+              <linearGradient id="fill-revenue-income" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.28} />
+                <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.02} />
+              </linearGradient>
+              <linearGradient id="fill-revenue-expenses" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--chart-2)" stopOpacity={0.28} />
+                <stop offset="100%" stopColor="var(--chart-2)" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} />
+            <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} width={40} />
+            <Tooltip {...TOOLTIP_STYLE} labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Area
+              type="monotone"
+              dataKey="income"
+              name="Income"
+              stroke="var(--chart-1)"
+              strokeWidth={2}
+              fill="url(#fill-revenue-income)"
+            />
+            <Area
+              type="monotone"
+              dataKey="expenses"
+              name="Expenses"
+              stroke="var(--chart-2)"
+              strokeWidth={2}
+              fill="url(#fill-revenue-expenses)"
+            />
           </AreaChart>
         </ChartWrapper>
 
@@ -105,11 +153,11 @@ export default function AnalyticsDashboardPage() {
           empty={!attendanceTrends.isPending && attendanceData.every((d) => d.value === 0)}
         >
           <LineChart data={attendanceData}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="label" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis allowDecimals={false} fontSize={12} tickLine={false} axisLine={false} width={28} />
-            <Tooltip labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
-            <Line type="monotone" dataKey="value" name="Check-ins" stroke="var(--primary)" strokeWidth={2} dot={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} />
+            <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} width={28} />
+            <Tooltip {...TOOLTIP_STYLE} labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
+            <Line type="monotone" dataKey="value" name="Check-ins" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
           </LineChart>
         </ChartWrapper>
 
@@ -120,11 +168,11 @@ export default function AnalyticsDashboardPage() {
           empty={!membershipGrowth.isPending && membershipData.every((d) => d.value === 0)}
         >
           <BarChart data={membershipData}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="label" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis allowDecimals={false} fontSize={12} tickLine={false} axisLine={false} width={28} />
-            <Tooltip labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
-            <Bar dataKey="value" name="New memberships" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} />
+            <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} width={28} />
+            <Tooltip {...TOOLTIP_STYLE} labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
+            <Bar dataKey="value" name="New memberships" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={28} />
           </BarChart>
         </ChartWrapper>
 
@@ -135,11 +183,11 @@ export default function AnalyticsDashboardPage() {
           empty={!newMemberGrowth.isPending && newMemberData.every((d) => d.value === 0)}
         >
           <BarChart data={newMemberData}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="label" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis allowDecimals={false} fontSize={12} tickLine={false} axisLine={false} width={28} />
-            <Tooltip labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
-            <Bar dataKey="value" name="New members" fill="#22c55e" radius={[4, 4, 0, 0]} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} />
+            <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} width={28} />
+            <Tooltip {...TOOLTIP_STYLE} labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
+            <Bar dataKey="value" name="New members" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={28} />
           </BarChart>
         </ChartWrapper>
 
@@ -150,11 +198,11 @@ export default function AnalyticsDashboardPage() {
           empty={!retention.isPending && retentionData.every((d) => d.value === 0)}
         >
           <LineChart data={retentionData}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="label" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis allowDecimals={false} fontSize={12} tickLine={false} axisLine={false} width={28} />
-            <Tooltip labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
-            <Line type="monotone" dataKey="value" name="Active members" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} />
+            <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} width={28} />
+            <Tooltip {...TOOLTIP_STYLE} labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
+            <Line type="monotone" dataKey="value" name="Active members" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
           </LineChart>
         </ChartWrapper>
 
@@ -165,13 +213,37 @@ export default function AnalyticsDashboardPage() {
           empty={!paymentCollection.isPending && collectionData.every((d) => d.income === 0 && d.expenses === 0)}
         >
           <AreaChart data={collectionData}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="label" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis allowDecimals={false} fontSize={12} tickLine={false} axisLine={false} width={40} />
-            <Tooltip labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
-            <Legend />
-            <Area type="monotone" dataKey="income" name="Collected" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.2} />
-            <Area type="monotone" dataKey="expenses" name="Invoiced" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.15} />
+            <defs>
+              <linearGradient id="fill-collection-income" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.28} />
+                <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.02} />
+              </linearGradient>
+              <linearGradient id="fill-collection-expenses" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--chart-2)" stopOpacity={0.28} />
+                <stop offset="100%" stopColor="var(--chart-2)" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+            <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} />
+            <YAxis allowDecimals={false} tick={AXIS_TICK} tickLine={false} axisLine={false} width={40} />
+            <Tooltip {...TOOLTIP_STYLE} labelFormatter={(label, payload) => payload[0]?.payload.date ?? label} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Area
+              type="monotone"
+              dataKey="income"
+              name="Collected"
+              stroke="var(--chart-1)"
+              strokeWidth={2}
+              fill="url(#fill-collection-income)"
+            />
+            <Area
+              type="monotone"
+              dataKey="expenses"
+              name="Invoiced"
+              stroke="var(--chart-2)"
+              strokeWidth={2}
+              fill="url(#fill-collection-expenses)"
+            />
           </AreaChart>
         </ChartWrapper>
 
@@ -183,9 +255,19 @@ export default function AnalyticsDashboardPage() {
           className="lg:col-span-2"
         >
           <PieChart>
-            <Tooltip formatter={(value: number) => `$${value.toFixed(2)}`} />
-            <Legend />
-            <Pie data={branchPieData} dataKey="revenue" nameKey="branch" cx="50%" cy="50%" outerRadius={100} label={(entry: { branch: string }) => entry.branch}>
+            <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => `$${value.toFixed(2)}`} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Pie
+              data={branchPieData}
+              dataKey="revenue"
+              nameKey="branch"
+              cx="50%"
+              cy="50%"
+              outerRadius={100}
+              label={(entry: { branch: string; revenue: number }) =>
+                `${entry.branch} (${branchPieTotal ? Math.round((entry.revenue / branchPieTotal) * 100) : 0}%)`
+              }
+            >
               {branchPieData.map((entry, index) => (
                 <Cell key={entry.branchId} fill={PIE_COLORS[index % PIE_COLORS.length]} />
               ))}

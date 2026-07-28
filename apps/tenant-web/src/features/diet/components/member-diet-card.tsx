@@ -4,14 +4,13 @@ import * as React from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { DietPlanSelect } from './diet-plan-select';
-import { DietProgressBadge } from './diet-badges';
+import { DietAssignmentStatusBadge, DietProgressBadge } from './diet-badges';
 import {
   toDietError,
   useAssignDietPlan,
@@ -146,8 +145,8 @@ export function MemberDietCard({ memberId }: MemberDietCardProps) {
             </p>
 
             {canProgress ? (
-              <div className="space-y-3 rounded-md border p-3">
-                <h4 className="text-sm font-medium">Today&apos;s tracking ({today})</h4>
+              <div className="space-y-3 rounded-xl border bg-muted/20 p-3.5 shadow-xs">
+                <h4 className="text-sm font-semibold text-foreground/90">Today&apos;s tracking ({today})</h4>
                 <div className="flex flex-wrap items-end gap-2">
                   <div className="space-y-1">
                     <Label htmlFor="dietWaterIntake" className="text-xs">
@@ -171,14 +170,14 @@ export function MemberDietCard({ memberId }: MemberDietCardProps) {
                     {current.dietPlan.mealTypes.map((mealType) => {
                       const status = todayLog?.mealsStatus[mealType] ?? 'PENDING';
                       return (
-                        <div key={mealType} className="flex items-center justify-between gap-2 border-b pb-1.5 text-sm last:border-0 last:pb-0">
+                        <div key={mealType} className="flex items-center justify-between gap-2 rounded-lg bg-muted/40 px-2.5 py-2 text-sm">
                           <span>{MEAL_LABELS[mealType]}</span>
                           <span className="flex items-center gap-1">
                             <DietProgressBadge status={status} />
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-7 px-2 text-xs"
+                              className="h-7 px-2 text-xs hover:bg-success/10 hover:text-success"
                               disabled={status === 'COMPLETED' || updateProgress.isPending}
                               onClick={() => handleMealStatus(mealType, 'COMPLETED')}
                             >
@@ -187,7 +186,7 @@ export function MemberDietCard({ memberId }: MemberDietCardProps) {
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-7 px-2 text-xs"
+                              className="h-7 px-2 text-xs hover:bg-warning/15 hover:text-warning-foreground"
                               disabled={status === 'SKIPPED' || updateProgress.isPending}
                               onClick={() => handleMealStatus(mealType, 'SKIPPED')}
                             >
@@ -209,7 +208,7 @@ export function MemberDietCard({ memberId }: MemberDietCardProps) {
         )}
 
         {canAssign && !current ? (
-          <div className="flex flex-wrap items-end gap-2">
+          <div className="flex flex-wrap items-end gap-2 rounded-xl border bg-muted/20 p-3.5">
             <div className="min-w-48 space-y-1">
               <Label htmlFor="assignDietPlan" className="text-xs">
                 Plan
@@ -230,14 +229,16 @@ export function MemberDietCard({ memberId }: MemberDietCardProps) {
 
         {history.length > 1 ? (
           <details className="text-sm">
-            <summary className="cursor-pointer text-muted-foreground hover:text-foreground">Plan history ({history.length})</summary>
+            <summary className="cursor-pointer select-none text-muted-foreground transition-colors hover:text-foreground">
+              Plan history ({history.length})
+            </summary>
             <div className="mt-2 space-y-1.5">
               {history.map((h) => (
-                <div key={h.id} className="flex flex-wrap items-center justify-between gap-2 border-b pb-1.5 last:border-0">
+                <div key={h.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/30 px-2.5 py-2">
                   <span>{h.dietPlan.name}</span>
                   <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     {new Date(h.startDate).toLocaleDateString()} – {h.endDate ? new Date(h.endDate).toLocaleDateString() : 'now'}
-                    <Badge variant="secondary">{h.status}</Badge>
+                    <DietAssignmentStatusBadge status={h.status} />
                   </span>
                 </div>
               ))}

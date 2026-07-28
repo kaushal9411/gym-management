@@ -31,9 +31,9 @@ const COMMON_TIMEZONES = [
 ] as const;
 
 const selectClassName = cn(
-  'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors duration-200',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-ring',
-  'disabled:cursor-not-allowed disabled:opacity-50',
+  'flex h-10 w-full items-center rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
+  'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted/40',
 );
 
 function detectTimezone(): string {
@@ -112,7 +112,7 @@ export function AccountDetailsStep() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="gymName">Gym name</Label>
+          <Label htmlFor="gymName" required>Gym name</Label>
           <Input id="gymName" placeholder="Gold's Gym" invalid={!!fieldError('gymName')} disabled={isSubmitting} {...form.register('gymName')} />
           {fieldError('gymName') ? <p role="alert" className="text-xs text-destructive">{fieldError('gymName')}</p> : null}
         </div>
@@ -124,12 +124,12 @@ export function AccountDetailsStep() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="ownerFirstName">Your first name</Label>
+          <Label htmlFor="ownerFirstName" required>Your first name</Label>
           <Input id="ownerFirstName" autoComplete="given-name" invalid={!!fieldError('ownerFirstName')} disabled={isSubmitting} {...form.register('ownerFirstName')} />
           {fieldError('ownerFirstName') ? <p role="alert" className="text-xs text-destructive">{fieldError('ownerFirstName')}</p> : null}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="ownerLastName">Your last name</Label>
+          <Label htmlFor="ownerLastName" required>Your last name</Label>
           <Input id="ownerLastName" autoComplete="family-name" invalid={!!fieldError('ownerLastName')} disabled={isSubmitting} {...form.register('ownerLastName')} />
           {fieldError('ownerLastName') ? <p role="alert" className="text-xs text-destructive">{fieldError('ownerLastName')}</p> : null}
         </div>
@@ -137,19 +137,19 @@ export function AccountDetailsStep() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="email">Work email</Label>
+          <Label htmlFor="email" required>Work email</Label>
           <Input id="email" type="email" autoComplete="email" placeholder="owner@goldgym.com" invalid={!!fieldError('email')} disabled={isSubmitting} {...form.register('email')} />
           {fieldError('email') ? <p role="alert" className="text-xs text-destructive">{fieldError('email')}</p> : null}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="mobile">Mobile number</Label>
+          <Label htmlFor="mobile" required>Mobile number</Label>
           <Input id="mobile" type="tel" autoComplete="tel" placeholder="+91 98765 43210" invalid={!!fieldError('mobile')} disabled={isSubmitting} {...form.register('mobile')} />
           {fieldError('mobile') ? <p role="alert" className="text-xs text-destructive">{fieldError('mobile')}</p> : null}
         </div>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="country">Country</Label>
+        <Label htmlFor="country" required>Country</Label>
         <select id="country" className={selectClassName} disabled={isSubmitting} {...form.register('country')}>
           {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
@@ -157,12 +157,12 @@ export function AccountDetailsStep() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="state">State / region</Label>
+          <Label htmlFor="state" required>State / region</Label>
           <Input id="state" invalid={!!fieldError('state')} disabled={isSubmitting} {...form.register('state')} />
           {fieldError('state') ? <p role="alert" className="text-xs text-destructive">{fieldError('state')}</p> : null}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="city">City</Label>
+          <Label htmlFor="city" required>City</Label>
           <Input id="city" invalid={!!fieldError('city')} disabled={isSubmitting} {...form.register('city')} />
           {fieldError('city') ? <p role="alert" className="text-xs text-destructive">{fieldError('city')}</p> : null}
         </div>
@@ -170,13 +170,13 @@ export function AccountDetailsStep() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="timezone">Timezone</Label>
+          <Label htmlFor="timezone" required>Timezone</Label>
           <select id="timezone" className={selectClassName} disabled={isSubmitting} {...form.register('timezone')}>
             {COMMON_TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz}</option>)}
           </select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="currency">Billing currency</Label>
+          <Label htmlFor="currency" required>Billing currency</Label>
           <select id="currency" className={selectClassName} disabled={isSubmitting} {...form.register('currency')}>
             {CURRENCIES.map((cur) => <option key={cur} value={cur}>{cur}</option>)}
           </select>
@@ -208,14 +208,14 @@ export function AccountDetailsStep() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password" required>Password</Label>
         <PasswordInput id="password" autoComplete="new-password" invalid={!!fieldError('password')} disabled={isSubmitting} {...form.register('password')} />
         <PasswordStrengthMeter password={passwordValue} />
         {fieldError('password') ? <p role="alert" className="text-xs text-destructive">{fieldError('password')}</p> : null}
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="confirmPassword">Confirm password</Label>
+        <Label htmlFor="confirmPassword" required>Confirm password</Label>
         <PasswordInput id="confirmPassword" autoComplete="new-password" invalid={!!fieldError('confirmPassword')} disabled={isSubmitting} {...form.register('confirmPassword')} />
         {fieldError('confirmPassword') ? <p role="alert" className="text-xs text-destructive">{fieldError('confirmPassword')}</p> : null}
       </div>

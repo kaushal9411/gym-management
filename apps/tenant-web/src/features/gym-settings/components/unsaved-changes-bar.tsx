@@ -18,11 +18,11 @@ export function UnsavedChangesBar({ isDirty, saving, onSave, onCancel }: Unsaved
   useUnsavedChangesWarning(isDirty);
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border bg-muted/40 px-4 py-3">
+    <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-xl border bg-card/95 px-4 py-3 shadow-xs backdrop-blur-sm">
       <span className="flex items-center gap-2 text-sm text-muted-foreground">
         {isDirty ? (
           <>
-            <AlertCircle className="size-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <AlertCircle className="size-4 shrink-0 text-warning" />
             You have unsaved changes.
           </>
         ) : (

@@ -3,6 +3,12 @@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
+
+const textareaClassName = cn(
+  'flex min-h-16 w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150',
+  'placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50',
+);
 
 export interface FoodFormState {
   name: string;
@@ -47,7 +53,7 @@ export function FoodFormFields({ value, onChange, disabled }: FoodFormFieldsProp
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="foodName">Food name</Label>
+          <Label htmlFor="foodName" required>Food name</Label>
           <Input id="foodName" value={value.name} disabled={disabled} onChange={(e) => set('name', e.target.value)} />
         </div>
         <div className="space-y-2">
@@ -109,14 +115,14 @@ export function FoodFormFields({ value, onChange, disabled }: FoodFormFieldsProp
         <Label htmlFor="foodNotes">Notes</Label>
         <textarea
           id="foodNotes"
-          className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+          className={textareaClassName}
           value={value.notes}
           disabled={disabled}
           onChange={(e) => set('notes', e.target.value)}
         />
       </div>
 
-      <label className="flex items-center gap-1.5 text-sm">
+      <label htmlFor="foodIsActive" className="flex items-center gap-2 text-sm">
         <Checkbox id="foodIsActive" checked={value.isActive} disabled={disabled} onCheckedChange={(c) => set('isActive', c === true)} />
         Active
       </label>

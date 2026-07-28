@@ -118,7 +118,7 @@ export function StaffActivationView({ token }: { token: string }) {
 
         <form onSubmit={onSubmit} noValidate className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="password">Create password</Label>
+            <Label htmlFor="password" required>Create password</Label>
             <PasswordInput
               id="password"
               autoComplete="new-password"
@@ -133,7 +133,7 @@ export function StaffActivationView({ token }: { token: string }) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm password</Label>
+            <Label htmlFor="confirmPassword" required>Confirm password</Label>
             <PasswordInput
               id="confirmPassword"
               autoComplete="new-password"

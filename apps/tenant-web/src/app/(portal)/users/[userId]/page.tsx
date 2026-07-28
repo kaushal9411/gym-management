@@ -154,14 +154,14 @@ function StatusActions({
 
   if (deleted || status === 'SUSPENDED' || status === 'DEACTIVATED') {
     return (
-      <Button variant="outline" size="sm" disabled={disabled || statusAction.isPending} onClick={() => run('restore')}>
+      <Button variant="success" size="sm" disabled={disabled || statusAction.isPending} onClick={() => run('restore')}>
         Restore
       </Button>
     );
   }
   return (
     <div className="flex gap-2">
-      <Button variant="outline" size="sm" disabled={disabled || statusAction.isPending} onClick={() => run('suspend')}>
+      <Button variant="warning" size="sm" disabled={disabled || statusAction.isPending} onClick={() => run('suspend')}>
         Suspend
       </Button>
       <Button variant="outline" size="sm" disabled={disabled || statusAction.isPending} onClick={() => run('deactivate')}>
@@ -209,11 +209,11 @@ function ProfileEditor({
       <CardContent className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-2">
-            <Label htmlFor="edit-name">Name</Label>
+            <Label htmlFor="edit-name" required>Name</Label>
             <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="edit-email">Email</Label>
+            <Label htmlFor="edit-email" required>Email</Label>
             <Input id="edit-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
           <div className="space-y-2">

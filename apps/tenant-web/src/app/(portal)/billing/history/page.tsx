@@ -1,10 +1,12 @@
 'use client';
 
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FormAlert } from '@/features/auth/components/form-alert';
 import { BillingNav } from '@/features/billing/components/billing-nav';
 import { toBillingError, usePaymentHistory } from '@/features/billing/hooks/use-billing';
+import { cn } from '@/lib/utils';
 
 const STATUS_STYLES: Record<string, string> = {
   SUCCEEDED: 'bg-success/10 text-success',
@@ -53,9 +55,9 @@ export default function PaymentHistoryPage() {
                   {payment.failureReason ? <p className="text-xs text-destructive">{payment.failureReason}</p> : null}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLES[payment.status] ?? 'bg-muted'}`}>
+                  <Badge className={cn('border-transparent', STATUS_STYLES[payment.status] ?? 'bg-muted text-muted-foreground')}>
                     {payment.status}
-                  </span>
+                  </Badge>
                   <span className="font-semibold">{formatMoney(payment.amount, payment.currency)}</span>
                 </div>
               </CardContent>

@@ -5,10 +5,9 @@ export const OTP_RESEND_COOLDOWN_SECONDS = 30;
 
 export const SUBDOMAIN_DEBOUNCE_MS = 500;
 
+/** Only Razorpay is offered — Stripe/PayPal stay valid backend enum values (untouched) but are no longer selectable from either checkout UI. */
 export const PAYMENT_PROVIDERS: { value: 'stripe' | 'razorpay' | 'paypal'; label: string }[] = [
-  { value: 'stripe', label: 'Card (Stripe)' },
   { value: 'razorpay', label: 'UPI / Cards (Razorpay)' },
-  { value: 'paypal', label: 'PayPal' },
 ];
 
 /** sessionStorage key — wizard progress only, never credentials. */

@@ -40,7 +40,7 @@ interface CheckoutDialogProps {
 export function CheckoutDialog({ open, onOpenChange, targetPlan, currentSortOrder, onSuccess }: CheckoutDialogProps) {
   const [billingCycle, setBillingCycle] = React.useState<BillingCycle>('MONTHLY');
   const [couponCode, setCouponCode] = React.useState('');
-  const [provider, setProvider] = React.useState<PaymentProvider>('stripe');
+  const [provider, setProvider] = React.useState<PaymentProvider>('razorpay');
   const [cardNumber, setCardNumber] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
 

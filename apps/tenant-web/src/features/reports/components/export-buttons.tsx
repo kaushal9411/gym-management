@@ -33,7 +33,7 @@ export function ExportButtons({ reportType, filters }: ExportButtonsProps) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div role="group" aria-label="Export report" className="flex flex-wrap items-center gap-2">
       <Button variant="outline" size="sm" onClick={() => void download('csv')}>
         <Download className="size-4" /> CSV
       </Button>

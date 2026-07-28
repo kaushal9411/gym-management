@@ -85,7 +85,10 @@ export default function NotificationSettingsPage() {
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
             (templates.data ?? []).map((template) => (
-              <div key={template.type} className="flex flex-wrap items-center justify-between gap-2 border-b pb-3 last:border-0 last:pb-0">
+              <div
+                key={template.type}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border-b border-border p-2 pb-3 transition-colors last:border-0 last:pb-0 hover:bg-accent/40"
+              >
                 <div>
                   <p className="font-medium">{template.label}</p>
                   <p className="text-xs text-muted-foreground">{template.description}</p>
@@ -133,7 +136,7 @@ export default function NotificationSettingsPage() {
                 value={bodyTemplate}
                 onChange={(e) => setBodyTemplate(e.target.value)}
                 rows={4}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs outline-none transition-all duration-150 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
               />
             </div>
             <div className="space-y-2">

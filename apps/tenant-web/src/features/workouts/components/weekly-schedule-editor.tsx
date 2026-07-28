@@ -9,8 +9,8 @@ import type { Exercise, PlanExercise, PlanExerciseInput, WeekDay } from '../type
 import { WEEK_DAYS } from '../types';
 
 const selectClassName = cn(
-  'h-9 w-full rounded-md border border-input bg-background px-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+  'h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm shadow-xs transition-all duration-150',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50',
 );
 
 const DAY_LABELS: Record<WeekDay, string> = {
@@ -145,8 +145,8 @@ export function WeeklyScheduleEditor({ initialExercises, exerciseOptions, disabl
         {WEEK_DAYS.map((day) => {
           const dayItems = items.filter((i) => i.dayOfWeek === day);
           return (
-            <div key={day} className="rounded-md border p-3">
-              <h4 className="mb-2 text-sm font-medium">{DAY_LABELS[day]}</h4>
+            <div key={day} className="rounded-xl border bg-card p-3.5 shadow-xs">
+              <h4 className="mb-2.5 text-sm font-semibold text-foreground/90">{DAY_LABELS[day]}</h4>
               {dayItems.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Rest day / no exercises.</p>
               ) : (
@@ -160,7 +160,7 @@ export function WeeklyScheduleEditor({ initialExercises, exerciseOptions, disabl
                       }}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={() => handleDrop(day, item.key)}
-                      className="flex items-center justify-between gap-2 rounded border bg-muted/30 px-2 py-1.5 text-sm"
+                      className="flex items-center justify-between gap-2 rounded-lg border bg-muted/40 px-2.5 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-muted/60"
                     >
                       <span className="flex items-center gap-1.5">
                         <GripVertical className="size-3.5 shrink-0 cursor-grab text-muted-foreground" aria-hidden="true" />
@@ -175,7 +175,7 @@ export function WeeklyScheduleEditor({ initialExercises, exerciseOptions, disabl
                         <button
                           type="button"
                           aria-label={`Remove ${item.exerciseName} from ${DAY_LABELS[day]}`}
-                          className="text-muted-foreground hover:text-destructive"
+                          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                           onClick={() => removeItem(item.key)}
                         >
                           <X className="size-3.5" />

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Check } from 'lucide-react';
 
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -58,7 +59,7 @@ export function PlanComparison({ currentPlanSlug, currentSortOrder, onChanged }:
                   <div>
                     <h3 className="flex items-center gap-2 text-base font-semibold">
                       {plan.name}
-                      {isCurrent ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">Current plan</span> : null}
+                      {isCurrent ? <Badge className="border-transparent bg-primary/10 text-primary">Current plan</Badge> : null}
                     </h3>
                     <p className="text-xs text-muted-foreground">{plan.description}</p>
                   </div>

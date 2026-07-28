@@ -78,11 +78,11 @@ export default function NewUserPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="name">Full name</Label>
+                <Label htmlFor="name" required>Full name</Label>
                 <Input id="name" value={name} onChange={(e) => setName(e.target.value)} disabled={createUser.isPending} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" required>Email</Label>
                 <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={createUser.isPending} />
               </div>
             </div>
@@ -93,14 +93,14 @@ export default function NewUserPage() {
                 <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={createUser.isPending} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password">Temporary password</Label>
+                <Label htmlFor="password" required>Temporary password</Label>
                 <PasswordInput id="password" value={password} onChange={(e) => setPassword(e.target.value)} disabled={createUser.isPending} />
                 <PasswordStrengthMeter password={password} />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Roles</Label>
+              <Label required>Roles</Label>
               <RoleMultiSelect selected={roleIds} onChange={setRoleIds} disabled={createUser.isPending} />
             </div>
 

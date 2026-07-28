@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { LoadingButton } from '@/components/ui/loading-button';
+import { Pagination } from '@/components/ui/pagination';
 import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
@@ -25,8 +26,8 @@ import { useSubmitHandler } from '@/hooks/use-submit-handler';
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
-  'h-9 rounded-md border border-input bg-background px-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+  'h-9 rounded-lg border border-input bg-background px-2 text-sm shadow-xs',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
 );
 
 type SortableColumn = NonNullable<ListStaffParams['sortBy']>;
@@ -396,7 +397,7 @@ export default function StaffListPage() {
             <>
               <Button
                 size="sm"
-                variant="outline"
+                variant="success"
                 onClick={() => setConfirmAction({ kind: 'bulk', action: 'activate', ids: [...selected] })}
               >
                 Bulk activate
@@ -435,20 +436,8 @@ export default function StaffListPage() {
         emptyMessage="No staff match these filters."
       />
 
-      {data && data.totalPages > 1 ? (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            Page {data.page} of {data.totalPages} · {data.total} staff
-          </span>
-          <span className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= data.totalPages} onClick={() => setPage((p) => p + 1)}>
-              Next
-            </Button>
-          </span>
-        </div>
+      {data ? (
+        <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
       ) : null}
 
       {!staff.isPending && (data?.total ?? 0) === 0 && !search && !status && !role && !workStatus ? (

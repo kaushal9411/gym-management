@@ -56,7 +56,8 @@ export function ImageUploadField({
       <div className="flex items-center gap-4">
         <div
           className={cn(
-            'flex items-center justify-center overflow-hidden rounded-md border bg-muted/40',
+            'flex items-center justify-center overflow-hidden rounded-xl border border-dashed bg-muted/30 shadow-xs transition-colors duration-150',
+            value && 'border-solid bg-muted/10',
             previewClassName ?? 'size-16',
           )}
         >
@@ -64,7 +65,7 @@ export function ImageUploadField({
             // eslint-disable-next-line @next/next/no-img-element -- data: URL preview, not an optimizable remote asset
             <img src={value} alt={`${label} preview`} className="size-full object-contain" />
           ) : (
-            <ImageUp className="size-6 text-muted-foreground" aria-hidden />
+            <ImageUp className="size-6 text-muted-foreground/60" aria-hidden />
           )}
         </div>
         <div className="space-y-1.5">

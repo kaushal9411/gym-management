@@ -35,8 +35,11 @@ export function ProgressIndicator({ current }: { current: WizardStep }) {
                 animate={{ scale: isCurrent ? 1.1 : 1 }}
                 transition={{ duration: 0.25 }}
                 className={cn(
-                  'flex size-7 items-center justify-center rounded-full text-xs font-semibold transition-colors duration-300',
-                  isComplete || isCurrent ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                  'flex size-7 items-center justify-center rounded-full text-xs font-semibold shadow-xs transition-colors duration-300',
+                  isComplete || isCurrent
+                    ? 'gradient-brand text-primary-foreground'
+                    : 'bg-muted text-muted-foreground',
+                  isCurrent && 'ring-4 ring-primary/15',
                 )}
                 aria-current={isCurrent ? 'step' : undefined}
               >
@@ -57,7 +60,7 @@ export function ProgressIndicator({ current }: { current: WizardStep }) {
                   initial={false}
                   animate={{ width: isComplete ? '100%' : '0%' }}
                   transition={{ duration: 0.3 }}
-                  className="h-full rounded-full bg-primary"
+                  className="gradient-brand h-full rounded-full"
                 />
               </div>
             ) : null}

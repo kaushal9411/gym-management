@@ -99,15 +99,15 @@ export default function NewStaffPage() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First name</Label>
+                <Label htmlFor="firstName" required>First name</Label>
                 <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} disabled={createStaff.isPending} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last name</Label>
+                <Label htmlFor="lastName" required>Last name</Label>
                 <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={createStaff.isPending} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email" required>Email</Label>
                 <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={createStaff.isPending} />
               </div>
               <div className="space-y-2">
@@ -119,13 +119,13 @@ export default function NewStaffPage() {
                 <Input id="employeeId" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} disabled={createStaff.isPending} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
+                <Label htmlFor="role" required>Role</Label>
                 <StaffRoleSelect id="role" value={role} onChange={setRole} disabled={createStaff.isPending} />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Branches (assign at least one, mark one primary)</Label>
+              <Label required>Branches (assign at least one, mark one primary)</Label>
               <StaffBranchesEditor
                 branchIds={branches.branchIds}
                 primaryBranchId={branches.primaryBranchId}

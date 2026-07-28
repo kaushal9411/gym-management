@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { toast } from 'sonner';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { FormAlert } from '@/features/auth/components/form-alert';
@@ -53,9 +54,9 @@ export function SubscriptionSummary({ subscription, onCancelled }: { subscriptio
             <p className="text-sm text-muted-foreground">Current plan</p>
             <h2 className="text-xl font-semibold">{subscription.plan.name}</h2>
           </div>
-          <span className={cn('rounded-full px-2.5 py-1 text-xs font-medium', STATUS_STYLES[subscription.status] ?? 'bg-muted')}>
+          <Badge className={cn('border-transparent', STATUS_STYLES[subscription.status] ?? 'bg-muted text-muted-foreground')}>
             {subscription.status.replace('_', ' ')}
-          </span>
+          </Badge>
         </div>
 
         <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">

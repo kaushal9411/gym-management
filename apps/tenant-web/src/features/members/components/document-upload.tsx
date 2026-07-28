@@ -22,8 +22,8 @@ const DOCUMENT_TYPES: Array<{ value: MemberDocumentType; label: string }> = [
 ];
 
 const selectClassName = cn(
-  'h-10 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
+  'h-10 rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50',
 );
 
 interface DocumentUploadProps {

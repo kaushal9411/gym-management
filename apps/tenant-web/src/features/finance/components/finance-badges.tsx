@@ -3,12 +3,12 @@ import { cn } from '@/lib/utils';
 import type { MemberInvoiceStatus, MemberPaymentMethod, MemberPaymentStatus } from '../types';
 
 const PAYMENT_STATUS_STYLES: Record<MemberPaymentStatus, string> = {
-  PENDING: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
-  SUCCESS: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
-  FAILED: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
-  CANCELLED: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
-  REFUNDED: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
-  PARTIALLY_REFUNDED: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
+  PENDING: 'bg-warning/15 text-warning-foreground',
+  SUCCESS: 'bg-success/10 text-success',
+  FAILED: 'bg-destructive/10 text-destructive',
+  CANCELLED: 'bg-muted text-muted-foreground',
+  REFUNDED: 'bg-muted text-muted-foreground',
+  PARTIALLY_REFUNDED: 'bg-muted text-muted-foreground',
 };
 
 const PAYMENT_STATUS_LABELS: Record<MemberPaymentStatus, string> = {
@@ -21,11 +21,11 @@ const PAYMENT_STATUS_LABELS: Record<MemberPaymentStatus, string> = {
 };
 
 const INVOICE_STATUS_STYLES: Record<MemberInvoiceStatus, string> = {
-  UNPAID: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
-  PAID: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
-  PARTIALLY_PAID: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300',
-  OVERDUE: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
-  CANCELLED: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300',
+  UNPAID: 'bg-warning/15 text-warning-foreground',
+  PAID: 'bg-success/10 text-success',
+  PARTIALLY_PAID: 'bg-muted text-muted-foreground',
+  OVERDUE: 'bg-destructive/10 text-destructive',
+  CANCELLED: 'bg-muted text-muted-foreground',
 };
 
 const METHOD_LABELS: Record<MemberPaymentMethod, string> = {

@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Pagination } from '@/components/ui/pagination';
 import { SearchBar } from '@/components/ui/search-bar';
 import { AttendanceMethodBadge, AttendanceStatusBadge } from '@/features/attendance/components/attendance-badges';
 import { toAttendanceError, useAttendanceList, useDeleteAttendance, useUpdateAttendance } from '@/features/attendance/hooks/use-attendance';
@@ -24,8 +25,8 @@ import { BranchSelect } from '@/features/members/components/branch-select';
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
-  'h-9 rounded-md border border-input bg-background px-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+  'h-9 rounded-lg border border-input bg-background px-2.5 text-sm shadow-xs transition-all duration-150',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
 );
 
 type SortableColumn = NonNullable<ListAttendanceParams['sortBy']>;
@@ -305,20 +306,8 @@ export default function AttendanceHistoryPage() {
 
       <DataTable columns={columns} rows={items} rowKey={(r) => r.id} loading={records.isPending} error={records.error} onRetry={() => records.refetch()} emptyMessage="No attendance records match these filters." />
 
-      {data && data.totalPages > 1 ? (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>
-            Page {data.page} of {data.totalPages} · {data.total} records
-          </span>
-          <span className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
-              Previous
-            </Button>
-            <Button variant="outline" size="sm" disabled={page >= data.totalPages} onClick={() => setPage((p) => p + 1)}>
-              Next
-            </Button>
-          </span>
-        </div>
+      {data ? (
+        <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
       ) : null}
 
       <Dialog open={!!editState} onOpenChange={(open) => !open && setEditState(null)}>
@@ -353,7 +342,7 @@ export default function AttendanceHistoryPage() {
                 <Label htmlFor="editNotes">Notes</Label>
                 <textarea
                   id="editNotes"
-                  className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+                  className="flex min-h-20 w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring"
                   value={editState.notes}
                   onChange={(e) => setEditState({ ...editState, notes: e.target.value })}
                 />

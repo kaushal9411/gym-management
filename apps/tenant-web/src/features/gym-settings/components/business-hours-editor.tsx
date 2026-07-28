@@ -3,6 +3,7 @@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import type { BusinessHours, Weekday } from '../types';
 
 const DAYS: Array<{ key: Weekday; label: string }> = [
@@ -29,12 +30,18 @@ export function BusinessHoursEditor({ value, onChange, disabled }: BusinessHours
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {DAYS.map(({ key, label }) => {
         const day = dayFor(key);
         return (
-          <div key={key} className="grid grid-cols-[100px_1fr_auto_1fr_auto] items-center gap-3">
-            <Label className="text-sm">{label}</Label>
+          <div
+            key={key}
+            className={cn(
+              'grid grid-cols-[100px_1fr_auto_1fr_auto] items-center gap-3 rounded-lg border border-transparent px-2.5 py-2 transition-colors duration-150',
+              day.closed ? 'bg-muted/30' : 'hover:bg-accent/40 hover:border-border',
+            )}
+          >
+            <Label className="text-sm font-medium">{label}</Label>
             <Input
               type="time"
               aria-label={`${label} opening time`}

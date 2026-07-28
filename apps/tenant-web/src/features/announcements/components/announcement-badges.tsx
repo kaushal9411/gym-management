@@ -1,10 +1,13 @@
-import { Badge } from '@/components/ui/badge';
+import { Badge, type BadgeProps } from '@/components/ui/badge';
 import type { AnnouncementStatus } from '../types';
 
-const STATUS_VARIANT: Record<AnnouncementStatus, 'secondary' | 'outline' | 'default'> = {
+// Mirrors the app-wide semantic mapping used by other status badges
+// (e.g. members/workouts/diet): live/active states get `success`, pending
+// states get `secondary`, wound-down states get `outline`.
+const STATUS_VARIANT: Record<AnnouncementStatus, NonNullable<BadgeProps['variant']>> = {
   DRAFT: 'outline',
   SCHEDULED: 'secondary',
-  PUBLISHED: 'default',
+  PUBLISHED: 'success',
   EXPIRED: 'outline',
 };
 

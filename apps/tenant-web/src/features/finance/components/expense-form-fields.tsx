@@ -63,7 +63,7 @@ export function ExpenseFormFields({ value, onChange, disabled }: ExpenseFormFiel
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="expenseCategory">Category</Label>
+          <Label htmlFor="expenseCategory" required>Category</Label>
           <select
             id="expenseCategory"
             className={selectClassName}
@@ -82,11 +82,11 @@ export function ExpenseFormFields({ value, onChange, disabled }: ExpenseFormFiel
           </select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="expenseAmount">Amount</Label>
+          <Label htmlFor="expenseAmount" required>Amount</Label>
           <Input id="expenseAmount" type="number" min={0} step="0.01" value={value.amount} disabled={disabled} onChange={(e) => set('amount', e.target.value)} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="expenseDate">Date</Label>
+          <Label htmlFor="expenseDate" required>Date</Label>
           <Input id="expenseDate" type="date" value={value.expenseDate} disabled={disabled} onChange={(e) => set('expenseDate', e.target.value)} />
         </div>
       </div>
@@ -105,9 +105,11 @@ export function ExpenseFormFields({ value, onChange, disabled }: ExpenseFormFiel
       <div className="space-y-2">
         <Label>Receipt</Label>
         {value.receiptFileName ? (
-          <div className="flex items-center gap-2 rounded-lg border p-2.5">
-            <FileText className="size-4 shrink-0 text-muted-foreground" />
-            <span className="flex-1 truncate text-sm">{value.receiptFileName}</span>
+          <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <FileText className="size-4" />
+            </div>
+            <span className="flex-1 truncate text-sm font-medium">{value.receiptFileName}</span>
             {!disabled ? (
               <Button type="button" variant="ghost" size="sm" onClick={() => onChange({ ...value, receiptFileName: '', receiptDataUrl: '' })}>
                 Remove
@@ -115,9 +117,10 @@ export function ExpenseFormFields({ value, onChange, disabled }: ExpenseFormFiel
             ) : null}
           </div>
         ) : (
-          <label className="flex w-fit cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground hover:border-input">
-            <Upload className="size-4" />
-            {uploading ? 'Uploading…' : 'Upload receipt (image or PDF)'}
+          <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:bg-accent/40">
+            <Upload className="size-5" />
+            <span className="font-medium text-foreground">{uploading ? 'Uploading…' : 'Upload receipt'}</span>
+            <span className="text-xs text-muted-foreground">Image or PDF, up to 2MB</span>
             <input
               type="file"
               accept="image/*,application/pdf"

@@ -37,7 +37,7 @@ export function IncomeFormFields({ value, onChange, disabled }: IncomeFormFields
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="incomeCategory">Category</Label>
+          <Label htmlFor="incomeCategory" required>Category</Label>
           <select id="incomeCategory" className={selectClassName} value={value.category} disabled={disabled} onChange={(e) => set('category', e.target.value as IncomeCategory)}>
             <option value="MEMBERSHIP_FEE">Membership Fee</option>
             <option value="PERSONAL_TRAINING">Personal Training</option>
@@ -46,11 +46,11 @@ export function IncomeFormFields({ value, onChange, disabled }: IncomeFormFields
           </select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="incomeAmount">Amount</Label>
+          <Label htmlFor="incomeAmount" required>Amount</Label>
           <Input id="incomeAmount" type="number" min={0} step="0.01" value={value.amount} disabled={disabled} onChange={(e) => set('amount', e.target.value)} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="incomeDate">Date</Label>
+          <Label htmlFor="incomeDate" required>Date</Label>
           <Input id="incomeDate" type="date" value={value.incomeDate} disabled={disabled} onChange={(e) => set('incomeDate', e.target.value)} />
         </div>
       </div>

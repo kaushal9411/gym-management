@@ -76,7 +76,7 @@ export function QrScanner({ onDecoded, disabled }: QrScannerProps) {
             <Camera className="size-4" /> Start camera scan
           </Button>
         )}
-        <div id={SCANNER_ELEMENT_ID} className={cameraActive ? 'mx-auto w-full max-w-xs overflow-hidden rounded-md border' : 'hidden'} />
+        <div id={SCANNER_ELEMENT_ID} className={cameraActive ? 'mx-auto w-full max-w-xs overflow-hidden rounded-xl border shadow-xs' : 'hidden'} />
         {cameraError ? <p className="text-sm text-destructive">{cameraError}</p> : null}
       </div>
 

@@ -1,5 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
+import { CreditCard, Receipt, TrendingDown, TrendingUp } from 'lucide-react';
+
+import { StatisticCard } from '@/components/ui/statistic-card';
 import type { FinanceDashboard } from '../types';
 
 function money(amount: string | number): string {
@@ -13,34 +14,28 @@ interface FinanceSummaryCardsProps {
 
 export function FinanceSummaryCards({ summary, loading }: FinanceSummaryCardsProps) {
   const cards = [
-    { label: "Today's income", value: summary ? money(summary.todayIncome) : undefined },
-    { label: 'Monthly income', value: summary ? money(summary.monthlyIncome) : undefined },
-    { label: 'Monthly expenses', value: summary ? money(summary.monthlyExpenses) : undefined },
+    { label: "Today's income", value: summary ? money(summary.todayIncome) : undefined, icon: CreditCard },
+    { label: 'Monthly income', value: summary ? money(summary.monthlyIncome) : undefined, icon: TrendingUp },
+    { label: 'Monthly expenses', value: summary ? money(summary.monthlyExpenses) : undefined, icon: TrendingDown },
     {
       label: 'Outstanding payments',
       value: summary ? money(summary.outstandingPayments) : undefined,
       sub: summary ? `${summary.outstandingInvoiceCount} invoice(s)` : undefined,
+      icon: Receipt,
     },
   ];
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((card) => (
-        <Card key={card.label}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{card.label}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <Skeleton className="h-8 w-20" />
-            ) : (
-              <>
-                <p className="text-2xl font-semibold tracking-tight">{card.value}</p>
-                {card.sub ? <p className="text-xs text-muted-foreground">{card.sub}</p> : null}
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <StatisticCard
+          key={card.label}
+          label={card.label}
+          value={card.value}
+          icon={card.icon}
+          loading={loading}
+          trend={card.sub ? { direction: 'flat', label: card.sub } : undefined}
+        />
       ))}
     </div>
   );
