@@ -53,13 +53,34 @@ export function PlanComparison({ currentPlanSlug, currentSortOrder, onChanged }:
           const included = plan.features.filter((f) => f.included);
 
           return (
-            <Card key={plan.slug} className={cn(isCurrent && 'border-primary')}>
+            <Card
+              key={plan.slug}
+              className={cn(isCurrent && 'border')}
+              style={
+                isCurrent
+                  ? {
+                      borderColor: 'color-mix(in oklch, var(--chart-7) 45%, transparent)',
+                      boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-7) 18%, transparent)',
+                    }
+                  : undefined
+              }
+            >
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="flex items-center gap-2 text-base font-semibold">
                       {plan.name}
-                      {isCurrent ? <Badge className="border-transparent bg-primary/10 text-primary">Current plan</Badge> : null}
+                      {isCurrent ? (
+                        <Badge
+                          className="border-transparent"
+                          style={{
+                            backgroundColor: 'color-mix(in oklch, var(--chart-7) 16%, transparent)',
+                            color: 'var(--chart-7)',
+                          }}
+                        >
+                          Current plan
+                        </Badge>
+                      ) : null}
                     </h3>
                     <p className="text-xs text-muted-foreground">{plan.description}</p>
                   </div>

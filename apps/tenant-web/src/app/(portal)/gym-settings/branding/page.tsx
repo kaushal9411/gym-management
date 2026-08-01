@@ -112,7 +112,14 @@ export default function BrandingPage() {
   return (
     <div className="space-y-5">
       <div className="flex items-start gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
+        <div
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+          style={{
+            backgroundColor: 'color-mix(in oklch, var(--chart-3) 16%, transparent)',
+            color: 'var(--chart-3)',
+            boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-3) 18%, transparent)',
+          }}
+        >
           <Palette className="size-5" aria-hidden />
         </div>
         <div>

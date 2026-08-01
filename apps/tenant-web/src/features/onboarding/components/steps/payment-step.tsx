@@ -87,7 +87,7 @@ export function PaymentStep() {
 
       {trialEligible ? (
         <div className="space-y-3">
-          <LoadingButton type="button" className="w-full" onClick={startTrial}>
+          <LoadingButton type="button" className="onboarding-cta w-full" onClick={startTrial}>
             <Sparkles aria-hidden />
             Start my {plan.trialDays}-day free trial
           </LoadingButton>
@@ -133,7 +133,7 @@ export function PaymentStep() {
         <LoadingButton
           type="button"
           variant={trialEligible ? 'outline' : 'default'}
-          className="w-full"
+          className={cn('w-full', !trialEligible && 'onboarding-cta')}
           onClick={submitPayment}
           loading={pay.isPending}
           loadingText="Processing payment…"

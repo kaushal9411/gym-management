@@ -16,6 +16,11 @@ export class AdminPlanController {
     sendSuccess(res, await adminPlanService.getById(req.params.planId!));
   }
 
+  async subscribers(req: Request, res: Response): Promise<void> {
+    const { page, limit } = req.query as unknown as { page: number; limit: number };
+    sendSuccess(res, await adminPlanService.subscribers(req.params.planId!, page, limit));
+  }
+
   async create(req: TypedBodyRequest<UpsertPlanInput>, res: Response): Promise<void> {
     const plan = await adminPlanService.create(req.body, req.admin!.sub, req.admin!.role);
     sendSuccess(res, plan, 'Plan created.', 201);

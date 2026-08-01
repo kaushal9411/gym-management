@@ -1,9 +1,11 @@
 'use client';
 
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { TrendingUp, Wallet } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StatisticCard } from '@/components/ui/statistic-card';
 import { useRevenueGrowth, useRevenueSummary } from '@/features/revenue/hooks/use-revenue';
 
 function formatMoney(amount: number): string {
@@ -24,14 +26,26 @@ export default function RevenuePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Revenue Analytics</h1>
-        <p className="text-muted-foreground">MRR, ARR, growth, and where the revenue is coming from.</p>
+      <div className="flex items-center gap-3">
+        <div
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+          style={{
+            backgroundColor: 'color-mix(in oklch, var(--chart-3) 16%, transparent)',
+            color: 'var(--chart-3)',
+            boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-3) 18%, transparent)',
+          }}
+        >
+          <TrendingUp className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Revenue Analytics</h1>
+          <p className="text-muted-foreground">MRR, ARR, growth, and where the revenue is coming from.</p>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">MRR</p><p className="mt-1 text-2xl font-bold">{formatMoney(summary.mrr)}</p></CardContent></Card>
-        <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">ARR</p><p className="mt-1 text-2xl font-bold">{formatMoney(summary.arr)}</p></CardContent></Card>
+        <StatisticCard label="MRR" value={formatMoney(summary.mrr)} icon={Wallet} tone="success" />
+        <StatisticCard label="ARR" value={formatMoney(summary.arr)} icon={TrendingUp} tone="violet" />
       </div>
 
       <Card>

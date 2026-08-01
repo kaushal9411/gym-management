@@ -428,6 +428,7 @@ const ADMIN_PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'plans:manage', description: 'Create, update, enable/disable subscription plans' },
   { key: 'coupons:manage', description: 'Create, update, delete coupons' },
   { key: 'payments:read', description: 'View payments, invoices, and transaction logs across all tenants' },
+  { key: 'payments:manage', description: "Create Razorpay payment links, verify payment status, and email invoices/receipts for a tenant's platform billing" },
   { key: 'revenue:read', description: 'View revenue analytics (MRR/ARR/growth)' },
   { key: 'support:manage', description: 'View, assign, and close support tickets' },
   { key: 'feature-flags:manage', description: 'Enable or disable modules globally' },
@@ -443,7 +444,7 @@ const ADMIN_PERMISSIONS: Array<{ key: string; description: string }> = [
 const ADMIN_ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
   SUPER_ADMIN: '*',
   SUPPORT_ADMIN: ['dashboard:read', 'tenants:read', 'support:manage', 'audit:read'],
-  FINANCE_ADMIN: ['dashboard:read', 'payments:read', 'revenue:read', 'coupons:manage', 'plans:manage', 'audit:read'],
+  FINANCE_ADMIN: ['dashboard:read', 'payments:read', 'payments:manage', 'revenue:read', 'coupons:manage', 'plans:manage', 'audit:read'],
   CONTENT_ADMIN: ['dashboard:read', 'cms:manage', 'templates:manage', 'notifications:send', 'audit:read'],
   TECHNICAL_ADMIN: ['dashboard:read', 'feature-flags:manage', 'settings:manage', 'reference-data:manage', 'audit:read'],
 };

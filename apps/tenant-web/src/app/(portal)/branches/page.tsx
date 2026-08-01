@@ -3,7 +3,7 @@
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowUp, ArrowUpDown, MoreHorizontal, Plus, Star } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Building2, MoreHorizontal, Plus, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -174,9 +174,21 @@ export default function BranchesPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Branches</h1>
-          <p className="text-muted-foreground">Manage every location your gym operates from.</p>
+        <div className="flex items-center gap-3.5">
+          <span
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-11"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--primary) 16%, transparent)',
+              color: 'var(--primary)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent)',
+            }}
+          >
+            <Building2 className="size-5" aria-hidden />
+          </span>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Branches</h1>
+            <p className="text-muted-foreground">Manage every location your gym operates from.</p>
+          </div>
         </div>
         {canCreate ? (
           <Button size="sm" asChild>

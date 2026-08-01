@@ -2,7 +2,7 @@
 
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
-import { Download, MoreHorizontal, Plus, Upload } from 'lucide-react';
+import { Download, MoreHorizontal, Plus, TrendingUp, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -145,9 +145,21 @@ export default function IncomePage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Income</h1>
-          <p className="text-muted-foreground">The gym&apos;s revenue ledger — membership fees, training, sales, and other income.</p>
+        <div className="flex items-center gap-3.5">
+          <div
+            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--success) 16%, transparent)',
+              color: 'var(--success)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--success) 18%, transparent)',
+            }}
+          >
+            <TrendingUp className="size-5" aria-hidden />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Income</h1>
+            <p className="text-muted-foreground">The gym&apos;s revenue ledger — membership fees, training, sales, and other income.</p>
+          </div>
         </div>
         {canManage ? (
           <Button size="sm" onClick={openCreate}>

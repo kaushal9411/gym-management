@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Check } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,9 +19,21 @@ export default function PermissionsPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Permissions</h1>
-        <p className="text-muted-foreground">The central registry every module authorizes against.</p>
+      <div className="flex items-center gap-3.5">
+        <span
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-11"
+          style={{
+            backgroundColor: 'color-mix(in oklch, var(--chart-3) 16%, transparent)',
+            color: 'var(--chart-3)',
+            boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-3) 18%, transparent)',
+          }}
+        >
+          <Lock className="size-5" aria-hidden />
+        </span>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Permissions</h1>
+          <p className="text-muted-foreground">The central registry every module authorizes against.</p>
+        </div>
       </div>
 
       <IamNav />

@@ -297,9 +297,21 @@ export default function MembersListPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
-          <p className="text-muted-foreground">Everyone training at your gym.</p>
+        <div className="flex items-center gap-3.5">
+          <div
+            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--primary) 16%, transparent)',
+              color: 'var(--primary)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent)',
+            }}
+          >
+            <Users className="size-5" aria-hidden />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
+            <p className="text-muted-foreground">Everyone training at your gym.</p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {canExport ? (

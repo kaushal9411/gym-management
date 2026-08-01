@@ -17,6 +17,7 @@ import { adminRoleRouter } from '../../modules/admin-roles/routes/admin-role.rou
 import { adminSettingsRouter } from '../../modules/admin-settings/routes/admin-settings.routes';
 import { adminTicketRouter } from '../../modules/admin-support/routes/admin-ticket.routes';
 import { adminTemplateRouter } from '../../modules/admin-templates/routes/admin-template.routes';
+import { adminTenantBillingRouter } from '../../modules/admin-tenants/routes/admin-tenant-billing.routes';
 import { adminTenantRouter } from '../../modules/admin-tenants/routes/admin-tenant.routes';
 import { announcementRouter } from '../../modules/announcements/routes/announcement.routes';
 import { attendanceRouter } from '../../modules/attendance/routes/attendance.routes';
@@ -65,6 +66,7 @@ v1Router.use('/auth', authRouter);
 v1Router.use('/admin/auth', adminAuthRouter);
 v1Router.use('/admin/dashboard', adminDashboardRouter);
 v1Router.use('/admin/tenants', adminTenantRouter);
+v1Router.use('/admin/tenants', adminTenantBillingRouter);
 v1Router.use('/admin/plans', adminPlanRouter);
 v1Router.use('/admin/coupons', adminCouponRouter);
 v1Router.use('/admin/payments', adminPaymentRouter);

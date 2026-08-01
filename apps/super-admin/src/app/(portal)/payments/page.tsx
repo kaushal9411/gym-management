@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Receipt } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { DataTable, type DataTableColumn } from '@/components/data-table';
@@ -53,9 +54,21 @@ export default function PaymentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Payments</h1>
-        <p className="text-muted-foreground">Payment history and invoices across every tenant.</p>
+      <div className="flex items-center gap-3">
+        <div
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+          style={{
+            backgroundColor: 'color-mix(in oklch, var(--success) 16%, transparent)',
+            color: 'var(--success)',
+            boxShadow: '0 0 0 1px color-mix(in oklch, var(--success) 18%, transparent)',
+          }}
+        >
+          <Receipt className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Payments</h1>
+          <p className="text-muted-foreground">Payment history and invoices across every tenant.</p>
+        </div>
       </div>
 
       <div className="flex gap-1 border-b">

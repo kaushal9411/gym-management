@@ -27,20 +27,21 @@ import { useAuth } from '@/features/auth/hooks/use-auth';
 import { useLogout } from '@/features/auth/hooks/use-logout';
 import { cn } from '@/lib/utils';
 
+/** Per-item icon accent (idle state only — the active item keeps the familiar primary highlight), drawn from the CVD-validated `--chart-*`/semantic tokens. Roles/Audit Logs/Settings are deliberately left neutral (undefined tone), matching the "admin stays neutral" convention. */
 const NAV_ITEMS = [
-  { href: ADMIN_ROUTES.dashboard, label: 'Dashboard', icon: Gauge },
-  { href: ADMIN_ROUTES.tenants, label: 'Tenants', icon: Building2 },
-  { href: ADMIN_ROUTES.plans, label: 'Plans', icon: CreditCard },
-  { href: ADMIN_ROUTES.coupons, label: 'Coupons', icon: Ticket },
-  { href: ADMIN_ROUTES.payments, label: 'Payments', icon: Receipt },
-  { href: ADMIN_ROUTES.revenue, label: 'Revenue', icon: TrendingUp },
-  { href: ADMIN_ROUTES.support, label: 'Support', icon: LifeBuoy },
-  { href: ADMIN_ROUTES.featureFlags, label: 'Feature Flags', icon: ToggleLeft },
-  { href: ADMIN_ROUTES.cms, label: 'CMS', icon: FileText },
-  { href: ADMIN_ROUTES.notifications, label: 'Notifications', icon: Bell },
-  { href: ADMIN_ROUTES.roles, label: 'Roles & Admins', icon: Users },
-  { href: ADMIN_ROUTES.auditLogs, label: 'Audit Logs', icon: ScrollText },
-  { href: ADMIN_ROUTES.settings, label: 'Settings', icon: Settings },
+  { href: ADMIN_ROUTES.dashboard, label: 'Dashboard', icon: Gauge, tone: undefined },
+  { href: ADMIN_ROUTES.tenants, label: 'Tenants', icon: Building2, tone: 'var(--chart-2)' },
+  { href: ADMIN_ROUTES.plans, label: 'Plans', icon: CreditCard, tone: 'var(--chart-7)' },
+  { href: ADMIN_ROUTES.coupons, label: 'Coupons', icon: Ticket, tone: 'var(--chart-5)' },
+  { href: ADMIN_ROUTES.payments, label: 'Payments', icon: Receipt, tone: 'var(--success)' },
+  { href: ADMIN_ROUTES.revenue, label: 'Revenue', icon: TrendingUp, tone: 'var(--chart-3)' },
+  { href: ADMIN_ROUTES.support, label: 'Support', icon: LifeBuoy, tone: 'var(--chart-4)' },
+  { href: ADMIN_ROUTES.featureFlags, label: 'Feature Flags', icon: ToggleLeft, tone: 'var(--chart-7)' },
+  { href: ADMIN_ROUTES.cms, label: 'CMS', icon: FileText, tone: 'var(--chart-5)' },
+  { href: ADMIN_ROUTES.notifications, label: 'Notifications', icon: Bell, tone: 'var(--chart-2)' },
+  { href: ADMIN_ROUTES.roles, label: 'Roles & Admins', icon: Users, tone: undefined },
+  { href: ADMIN_ROUTES.auditLogs, label: 'Audit Logs', icon: ScrollText, tone: undefined },
+  { href: ADMIN_ROUTES.settings, label: 'Settings', icon: Settings, tone: undefined },
 ] as const;
 
 function PortalShell({ children }: { children: React.ReactNode }) {
@@ -61,11 +62,22 @@ function PortalShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                  'group relative flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition-colors',
                   active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                 )}
               >
-                <Icon className="size-4" aria-hidden />
+                <span
+                  aria-hidden
+                  className={cn(
+                    'absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary transition-opacity duration-150',
+                    active ? 'opacity-100' : 'opacity-0',
+                  )}
+                />
+                <Icon
+                  className="size-4 shrink-0 transition-colors duration-150"
+                  style={!active && item.tone ? { color: item.tone, opacity: 0.75 } : undefined}
+                  aria-hidden
+                />
                 {item.label}
               </Link>
             );

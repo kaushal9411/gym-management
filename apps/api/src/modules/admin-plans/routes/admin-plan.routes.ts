@@ -4,7 +4,7 @@ import { validate } from '../../../core/middleware/validate.middleware';
 import { adminAuthenticateMiddleware } from '../../admin-auth/middlewares/admin-authenticate.middleware';
 import { requireAdminPermission } from '../../admin-auth/middlewares/admin-authorize.middleware';
 import { adminPlanController } from '../controllers/admin-plan.controller';
-import { createPlanSchema, planIdParamSchema, setPlanActiveSchema, updatePlanSchema } from '../validators/admin-plan.validators';
+import { createPlanSchema, planIdParamSchema, planSubscribersQuerySchema, setPlanActiveSchema, updatePlanSchema } from '../validators/admin-plan.validators';
 
 export const adminPlanRouter: Router = Router();
 
@@ -21,6 +21,14 @@ adminPlanRouter.get('/', requireAdminPermission('plans:manage'), asyncHandler(ad
 
 /** @openapi { "/admin/plans/{planId}": { get: { tags: [Admin Plans], summary: Get plan, security: [{bearerAuth: []}], responses: { 200: { description: Plan } } } } } */
 adminPlanRouter.get('/:planId', requireAdminPermission('plans:manage'), validate({ params: planIdParamSchema }), asyncHandler(adminPlanController.getById.bind(adminPlanController)));
+
+/** @openapi { "/admin/plans/{planId}/subscribers": { get: { tags: [Admin Plans], summary: Tenants currently on this plan, security: [{bearerAuth: []}], responses: { 200: { description: Paginated subscribers } } } } } */
+adminPlanRouter.get(
+  '/:planId/subscribers',
+  requireAdminPermission('plans:manage'),
+  validate({ params: planIdParamSchema, query: planSubscribersQuerySchema }),
+  asyncHandler(adminPlanController.subscribers.bind(adminPlanController)),
+);
 
 /** @openapi { "/admin/plans": { post: { tags: [Admin Plans], summary: Create Plan, security: [{bearerAuth: []}], responses: { 201: { description: Created } } } } } */
 adminPlanRouter.post('/', requireAdminPermission('plans:manage'), validate({ body: createPlanSchema }), asyncHandler(adminPlanController.create.bind(adminPlanController)));

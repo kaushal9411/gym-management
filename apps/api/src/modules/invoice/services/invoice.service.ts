@@ -1,3 +1,5 @@
+import PDFDocument from 'pdfkit';
+
 import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import type { TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
@@ -93,5 +95,58 @@ export class InvoiceService {
     <p style="font-weight:700;font-size:16px;">Total: ${money(Number(invoice.total))}</p>
   </div>
 </body></html>`;
+  }
+
+  /** Real binary PDF via pdfkit (already a dependency, used by the unrelated Member Invoice module) — same layout, adapted to this model's fields. */
+  async renderPdf(tenantId: string, invoiceId: string, tenantName: string): Promise<Buffer> {
+    const invoice = await this.invoiceRepository.findById(tenantId, invoiceId);
+    if (!invoice) throw new AppError(ErrorCode.NOT_FOUND, 'Invoice not found.', 404);
+
+    const money = (amount: number | string | { toString(): string }) =>
+      new Intl.NumberFormat('en-US', { style: 'currency', currency: invoice.currency }).format(Number(amount.toString()));
+
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 50 });
+      const chunks: Buffer[] = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      doc.fontSize(20).text(`Invoice ${invoice.invoiceNumber}`, { align: 'left' });
+      doc.moveDown(0.5);
+      doc.fontSize(10).fillColor('#6b7280');
+      doc.text(`Billed to: ${tenantName}`);
+      doc.text(`Issued: ${invoice.createdAt.toDateString()}${invoice.dueDate ? `    Due: ${invoice.dueDate.toDateString()}` : ''}`);
+      doc.text(`Status: ${invoice.status}`);
+      doc.moveDown();
+      doc.fillColor('#111827');
+
+      const tableTop = doc.y;
+      doc.fontSize(10).text('Description', 50, tableTop, { width: 260 });
+      doc.text('Qty', 320, tableTop, { width: 50, align: 'right' });
+      doc.text('Unit price', 370, tableTop, { width: 80, align: 'right' });
+      doc.text('Amount', 460, tableTop, { width: 80, align: 'right' });
+      doc.moveTo(50, tableTop + 15).lineTo(540, tableTop + 15).stroke();
+
+      let y = tableTop + 22;
+      for (const item of invoice.items) {
+        doc.text(item.description, 50, y, { width: 260 });
+        doc.text(String(item.quantity), 320, y, { width: 50, align: 'right' });
+        doc.text(money(item.unitPrice), 370, y, { width: 80, align: 'right' });
+        doc.text(money(item.amount), 460, y, { width: 80, align: 'right' });
+        y += 20;
+      }
+
+      y += 10;
+      doc.text(`Subtotal: ${money(invoice.subtotal)}`, 370, y, { width: 170, align: 'right' });
+      y += 16;
+      doc.text(`Discount: -${money(invoice.discountAmount)}`, 370, y, { width: 170, align: 'right' });
+      y += 16;
+      doc.text(`Tax: ${money(invoice.taxAmount)}`, 370, y, { width: 170, align: 'right' });
+      y += 20;
+      doc.fontSize(12).text(`Total: ${money(invoice.total)}`, 370, y, { width: 170, align: 'right' });
+
+      doc.end();
+    });
   }
 }

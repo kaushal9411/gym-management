@@ -3,7 +3,7 @@
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Plus } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Plus, Receipt } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
@@ -101,9 +101,21 @@ export default function InvoicesPage() {
       </Button>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Invoices</h1>
-          <p className="text-muted-foreground">Bills issued to members — auto-generated on payment, or created in advance.</p>
+        <div className="flex items-center gap-3.5">
+          <div
+            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--chart-7) 16%, transparent)',
+              color: 'var(--chart-7)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-7) 18%, transparent)',
+            }}
+          >
+            <Receipt className="size-5" aria-hidden />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Invoices</h1>
+            <p className="text-muted-foreground">Bills issued to members — auto-generated on payment, or created in advance.</p>
+          </div>
         </div>
         {canCreate ? (
           <Button size="sm" asChild>

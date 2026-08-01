@@ -15,12 +15,12 @@ export function StatsGrid() {
   const data = kpis.data;
 
   const stats = [
-    { key: 'attendance', label: "Today's Attendance", icon: UserCheck, value: data?.todaysAttendance },
-    { key: 'active-members', label: 'Active Members', icon: Users, value: data?.activeMembers },
-    { key: 'expiring-memberships', label: 'Expiring Memberships', icon: CalendarClock, value: data?.expiringMemberships },
-    { key: 'new-registrations', label: 'New Members (this month)', icon: UserPlus, value: data?.newMembersThisMonth },
-    { key: 'revenue-summary', label: 'Monthly Revenue', icon: Wallet, value: data ? `$${data.monthlyRevenue}` : undefined },
-    { key: 'pending-payments', label: 'Outstanding Payments', icon: Clock3, value: data ? `$${data.outstandingPayments}` : undefined },
+    { key: 'attendance', label: "Today's Attendance", icon: UserCheck, value: data?.todaysAttendance, tone: 'orange' },
+    { key: 'active-members', label: 'Active Members', icon: Users, value: data?.activeMembers, tone: 'primary' },
+    { key: 'expiring-memberships', label: 'Expiring Memberships', icon: CalendarClock, value: data?.expiringMemberships, tone: 'warning' },
+    { key: 'new-registrations', label: 'New Members (this month)', icon: UserPlus, value: data?.newMembersThisMonth, tone: 'aqua' },
+    { key: 'revenue-summary', label: 'Monthly Revenue', icon: Wallet, value: data ? `$${data.monthlyRevenue}` : undefined, tone: 'success' },
+    { key: 'pending-payments', label: 'Outstanding Payments', icon: Clock3, value: data ? `$${data.outstandingPayments}` : undefined, tone: 'violet' },
   ] as const;
 
   if (!hasPermission('reports:view')) return null;
@@ -28,7 +28,7 @@ export function StatsGrid() {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {stats.map((stat) => (
-        <StatisticCard key={stat.key} label={stat.label} value={stat.value ?? '—'} icon={stat.icon} loading={kpis.isPending} />
+        <StatisticCard key={stat.key} label={stat.label} value={stat.value ?? '—'} icon={stat.icon} tone={stat.tone} loading={kpis.isPending} />
       ))}
     </div>
   );

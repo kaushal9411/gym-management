@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, CalendarCheck, IdCard } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -647,7 +647,15 @@ export default function MemberDetailPage() {
 
       <Card id="membership">
         <CardHeader>
-          <CardTitle className="text-base">Membership</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <span
+              className="flex size-7 shrink-0 items-center justify-center rounded-full"
+              style={{ backgroundColor: 'color-mix(in oklch, var(--chart-7) 16%, transparent)', color: 'var(--chart-7)' }}
+            >
+              <IdCard className="size-3.5" aria-hidden />
+            </span>
+            Membership
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {data.currentMembership ? (
@@ -734,7 +742,15 @@ export default function MemberDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Attendance</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <span
+              className="flex size-7 shrink-0 items-center justify-center rounded-full"
+              style={{ backgroundColor: 'color-mix(in oklch, var(--success) 16%, transparent)', color: 'var(--success)' }}
+            >
+              <CalendarCheck className="size-3.5" aria-hidden />
+            </span>
+            Attendance
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">

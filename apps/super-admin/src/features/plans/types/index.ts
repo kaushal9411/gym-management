@@ -26,6 +26,15 @@ export interface Plan {
   _count?: { subscriptions: number };
 }
 
+export interface PlanSubscriber {
+  id: string;
+  status: string;
+  billingCycle: string;
+  currentPeriodEnd: string | null;
+  createdAt: string;
+  tenant: { id: string; name: string; slug: string; status: string };
+}
+
 export interface UpsertPlanInput {
   slug: string;
   name: string;

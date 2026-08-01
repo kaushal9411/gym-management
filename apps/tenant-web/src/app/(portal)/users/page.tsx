@@ -4,7 +4,7 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useSubmitHandler } from '@/hooks/use-submit-handler';
 import * as React from 'react';
 import Link from 'next/link';
-import { Download, MoreHorizontal, Upload, UserPlus, Users } from 'lucide-react';
+import { Download, MoreHorizontal, Upload, UserCog, UserPlus, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -214,9 +214,21 @@ export default function UsersPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Staff &amp; Access</h1>
-          <p className="text-muted-foreground">Manage your team, their roles, and what they can do.</p>
+        <div className="flex items-center gap-3.5">
+          <span
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-11"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--primary) 16%, transparent)',
+              color: 'var(--primary)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent)',
+            }}
+          >
+            <UserCog className="size-5" aria-hidden />
+          </span>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Staff &amp; Access</h1>
+            <p className="text-muted-foreground">Manage your team, their roles, and what they can do.</p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {hasPermission('users:export') ? (

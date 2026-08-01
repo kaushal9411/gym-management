@@ -15,6 +15,18 @@ export function usePlans() {
   return useQuery({ queryKey: ['admin', 'plans'], queryFn: () => adminPlanService.list() });
 }
 
+export function usePlanById(id: string) {
+  return useQuery({ queryKey: ['admin', 'plans', id], queryFn: () => adminPlanService.getById(id), enabled: !!id });
+}
+
+export function usePlanSubscribers(id: string, params: { page: number; limit: number }) {
+  return useQuery({
+    queryKey: ['admin', 'plans', id, 'subscribers', params],
+    queryFn: () => adminPlanService.subscribers(id, params),
+    enabled: !!id,
+  });
+}
+
 export function useCreatePlan() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { LifeBuoy } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { DataTable, type DataTableColumn } from '@/components/data-table';
@@ -40,9 +41,21 @@ export default function SupportPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Support Tickets</h1>
-        <p className="text-muted-foreground">View, assign, and resolve support requests.</p>
+      <div className="flex items-center gap-3">
+        <div
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+          style={{
+            backgroundColor: 'color-mix(in oklch, var(--chart-4) 16%, transparent)',
+            color: 'var(--chart-4)',
+            boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-4) 18%, transparent)',
+          }}
+        >
+          <LifeBuoy className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Support Tickets</h1>
+          <p className="text-muted-foreground">View, assign, and resolve support requests.</p>
+        </div>
       </div>
 
       <select

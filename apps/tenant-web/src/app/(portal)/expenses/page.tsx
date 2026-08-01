@@ -3,7 +3,7 @@
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
-import { Download, MoreHorizontal, Plus, Upload } from 'lucide-react';
+import { Download, MoreHorizontal, Plus, TrendingDown, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -122,9 +122,21 @@ export default function ExpensesPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Expenses</h1>
-          <p className="text-muted-foreground">The gym&apos;s expense ledger — rent, salaries, utilities, and more.</p>
+        <div className="flex items-center gap-3.5">
+          <div
+            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--warning) 16%, transparent)',
+              color: 'var(--warning)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--warning) 18%, transparent)',
+            }}
+          >
+            <TrendingDown className="size-5" aria-hidden />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Expenses</h1>
+            <p className="text-muted-foreground">The gym&apos;s expense ledger — rent, salaries, utilities, and more.</p>
+          </div>
         </div>
         {canManage ? (
           <Button size="sm" asChild>

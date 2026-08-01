@@ -85,6 +85,22 @@ export class AdminPlanRepository {
   async countActiveSubscriptions(id: string): Promise<number> {
     return prisma.subscription.count({ where: { planId: id, status: { in: ['ACTIVE', 'TRIALING'] } } });
   }
+
+  /** Tenants currently on this plan — one Subscription row per tenant (upgrade/downgrade mutates the existing row's planId rather than inserting a new one, see `SubscriptionService.checkout()`), so this is genuinely "who's on this plan right now," not history. */
+  async subscribers(planId: string, skip: number, take: number) {
+    const where = { planId };
+    const [total, items] = await Promise.all([
+      prisma.subscription.count({ where }),
+      prisma.subscription.findMany({
+        where,
+        include: { tenant: { select: { id: true, name: true, slug: true, status: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+    ]);
+    return { total, items };
+  }
 }
 
 export const adminPlanRepository = new AdminPlanRepository();

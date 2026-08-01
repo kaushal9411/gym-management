@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { QrCode, UserCheck } from 'lucide-react';
+import { CalendarCheck, QrCode, UserCheck } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,9 +34,21 @@ export default function AttendanceDashboardPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Attendance</h1>
-          <p className="text-muted-foreground">Who&apos;s checked in, and how the gym trends over time.</p>
+        <div className="flex items-center gap-3.5">
+          <div
+            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--success) 16%, transparent)',
+              color: 'var(--success)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--success) 18%, transparent)',
+            }}
+          >
+            <CalendarCheck className="size-5" aria-hidden />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Attendance</h1>
+            <p className="text-muted-foreground">Who&apos;s checked in, and how the gym trends over time.</p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>

@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { toast } from 'sonner';
+import { Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -205,9 +206,14 @@ export default function RolesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Roles & Admins</h1>
-        <p className="text-muted-foreground">System + custom roles, permissions, and admin staff accounts.</p>
+      <div className="flex items-center gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+          <Users className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Roles & Admins</h1>
+          <p className="text-muted-foreground">System + custom roles, permissions, and admin staff accounts.</p>
+        </div>
       </div>
 
       <div className="flex gap-1 border-b">

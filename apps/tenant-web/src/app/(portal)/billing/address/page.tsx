@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Receipt } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -70,9 +71,21 @@ export default function BillingAddressPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Billing & Subscription</h1>
-        <p className="text-muted-foreground">Manage your FitCloud plan, payment, and invoices.</p>
+      <div className="flex items-center gap-3.5">
+        <div
+          className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
+          style={{
+            backgroundColor: 'color-mix(in oklch, var(--chart-3) 16%, transparent)',
+            color: 'var(--chart-3)',
+            boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-3) 18%, transparent)',
+          }}
+        >
+          <Receipt className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Billing & Subscription</h1>
+          <p className="text-muted-foreground">Manage your FitCloud plan, payment, and invoices.</p>
+        </div>
       </div>
 
       <BillingNav />

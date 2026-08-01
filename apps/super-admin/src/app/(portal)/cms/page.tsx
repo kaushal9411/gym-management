@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { toast } from 'sonner';
+import { FileText } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -84,9 +85,21 @@ export default function CmsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">CMS</h1>
-          <p className="text-muted-foreground">Landing page content, blogs, FAQs, testimonials, and legal pages.</p>
+        <div className="flex items-center gap-3">
+          <div
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--chart-5) 16%, transparent)',
+              color: 'var(--chart-5)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-5) 18%, transparent)',
+            }}
+          >
+            <FileText className="size-5" aria-hidden />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">CMS</h1>
+            <p className="text-muted-foreground">Landing page content, blogs, FAQs, testimonials, and legal pages.</p>
+          </div>
         </div>
         <Button onClick={() => { setForm(EMPTY_FORM); setCreating(true); }}>Create page</Button>
       </div>

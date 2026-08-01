@@ -1,5 +1,6 @@
 import { apiClient, toAdminServiceError } from '@/features/auth/services/api-client';
-import type { Plan, UpsertPlanInput } from '../types';
+import type { PaginatedResult } from '@/features/payments/types';
+import type { Plan, PlanSubscriber, UpsertPlanInput } from '../types';
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -11,6 +12,24 @@ class AdminPlanService {
   async list(): Promise<Plan[]> {
     try {
       const res = await apiClient.get<ApiEnvelope<Plan[]>>('/admin/plans');
+      return res.data.data;
+    } catch (error) {
+      throw toAdminServiceError(error);
+    }
+  }
+
+  async getById(id: string): Promise<Plan> {
+    try {
+      const res = await apiClient.get<ApiEnvelope<Plan>>(`/admin/plans/${id}`);
+      return res.data.data;
+    } catch (error) {
+      throw toAdminServiceError(error);
+    }
+  }
+
+  async subscribers(id: string, params: { page: number; limit: number }): Promise<PaginatedResult<PlanSubscriber>> {
+    try {
+      const res = await apiClient.get<ApiEnvelope<PaginatedResult<PlanSubscriber>>>(`/admin/plans/${id}/subscribers`, { params });
       return res.data.data;
     } catch (error) {
       throw toAdminServiceError(error);

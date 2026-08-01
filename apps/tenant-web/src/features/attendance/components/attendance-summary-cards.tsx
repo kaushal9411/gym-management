@@ -17,16 +17,16 @@ interface AttendanceSummaryCardsProps {
 
 export function AttendanceSummaryCards({ summary, loading }: AttendanceSummaryCardsProps) {
   const cards = [
-    { key: 'check-ins', label: 'Check-ins today', icon: LogIn, value: summary?.totalCheckInsToday ?? 0 },
-    { key: 'check-outs', label: 'Check-outs today', icon: LogOut, value: summary?.totalCheckOutsToday ?? 0 },
-    { key: 'inside', label: 'Currently inside', icon: DoorOpen, value: summary?.currentlyInside ?? 0 },
-    { key: 'peak', label: 'Peak check-in time', icon: Clock3, value: summary ? formatHour(summary.peakCheckInHour) : '—' },
-  ];
+    { key: 'check-ins', label: 'Check-ins today', icon: LogIn, value: summary?.totalCheckInsToday ?? 0, tone: 'success' },
+    { key: 'check-outs', label: 'Check-outs today', icon: LogOut, value: summary?.totalCheckOutsToday ?? 0, tone: 'orange' },
+    { key: 'inside', label: 'Currently inside', icon: DoorOpen, value: summary?.currentlyInside ?? 0, tone: 'primary' },
+    { key: 'peak', label: 'Peak check-in time', icon: Clock3, value: summary ? formatHour(summary.peakCheckInHour) : '—', tone: 'aqua' },
+  ] as const;
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {cards.map((card) => (
-        <StatisticCard key={card.key} label={card.label} value={card.value} icon={card.icon} loading={loading} />
+        <StatisticCard key={card.key} label={card.label} value={card.value} icon={card.icon} tone={card.tone} loading={loading} />
       ))}
     </div>
   );

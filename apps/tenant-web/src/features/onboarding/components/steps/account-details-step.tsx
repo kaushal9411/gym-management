@@ -31,7 +31,7 @@ const COMMON_TIMEZONES = [
 ] as const;
 
 const selectClassName = cn(
-  'flex h-10 w-full items-center rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150',
+  'flex h-10 w-full items-center rounded-lg border border-input bg-background px-3.5 py-2 text-sm text-foreground shadow-xs transition-all duration-150',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
   'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted/40',
 );
@@ -125,12 +125,12 @@ export function AccountDetailsStep() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="ownerFirstName" required>Your first name</Label>
-          <Input id="ownerFirstName" autoComplete="given-name" invalid={!!fieldError('ownerFirstName')} disabled={isSubmitting} {...form.register('ownerFirstName')} />
+          <Input id="ownerFirstName" placeholder="Jamie" autoComplete="given-name" invalid={!!fieldError('ownerFirstName')} disabled={isSubmitting} {...form.register('ownerFirstName')} />
           {fieldError('ownerFirstName') ? <p role="alert" className="text-xs text-destructive">{fieldError('ownerFirstName')}</p> : null}
         </div>
         <div className="space-y-2">
           <Label htmlFor="ownerLastName" required>Your last name</Label>
-          <Input id="ownerLastName" autoComplete="family-name" invalid={!!fieldError('ownerLastName')} disabled={isSubmitting} {...form.register('ownerLastName')} />
+          <Input id="ownerLastName" placeholder="Rivera" autoComplete="family-name" invalid={!!fieldError('ownerLastName')} disabled={isSubmitting} {...form.register('ownerLastName')} />
           {fieldError('ownerLastName') ? <p role="alert" className="text-xs text-destructive">{fieldError('ownerLastName')}</p> : null}
         </div>
       </div>
@@ -158,12 +158,12 @@ export function AccountDetailsStep() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="state" required>State / region</Label>
-          <Input id="state" invalid={!!fieldError('state')} disabled={isSubmitting} {...form.register('state')} />
+          <Input id="state" placeholder="Delhi" invalid={!!fieldError('state')} disabled={isSubmitting} {...form.register('state')} />
           {fieldError('state') ? <p role="alert" className="text-xs text-destructive">{fieldError('state')}</p> : null}
         </div>
         <div className="space-y-2">
           <Label htmlFor="city" required>City</Label>
-          <Input id="city" invalid={!!fieldError('city')} disabled={isSubmitting} {...form.register('city')} />
+          <Input id="city" placeholder="New Delhi" invalid={!!fieldError('city')} disabled={isSubmitting} {...form.register('city')} />
           {fieldError('city') ? <p role="alert" className="text-xs text-destructive">{fieldError('city')}</p> : null}
         </div>
       </div>
@@ -186,12 +186,12 @@ export function AccountDetailsStep() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="numberOfBranches">Number of branches (optional)</Label>
-          <Input id="numberOfBranches" type="number" min={1} invalid={!!fieldError('numberOfBranches')} disabled={isSubmitting} {...form.register('numberOfBranches')} />
+          <Input id="numberOfBranches" type="number" min={1} placeholder="1" invalid={!!fieldError('numberOfBranches')} disabled={isSubmitting} {...form.register('numberOfBranches')} />
           {fieldError('numberOfBranches') ? <p role="alert" className="text-xs text-destructive">{fieldError('numberOfBranches')}</p> : null}
         </div>
         <div className="space-y-2">
           <Label htmlFor="expectedMembers">Expected members (optional)</Label>
-          <Input id="expectedMembers" type="number" min={1} invalid={!!fieldError('expectedMembers')} disabled={isSubmitting} {...form.register('expectedMembers')} />
+          <Input id="expectedMembers" type="number" min={1} placeholder="100" invalid={!!fieldError('expectedMembers')} disabled={isSubmitting} {...form.register('expectedMembers')} />
           {fieldError('expectedMembers') ? <p role="alert" className="text-xs text-destructive">{fieldError('expectedMembers')}</p> : null}
         </div>
       </div>
@@ -199,11 +199,11 @@ export function AccountDetailsStep() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="gstNumber">GST / tax number (optional)</Label>
-          <Input id="gstNumber" disabled={isSubmitting} {...form.register('gstNumber')} />
+          <Input id="gstNumber" placeholder="07AAACG1234B1Z5" disabled={isSubmitting} {...form.register('gstNumber')} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="businessRegistrationNumber">Business registration number (optional)</Label>
-          <Input id="businessRegistrationNumber" disabled={isSubmitting} {...form.register('businessRegistrationNumber')} />
+          <Input id="businessRegistrationNumber" placeholder="U74999DL2020PTC123456" disabled={isSubmitting} {...form.register('businessRegistrationNumber')} />
         </div>
       </div>
 
@@ -252,7 +252,7 @@ export function AccountDetailsStep() {
         )}
       />
 
-      <LoadingButton type="submit" className="w-full" loading={isSubmitting} loadingText="Creating your account…">
+      <LoadingButton type="submit" className="onboarding-cta w-full" loading={isSubmitting} loadingText="Creating your account…">
         Continue
       </LoadingButton>
     </form>

@@ -1,24 +1,24 @@
 'use client';
 
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  AlertTriangle,
+  Building2,
+  CircleCheck,
+  Clock3,
+  Gauge,
+  TrendingUp,
+  Wallet,
+  XCircle,
+} from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StatisticCard } from '@/components/ui/statistic-card';
 import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard';
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
-}
-
-function StatCard({ label, value, tone }: { label: string; value: string | number; tone?: 'default' | 'success' | 'destructive' }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className={`mt-1 text-2xl font-bold ${tone === 'success' ? 'text-success' : tone === 'destructive' ? 'text-destructive' : ''}`}>{value}</p>
-      </CardContent>
-    </Card>
-  );
 }
 
 export default function DashboardPage() {
@@ -34,20 +34,38 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">Platform-wide overview across every tenant.</p>
+      <div
+        className="flex items-center gap-3.5 rounded-2xl border p-5"
+        style={{
+          backgroundImage:
+            'linear-gradient(120deg, color-mix(in oklch, var(--primary) 12%, transparent) 0%, color-mix(in oklch, var(--chart-2) 9%, transparent) 60%, color-mix(in oklch, var(--chart-3) 8%, transparent) 100%)',
+        }}
+      >
+        <div
+          className="hidden size-11 shrink-0 items-center justify-center rounded-xl sm:flex"
+          style={{
+            backgroundColor: 'color-mix(in oklch, var(--primary) 16%, transparent)',
+            color: 'var(--primary)',
+            boxShadow: '0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent)',
+          }}
+        >
+          <Gauge className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground">Platform-wide overview across every tenant.</p>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total tenants" value={stats.totals.totalTenants} />
-        <StatCard label="Active tenants" value={stats.totals.activeTenants} tone="success" />
-        <StatCard label="Trial tenants" value={stats.totals.trialTenants} />
-        <StatCard label="Expired / suspended" value={stats.totals.expiredTenants} tone="destructive" />
-        <StatCard label="Monthly revenue" value={formatMoney(stats.revenue.monthly)} tone="success" />
-        <StatCard label="Yearly revenue" value={formatMoney(stats.revenue.yearly)} />
-        <StatCard label="Pending payments" value={stats.revenue.pendingPayments} />
-        <StatCard label="Failed payments" value={stats.revenue.failedPayments} tone="destructive" />
+        <StatisticCard label="Total tenants" value={stats.totals.totalTenants} icon={Building2} tone="primary" />
+        <StatisticCard label="Active tenants" value={stats.totals.activeTenants} icon={CircleCheck} tone="success" />
+        <StatisticCard label="Trial tenants" value={stats.totals.trialTenants} icon={Clock3} tone="aqua" />
+        <StatisticCard label="Expired / suspended" value={stats.totals.expiredTenants} icon={AlertTriangle} tone="destructive" />
+        <StatisticCard label="Monthly revenue" value={formatMoney(stats.revenue.monthly)} icon={Wallet} tone="success" />
+        <StatisticCard label="Yearly revenue" value={formatMoney(stats.revenue.yearly)} icon={TrendingUp} tone="violet" />
+        <StatisticCard label="Pending payments" value={stats.revenue.pendingPayments} icon={Clock3} tone="warning" />
+        <StatisticCard label="Failed payments" value={stats.revenue.failedPayments} icon={XCircle} tone="destructive" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -60,14 +78,14 @@ export default function DashboardPage() {
               <AreaChart data={stats.growthChart}>
                 <defs>
                   <linearGradient id="growthFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                    <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.4} />
+                    <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(d: string) => d.slice(5)} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={28} />
                 <Tooltip />
-                <Area type="monotone" dataKey="count" stroke="var(--primary)" fill="url(#growthFill)" strokeWidth={2} />
+                <Area type="monotone" dataKey="count" stroke="var(--chart-1)" fill="url(#growthFill)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>

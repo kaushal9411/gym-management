@@ -1,5 +1,7 @@
 'use client';
 
+import { ToggleLeft } from 'lucide-react';
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFeatureFlags, useSetFeatureFlag } from '@/features/feature-flags/hooks/use-feature-flags';
@@ -25,9 +27,21 @@ export default function FeatureFlagsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Feature Flags</h1>
-        <p className="text-muted-foreground">Enable or disable modules globally, across every tenant.</p>
+      <div className="flex items-center gap-3">
+        <div
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+          style={{
+            backgroundColor: 'color-mix(in oklch, var(--chart-7) 16%, transparent)',
+            color: 'var(--chart-7)',
+            boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-7) 18%, transparent)',
+          }}
+        >
+          <ToggleLeft className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Feature Flags</h1>
+          <p className="text-muted-foreground">Enable or disable modules globally, across every tenant.</p>
+        </div>
       </div>
 
       {Object.entries(grouped).map(([category, categoryFlags]) => (

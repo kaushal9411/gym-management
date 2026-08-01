@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -178,9 +178,21 @@ export default function AttendanceCheckInPage() {
           <ArrowLeft className="size-4" /> Back to attendance
         </Link>
       </Button>
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Check in / Check out</h1>
-        <p className="text-muted-foreground">Scan a member&apos;s QR code, or search for them manually.</p>
+      <div className="flex items-center gap-3.5">
+        <div
+          className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
+          style={{
+            backgroundColor: 'color-mix(in oklch, var(--success) 16%, transparent)',
+            color: 'var(--success)',
+            boxShadow: '0 0 0 1px color-mix(in oklch, var(--success) 18%, transparent)',
+          }}
+        >
+          <QrCode className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Check in / Check out</h1>
+          <p className="text-muted-foreground">Scan a member&apos;s QR code, or search for them manually.</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

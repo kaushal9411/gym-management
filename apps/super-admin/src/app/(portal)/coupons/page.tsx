@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { toast } from 'sonner';
+import { Ticket } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -68,9 +69,21 @@ export default function CouponsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Coupons</h1>
-          <p className="text-muted-foreground">Discount codes — percentage, fixed amount, or trial extension.</p>
+        <div className="flex items-center gap-3">
+          <div
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--chart-5) 16%, transparent)',
+              color: 'var(--chart-5)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-5) 18%, transparent)',
+            }}
+          >
+            <Ticket className="size-5" aria-hidden />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Coupons</h1>
+            <p className="text-muted-foreground">Discount codes — percentage, fixed amount, or trial extension.</p>
+          </div>
         </div>
         <Button onClick={() => setCreating(true)}>Create coupon</Button>
       </div>

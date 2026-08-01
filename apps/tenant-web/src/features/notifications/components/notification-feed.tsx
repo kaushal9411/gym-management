@@ -9,7 +9,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { formatRelativeTime } from '@/lib/format-relative-time';
 import { cn } from '@/lib/utils';
 import { CATEGORY_ICON, NOTIFICATION_TABS, type NotificationFilterTab } from '../constants';
-import type { TenantNotification } from '../types';
+import type { NotificationCategory, TenantNotification } from '../types';
+
+/**
+ * Subtle per-category tint for the icon circle — kept to the handful of
+ * categories members see most often so a dense feed doesn't turn into a
+ * rainbow; everything else keeps the original neutral `bg-muted` treatment.
+ */
+const CATEGORY_TONE_VAR: Partial<Record<NotificationCategory, string>> = {
+  PAYMENT: 'var(--success)',
+  ATTENDANCE: 'var(--chart-3)',
+  ANNOUNCEMENT: 'var(--chart-2)',
+};
 
 interface NotificationFeedProps {
   tab: NotificationFilterTab;
@@ -58,6 +69,7 @@ export function NotificationFeed({ tab, onTabChange, items, isLoading, onMarkRea
         ) : (
           items.map((notification) => {
             const Icon = CATEGORY_ICON[notification.category];
+            const toneVar = CATEGORY_TONE_VAR[notification.category];
             return (
               <div
                 key={notification.id}
@@ -74,9 +86,15 @@ export function NotificationFeed({ tab, onTabChange, items, isLoading, onMarkRea
                 >
                   <span
                     className={cn(
-                      'mt-0.5 flex shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground',
+                      'mt-0.5 flex shrink-0 items-center justify-center rounded-full',
                       compact ? 'size-8' : 'size-9',
+                      !toneVar && 'bg-muted text-muted-foreground',
                     )}
+                    style={
+                      toneVar
+                        ? { backgroundColor: `color-mix(in oklch, ${toneVar} 16%, transparent)`, color: toneVar }
+                        : undefined
+                    }
                   >
                     <Icon className={compact ? 'size-4' : 'size-4.5'} />
                   </span>

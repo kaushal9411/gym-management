@@ -3,7 +3,7 @@
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Download, MoreHorizontal } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, CalendarCheck, Download, MoreHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -212,14 +212,26 @@ export default function AttendanceHistoryPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <Button variant="ghost" size="sm" asChild className="-ml-2 mb-1">
-            <Link href="/attendance">
-              <ArrowLeft className="size-4" /> Back to attendance
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-semibold tracking-tight">Attendance history</h1>
-          <p className="text-muted-foreground">Every check-in and check-out, searchable and filterable.</p>
+        <div className="flex items-center gap-3.5">
+          <div
+            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--success) 16%, transparent)',
+              color: 'var(--success)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--success) 18%, transparent)',
+            }}
+          >
+            <CalendarCheck className="size-5" aria-hidden />
+          </div>
+          <div>
+            <Button variant="ghost" size="sm" asChild className="-ml-2 mb-1">
+              <Link href="/attendance">
+                <ArrowLeft className="size-4" /> Back to attendance
+              </Link>
+            </Button>
+            <h1 className="text-2xl font-semibold tracking-tight">Attendance history</h1>
+            <p className="text-muted-foreground">Every check-in and check-out, searchable and filterable.</p>
+          </div>
         </div>
         {canExport ? (
           <div className="flex gap-2">

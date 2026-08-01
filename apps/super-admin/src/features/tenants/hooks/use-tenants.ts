@@ -23,6 +23,22 @@ export function useTenantAuditLogs(tenantId: string) {
   return useQuery({ queryKey: ['admin', 'tenants', tenantId, 'audit'], queryFn: () => adminTenantService.auditLogs(tenantId), enabled: !!tenantId });
 }
 
+export function useTenantPayments(tenantId: string, params: { page: number; limit: number }) {
+  return useQuery({
+    queryKey: ['admin', 'tenants', tenantId, 'payments', params],
+    queryFn: () => adminTenantService.payments(tenantId, params),
+    enabled: !!tenantId,
+  });
+}
+
+export function useTenantInvoices(tenantId: string, params: { page: number; limit: number }) {
+  return useQuery({
+    queryKey: ['admin', 'tenants', tenantId, 'invoices', params],
+    queryFn: () => adminTenantService.invoices(tenantId, params),
+    enabled: !!tenantId,
+  });
+}
+
 function useTenantMutation(fn: (tenantId: string) => Promise<unknown>) {
   const queryClient = useQueryClient();
   return useMutation({

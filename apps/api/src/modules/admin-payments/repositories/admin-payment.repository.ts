@@ -3,8 +3,8 @@ import type { PaymentStatus } from '@prisma/client';
 import { prisma } from '../../../infrastructure/database/prisma';
 
 export class AdminPaymentRepository {
-  async list(params: { status?: PaymentStatus; skip: number; take: number }) {
-    const where = params.status ? { status: params.status } : {};
+  async list(params: { tenantId?: string; status?: PaymentStatus; skip: number; take: number }) {
+    const where = { ...(params.tenantId ? { tenantId: params.tenantId } : {}), ...(params.status ? { status: params.status } : {}) };
     const [total, items] = await Promise.all([
       prisma.payment.count({ where }),
       prisma.payment.findMany({
@@ -25,10 +25,12 @@ export class AdminPaymentRepository {
     });
   }
 
-  async listInvoices(params: { skip: number; take: number }) {
+  async listInvoices(params: { tenantId?: string; skip: number; take: number }) {
+    const where = params.tenantId ? { tenantId: params.tenantId } : {};
     const [total, items] = await Promise.all([
-      prisma.invoice.count(),
+      prisma.invoice.count({ where }),
       prisma.invoice.findMany({
+        where,
         include: { tenant: { select: { name: true, slug: true } } },
         orderBy: { createdAt: 'desc' },
         skip: params.skip,

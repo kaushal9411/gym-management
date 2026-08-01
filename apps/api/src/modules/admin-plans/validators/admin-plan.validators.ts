@@ -34,3 +34,8 @@ export const setPlanActiveSchema = z.object({
 export const planIdParamSchema = z.object({
   planId: z.string().uuid(),
 });
+
+export const planSubscribersQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+});

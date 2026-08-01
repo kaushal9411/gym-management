@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { Sparkles } from 'lucide-react';
 
 import { CardSkeleton } from '@/components/ui/card-skeleton';
 import { AnnouncementsWidget } from '@/features/dashboard/components/announcements-widget';
@@ -37,10 +38,28 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Welcome, {user?.name?.split(' ')[0]}</h1>
-          <p className="mt-1 text-muted-foreground">Here&apos;s what&apos;s happening at your gym today.</p>
+      <div
+        className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border p-5 sm:p-6"
+        style={{
+          backgroundImage:
+            'linear-gradient(120deg, color-mix(in oklch, var(--primary) 12%, transparent) 0%, color-mix(in oklch, var(--chart-2) 9%, transparent) 60%, color-mix(in oklch, var(--chart-3) 8%, transparent) 100%)',
+        }}
+      >
+        <div className="flex items-center gap-3.5">
+          <div
+            className="hidden size-11 shrink-0 items-center justify-center rounded-xl sm:flex"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--primary) 16%, transparent)',
+              color: 'var(--primary)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent)',
+            }}
+          >
+            <Sparkles className="size-5" aria-hidden />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Welcome, {user?.name?.split(' ')[0]}</h1>
+            <p className="mt-1 text-muted-foreground">Here&apos;s what&apos;s happening at your gym today.</p>
+          </div>
         </div>
         <DateRangeSelector />
       </div>

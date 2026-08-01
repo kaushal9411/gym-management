@@ -1,19 +1,15 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { CreditCard, Users } from 'lucide-react';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DataTable, type DataTableColumn } from '@/components/data-table';
+import { PlanFormDialog } from '@/features/plans/components/plan-form-dialog';
 import { toPlanError, useCreatePlan, useDeletePlan, usePlans, useSetPlanActive, useUpdatePlan } from '@/features/plans/hooks/use-plans';
 import type { Plan, UpsertPlanInput } from '@/features/plans/types';
 
@@ -36,20 +32,28 @@ const EMPTY_FORM: UpsertPlanInput = {
   features: [],
 };
 
+function formatMoney(amount: string, currency: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 0 }).format(Number(amount));
+  } catch {
+    return `${currency} ${amount}`;
+  }
+}
+
 export default function PlansPage() {
+  const router = useRouter();
   const { data: plans, isLoading } = usePlans();
   const createPlan = useCreatePlan();
   const updatePlan = useUpdatePlan();
   const setActive = useSetPlanActive();
   const deletePlan = useDeletePlan();
 
-  const [editing, setEditing] = React.useState<Plan | null>(null);
-  const [creating, setCreating] = React.useState(false);
+  const [dialogMode, setDialogMode] = React.useState<'create' | Plan | null>(null);
   const [form, setForm] = React.useState<UpsertPlanInput>(EMPTY_FORM);
 
   const openCreate = () => {
     setForm(EMPTY_FORM);
-    setCreating(true);
+    setDialogMode('create');
   };
 
   const openEdit = (plan: Plan) => {
@@ -71,25 +75,25 @@ export default function PlansPage() {
       sortOrder: plan.sortOrder,
       features: plan.features,
     });
-    setEditing(plan);
+    setDialogMode(plan);
   };
 
   const submit = () => {
-    if (creating) {
+    if (dialogMode === 'create') {
       createPlan.mutate(form, {
         onSuccess: () => {
           toast.success('Plan created');
-          setCreating(false);
+          setDialogMode(null);
         },
         onError: (err) => toast.error(toPlanError(err).message),
       });
-    } else if (editing) {
+    } else if (dialogMode) {
       updatePlan.mutate(
-        { id: editing.id, input: form },
+        { id: dialogMode.id, input: form },
         {
           onSuccess: () => {
             toast.success('Plan updated');
-            setEditing(null);
+            setDialogMode(null);
           },
           onError: (err) => toast.error(toPlanError(err).message),
         },
@@ -97,96 +101,102 @@ export default function PlansPage() {
     }
   };
 
-  const columns: DataTableColumn<Plan>[] = [
-    { key: 'name', header: 'Plan', render: (p) => <span className="font-medium">{p.name}</span> },
-    { key: 'slug', header: 'Slug', render: (p) => p.slug },
-    { key: 'price', header: 'Price (mo/yr)', render: (p) => `${p.currency} ${p.priceMonthly} / ${p.priceYearly}` },
-    { key: 'trial', header: 'Trial', render: (p) => `${p.trialDays}d` },
-    { key: 'subs', header: 'Active subs', render: (p) => p._count?.subscriptions ?? 0 },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (p) => (
-        <button
-          onClick={() => setActive.mutate({ id: p.id, isActive: !p.isActive })}
-          className={`rounded-full px-2 py-0.5 text-xs font-medium ${p.isActive ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}
-        >
-          {p.isActive ? 'Active' : 'Disabled'}
-        </button>
-      ),
-    },
-    {
-      key: 'actions',
-      header: '',
-      render: (p) => (
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => openEdit(p)}>Edit</Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={() => {
-              if (!window.confirm(`Delete ${p.name}?`)) return;
-              deletePlan.mutate(p.id, { onError: (err) => toast.error(toPlanError(err).message) });
-            }}
-          >
-            Delete
-          </Button>
-        </div>
-      ),
-    },
-  ];
-
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Plans</h1>
-          <p className="text-muted-foreground">Subscription plan catalog — pricing, limits, features, trial days.</p>
+        <div className="flex items-center gap-3">
+          <div
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--chart-7) 16%, transparent)',
+              color: 'var(--chart-7)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-7) 18%, transparent)',
+            }}
+          >
+            <CreditCard className="size-5" aria-hidden />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Plans</h1>
+            <p className="text-muted-foreground">Subscription plan catalog — click a plan for full details, subscribers, and upgrade/downgrade tools.</p>
+          </div>
         </div>
         <Button onClick={openCreate}>Create plan</Button>
       </div>
 
-      {isLoading || !plans ? <Skeleton className="h-72 rounded-xl" /> : <DataTable columns={columns} rows={plans} rowKey={(p) => p.id} />}
+      {isLoading || !plans ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-80 rounded-xl" />)}
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {plans.map((p) => (
+            <Card
+              key={p.id}
+              role="link"
+              tabIndex={0}
+              onClick={() => router.push(`/plans/${p.id}`)}
+              onKeyDown={(e) => e.key === 'Enter' && router.push(`/plans/${p.id}`)}
+              className="cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <CardHeader className="space-y-3">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-lg font-semibold">{p.name}</p>
+                    <p className="text-xs text-muted-foreground">{p.slug}</p>
+                  </div>
+                  <Badge
+                    variant={p.isActive ? 'success' : 'secondary'}
+                    className="cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActive.mutate({ id: p.id, isActive: !p.isActive });
+                    }}
+                  >
+                    {p.isActive ? 'Active' : 'Disabled'}
+                  </Badge>
+                </div>
+                <div>
+                  <span className="text-3xl font-bold tracking-tight">{formatMoney(p.priceMonthly, p.currency)}</span>
+                  <span className="text-sm text-muted-foreground">/mo</span>
+                  <span className="ml-2 text-xs text-muted-foreground">or {formatMoney(p.priceYearly, p.currency)}/yr</span>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {p.description ? <p className="text-sm text-muted-foreground">{p.description}</p> : null}
+                <div className="flex items-center gap-1.5 text-sm">
+                  <Users className="size-4 text-muted-foreground" />
+                  <span className="font-medium">{p._count?.subscriptions ?? 0}</span>
+                  <span className="text-muted-foreground">tenant{(p._count?.subscriptions ?? 0) === 1 ? '' : 's'} subscribed</span>
+                </div>
+                <p className="text-xs text-muted-foreground">{p.trialDays}-day trial · up to {p.maxBranches} branch{p.maxBranches === 1 ? '' : 'es'} · {p.maxMembers} members</p>
 
-      <Dialog open={creating || !!editing} onOpenChange={(open) => !open && (setCreating(false), setEditing(null))}>
-        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{creating ? 'Create plan' : `Edit ${editing?.name}`}</DialogTitle>
-          </DialogHeader>
+                <div className="flex gap-2 border-t pt-3" onClick={(e) => e.stopPropagation()}>
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => openEdit(p)}>Edit</Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => {
+                      if (!window.confirm(`Delete ${p.name}?`)) return;
+                      deletePlan.mutate(p.id, { onError: (err) => toast.error(toPlanError(err).message) });
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><Label>Slug</Label><Input value={form.slug} disabled={!creating} onChange={(e) => setForm({ ...form, slug: e.target.value })} /></div>
-              <div className="space-y-1"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
-            </div>
-            <div className="space-y-1"><Label>Description</Label><Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1"><Label>Price / mo</Label><Input type="number" value={form.priceMonthly} onChange={(e) => setForm({ ...form, priceMonthly: Number(e.target.value) })} /></div>
-              <div className="space-y-1"><Label>Price / yr</Label><Input type="number" value={form.priceYearly} onChange={(e) => setForm({ ...form, priceYearly: Number(e.target.value) })} /></div>
-              <div className="space-y-1"><Label>Currency</Label><Input value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value.toUpperCase() })} /></div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1"><Label>Trial days</Label><Input type="number" value={form.trialDays} onChange={(e) => setForm({ ...form, trialDays: Number(e.target.value) })} /></div>
-              <div className="space-y-1"><Label>Sort order</Label><Input type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) })} /></div>
-              <div className="space-y-1"><Label>Storage (MB)</Label><Input type="number" value={form.maxStorageMb} onChange={(e) => setForm({ ...form, maxStorageMb: Number(e.target.value) })} /></div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1"><Label>Max branches</Label><Input type="number" value={form.maxBranches} onChange={(e) => setForm({ ...form, maxBranches: Number(e.target.value) })} /></div>
-              <div className="space-y-1"><Label>Max managers</Label><Input type="number" value={form.maxManagers} onChange={(e) => setForm({ ...form, maxManagers: Number(e.target.value) })} /></div>
-              <div className="space-y-1"><Label>Max trainers</Label><Input type="number" value={form.maxTrainers} onChange={(e) => setForm({ ...form, maxTrainers: Number(e.target.value) })} /></div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1"><Label>Max receptionists</Label><Input type="number" value={form.maxReceptionists} onChange={(e) => setForm({ ...form, maxReceptionists: Number(e.target.value) })} /></div>
-              <div className="space-y-1"><Label>Max staff</Label><Input type="number" value={form.maxStaff} onChange={(e) => setForm({ ...form, maxStaff: Number(e.target.value) })} /></div>
-              <div className="space-y-1"><Label>Max members</Label><Input type="number" value={form.maxMembers} onChange={(e) => setForm({ ...form, maxMembers: Number(e.target.value) })} /></div>
-            </div>
-
-            <Button className="w-full" onClick={submit} disabled={createPlan.isPending || updatePlan.isPending}>
-              {creating ? 'Create plan' : 'Save changes'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <PlanFormDialog
+        mode={dialogMode}
+        value={form}
+        onChange={setForm}
+        onSubmit={submit}
+        submitting={createPlan.isPending || updatePlan.isPending}
+        onOpenChange={(open) => !open && setDialogMode(null)}
+      />
     </div>
   );
 }

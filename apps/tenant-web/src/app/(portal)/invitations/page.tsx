@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Mail } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -71,9 +72,21 @@ export default function InvitationsPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Invitations</h1>
-          <p className="text-muted-foreground">Pending invites expire after 48 hours.</p>
+        <div className="flex items-center gap-3.5">
+          <span
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-11"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--chart-2) 16%, transparent)',
+              color: 'var(--chart-2)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-2) 18%, transparent)',
+            }}
+          >
+            <Mail className="size-5" aria-hidden />
+          </span>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Invitations</h1>
+            <p className="text-muted-foreground">Pending invites expire after 48 hours.</p>
+          </div>
         </div>
         <InviteDialog />
       </div>

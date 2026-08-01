@@ -3,7 +3,7 @@
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, Plus, Upload } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, CreditCard, Download, Plus, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
@@ -102,9 +102,21 @@ export default function PaymentsPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Payments</h1>
-          <p className="text-muted-foreground">Member payments, invoices, income, and expenses.</p>
+        <div className="flex items-center gap-3.5">
+          <div
+            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--primary) 16%, transparent)',
+              color: 'var(--primary)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent)',
+            }}
+          >
+            <CreditCard className="size-5" aria-hidden />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Payments</h1>
+            <p className="text-muted-foreground">Member payments, invoices, income, and expenses.</p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>

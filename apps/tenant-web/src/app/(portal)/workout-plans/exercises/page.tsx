@@ -3,7 +3,7 @@
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, MoreHorizontal, Plus } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Dumbbell, MoreHorizontal, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -232,9 +232,21 @@ export default function ExerciseLibraryPage() {
       </Button>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Exercise Library</h1>
-          <p className="text-muted-foreground">Reusable exercises for building workout plans.</p>
+        <div className="flex items-center gap-3.5">
+          <div
+            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--chart-2) 16%, transparent)',
+              color: 'var(--chart-2)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-2) 18%, transparent)',
+            }}
+          >
+            <Dumbbell className="size-5" aria-hidden />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Exercise Library</h1>
+            <p className="text-muted-foreground">Reusable exercises for building workout plans.</p>
+          </div>
         </div>
         {canCreate ? (
           <Button size="sm" onClick={openCreate}>

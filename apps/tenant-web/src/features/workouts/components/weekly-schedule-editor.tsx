@@ -146,7 +146,10 @@ export function WeeklyScheduleEditor({ initialExercises, exerciseOptions, disabl
           const dayItems = items.filter((i) => i.dayOfWeek === day);
           return (
             <div key={day} className="rounded-xl border bg-card p-3.5 shadow-xs">
-              <h4 className="mb-2.5 text-sm font-semibold text-foreground/90">{DAY_LABELS[day]}</h4>
+              <h4 className="mb-2.5 flex items-center gap-1.5 text-sm font-semibold text-foreground/90">
+                <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: 'var(--chart-2)' }} aria-hidden="true" />
+                {DAY_LABELS[day]}
+              </h4>
               {dayItems.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Rest day / no exercises.</p>
               ) : (

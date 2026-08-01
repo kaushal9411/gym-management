@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { Building2 } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -50,9 +51,21 @@ export default function TenantsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Tenants</h1>
-        <p className="text-muted-foreground">Every gym on the platform — search, filter, and manage.</p>
+      <div className="flex items-center gap-3">
+        <div
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl"
+          style={{
+            backgroundColor: 'color-mix(in oklch, var(--chart-2) 16%, transparent)',
+            color: 'var(--chart-2)',
+            boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-2) 18%, transparent)',
+          }}
+        >
+          <Building2 className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Tenants</h1>
+          <p className="text-muted-foreground">Every gym on the platform — search, filter, and manage.</p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">

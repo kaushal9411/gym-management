@@ -17,6 +17,13 @@ const ICONS: Record<RecentActivityItem['type'], typeof UserCheck> = {
   NEW_MEMBER: UserPlus,
 };
 
+/** Per-type accent — same CVD-validated `--chart-*`/semantic tokens used across the dashboard, theme-aware. */
+const ICON_TONE: Record<RecentActivityItem['type'], string> = {
+  PAYMENT: 'var(--success)',
+  CHECK_IN: 'var(--primary)',
+  NEW_MEMBER: 'var(--chart-2)',
+};
+
 /** "Get Recent Activities" (Prompt 20) — a real merged feed of payments/check-ins/new members, superseding the Prompt-10 foundation's generic-notifications stand-in. Scoped to the header's currently-selected branch (Prompt 24). */
 export function RecentActivity() {
   const { hasPermission } = usePermissions();
@@ -44,7 +51,13 @@ export function RecentActivity() {
                 key={`${item.type}-${item.id}`}
                 className="flex items-start gap-3 rounded-lg p-1.5 text-sm transition-colors hover:bg-accent/50"
               >
-                <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <span
+                  className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full"
+                  style={{
+                    backgroundColor: `color-mix(in oklch, ${ICON_TONE[item.type]} 16%, transparent)`,
+                    color: ICON_TONE[item.type],
+                  }}
+                >
                   <Icon className="size-3.5" aria-hidden />
                 </span>
                 <div className="min-w-0 flex-1">

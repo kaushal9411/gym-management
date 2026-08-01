@@ -138,7 +138,10 @@ export function MealBuilder({ initialMeals, foodOptions, disabled, onChange }: M
           const mealItems = items.filter((i) => i.mealType === mealType);
           return (
             <div key={mealType} className="rounded-xl border bg-card p-3.5 shadow-xs">
-              <h4 className="mb-2.5 text-sm font-semibold text-foreground/90">{MEAL_LABELS[mealType]}</h4>
+              <h4 className="mb-2.5 flex items-center gap-1.5 text-sm font-semibold text-foreground/90">
+                <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: 'var(--success)' }} aria-hidden="true" />
+                {MEAL_LABELS[mealType]}
+              </h4>
               {mealItems.length === 0 ? (
                 <p className="text-xs text-muted-foreground">No foods added.</p>
               ) : (

@@ -92,9 +92,15 @@ export function PlanSelectionStep() {
           const included = plan.features.filter((f) => f.included);
 
           return (
-            <Card key={plan.slug} className={cn('relative', isPopular && 'border-primary shadow-md')}>
+            <Card
+              key={plan.slug}
+              className={cn('relative', isPopular && 'border-orange-400/50 shadow-[0_0_24px_-8px_rgba(255,138,61,0.4)]')}
+            >
               {isPopular ? (
-                <span className="absolute -top-2.5 left-4 rounded-full bg-primary px-2.5 py-0.5 text-xs font-medium text-primary-foreground">
+                <span
+                  className="absolute -top-2.5 left-4 rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
+                  style={{ backgroundImage: 'linear-gradient(135deg, #ff8a3d 0%, #e0271b 100%)' }}
+                >
                   Most popular
                 </span>
               ) : null}
@@ -125,7 +131,7 @@ export function PlanSelectionStep() {
 
                 <LoadingButton
                   type="button"
-                  className="w-full"
+                  className={cn('w-full', isPopular && 'onboarding-cta')}
                   variant={isPopular ? 'default' : 'outline'}
                   onClick={() => choose(plan)}
                   loading={isSelecting}

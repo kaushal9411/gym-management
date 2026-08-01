@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { ScrollText } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,9 +25,14 @@ export default function AuditLogsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Audit Logs</h1>
-        <p className="text-muted-foreground">Every admin action — login, tenant changes, subscription/payment changes, settings changes.</p>
+      <div className="flex items-center gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/10">
+          <ScrollText className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Audit Logs</h1>
+          <p className="text-muted-foreground">Every admin action — login, tenant changes, subscription/payment changes, settings changes.</p>
+        </div>
       </div>
 
       <Input

@@ -1,4 +1,5 @@
 import { apiClient, toAdminServiceError } from '@/features/auth/services/api-client';
+import type { InvoiceListItem, PaymentListItem } from '@/features/payments/types';
 import type { PaginatedResult, TenantDetail, TenantListItem, TenantStatus } from '../types';
 
 interface ApiEnvelope<T> {
@@ -79,6 +80,24 @@ class AdminTenantService {
   async auditLogs(tenantId: string) {
     try {
       const res = await apiClient.get<ApiEnvelope<unknown[]>>(`/admin/tenants/${tenantId}/audit-logs`);
+      return res.data.data;
+    } catch (error) {
+      throw toAdminServiceError(error);
+    }
+  }
+
+  async payments(tenantId: string, params: { page: number; limit: number }): Promise<PaginatedResult<PaymentListItem>> {
+    try {
+      const res = await apiClient.get<ApiEnvelope<PaginatedResult<PaymentListItem>>>(`/admin/tenants/${tenantId}/payments`, { params });
+      return res.data.data;
+    } catch (error) {
+      throw toAdminServiceError(error);
+    }
+  }
+
+  async invoices(tenantId: string, params: { page: number; limit: number }): Promise<PaginatedResult<InvoiceListItem>> {
+    try {
+      const res = await apiClient.get<ApiEnvelope<PaginatedResult<InvoiceListItem>>>(`/admin/tenants/${tenantId}/invoices`, { params });
       return res.data.data;
     } catch (error) {
       throw toAdminServiceError(error);

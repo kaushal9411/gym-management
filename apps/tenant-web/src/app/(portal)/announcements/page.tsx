@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { CalendarClock, Plus, Send, Trash2 } from 'lucide-react';
+import { CalendarClock, Megaphone, Plus, Send, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -48,9 +48,21 @@ export default function AnnouncementsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Announcements</h1>
-          <p className="text-muted-foreground">Broadcast news to your members and staff.</p>
+        <div className="flex items-center gap-3.5">
+          <div
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-11"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--chart-3) 16%, transparent)',
+              color: 'var(--chart-3)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-3) 18%, transparent)',
+            }}
+          >
+            <Megaphone className="size-5" aria-hidden />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Announcements</h1>
+            <p className="text-muted-foreground">Broadcast news to your members and staff.</p>
+          </div>
         </div>
         {canCreate ? (
           <Button

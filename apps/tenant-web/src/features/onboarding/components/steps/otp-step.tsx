@@ -105,7 +105,7 @@ export function OtpStep() {
 
       <LoadingButton
         type="button"
-        className="w-full"
+        className="onboarding-cta w-full"
         onClick={() => submit(code)}
         disabled={code.length !== 6}
         loading={verifyOtp.isPending}
@@ -119,7 +119,7 @@ export function OtpStep() {
         {countdown.isRunning ? (
           <>Resend available in <span className="font-medium tabular-nums">{countdown.formatted}</span></>
         ) : (
-          <Button type="button" variant="link" className="h-auto p-0 text-sm" onClick={handleResend} disabled={resendOtp.isPending}>
+          <Button type="button" variant="link" className="h-auto p-0 text-sm text-cyan-300" onClick={handleResend} disabled={resendOtp.isPending}>
             {resendOtp.isPending ? 'Sending…' : "Didn't get the code? Resend"}
           </Button>
         )}

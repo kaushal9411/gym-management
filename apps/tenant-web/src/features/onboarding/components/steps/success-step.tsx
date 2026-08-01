@@ -136,7 +136,7 @@ export function SuccessStep() {
         title="Your gym is ready!"
         description={`${state.gymName} was created successfully. We couldn't sign you in automatically, so please sign in with the email and password you just chose.`}
       >
-        <Button asChild className="w-full">
+        <Button asChild className="onboarding-cta w-full">
           <a href={buildTenantLoginUrl(confirmedSlug)}>Sign in to my portal</a>
         </Button>
       </StatusScreen>
@@ -221,7 +221,7 @@ function ProvisionedRedirect({ gymName, slug, handoffUrl }: { gymName: string | 
       description={`${gymName} is live at ${slug}.fitcloud.com. We've emailed you a welcome message with everything you need.`}
       footnote="Redirecting you to your new portal…"
     >
-      <Button asChild className="w-full">
+      <Button asChild className="onboarding-cta w-full">
         <a href={handoffUrl}>Go to my portal</a>
       </Button>
     </StatusScreen>

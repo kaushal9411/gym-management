@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { PieChart as PieChartIcon } from 'lucide-react';
 import {
   Area,
   AreaChart,
@@ -97,9 +98,21 @@ export default function AnalyticsDashboardPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Analytics Dashboard</h1>
-        <p className="text-muted-foreground">Trends and comparisons across the last 30 days by default.</p>
+      <div className="flex items-center gap-3.5">
+        <div
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-11"
+          style={{
+            backgroundColor: 'color-mix(in oklch, var(--chart-7) 16%, transparent)',
+            color: 'var(--chart-7)',
+            boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-7) 18%, transparent)',
+          }}
+        >
+          <PieChartIcon className="size-5" aria-hidden />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Analytics Dashboard</h1>
+          <p className="text-muted-foreground">Trends and comparisons across the last 30 days by default.</p>
+        </div>
       </div>
 
       <ReportFiltersBar value={filters} onChange={setFilters} />

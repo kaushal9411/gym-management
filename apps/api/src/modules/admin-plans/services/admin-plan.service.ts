@@ -40,6 +40,13 @@ export class AdminPlanService {
     return plan;
   }
 
+  async subscribers(id: string, page: number, limit: number) {
+    await this.getById(id);
+    const skip = (page - 1) * limit;
+    const { total, items } = await adminPlanRepository.subscribers(id, skip, limit);
+    return { items, page, limit, total, totalPages: Math.ceil(total / limit) };
+  }
+
   async remove(id: string, adminUserId: string, adminRole: string): Promise<void> {
     await this.getById(id);
     const activeCount = await adminPlanRepository.countActiveSubscriptions(id);

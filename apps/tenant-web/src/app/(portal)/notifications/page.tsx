@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Settings2 } from 'lucide-react';
+import { Bell, Settings2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Pagination } from '@/components/ui/pagination';
@@ -29,9 +29,21 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
-          <p className="text-muted-foreground">Everything sent to your gym, in one place.</p>
+        <div className="flex items-center gap-3.5">
+          <div
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-11"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--chart-2) 16%, transparent)',
+              color: 'var(--chart-2)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-2) 18%, transparent)',
+            }}
+          >
+            <Bell className="size-5" aria-hidden />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
+            <p className="text-muted-foreground">Everything sent to your gym, in one place.</p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>

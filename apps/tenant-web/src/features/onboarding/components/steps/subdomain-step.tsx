@@ -106,7 +106,7 @@ export function SubdomainStep() {
 
       <LoadingButton
         type="submit"
-        className="w-full"
+        className="onboarding-cta w-full"
         disabled={!showResult || !check.available}
       >
         Continue

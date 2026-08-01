@@ -162,9 +162,21 @@ export default function DietPlansPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Diet Plans</h1>
-          <p className="text-muted-foreground">Meal plans, nutrition templates, and member diet assignments.</p>
+        <div className="flex items-center gap-3.5">
+          <div
+            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
+            style={{
+              backgroundColor: 'color-mix(in oklch, var(--success) 16%, transparent)',
+              color: 'var(--success)',
+              boxShadow: '0 0 0 1px color-mix(in oklch, var(--success) 18%, transparent)',
+            }}
+          >
+            <Apple className="size-5" aria-hidden />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Diet Plans</h1>
+            <p className="text-muted-foreground">Meal plans, nutrition templates, and member diet assignments.</p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="sm" asChild>

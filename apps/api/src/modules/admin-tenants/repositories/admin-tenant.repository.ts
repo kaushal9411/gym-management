@@ -38,11 +38,14 @@ export class AdminTenantRepository {
       include: {
         settings: true,
         branding: true,
+        profile: true,
         limits: true,
         usage: true,
         domains: true,
-        subscriptions: { orderBy: { createdAt: 'desc' }, take: 1, include: { plan: true } },
+        subscriptions: { orderBy: { createdAt: 'desc' }, take: 1, include: { plan: true, coupon: true } },
         users: { where: { status: { not: 'DEACTIVATED' } }, orderBy: { createdAt: 'asc' } },
+        // Same ordering convention as `BranchRepository.list()` — default branch first, then alphabetical.
+        branches: { where: { deletedAt: null }, orderBy: [{ isDefault: 'desc' }, { name: 'asc' }] },
       },
     });
   }

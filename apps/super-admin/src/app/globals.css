@@ -4,8 +4,9 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ────────────────────────────────────────────────────────────────────
-   Design tokens. --primary/--ring are overridden per tenant at runtime
-   (inline style on <body>, values from tenant branding settings).
+   Design tokens. Unlike tenant-web, this app serves exactly one internal
+   organization — --primary/--ring are fixed constants here, not overridden
+   per tenant at runtime (no inline <body> style, see app/layout.tsx).
    ──────────────────────────────────────────────────────────────────── */
 :root {
   --radius: 0.625rem;
@@ -32,6 +33,20 @@
   --border: oklch(0.9 0.007 275);
   --input: oklch(0.9 0.007 275);
   --ring: oklch(0.51 0.23 277);
+
+  /* Categorical accent palette: slot 1 = live --primary, slots 2-8 a fixed
+     CVD-validated hex order (validated against this app's own card surface
+     #ffffff — identical to tenant-web's, so the same validated values are
+     reused verbatim). Never reorder these slots or reuse a status hue
+     (--success/--warning/--destructive) for a categorical accent. */
+  --chart-1: var(--primary);
+  --chart-2: #eb6834; /* orange */
+  --chart-3: #1baf7a; /* aqua */
+  --chart-4: #eda100; /* yellow */
+  --chart-5: #e87ba4; /* magenta */
+  --chart-6: #008300; /* green */
+  --chart-7: #4a3aa7; /* violet */
+  --chart-8: #e34948; /* red */
 }
 
 .dark {
@@ -58,6 +73,17 @@
   --border: oklch(0.29 0.015 275);
   --input: oklch(0.32 0.015 275);
   --ring: oklch(0.62 0.2 277);
+
+  /* Same categorical order, stepped for the dark surface (validated
+     against dark card surface #12131a, identical to tenant-web's). */
+  --chart-1: var(--primary);
+  --chart-2: #d95926; /* orange */
+  --chart-3: #199e70; /* aqua */
+  --chart-4: #c98500; /* yellow */
+  --chart-5: #d55181; /* magenta */
+  --chart-6: #008300; /* green */
+  --chart-7: #9085e9; /* violet */
+  --chart-8: #e66767; /* red */
 }
 
 @theme inline {
@@ -84,6 +110,14 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-chart-6: var(--chart-6);
+  --color-chart-7: var(--chart-7);
+  --color-chart-8: var(--chart-8);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
