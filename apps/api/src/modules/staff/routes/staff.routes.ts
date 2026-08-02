@@ -182,6 +182,24 @@ staffRouter.post(
   asyncHandler(staffController.activate.bind(staffController)),
 );
 
+/**
+ * @openapi
+ * /staff/{staffId}/manual-activate:
+ *   post:
+ *     tags: [Staff]
+ *     summary: Manager-side activation of a PENDING_VERIFICATION staff account — sets a real password without the staff member clicking their email link
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: "{ email, temporaryPassword }" }
+ *       409: { description: Already activated }
+ */
+staffRouter.post(
+  '/:staffId/manual-activate',
+  requirePermission('staff:activate'),
+  validate({ params: staffIdParamSchema }),
+  asyncHandler(staffController.manualActivate.bind(staffController)),
+);
+
 /** @openapi { "/staff/{staffId}/deactivate": { post: { tags: [Staff], summary: Deactivate a staff account, security: [{bearerAuth: []}], responses: { 200: { description: Deactivated } } } } } */
 staffRouter.post(
   '/:staffId/deactivate',

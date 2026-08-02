@@ -16,7 +16,17 @@ const DEFAULT_BRANDING = {
 /** Shape returned by both `findBySlug`/`findById`'s `include` below. */
 type TenantWithRelations = Tenant & {
   settings: TenantSettings | null;
-  branding: { primaryColor: string; primaryForeground: string; secondaryColor: string | null; logoUrl: string | null; faviconUrl: string | null; welcomeMessage: string | null } | null;
+  branding: {
+    primaryColor: string;
+    primaryForeground: string;
+    secondaryColor: string | null;
+    logoUrl: string | null;
+    faviconUrl: string | null;
+    loginBackgroundUrl: string | null;
+    dashboardBannerUrl: string | null;
+    emailLogoUrl: string | null;
+    welcomeMessage: string | null;
+  } | null;
   subscriptions: Array<{ status: string; trialEndsAt: Date | null; currentPeriodEnd: Date | null; plan: { slug: string; name: string } }>;
   modules: Array<{ key: string; enabled: boolean }>;
   branches: Branch[];

@@ -1,3 +1,5 @@
+import type { AxiosProgressEvent } from 'axios';
+
 import { apiClient } from '@/features/auth/services/api-client';
 import type {
   Branding,
@@ -62,8 +64,16 @@ class GymSettingsService {
   }
 
   // ── Branding ──────────────────────────────────────────────────────────────
+  // silent: true — every upload mutation below invalidates this query on
+  // success, triggering an automatic background refetch right after the
+  // upload's own local progress bar completes. Without `silent`, that
+  // refetch (not the upload itself, which was already fixed) was what
+  // popped the global loader back up immediately after "Image uploaded"
+  // (user-reported/screenshotted). The branding page already renders its
+  // own `Skeleton` for the true first-load case (`branding.isPending`);
+  // this refetch-after-save has no visible content gap to fill.
   async getBranding(): Promise<Branding> {
-    const res = await apiClient.get<ApiEnvelope<Branding>>('/settings/branding');
+    const res = await apiClient.get<ApiEnvelope<Branding>>('/settings/branding', { silent: true });
     return res.data.data;
   }
 
@@ -72,18 +82,26 @@ class GymSettingsService {
     return res.data.data;
   }
 
-  async uploadLogo(dataUrl: string): Promise<Branding> {
-    const res = await apiClient.post<ApiEnvelope<Branding>>('/settings/branding/logo', { dataUrl });
+  // `silent: true` on every upload below — these already have their own
+  // local, in-place progress bar (see `ImageUploadField`); the global
+  // full-screen loader showing on top of that is redundant and, worse,
+  // covers the exact thumbnail/button the user is watching.
+  async uploadLogo(dataUrl: string, onUploadProgress?: (event: AxiosProgressEvent) => void): Promise<Branding> {
+    const res = await apiClient.post<ApiEnvelope<Branding>>('/settings/branding/logo', { dataUrl }, { silent: true, onUploadProgress });
     return res.data.data;
   }
 
-  async uploadFavicon(dataUrl: string): Promise<Branding> {
-    const res = await apiClient.post<ApiEnvelope<Branding>>('/settings/branding/favicon', { dataUrl });
+  async uploadFavicon(dataUrl: string, onUploadProgress?: (event: AxiosProgressEvent) => void): Promise<Branding> {
+    const res = await apiClient.post<ApiEnvelope<Branding>>('/settings/branding/favicon', { dataUrl }, { silent: true, onUploadProgress });
     return res.data.data;
   }
 
-  async uploadBrandingAsset(field: BrandingAssetField, dataUrl: string): Promise<Branding> {
-    const res = await apiClient.post<ApiEnvelope<Branding>>('/settings/branding/upload', { field, dataUrl });
+  async uploadBrandingAsset(
+    field: BrandingAssetField,
+    dataUrl: string,
+    onUploadProgress?: (event: AxiosProgressEvent) => void,
+  ): Promise<Branding> {
+    const res = await apiClient.post<ApiEnvelope<Branding>>('/settings/branding/upload', { field, dataUrl }, { silent: true, onUploadProgress });
     return res.data.data;
   }
 

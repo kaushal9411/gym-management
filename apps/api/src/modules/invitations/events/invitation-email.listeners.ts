@@ -20,7 +20,7 @@ export function registerInvitationEmailListeners(): void {
       const branding: EmailBranding = {
         tenantName: tenant.name,
         primaryColor: tenant.branding.primaryColor,
-        logoUrl: tenant.branding.logoUrl,
+        logoUrl: tenant.branding.emailLogoUrl ?? tenant.branding.logoUrl,
       };
       const acceptUrl = `http://${tenant.slug}.${env.platformDomain}/invitation/${payload.token}`;
       const template = buildInvitationEmail(branding, payload.inviterName, payload.roleLabel, acceptUrl);

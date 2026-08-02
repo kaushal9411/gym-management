@@ -27,9 +27,17 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="flex min-h-dvh flex-col lg:flex-row">
-      {/* Hero panel — brand gradient, hidden below lg */}
-      <div className="gradient-brand relative hidden w-full shrink-0 flex-col justify-between overflow-hidden p-10 text-primary-foreground lg:flex lg:w-[42%] xl:w-[38%]">
+      {/* Hero panel — brand gradient (or the tenant's uploaded login background image), hidden below lg */}
+      <div
+        className="gradient-brand relative hidden w-full shrink-0 flex-col justify-between overflow-hidden bg-cover bg-center p-10 text-primary-foreground lg:flex lg:w-[42%] xl:w-[38%]"
+        style={tenant.branding.loginBackgroundUrl ? { backgroundImage: `url(${tenant.branding.loginBackgroundUrl})` } : undefined}
+      >
         <div aria-hidden className="pointer-events-none absolute inset-0">
+          {tenant.branding.loginBackgroundUrl ? (
+            // A photo can be any brightness/color — this scrim keeps the white
+            // text/highlights card legible regardless of what was uploaded.
+            <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/35 to-black/60" />
+          ) : null}
           <div className="absolute -left-24 -top-24 size-72 rounded-full bg-white/10 blur-3xl" />
           <div className="absolute -bottom-32 -right-16 size-96 rounded-full bg-black/10 blur-3xl" />
           <svg className="absolute inset-0 size-full opacity-[0.07]" aria-hidden>

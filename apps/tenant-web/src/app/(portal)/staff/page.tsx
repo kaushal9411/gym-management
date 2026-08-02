@@ -3,7 +3,7 @@
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowUp, ArrowUpDown, Contact, Download, MoreHorizontal, Upload, UserPlus, Users } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Contact, Copy, Download, MoreHorizontal, Upload, UserPlus, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -12,7 +12,9 @@ import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { Pagination } from '@/components/ui/pagination';
 import { SearchBar } from '@/components/ui/search-bar';
@@ -20,7 +22,15 @@ import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { UserStatusBadge } from '@/features/iam/components/status-badge';
 import { staffService } from '@/features/staff/services/staff.service';
-import { toStaffError, useBulkImportStaff, useBulkStaffAction, useStaffList, useStaffStatusAction } from '@/features/staff/hooks/use-staff';
+import {
+  toStaffError,
+  useBulkImportStaff,
+  useBulkStaffAction,
+  useManualActivateStaff,
+  useResendStaffActivation,
+  useStaffList,
+  useStaffStatusAction,
+} from '@/features/staff/hooks/use-staff';
 import type { ListStaffParams, StaffBulkImportRow, StaffListItem, StaffRole, UserStatus, WorkStatus } from '@/features/staff/types';
 import { useSubmitHandler } from '@/hooks/use-submit-handler';
 import { cn } from '@/lib/utils';
@@ -87,6 +97,9 @@ export default function StaffListPage() {
   const statusAction = useStaffStatusAction();
   const bulkAction = useBulkStaffAction();
   const bulkImport = useBulkImportStaff();
+  const manualActivate = useManualActivateStaff();
+  const resendActivation = useResendStaffActivation();
+  const [activationResult, setActivationResult] = React.useState<{ name: string; email: string; temporaryPassword: string } | null>(null);
   const importInputRef = React.useRef<HTMLInputElement>(null);
 
   const canManage = hasPermission('staff:update');
@@ -122,6 +135,20 @@ export default function StaffListPage() {
       {label} {sortIcon(column)}
     </button>
   );
+
+  const handleManualActivate = (s: StaffListItem) => {
+    manualActivate.mutate(s.id, {
+      onSuccess: (result) => setActivationResult({ name: s.name, ...result }),
+      onError: (err) => toast.error(toStaffError(err).message),
+    });
+  };
+
+  const handleResendActivation = (s: StaffListItem) => {
+    resendActivation.mutate(s.id, {
+      onSuccess: () => toast.success(`Activation email resent to ${s.name}.`),
+      onError: (err) => toast.error(toStaffError(err).message),
+    });
+  };
 
   const runSingleAction = (staffId: string, action: StatusAction) => {
     statusAction.mutate(
@@ -273,6 +300,11 @@ export default function StaffListPage() {
                     Restore / activate
                   </DropdownMenuItem>
                 ) : null
+              ) : s.status === 'PENDING_VERIFICATION' && canActivate ? (
+                <>
+                  <DropdownMenuItem onClick={() => handleManualActivate(s)}>Manually activate</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleResendActivation(s)}>Resend activation email</DropdownMenuItem>
+                </>
               ) : canActivate ? (
                 <>
                   <DropdownMenuItem onClick={() => setConfirmAction({ kind: 'single', action: 'suspend', ids: [s.id] })}>
@@ -476,6 +508,44 @@ export default function StaffListPage() {
         loading={statusAction.isPending || bulkAction.isPending}
         onConfirm={confirmAndRun}
       />
+
+      <Dialog open={!!activationResult} onOpenChange={(open) => !open && setActivationResult(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{activationResult?.name} is now active</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Share this temporary password with them directly (call, message, in person) — it won&apos;t be shown again. They should change it after
+              signing in.
+            </p>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Email</p>
+              <Input readOnly value={activationResult?.email ?? ''} className="h-9 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs text-muted-foreground">Temporary password</p>
+              <div className="flex items-center gap-2">
+                <Input readOnly value={activationResult?.temporaryPassword ?? ''} className="h-9 font-mono text-sm" />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (!activationResult) return;
+                    void navigator.clipboard.writeText(activationResult.temporaryPassword);
+                    toast.success('Password copied.');
+                  }}
+                >
+                  <Copy className="size-3.5" />
+                </Button>
+              </div>
+            </div>
+            <Button variant="outline" className="w-full" onClick={() => setActivationResult(null)}>
+              Done
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

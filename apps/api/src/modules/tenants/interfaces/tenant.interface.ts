@@ -18,6 +18,9 @@ export interface ResolvedTenant {
     secondaryColor: string;
     logoUrl?: string;
     faviconUrl?: string;
+    loginBackgroundUrl?: string;
+    dashboardBannerUrl?: string;
+    emailLogoUrl?: string;
     welcomeMessage: string;
   };
   timezone: string;
@@ -66,6 +69,9 @@ export interface ResolvedTenantRecord {
     secondaryColor: string | null;
     logoUrl: string | null;
     faviconUrl: string | null;
+    loginBackgroundUrl: string | null;
+    dashboardBannerUrl: string | null;
+    emailLogoUrl: string | null;
     welcomeMessage: string | null;
   } | null;
   subscriptions: Array<{

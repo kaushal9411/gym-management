@@ -18,6 +18,8 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s · ${tenant.name}`,
     },
     description: `${tenant.name} member and staff portal, powered by FitCloud.`,
+    // Falls back to the static app/favicon.ico when the tenant hasn't uploaded one.
+    icons: tenant.branding.faviconUrl ? { icon: tenant.branding.faviconUrl } : undefined,
   };
 }
 

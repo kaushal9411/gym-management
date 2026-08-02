@@ -11,6 +11,7 @@ import {
 import storage from 'redux-persist/lib/storage';
 
 import { authReducer } from '@/features/auth/store/auth-slice';
+import { uiReducer } from './ui-slice';
 
 /**
  * Same documented tradeoff as tenant-web's store (access + refresh tokens
@@ -27,6 +28,8 @@ const authPersistConfig = {
 
 const rootReducer = combineReducers({
   auth: persistReducer(authPersistConfig, authReducer),
+  // `ui` is request-tracking scaffolding and is never persisted (same rule as tenant-web's store).
+  ui: uiReducer,
 });
 
 export function makeStore() {

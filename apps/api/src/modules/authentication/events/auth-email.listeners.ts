@@ -26,7 +26,7 @@ async function brandingFor(tenantId: string): Promise<{ branding: EmailBranding;
     return { branding: { tenantName: 'FitCloud' }, slug: '' };
   }
   return {
-    branding: { tenantName: tenant.name, primaryColor: tenant.branding.primaryColor, logoUrl: tenant.branding.logoUrl },
+    branding: { tenantName: tenant.name, primaryColor: tenant.branding.primaryColor, logoUrl: tenant.branding.emailLogoUrl ?? tenant.branding.logoUrl },
     slug: tenant.slug,
   };
 }

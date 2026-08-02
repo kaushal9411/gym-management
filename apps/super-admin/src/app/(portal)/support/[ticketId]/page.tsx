@@ -18,9 +18,18 @@ export default function TicketDetailPage() {
   const setStatus = useSetTicketStatus();
   const closeTicket = useCloseTicket();
   const addNote = useAddTicketNote();
+  const [reply, setReply] = React.useState('');
   const [note, setNote] = React.useState('');
 
   if (isLoading || !ticket) return <Skeleton className="h-96 rounded-xl" />;
+
+  const submitReply = () => {
+    if (!reply.trim()) return;
+    addNote.mutate(
+      { id: params.ticketId, note: reply.trim(), isInternal: false },
+      { onSuccess: () => setReply(''), onError: (err) => toast.error(toTicketError(err).message) },
+    );
+  };
 
   const submitNote = () => {
     if (!note.trim()) return;
@@ -29,6 +38,9 @@ export default function TicketDetailPage() {
       { onSuccess: () => setNote(''), onError: (err) => toast.error(toTicketError(err).message) },
     );
   };
+
+  const publicReplies = ticket.notes.filter((n) => !n.isInternal);
+  const internalNotes = ticket.notes.filter((n) => n.isInternal);
 
   return (
     <div className="space-y-6">
@@ -55,9 +67,40 @@ export default function TicketDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">Internal notes</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">Reply to tenant</CardTitle>
+          <p className="text-sm text-muted-foreground">Visible to {ticket.createdByEmail} on their ticket.</p>
+        </CardHeader>
         <CardContent className="space-y-3">
-          {ticket.notes.length === 0 ? <p className="text-sm text-muted-foreground">No notes yet.</p> : ticket.notes.map((n) => (
+          {publicReplies.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No replies sent yet.</p>
+          ) : (
+            publicReplies.map((n) => (
+              <div key={n.id} className="rounded-md border border-primary/20 bg-primary/5 p-2.5 text-sm">
+                <p>{n.note}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{n.authorAdmin.name} · {new Date(n.createdAt).toLocaleString()}</p>
+              </div>
+            ))
+          )}
+          <div className="flex gap-2">
+            <Input
+              placeholder="Reply to the tenant…"
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submitReply()}
+            />
+            <Button onClick={submitReply} disabled={addNote.isPending || !reply.trim()}>Send reply</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Internal notes</CardTitle>
+          <p className="text-sm text-muted-foreground">Only visible to FitCloud staff.</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {internalNotes.length === 0 ? <p className="text-sm text-muted-foreground">No notes yet.</p> : internalNotes.map((n) => (
             <div key={n.id} className="rounded-md border bg-muted/30 p-2.5 text-sm">
               <p>{n.note}</p>
               <p className="mt-1 text-xs text-muted-foreground">{n.authorAdmin.name} · {new Date(n.createdAt).toLocaleString()}</p>

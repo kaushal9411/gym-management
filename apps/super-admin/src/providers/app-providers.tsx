@@ -7,6 +7,8 @@ import { Provider as ReduxProvider } from 'react-redux';
 import { PersistGate } from 'redux-persist/integration/react';
 import { persistStore } from 'redux-persist';
 
+import { GlobalLoader } from '@/components/loading/global-loader';
+import { NavigationProgressProvider } from '@/components/navigation-progress-provider';
 import { Toaster } from '@/components/ui/sonner';
 import { makeStore, registerActiveStore, type AppStore } from '@/store';
 import { AuthProvider } from './auth-provider';
@@ -30,7 +32,12 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
         <QueryClientProvider client={queryClient}>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             <AuthProvider>
-              {children}
+              <React.Suspense fallback={null}>
+                <NavigationProgressProvider>
+                  <GlobalLoader />
+                  {children}
+                </NavigationProgressProvider>
+              </React.Suspense>
               <Toaster />
             </AuthProvider>
           </ThemeProvider>

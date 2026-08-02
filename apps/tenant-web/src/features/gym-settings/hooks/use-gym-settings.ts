@@ -1,5 +1,6 @@
 'use client';
 
+import type { AxiosProgressEvent } from 'axios';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { AuthServiceError } from '@/features/auth/types';
@@ -106,13 +107,18 @@ export function useUpdateBranding() {
 
 export function useUploadLogo() {
   const invalidate = useInvalidateBranding();
-  return useMutation({ mutationFn: (dataUrl: string) => gymSettingsService.uploadLogo(dataUrl), onSuccess: invalidate });
+  return useMutation({
+    mutationFn: ({ dataUrl, onUploadProgress }: { dataUrl: string; onUploadProgress?: (event: AxiosProgressEvent) => void }) =>
+      gymSettingsService.uploadLogo(dataUrl, onUploadProgress),
+    onSuccess: invalidate,
+  });
 }
 
 export function useUploadFavicon() {
   const invalidate = useInvalidateBranding();
   return useMutation({
-    mutationFn: (dataUrl: string) => gymSettingsService.uploadFavicon(dataUrl),
+    mutationFn: ({ dataUrl, onUploadProgress }: { dataUrl: string; onUploadProgress?: (event: AxiosProgressEvent) => void }) =>
+      gymSettingsService.uploadFavicon(dataUrl, onUploadProgress),
     onSuccess: invalidate,
   });
 }
@@ -120,8 +126,15 @@ export function useUploadFavicon() {
 export function useUploadBrandingAsset() {
   const invalidate = useInvalidateBranding();
   return useMutation({
-    mutationFn: ({ field, dataUrl }: { field: BrandingAssetField; dataUrl: string }) =>
-      gymSettingsService.uploadBrandingAsset(field, dataUrl),
+    mutationFn: ({
+      field,
+      dataUrl,
+      onUploadProgress,
+    }: {
+      field: BrandingAssetField;
+      dataUrl: string;
+      onUploadProgress?: (event: AxiosProgressEvent) => void;
+    }) => gymSettingsService.uploadBrandingAsset(field, dataUrl, onUploadProgress),
     onSuccess: invalidate,
   });
 }

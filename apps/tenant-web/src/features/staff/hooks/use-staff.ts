@@ -80,6 +80,14 @@ export function useResetStaffPassword() {
   return useMutation({ mutationFn: (staffId: string) => staffService.resetPassword(staffId) });
 }
 
+export function useManualActivateStaff() {
+  const invalidate = useInvalidateStaff();
+  return useMutation({
+    mutationFn: (staffId: string) => staffService.manualActivate(staffId),
+    onSuccess: invalidate,
+  });
+}
+
 export function useResendStaffActivation() {
   return useMutation({ mutationFn: (staffId: string) => staffService.resendActivation(staffId) });
 }

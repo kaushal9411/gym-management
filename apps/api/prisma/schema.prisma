@@ -343,6 +343,13 @@ model User {
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
+  /// Covers the default "browse all staff/users" sort (createdAt desc) and
+  /// the created-at range filter on the user list — neither had a usable
+  /// composite index before (Prompt 32 perf pass).
+  @@index([tenantId, createdAt])
+  /// Covers the "inactive staff" report filter (lastLoginAt range) — had no
+  /// index at all before (Prompt 32 perf pass).
+  @@index([tenantId, lastLoginAt])
   @@map("users")
 }
 
@@ -572,6 +579,8 @@ model StaffProfile {
 
   @@unique([tenantId, employeeId])
   @@index([tenantId])
+  /// Covers the staff list's `workStatus` filter (Prompt 32 perf pass).
+  @@index([tenantId, workStatus])
   @@map("staff_profiles")
 }
 
@@ -703,6 +712,11 @@ model MembershipPlan {
   @@unique([tenantId, planCode])
   @@index([tenantId])
   @@index([tenantId, displayOrder])
+  /// Covers `isActive` — filtered on every list call including the
+  /// highest-traffic one (the Assign/Renew/Upgrade "assignable plans"
+  /// dropdown); every sibling catalog (WorkoutPlan/DietPlan/Exercise/Food)
+  /// already had this, this one was missed (Prompt 32 perf pass).
+  @@index([tenantId, isActive])
   @@map("membership_plans")
 }
 
@@ -763,6 +777,12 @@ model Member {
   @@unique([tenantId, memberId])
   @@index([tenantId, status])
   @@index([tenantId, branchId])
+  /// Covers the default "browse all members" sort (createdAt desc) — the
+  /// most common unfiltered list call had no usable index before (Prompt 32
+  /// perf pass).
+  @@index([tenantId, createdAt])
+  /// Covers the trainer-filtered member list.
+  @@index([tenantId, trainerId])
   @@map("members")
 }
 
@@ -893,6 +913,13 @@ model Attendance {
   @@index([tenantId, memberId])
   @@index([tenantId, branchId])
   @@index([tenantId, attendanceDate])
+  /// Covers the default "recent attendance" sort (checkInTime desc,
+  /// unbounded date range) — the most common unfiltered list call had no
+  /// usable index before (Prompt 32 perf pass).
+  @@index([tenantId, checkInTime])
+  /// Covers the branch-scoped dashboard aggregates (countForDate/
+  /// trendBetween), which filter tenantId+branchId+attendanceDate together.
+  @@index([tenantId, branchId, attendanceDate])
   @@map("attendance_records")
 }
 
@@ -1349,6 +1376,12 @@ model MemberInvoice {
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, memberId])
   @@index([tenantId, status])
+  /// Covers the branch-scoped outstanding-balance dashboard aggregate
+  /// (`sumOutstanding`) and the branch-filtered invoice list, neither of
+  /// which had an index containing `branchId` before (Prompt 32 perf pass).
+  @@index([tenantId, branchId, status])
+  /// Covers the default "browse all invoices" sort (createdAt desc).
+  @@index([tenantId, createdAt])
   @@map("member_invoices")
 }
 
@@ -1408,6 +1441,11 @@ model MemberPayment {
   @@index([tenantId, memberId])
   @@index([tenantId, status])
   @@index([tenantId, invoiceId])
+  /// Covers the branch-scoped finance-dashboard aggregates (recent/
+  /// sumFinalAmountForDateRange/dailyTotalsForRange) and the branch-filtered
+  /// payment list — `branchId` was filtered in all of these with no index
+  /// containing it before (Prompt 32 perf pass).
+  @@index([tenantId, branchId, paymentDate])
   @@map("member_payments")
 }
 
@@ -1458,6 +1496,9 @@ model Income {
 
   @@index([tenantId, category])
   @@index([tenantId, incomeDate])
+  /// Covers the branch-scoped finance-dashboard aggregates, which filter
+  /// tenantId+branchId+incomeDate together (Prompt 32 perf pass).
+  @@index([tenantId, branchId, incomeDate])
   @@map("income_entries")
 }
 
@@ -1484,6 +1525,9 @@ model Expense {
 
   @@index([tenantId, category])
   @@index([tenantId, expenseDate])
+  /// Covers the branch-scoped finance-dashboard aggregates, which filter
+  /// tenantId+branchId+expenseDate together (Prompt 32 perf pass).
+  @@index([tenantId, branchId, expenseDate])
   @@map("expenses")
 }
 
@@ -1671,6 +1715,9 @@ model AuditLog {
 
   @@index([tenantId, createdAt])
   @@index([action])
+  /// Covers "show this user's activity" — a common IAM detail-page query
+  /// with no index at all before (Prompt 32 perf pass).
+  @@index([tenantId, actorUserId])
   @@map("audit_logs")
 }
 
@@ -2491,7 +2538,13 @@ model SupportTicket {
   notes         SupportTicketNote[]
 
   @@index([status, priority])
-  @@index([tenantId])
+  /// Covers the tenant portal's ticket list (`WHERE tenantId [AND status]
+  /// ORDER BY createdAt`) — the old lone `[tenantId]` index couldn't serve
+  /// the status filter or the sort; superseded by this composite, whose
+  /// leftmost-prefix (`tenantId` alone) still covers every use the old
+  /// index did (Prompt 32 perf pass). `[status, priority]` above stays
+  /// as-is — it serves the separate cross-tenant admin queue view.
+  @@index([tenantId, status, createdAt])
   @@map("support_tickets")
 }
 

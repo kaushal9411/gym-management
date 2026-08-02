@@ -65,6 +65,8 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'settings:manage', description: 'Manage branding, timezone, currency, tax settings' },
   { key: 'profile:read', description: "Read one's own profile" },
   { key: 'profile:update', description: "Update one's own profile" },
+  { key: 'support:view', description: "View the gym's support tickets" },
+  { key: 'support:create', description: 'Raise a new support ticket with the FitCloud team' },
 
   // Staff Management (Prompt 13) — Manager/Trainer/Receptionist only, distinct
   // from the generic `users:*` IAM keys which cover every account type.
@@ -207,6 +209,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'reports:view', 'reports:export', 'analytics:view',
     'notifications:view', 'announcements:view', 'announcements:create', 'announcements:update', 'announcements:delete', 'announcements:publish',
     'branches:view', 'branches:create', 'branches:update', 'branches:delete', 'branches:restore', 'branches:activate',
+    'support:view', 'support:create',
   ],
   TRAINER: [
     'members:read', 'attendance:create', 'attendance:read',
@@ -232,6 +235,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     // Trainers need to see the branch list/selector, but branch CRUD/
     // activation/default-setting stays a Manager decision.
     'branches:view',
+    'support:view', 'support:create',
   ],
   RECEPTIONIST: [
     'members:manage', 'members:read',
@@ -264,8 +268,9 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     // Front-desk needs to see the branch list/selector, but branch CRUD/
     // activation/default-setting stays a Manager decision.
     'branches:view',
+    'support:view', 'support:create',
   ],
-  MEMBER: ['profile:read', 'profile:update', 'bookings:create', 'bookings:read', 'payments:read', 'chat:use'],
+  MEMBER: ['profile:read', 'profile:update', 'bookings:create', 'bookings:read', 'payments:read', 'chat:use', 'support:view', 'support:create'],
 };
 
 interface PlanFeatureSeed {

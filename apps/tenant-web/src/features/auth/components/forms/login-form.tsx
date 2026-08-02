@@ -146,7 +146,7 @@ export function LoginForm() {
         }
       `}</style>
 
-      <LoginHero />
+      <LoginHero backgroundImageUrl={tenant.branding.loginBackgroundUrl} />
 
       <main className="flex flex-1 items-center justify-center px-4 py-10">
         <motion.div

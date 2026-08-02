@@ -1,8 +1,21 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 
 import { getActiveStore } from '@/store';
+import { requestFinished, requestStarted } from '@/store/ui-slice';
 import { signedOut } from '../store/auth-slice';
 import { AdminServiceError, type AdminErrorCode } from '../types';
+
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    /**
+     * Excludes this request from `ui-slice.pendingRequests` — the shared
+     * signal driving the app's global loader. Pass on calls that already
+     * have their own local, in-place loading UI (see tenant-web's
+     * identical declaration for the full write-up).
+     */
+    silent?: boolean;
+  }
+}
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
 
@@ -51,16 +64,19 @@ apiClient.interceptors.request.use((config) => {
   const controller = new AbortController();
   inFlight.set(key, controller);
   config.signal = controller.signal;
+  if (!config.silent) getActiveStore()?.dispatch(requestStarted());
   return config;
 });
 
 apiClient.interceptors.response.use(
   (response) => {
     inFlight.delete(requestKey(response.config));
+    if (!response.config.silent) getActiveStore()?.dispatch(requestFinished());
     return response;
   },
   async (error: AxiosError<ApiErrorBody>) => {
     if (error.config) inFlight.delete(requestKey(error.config));
+    if (!error.config?.silent) getActiveStore()?.dispatch(requestFinished());
     if (axios.isCancel(error)) return Promise.reject(error);
 
     const adminError = toAdminServiceError(error);

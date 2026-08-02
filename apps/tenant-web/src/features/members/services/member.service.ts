@@ -129,7 +129,8 @@ class MemberService {
   }
 
   async uploadDocument(id: string, type: MemberDocumentType, fileName: string, fileDataUrl: string): Promise<MemberDocument> {
-    const res = await apiClient.post<ApiEnvelope<MemberDocument>>(`/members/${id}/documents`, { type, fileName, fileDataUrl });
+    // silent: true — already has its own local "Uploading…" button state (see DocumentUpload); the global loader would be redundant.
+    const res = await apiClient.post<ApiEnvelope<MemberDocument>>(`/members/${id}/documents`, { type, fileName, fileDataUrl }, { silent: true });
     return res.data.data;
   }
 

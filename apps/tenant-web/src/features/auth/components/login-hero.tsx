@@ -2,6 +2,8 @@
 
 import { Activity, Dumbbell, Footprints, PenSquare } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
+
 const ICON_CHIPS = [
   { icon: Dumbbell, className: 'left-[8%] top-[20%]', tint: 'cyan' },
   { icon: Footprints, className: 'left-[34%] top-[9%]', tint: 'orange' },
@@ -17,15 +19,23 @@ const DIAMONDS = [
   { className: 'right-[22%] bottom-[10%] size-5', tint: 'cyan', delay: '-5s' },
 ] as const;
 
+interface LoginHeroProps {
+  /** Tenant's uploaded "Login background image" (Gym Settings → Branding), if any. Replaces the solid `#07070b` base layer — every decorative element (glow, streaks, diamonds, chips, dots, vignette) still renders on top, unchanged. */
+  backgroundImageUrl?: string;
+}
+
 /**
  * Full-bleed dark "energetic gym" backdrop for the login experience — a
  * fixed neon dual-tone (orange + cyan) aesthetic, deliberately independent
  * of the app's light/dark theme toggle, matching the reference concept art.
  * Login-only: not imported anywhere else, zero effect on other auth pages.
  */
-export function LoginHero() {
+export function LoginHero({ backgroundImageUrl }: LoginHeroProps) {
   return (
-    <div className="absolute inset-0 -z-10 overflow-hidden bg-[#07070b]">
+    <div
+      className={cn('absolute inset-0 -z-10 overflow-hidden bg-cover bg-center', !backgroundImageUrl && 'bg-[#07070b]')}
+      style={backgroundImageUrl ? { backgroundImage: `url(${backgroundImageUrl})` } : undefined}
+    >
       <style>{`
         @keyframes login-bg-drift {
           0%, 100% { background-position: 0% 0%, 100% 100%; }
@@ -119,6 +129,13 @@ export function LoginHero() {
         <span className="login-dot absolute left-[14%] top-[74%] size-1 rounded-full bg-cyan-400" style={{ animationDelay: '-1s' }} />
         <span className="login-dot absolute left-[46%] top-[86%] size-1.5 rounded-full bg-orange-400" style={{ animationDelay: '-3s' }} />
       </div>
+
+      {backgroundImageUrl ? (
+        // A photo can be any brightness/color, unlike the fixed near-black
+        // base it replaces — an even overall scrim (not just the edge
+        // vignette below) keeps the glass card and neon accents readable.
+        <div aria-hidden className="pointer-events-none absolute inset-0 bg-black/45" />
+      ) : null}
 
       {/* Vignette to keep the center readable */}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_45%,transparent_0%,rgba(7,7,11,0.55)_100%)]" />

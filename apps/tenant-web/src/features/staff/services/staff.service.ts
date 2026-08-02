@@ -69,6 +69,11 @@ class StaffService {
     await apiClient.post(`/staff/${staffId}/resend-activation`);
   }
 
+  async manualActivate(staffId: string): Promise<{ email: string; temporaryPassword: string }> {
+    const res = await apiClient.post<ApiEnvelope<{ email: string; temporaryPassword: string }>>(`/staff/${staffId}/manual-activate`);
+    return res.data.data;
+  }
+
   async assignBranches(staffId: string, payload: AssignBranchesPayload): Promise<StaffDetail> {
     const res = await apiClient.put<ApiEnvelope<StaffDetail>>(`/staff/${staffId}/branches`, payload);
     return res.data.data;

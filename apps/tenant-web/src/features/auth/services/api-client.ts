@@ -1,6 +1,24 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 
 import { getActiveStore } from '@/store';
+
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    /**
+     * Excludes this request from `ui-slice.pendingRequests` — the shared
+     * signal that drives the app's global full-screen loader
+     * (`components/loading/global-loader.tsx`). Pass on calls that already
+     * have their own local, in-place loading UI (e.g. an image upload with
+     * a progress bar on the thumbnail itself) — showing the big loader on
+     * top of a UI that already says "uploading" is redundant, and worse,
+     * covers the very thing the user is watching (confirmed user-reported:
+     * uploading a branding image blanked the whole screen with the global
+     * loader, obscuring the other "Change image" buttons they might want
+     * to use next, and covering the item they were actively uploading).
+     */
+    silent?: boolean;
+  }
+}
 import { requestFinished, requestStarted } from '@/store/ui-slice';
 import { signedOut } from '../store/auth-slice';
 import { getCurrentTenantSlug } from '../utils/tenant-detection';
@@ -131,21 +149,21 @@ apiClient.interceptors.request.use((config) => {
   inFlight.set(key, controller);
   config.signal = controller.signal;
 
-  getActiveStore()?.dispatch(requestStarted());
+  if (!config.silent) getActiveStore()?.dispatch(requestStarted());
   return config;
 });
 
 apiClient.interceptors.response.use(
   (response) => {
     inFlight.delete(requestKey(response.config));
-    getActiveStore()?.dispatch(requestFinished());
+    if (!response.config.silent) getActiveStore()?.dispatch(requestFinished());
     return response;
   },
   async (error: AxiosError<ApiErrorBody>) => {
     const config = error.config;
     if (config) {
       inFlight.delete(requestKey(config));
-      getActiveStore()?.dispatch(requestFinished());
+      if (!config.silent) getActiveStore()?.dispatch(requestFinished());
     }
 
     if (axios.isCancel(error)) return Promise.reject(error);

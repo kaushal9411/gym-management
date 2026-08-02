@@ -9,6 +9,10 @@ export interface TenantBranding {
   /** Optional hosted logo; when absent the initials mark is rendered. */
   logoUrl?: string;
   faviconUrl?: string;
+  /** Optional background image behind the auth (login/register/etc.) hero panel. */
+  loginBackgroundUrl?: string;
+  /** Optional banner image for the dashboard header. */
+  dashboardBannerUrl?: string;
   /** Short welcome line shown on the login screen. */
   welcomeMessage: string;
 }

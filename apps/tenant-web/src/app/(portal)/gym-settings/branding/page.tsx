@@ -97,11 +97,19 @@ export default function BrandingPage() {
     }
   };
 
-  const handleUpload = async (kind: 'logo' | 'favicon' | 'loginBackgroundUrl' | 'dashboardBannerUrl' | 'emailLogoUrl', dataUrl: string) => {
+  const handleUpload = async (
+    kind: 'logo' | 'favicon' | 'loginBackgroundUrl' | 'dashboardBannerUrl' | 'emailLogoUrl',
+    dataUrl: string,
+    onProgress: (percent: number) => void,
+  ) => {
+    const onUploadProgress = (event: { loaded: number; total?: number }) => {
+      const total = event.total ?? event.loaded;
+      onProgress(total > 0 ? Math.round((event.loaded / total) * 100) : 0);
+    };
     try {
-      if (kind === 'logo') await uploadLogo.mutateAsync(dataUrl);
-      else if (kind === 'favicon') await uploadFavicon.mutateAsync(dataUrl);
-      else await uploadAsset.mutateAsync({ field: kind, dataUrl });
+      if (kind === 'logo') await uploadLogo.mutateAsync({ dataUrl, onUploadProgress });
+      else if (kind === 'favicon') await uploadFavicon.mutateAsync({ dataUrl, onUploadProgress });
+      else await uploadAsset.mutateAsync({ field: kind, dataUrl, onUploadProgress });
       toast.success('Image uploaded');
       refreshPortalChrome();
     } catch (error) {
@@ -204,7 +212,7 @@ export default function BrandingPage() {
                 value={branding.data.logoUrl}
                 maxDimension={512}
                 disabled={!canManage}
-                onUpload={(dataUrl) => void handleUpload('logo', dataUrl)}
+                onUpload={(dataUrl, onProgress) => handleUpload('logo', dataUrl, onProgress)}
               />
               <ImageUploadField
                 label="Favicon"
@@ -213,7 +221,7 @@ export default function BrandingPage() {
                 maxDimension={64}
                 previewClassName="size-10"
                 disabled={!canManage}
-                onUpload={(dataUrl) => void handleUpload('favicon', dataUrl)}
+                onUpload={(dataUrl, onProgress) => handleUpload('favicon', dataUrl, onProgress)}
               />
               <ImageUploadField
                 label="Login background image"
@@ -221,7 +229,7 @@ export default function BrandingPage() {
                 maxDimension={1280}
                 previewClassName="h-16 w-28"
                 disabled={!canManage}
-                onUpload={(dataUrl) => void handleUpload('loginBackgroundUrl', dataUrl)}
+                onUpload={(dataUrl, onProgress) => handleUpload('loginBackgroundUrl', dataUrl, onProgress)}
               />
               <ImageUploadField
                 label="Dashboard banner"
@@ -229,7 +237,7 @@ export default function BrandingPage() {
                 maxDimension={1280}
                 previewClassName="h-16 w-28"
                 disabled={!canManage}
-                onUpload={(dataUrl) => void handleUpload('dashboardBannerUrl', dataUrl)}
+                onUpload={(dataUrl, onProgress) => handleUpload('dashboardBannerUrl', dataUrl, onProgress)}
               />
               <ImageUploadField
                 label="Email logo"
@@ -237,7 +245,7 @@ export default function BrandingPage() {
                 value={branding.data.emailLogoUrl}
                 maxDimension={512}
                 disabled={!canManage}
-                onUpload={(dataUrl) => void handleUpload('emailLogoUrl', dataUrl)}
+                onUpload={(dataUrl, onProgress) => handleUpload('emailLogoUrl', dataUrl, onProgress)}
               />
             </CardContent>
           </Card>

@@ -40,6 +40,11 @@ export class StaffController {
     sendSuccess(res, null, 'Staff member activated.');
   }
 
+  async manualActivate(req: Request, res: Response): Promise<void> {
+    const result = await serviceFor(req).manualActivate(req.params.staffId!, actorFrom(req));
+    sendSuccess(res, result, 'Staff member activated with a temporary password.');
+  }
+
   async deactivate(req: Request, res: Response): Promise<void> {
     await serviceFor(req).deactivate(req.params.staffId!, actorFrom(req));
     sendSuccess(res, null, 'Staff member deactivated.');

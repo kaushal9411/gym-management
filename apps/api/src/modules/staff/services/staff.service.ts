@@ -314,6 +314,32 @@ export class StaffService {
     await this.audit(actor, 'staff.invitation_resent', userId);
   }
 
+  /**
+   * Manager-side alternative to the staff member clicking their own
+   * activation email (e.g. the manager confirmed identity by phone and wants
+   * to hand over credentials directly, or the email never arrived). Sets a
+   * real, usable password — same two-call sequence `acceptActivation` itself
+   * uses (`authUserRepository.updatePasswordHash` + status/emailVerifiedAt) —
+   * so this is a genuine activation, not a status-only flip like `activate()`
+   * above (which is for un-suspending an *already-activated* account and
+   * would otherwise leave a PENDING_VERIFICATION user ACTIVE with no usable
+   * password). Returns the generated password once, directly — this module
+   * has no secure side-channel to deliver it otherwise (mirrors the Super
+   * Admin portal's `AdminRoleService#createAdmin` precedent).
+   */
+  async manualActivate(userId: string, actor: IamActor): Promise<{ email: string; temporaryPassword: string }> {
+    const staffMember = await this.mustFind(userId);
+    if (staffMember.status !== 'PENDING_VERIFICATION') {
+      throw new ConflictError(ErrorCode.CONFLICT, 'This staff member has already activated their account.');
+    }
+    const temporaryPassword = `Temp-${generateOpaqueToken(10)}!A`;
+    const passwordHash = await passwordService.hash(temporaryPassword);
+    await this.authUserRepository.updatePasswordHash(this.tenantId, userId, passwordHash);
+    await this.users.update(userId, { status: 'ACTIVE', emailVerifiedAt: new Date() });
+    await this.audit(actor, 'staff.manually_activated', userId);
+    return { email: staffMember.email, temporaryPassword };
+  }
+
   async assignBranches(userId: string, input: AssignBranchesInput, actor: IamActor): Promise<StaffDetailDto> {
     await this.mustFind(userId);
     if (!input.branchIds.includes(input.primaryBranchId)) {
