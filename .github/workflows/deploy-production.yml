@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: production   # requires manual approval (environment protection rule)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Promote staging-verified images (placeholder)
         run: echo "retag $GITHUB_SHA images from staging repo — never rebuild for prod"

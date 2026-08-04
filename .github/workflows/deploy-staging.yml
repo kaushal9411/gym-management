@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # ── Build & push images (SHA-tagged) ──
       # - uses: aws-actions/configure-aws-credentials@v4  (OIDC role)
@@ -44,6 +44,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Playwright suite (placeholder)
         run: echo "registration → provisioning → subdomain login → CRUD smoke"
