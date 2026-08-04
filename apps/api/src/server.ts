@@ -11,19 +11,10 @@ import { startEmailWorker, stopEmailWorker } from './infrastructure/queue/email.
 import { initSocketServer } from './infrastructure/realtime/socket-server';
 import { registerAuthEmailListeners } from './modules/authentication/events/auth-email.listeners';
 import { registerInvitationEmailListeners } from './modules/invitations/events/invitation-email.listeners';
-import { startMembershipExpiryJobs, stopMembershipExpiryJobs } from './modules/members/jobs/membership-expiry.jobs';
 import { registerOnboardingEmailListeners } from './modules/onboarding/events/onboarding-email.listeners';
-import { startScheduledReportJobs, stopScheduledReportJobs } from './modules/reports/jobs/scheduled-reports.jobs';
+import { initScheduler, stopScheduler } from './modules/scheduler/services/scheduler-engine.service';
 import { registerStaffEmailListeners } from './modules/staff/events/staff-email.listeners';
 import { registerBillingEmailListeners } from './modules/subscription/events/billing-email.listeners';
-import {
-  startSubscriptionBillingJobs,
-  stopSubscriptionBillingJobs,
-} from './modules/subscription/jobs/subscription-billing.jobs';
-import {
-  startTenantAnnouncementSchedulerJobs,
-  stopTenantAnnouncementSchedulerJobs,
-} from './modules/tenant-announcements/jobs/tenant-announcement-scheduler.jobs';
 
 async function bootstrap(): Promise<void> {
   registerAuthEmailListeners();
@@ -32,10 +23,7 @@ async function bootstrap(): Promise<void> {
   registerInvitationEmailListeners();
   registerStaffEmailListeners();
   startEmailWorker();
-  await startSubscriptionBillingJobs();
-  await startScheduledReportJobs();
-  await startMembershipExpiryJobs();
-  await startTenantAnnouncementSchedulerJobs();
+  await initScheduler();
 
   const app = createApp();
   // Resolved through the DI container to prove it's wired, not just declared.
@@ -52,10 +40,7 @@ async function bootstrap(): Promise<void> {
     logger.info(`${signal} received — shutting down gracefully`);
     server.close(async () => {
       await stopEmailWorker();
-      await stopSubscriptionBillingJobs();
-      await stopScheduledReportJobs();
-      await stopMembershipExpiryJobs();
-      await stopTenantAnnouncementSchedulerJobs();
+      await stopScheduler();
       await emailQueue.close();
       await disconnectPrisma();
       await disconnectRedis();

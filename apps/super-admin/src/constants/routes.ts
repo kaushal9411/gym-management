@@ -13,4 +13,5 @@ export const ADMIN_ROUTES = {
   settings: '/settings',
   auditLogs: '/audit-logs',
   roles: '/roles',
+  scheduler: '/scheduler',
 } as const;

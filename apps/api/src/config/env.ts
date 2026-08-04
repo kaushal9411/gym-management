@@ -49,6 +49,14 @@ const envSchema = z.object({
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
 
+  /** Provider abstraction (`modules/ai-assistant/providers/`) — never hardcode a provider/key in code, this is the only place it's read from. */
+  AI_PROVIDER: z.enum(['openrouter', 'openai', 'anthropic', 'gemini', 'azure-openai', 'ollama']).default('openrouter'),
+  AI_MODEL: z.string().default('inclusionai/ling-3.0-flash:free'),
+  AI_API_KEY: z.string().optional(),
+  AI_BASE_URL: z.string().optional(),
+  AI_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.7),
+  AI_MAX_TOKENS: z.coerce.number().int().positive().max(32_000).default(1024),
+
   BCRYPT_SALT_ROUNDS: z.coerce.number().int().min(10).max(15).default(10),
   LOGIN_MAX_ATTEMPTS: z.coerce.number().int().positive().default(5),
   LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
@@ -128,6 +136,26 @@ export const env = {
     keySecret: raw.RAZORPAY_KEY_SECRET,
     get isConfigured() {
       return Boolean(raw.RAZORPAY_KEY_ID && raw.RAZORPAY_KEY_SECRET);
+    },
+  },
+
+  /**
+   * The ONE place an AI provider/model/key is read from — `AI_PROVIDER`
+   * selects which adapter `providers/factory.ts` instantiates; everything
+   * else is generic config passed to whichever adapter that is. `ollama`
+   * needs no API key (local daemon); every other provider does, so
+   * `isConfigured` special-cases it rather than requiring `AI_API_KEY`
+   * unconditionally.
+   */
+  ai: {
+    provider: raw.AI_PROVIDER,
+    model: raw.AI_MODEL,
+    apiKey: raw.AI_API_KEY,
+    baseUrl: raw.AI_BASE_URL,
+    temperature: raw.AI_TEMPERATURE,
+    maxTokens: raw.AI_MAX_TOKENS,
+    get isConfigured() {
+      return raw.AI_PROVIDER === 'ollama' || Boolean(raw.AI_API_KEY);
     },
   },
 

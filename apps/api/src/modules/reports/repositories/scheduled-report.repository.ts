@@ -32,7 +32,7 @@ export class ScheduledReportRepository {
     await this.db.scheduledReport.delete({ where: { id } });
   }
 
-  /** Cross-tenant scan for the BullMQ job — due, active schedules across every tenant. Raw `prisma` (platform-wide job, same documented pattern as `subscription-billing.jobs.ts`). */
+  /** Cross-tenant scan for the Scheduler's `tenant-scheduled-reports-dispatch` job — due, active schedules across every tenant. Raw `prisma` (platform-wide job, same documented pattern as the module's other cross-tenant sweeps). */
   static async findDueAcrossTenants(prisma: PrismaClient, before: Date) {
     return prisma.scheduledReport.findMany({
       where: { isActive: true, nextRunAt: { lte: before } },

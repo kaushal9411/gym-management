@@ -18,6 +18,27 @@ async function tenantsForAudience(audience: AnnouncementAudience) {
   });
 }
 
+/**
+ * The actual send: email fan-out (if channel is EMAIL) + in-portal
+ * Notification Center broadcast (always). Extracted so both the admin's
+ * manual "Send" button and the Scheduler's `send-scheduled-notifications`
+ * sweep (`modules/scheduler/handlers/notification.handlers.ts`) go through
+ * the exact same dispatch path — the sweep is what makes `scheduledAt`
+ * actually fire on its own, closing a previously-documented gap.
+ */
+export async function dispatchNotification(notification: { id: string; title: string; body: string; channel: string; audience: AnnouncementAudience }): Promise<void> {
+  const tenants = await tenantsForAudience(notification.audience);
+
+  if (notification.channel === 'EMAIL') {
+    const html = renderEmailLayout(PLATFORM_BRANDING, `<h1 style="font-size:20px;margin:0 0 12px;">${notification.title}</h1><p>${notification.body}</p>`);
+    for (const tenant of tenants) {
+      const owner = tenant.users[0];
+      if (owner) await enqueueEmail({ to: owner.email, subject: notification.title, html });
+    }
+  }
+  await tenantNotificationService.broadcast(tenants.map((t) => t.id), notification.title, notification.body, notification.id);
+}
+
 export class AdminNotificationService {
   // ── Announcements (persistent in-portal banner) ──
   async listAnnouncements() {
@@ -55,19 +76,10 @@ export class AdminNotificationService {
     if (!notification) throw new AppError(ErrorCode.NOT_FOUND, 'Notification not found', 404);
     if (notification.sentAt) throw new AppError(ErrorCode.CONFLICT, 'This notification was already sent.', 409);
 
-    const tenants = await tenantsForAudience(notification.audience);
-
-    if (notification.channel === 'EMAIL') {
-      const html = renderEmailLayout(PLATFORM_BRANDING, `<h1 style="font-size:20px;margin:0 0 12px;">${notification.title}</h1><p>${notification.body}</p>`);
-      for (const tenant of tenants) {
-        const owner = tenant.users[0];
-        if (owner) await enqueueEmail({ to: owner.email, subject: notification.title, html });
-      }
-    }
     // Regardless of channel, every matching tenant sees it in their in-portal
     // Notification Center — that's the one piece that's actually wired up
     // today; PUSH is architecture-only (no push provider configured yet).
-    await tenantNotificationService.broadcast(tenants.map((t) => t.id), notification.title, notification.body, notification.id);
+    await dispatchNotification(notification);
 
     const updated = await prisma.notification.update({ where: { id }, data: { sentAt: new Date() } });
     await adminAuditLogRepository.record({ adminUserId, actorRole: adminRole, action: 'admin.notification_sent', entityType: 'Notification', entityId: id });

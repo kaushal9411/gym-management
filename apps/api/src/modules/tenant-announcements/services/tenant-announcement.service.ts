@@ -112,7 +112,7 @@ export class TenantAnnouncementService {
     return this.getById(id);
   }
 
-  /** "Schedule Announcement" — sets a future auto-publish time; the BullMQ sweep (`jobs/tenant-announcement-scheduler.jobs.ts`) publishes it once due. */
+  /** "Schedule Announcement" — sets a future auto-publish time; the Scheduler & Background Jobs module's `send-scheduled-announcements` job publishes it once due. */
   async schedule(id: string, input: ScheduleAnnouncementInput, actor: IamActor): Promise<TenantAnnouncementDto> {
     const existing = await this.mustFind(id);
     if (existing.status === 'PUBLISHED' || existing.status === 'EXPIRED') {

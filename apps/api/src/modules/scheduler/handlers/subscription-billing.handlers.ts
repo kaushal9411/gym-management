@@ -1,17 +1,14 @@
-import { Queue, Worker } from 'bullmq';
-
 import { logger } from '../../../core/logging/logger';
 import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { subscriptionAlertEmail } from '../../../infrastructure/mail/templates/auth-templates';
 import { gracePeriodReminderEmail, subscriptionExpiredEmail } from '../../../infrastructure/mail/templates/billing-templates';
-import { createQueueConnection } from '../../../infrastructure/queue/connection';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
+import { SubscriptionService } from '../../subscription/services/subscription.service';
 import { tenantNotificationService } from '../../tenant-notifications/services/tenant-notification.service';
-import { SubscriptionService } from '../services/subscription.service';
+import type { JobHandler } from '../types';
 
-const QUEUE_NAME = 'subscription-billing';
 const REMINDER_WINDOW_DAYS = 3;
 const GRACE_PERIOD_DAYS = 3;
 const EXPIRE_AFTER_SUSPENDED_DAYS = 7;
@@ -19,53 +16,25 @@ const DAY_MS = 86_400_000;
 const DEDUPE_TTL_SECONDS = 8 * 86_400;
 
 /**
- * The full Prompt 8 lifecycle sweep — Trial → Active → Renewal Due → Grace
- * → Suspended → (Reactivated by a successful renew()) → Cancelled/Expired —
- * plus the reminder emails at each transition. Supersedes onboarding's
- * narrower subscription-lifecycle.jobs.ts (trial/renewal reminders only),
- * which this file's trial/renewal reminder functions absorbed unchanged.
- *
- * "Invoice Generation" from Prompt 8's queue-job list isn't a separate job
- * here — invoices are generated synchronously as part of checkout()/renew()
- * (see subscription.service.ts), so every job below that successfully
- * renews a subscription has already generated that period's invoice by the
- * time this sweep moves on.
- *
- * Cross-tenant scans use the raw client — same documented dev-superuser RLS
- * caveat as every other platform-wide job in this codebase (see
- * onboarding's original subscription-lifecycle.jobs.ts).
+ * Migrated verbatim from the old `subscription-billing.jobs.ts` module-local
+ * BullMQ registration — the full Prompt 8 platform-billing lifecycle sweep
+ * (Trial → Active → Renewal Due → Grace → Suspended → Expired), unchanged
+ * phase-by-phase. Kept as a single atomic handler rather than split into the
+ * spec's per-tenant "Payment Jobs" types — this is FitCloud's OWN billing of
+ * its tenants (a different concern from `payment.handlers.ts`'s member-level
+ * jobs), and its 7 phases were already tested together as one sweep; nothing
+ * here changed except the trigger mechanism (this module's registry instead
+ * of its own `Queue`/`Worker`/`repeat`).
  */
-let queue: Queue | null = null;
-let worker: Worker | null = null;
-
-export async function startSubscriptionBillingJobs(): Promise<void> {
-  queue = new Queue(QUEUE_NAME, { connection: createQueueConnection() });
-
-  worker = new Worker(
-    QUEUE_NAME,
-    async () => {
-      await remindTrialsEndingSoon();
-      await remindRenewalsDueSoon();
-      await convertExpiredTrials();
-      await processOverdueRenewals();
-      await remindGracePeriod();
-      await suspendExpiredGrace();
-      await expireSuspended();
-    },
-    { connection: createQueueConnection() },
-  );
-  worker.on('failed', (job, err) => logger.error('Subscription billing job failed', { jobId: job?.id, error: err.message }));
-
-  await queue.add('daily-scan', {}, { repeat: { every: 24 * 60 * 60_000 }, removeOnComplete: true, removeOnFail: true });
-  await queue.add('startup-scan', {}, { removeOnComplete: true, removeOnFail: true });
-
-  logger.info('Subscription billing jobs scheduled (reminders + lifecycle sweep, every 24h)');
-}
-
-export async function stopSubscriptionBillingJobs(): Promise<void> {
-  await worker?.close();
-  await queue?.close();
-}
+export const platformSubscriptionBillingSweep: JobHandler = async () => {
+  await remindTrialsEndingSoon();
+  await remindRenewalsDueSoon();
+  await convertExpiredTrials();
+  await processOverdueRenewals();
+  await remindGracePeriod();
+  await suspendExpiredGrace();
+  await expireSuspended();
+};
 
 async function remindTrialsEndingSoon(): Promise<void> {
   const windowEnd = new Date(Date.now() + REMINDER_WINDOW_DAYS * DAY_MS);
@@ -78,11 +47,15 @@ async function remindTrialsEndingSoon(): Promise<void> {
     const owner = tenant.users[0];
     if (!owner) continue;
     const dedupeKey = `reminder:trial:${tenant.id}`;
+    // eslint-disable-next-line no-await-in-loop -- sequential across a small, infrequent (daily) batch; no throughput requirement justifies parallelizing
     if (await cache.get(dedupeKey)) continue;
 
     const template = subscriptionAlertEmail({ tenantName: tenant.name }, owner.name, 'trial_ending');
+    // eslint-disable-next-line no-await-in-loop
     await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
+    // eslint-disable-next-line no-await-in-loop
     await tenantNotificationService.notifyTenant(tenant.id, 'SUBSCRIPTION', template.subject, template.subject);
+    // eslint-disable-next-line no-await-in-loop
     await cache.set(dedupeKey, true, DEDUPE_TTL_SECONDS);
   }
 }
@@ -98,11 +71,15 @@ async function remindRenewalsDueSoon(): Promise<void> {
     const owner = subscription.tenant.users[0];
     if (!owner) continue;
     const dedupeKey = `reminder:renewal:${subscription.id}`;
+    // eslint-disable-next-line no-await-in-loop -- see remindTrialsEndingSoon
     if (await cache.get(dedupeKey)) continue;
 
     const template = subscriptionAlertEmail({ tenantName: subscription.tenant.name }, owner.name, 'renewal_reminder');
+    // eslint-disable-next-line no-await-in-loop
     await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
+    // eslint-disable-next-line no-await-in-loop
     await tenantNotificationService.notifyTenant(subscription.tenantId, 'SUBSCRIPTION', template.subject, template.subject);
+    // eslint-disable-next-line no-await-in-loop
     await cache.set(dedupeKey, true, DEDUPE_TTL_SECONDS);
   }
 }
@@ -115,6 +92,7 @@ async function convertExpiredTrials(): Promise<void> {
   });
 
   for (const subscription of subscriptions) {
+    // eslint-disable-next-line no-await-in-loop -- sequential across a small, infrequent (daily) batch
     await tryRenewOrEnterGrace(subscription.tenantId, subscription.id, subscription.tenant.name, subscription.tenant.users[0]?.email);
   }
 }
@@ -128,13 +106,13 @@ async function processOverdueRenewals(): Promise<void> {
 
   for (const subscription of subscriptions) {
     if (subscription.cancelAtPeriodEnd) {
-      await prisma.subscription.update({
-        where: { id: subscription.id },
-        data: { status: 'CANCELED', cancelledAt: new Date() },
-      });
+      // eslint-disable-next-line no-await-in-loop -- see convertExpiredTrials
+      await prisma.subscription.update({ where: { id: subscription.id }, data: { status: 'CANCELED', cancelledAt: new Date() } });
+      // eslint-disable-next-line no-await-in-loop
       await prisma.tenant.update({ where: { id: subscription.tenantId }, data: { status: 'CANCELLED', suspendedAt: new Date() } });
       continue;
     }
+    // eslint-disable-next-line no-await-in-loop
     await tryRenewOrEnterGrace(subscription.tenantId, subscription.id, subscription.tenant.name, subscription.tenant.users[0]?.email);
   }
 }
@@ -167,24 +145,28 @@ async function remindGracePeriod(): Promise<void> {
     const owner = subscription.tenant.users[0];
     if (!owner || !subscription.graceEndsAt) continue;
     const dedupeKey = `reminder:grace:${subscription.id}:${new Date().toISOString().slice(0, 10)}`;
+    // eslint-disable-next-line no-await-in-loop -- see remindTrialsEndingSoon
     if (await cache.get(dedupeKey)) continue;
 
     const daysRemaining = Math.max(1, Math.ceil((subscription.graceEndsAt.getTime() - Date.now()) / DAY_MS));
     const template = gracePeriodReminderEmail({ tenantName: subscription.tenant.name }, owner.name, daysRemaining);
+    // eslint-disable-next-line no-await-in-loop
     await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
+    // eslint-disable-next-line no-await-in-loop
     await tenantNotificationService.notifyTenant(subscription.tenantId, 'SUBSCRIPTION', template.subject, template.subject);
+    // eslint-disable-next-line no-await-in-loop
     await cache.set(dedupeKey, true, DEDUPE_TTL_SECONDS);
   }
 }
 
 async function suspendExpiredGrace(): Promise<void> {
-  const subscriptions = await prisma.subscription.findMany({
-    where: { status: 'PAST_DUE', graceEndsAt: { lte: new Date() } },
-  });
+  const subscriptions = await prisma.subscription.findMany({ where: { status: 'PAST_DUE', graceEndsAt: { lte: new Date() } } });
 
   for (const subscription of subscriptions) {
     const now = new Date();
+    // eslint-disable-next-line no-await-in-loop -- see remindTrialsEndingSoon
     await prisma.subscription.update({ where: { id: subscription.id }, data: { status: 'SUSPENDED', suspendedAt: now } });
+    // eslint-disable-next-line no-await-in-loop
     await prisma.tenant.update({ where: { id: subscription.tenantId }, data: { status: 'SUSPENDED', suspendedAt: now } });
   }
 }
@@ -198,12 +180,15 @@ async function expireSuspended(): Promise<void> {
   });
 
   for (const subscription of subscriptions) {
+    // eslint-disable-next-line no-await-in-loop -- see remindTrialsEndingSoon
     await prisma.subscription.update({ where: { id: subscription.id }, data: { status: 'EXPIRED' } });
 
     const owner = subscription.tenant.users[0];
     if (!owner) continue;
     const template = subscriptionExpiredEmail({ tenantName: subscription.tenant.name }, owner.name);
+    // eslint-disable-next-line no-await-in-loop
     await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
+    // eslint-disable-next-line no-await-in-loop
     await tenantNotificationService.notifyTenant(subscription.tenantId, 'SUBSCRIPTION', template.subject, template.subject);
   }
 }

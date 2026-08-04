@@ -199,6 +199,7 @@ export class MemberService {
     });
     await this.audit(actor, 'member.created', member.id);
     await notifyNewMemberRegistration(this.tenantId, {
+      memberId: member.id,
       memberName: `${member.firstName} ${member.lastName}`.trim(),
       memberCode: member.memberId,
       memberEmail: member.email,

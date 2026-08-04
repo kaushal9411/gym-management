@@ -1,9 +1,14 @@
+import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { renderTemplate } from '../constants/default-templates';
 
 import { notificationTemplateService } from './notification-template.service';
 import { tenantNotificationService } from './tenant-notification.service';
+
+/** Marker set once a member's welcome message has actually fired (synchronously here, or as a catch-up by the Scheduler's `welcome-messages` job) — lets the catch-up sweep tell "never sent" apart from "already sent". */
+export const WELCOME_SENT_TTL_SECONDS = 30 * 86_400;
+export const welcomeSentCacheKey = (memberId: string): string => `welcome-sent:${memberId}`;
 
 /**
  * The 12 trigger-event entry points the spec asks for, plus Membership
@@ -46,7 +51,7 @@ async function fireTemplated(
 
 export async function notifyNewMemberRegistration(
   tenantId: string,
-  params: { memberName: string; memberCode: string; memberEmail?: string | null },
+  params: { memberId: string; memberName: string; memberCode: string; memberEmail?: string | null },
 ): Promise<void> {
   await fireTemplated(tenantId, 'NEW_MEMBER_REGISTRATION', { memberName: params.memberName, memberCode: params.memberCode }, { category: 'MEMBER' });
 
@@ -58,6 +63,7 @@ export async function notifyNewMemberRegistration(
       { memberName: params.memberName, memberCode: params.memberCode, tenantName: tenant?.name ?? 'the gym' },
       { category: 'MEMBER', recipientEmail: params.memberEmail },
     );
+    await cache.set(welcomeSentCacheKey(params.memberId), true, WELCOME_SENT_TTL_SECONDS);
   }
 }
 
@@ -152,4 +158,9 @@ export async function notifyStaffInvitation(tenantId: string, params: { email: s
 /** Called by the tenant-announcements module on publish (manual or via the scheduler sweep) — reuses the announcement's own title/body verbatim rather than a template. */
 export async function notifyAnnouncementPublished(tenantId: string, params: { title: string; body: string }): Promise<void> {
   await tenantNotificationService.notifyTenant(tenantId, 'ANNOUNCEMENT', params.title, params.body);
+}
+
+/** Called by the Scheduler's `birthday-wishes` sweep — the `BIRTHDAY_WISHES` template existed since the Notifications module was built but had no firing point until now. */
+export async function notifyBirthdayWishes(tenantId: string, params: { memberName: string; memberEmail?: string | null }): Promise<void> {
+  await fireTemplated(tenantId, 'BIRTHDAY_WISHES', { memberName: params.memberName }, { category: 'MEMBER', recipientEmail: params.memberEmail });
 }

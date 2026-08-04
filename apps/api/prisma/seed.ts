@@ -67,6 +67,7 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'profile:update', description: "Update one's own profile" },
   { key: 'support:view', description: "View the gym's support tickets" },
   { key: 'support:create', description: 'Raise a new support ticket with the FitCloud team' },
+  { key: 'ai:use', description: 'Chat with the AI Business Assistant (proposed actions still require the matching real permission to confirm)' },
 
   // Staff Management (Prompt 13) — Manager/Trainer/Receptionist only, distinct
   // from the generic `users:*` IAM keys which cover every account type.
@@ -209,7 +210,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'reports:view', 'reports:export', 'analytics:view',
     'notifications:view', 'announcements:view', 'announcements:create', 'announcements:update', 'announcements:delete', 'announcements:publish',
     'branches:view', 'branches:create', 'branches:update', 'branches:delete', 'branches:restore', 'branches:activate',
-    'support:view', 'support:create',
+    'support:view', 'support:create', 'ai:use',
   ],
   TRAINER: [
     'members:read', 'attendance:create', 'attendance:read',
@@ -235,7 +236,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     // Trainers need to see the branch list/selector, but branch CRUD/
     // activation/default-setting stays a Manager decision.
     'branches:view',
-    'support:view', 'support:create',
+    'support:view', 'support:create', 'ai:use',
   ],
   RECEPTIONIST: [
     'members:manage', 'members:read',
@@ -268,7 +269,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     // Front-desk needs to see the branch list/selector, but branch CRUD/
     // activation/default-setting stays a Manager decision.
     'branches:view',
-    'support:view', 'support:create',
+    'support:view', 'support:create', 'ai:use',
   ],
   MEMBER: ['profile:read', 'profile:update', 'bookings:create', 'bookings:read', 'payments:read', 'chat:use', 'support:view', 'support:create'],
 };
@@ -329,7 +330,7 @@ function featureChecklist(included: Partial<Record<string, boolean>>): PlanFeatu
     { key: 'custom_domain', label: 'Custom domain' },
     { key: 'video_training', label: 'Video training (coming soon)' },
     { key: 'live_classes', label: 'Live classes (coming soon)' },
-    { key: 'ai_coach', label: 'AI coach (coming soon)' },
+    { key: 'ai_coach', label: 'AI Business Assistant' },
     { key: 'marketplace', label: 'Marketplace (coming soon)' },
   ];
   return catalog.map((f) => ({ ...f, included: included[f.key] ?? false }));
@@ -344,6 +345,9 @@ const PROFESSIONAL_FEATURES = {
   workout_plans: true, diet_plans: true, income: true, expenses: true,
   reports: true, notifications: true, chat: true,
   email_templates: true, sms_templates: true,
+  // AI Business Assistant — was an architecture-only "coming soon" catalog
+  // entry (every tier `false`) until this module actually existed.
+  ai_coach: true,
 };
 const ENTERPRISE_FEATURES = {
   ...PROFESSIONAL_FEATURES,
@@ -444,6 +448,11 @@ const ADMIN_PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'admins:manage', description: 'Manage admin users, roles, and permissions' },
   { key: 'templates:manage', description: 'Manage email/SMS template content' },
   { key: 'reference-data:manage', description: 'Manage countries, currencies, and tax rules' },
+  { key: 'scheduler:view', description: 'View scheduled jobs, execution history, and queue status' },
+  { key: 'scheduler:manage', description: 'Resume/cancel jobs and manage queues (clear backlog)' },
+  { key: 'scheduler:trigger', description: 'Manually trigger a background job' },
+  { key: 'scheduler:retry', description: 'Retry a failed job or re-enqueue an entire failed queue' },
+  { key: 'scheduler:pause', description: 'Pause a job or a queue' },
 ];
 
 const ADMIN_ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
@@ -451,7 +460,18 @@ const ADMIN_ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
   SUPPORT_ADMIN: ['dashboard:read', 'tenants:read', 'support:manage', 'audit:read'],
   FINANCE_ADMIN: ['dashboard:read', 'payments:read', 'payments:manage', 'revenue:read', 'coupons:manage', 'plans:manage', 'audit:read'],
   CONTENT_ADMIN: ['dashboard:read', 'cms:manage', 'templates:manage', 'notifications:send', 'audit:read'],
-  TECHNICAL_ADMIN: ['dashboard:read', 'feature-flags:manage', 'settings:manage', 'reference-data:manage', 'audit:read'],
+  TECHNICAL_ADMIN: [
+    'dashboard:read',
+    'feature-flags:manage',
+    'settings:manage',
+    'reference-data:manage',
+    'audit:read',
+    'scheduler:view',
+    'scheduler:manage',
+    'scheduler:trigger',
+    'scheduler:retry',
+    'scheduler:pause',
+  ],
 };
 
 const FEATURE_FLAGS: Array<{ key: string; label: string; category: string }> = [

@@ -12,6 +12,7 @@ import { NavigationProgressProvider } from '@/components/navigation-progress-pro
 import { SessionExpiryModal } from '@/components/session-expiry-modal';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { AiLauncherButton } from '@/features/ai-assistant/components/ai-launcher-button';
 import { RealtimeProvider } from '@/features/realtime/realtime-provider';
 import { TenantProvider } from '@/features/tenant/tenant-provider';
 import { TenantStoreSync } from '@/features/tenant/store/tenant-store-sync';
@@ -69,6 +70,7 @@ export function AppProviders({ tenant, children }: { tenant: Tenant; children: R
                     </React.Suspense>
                     <SessionExpiryModal />
                     <Toaster />
+                    <AiLauncherButton />
                   </TooltipProvider>
                 </RealtimeProvider>
               </AuthProvider>

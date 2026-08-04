@@ -226,6 +226,9 @@ model Tenant {
   scheduledReports      ScheduledReport[]
   tenantAnnouncements   TenantAnnouncement[]
   notificationTemplates NotificationTemplate[]
+  aiConversations       AiConversation[]
+  aiMessages            AiMessage[]
+  aiRequestLogs         AiRequestLog[]
 
   @@map("tenants")
 }
@@ -340,6 +343,7 @@ model User {
   expensesRecorded             Expense[]             @relation("ExpenseRecordedBy")
   scheduledReportsCreated      ScheduledReport[]     @relation("ScheduledReportCreatedBy")
   tenantAnnouncementsCreated   TenantAnnouncement[]  @relation("TenantAnnouncementCreatedBy")
+  aiConversations              AiConversation[]
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
@@ -2500,6 +2504,98 @@ model FeatureFlag {
   @@map("feature_flags")
 }
 
+enum JobCategory {
+  MEMBERSHIP
+  ATTENDANCE
+  PAYMENT
+  NOTIFICATION
+  REPORT
+  MAINTENANCE
+}
+
+/// Shared status domain for both `ScheduledJob` (the job definition's
+/// current state) and `JobExecution` (a single run's outcome) — SCHEDULED/
+/// PAUSED only ever apply to the definition, PENDING/RUNNING/COMPLETED/
+/// FAILED/CANCELLED apply to a specific execution (a definition mirrors its
+/// last execution's outcome into its own `lastStatus`).
+enum JobRunStatus {
+  PENDING
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  PAUSED
+}
+
+enum JobTriggerType {
+  SCHEDULED
+  MANUAL
+  RETRY
+}
+
+/// Scheduler & Background Jobs module — one row per registered job TYPE,
+/// seeded/upserted from the in-code job registry (`modules/scheduler/constants
+/// /job-registry.ts`) at boot. This is the mutable scheduling/runtime state a
+/// super admin can view and control (pause/resume/cancel/trigger); the actual
+/// handler logic lives in code, never here. Centralizes what used to be 4
+/// scattered `Queue`/`Worker`/`repeat` registrations inside individual
+/// modules (subscription-billing, scheduled-reports, membership-expiry,
+/// tenant-announcement-scheduler) — those now register through this table
+/// instead of owning their own cron logic.
+model ScheduledJob {
+  id           String        @id @default(uuid()) @db.Uuid
+  name         String        @unique @db.VarChar(100)
+  category     JobCategory
+  queueName    String        @map("queue_name") @db.VarChar(60)
+  cronPattern  String        @map("cron_pattern") @db.VarChar(60)
+  timezone     String        @default("UTC") @db.VarChar(60)
+  status       JobRunStatus  @default(SCHEDULED)
+  isPaused     Boolean       @default(false) @map("is_paused")
+  priority     Int           @default(0)
+  maxRetries   Int           @default(3) @map("max_retries")
+  retryDelayMs Int           @default(60000) @map("retry_delay_ms")
+  timeoutMs    Int           @default(300000) @map("timeout_ms")
+  lastRunAt    DateTime?     @map("last_run_at")
+  lastStatus   JobRunStatus? @map("last_status")
+  nextRunAt    DateTime?     @map("next_run_at")
+  description  String?
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  executions JobExecution[]
+
+  @@index([category])
+  @@map("scheduled_jobs")
+}
+
+/// Durable per-attempt execution history. The 4 pre-existing repeatable
+/// BullMQ jobs this module absorbs all used `removeOnComplete/Fail: true`,
+/// so they retained zero history — this table is what makes "Get Job
+/// History" / "Get Failed Jobs" queryable instead of reading ephemeral,
+/// self-pruning queue state.
+model JobExecution {
+  id          String         @id @default(uuid()) @db.Uuid
+  jobId       String         @map("job_id") @db.Uuid
+  jobName     String         @map("job_name") @db.VarChar(100)
+  status      JobRunStatus
+  trigger     JobTriggerType
+  attempt     Int            @default(1)
+  tenantId    String?        @map("tenant_id") @db.Uuid
+  triggeredBy String?        @map("triggered_by") @db.Uuid
+  startedAt   DateTime       @map("started_at")
+  finishedAt  DateTime?      @map("finished_at")
+  durationMs  Int?           @map("duration_ms")
+  result      Json?
+  error       String?
+
+  job ScheduledJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, startedAt])
+  @@index([status])
+  @@map("job_executions")
+}
+
 /// Landing page content, blogs, FAQs, testimonials, and legal pages — one
 /// table, `type` distinguishes them; `content` is `Json` (rich structured
 /// content) rather than a single text blob so the CMS can evolve per type.
@@ -2797,4 +2893,77 @@ model NotificationTemplate {
 
   @@unique([tenantId, type])
   @@map("notification_templates")
+}
+
+enum AiMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+
+  @@map("ai_message_role")
+}
+
+/// AI Business Assistant module — one row per chat conversation. Scoped to
+/// the user who started it (`userId`), not shared across a tenant's staff,
+/// per the spec's "conversation history per user" business rule.
+model AiConversation {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  title     String   @default("New conversation") @db.VarChar(200)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages AiMessage[]
+
+  @@index([tenantId, userId, updatedAt])
+  @@map("ai_conversations")
+}
+
+/// One row per chat turn. `actionPayload` holds a proposed AI Action
+/// (create member / renew membership / assign workout / assign diet /
+/// generate report / send notification) parsed out of an ASSISTANT
+/// message's response — present only while awaiting the user's explicit
+/// confirm/cancel, never executed on its own (see `ai-actions.service.ts`).
+model AiMessage {
+  id             String        @id @default(uuid()) @db.Uuid
+  tenantId       String        @map("tenant_id") @db.Uuid
+  conversationId String        @map("conversation_id") @db.Uuid
+  role           AiMessageRole
+  content        String
+  actionPayload  Json?         @map("action_payload")
+  actionStatus   String?       @map("action_status") @db.VarChar(20)
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  tenant       Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, conversationId, createdAt])
+  @@map("ai_messages")
+}
+
+/// Durable log of every AI provider request — "Log AI requests" business
+/// rule. Independent of `AiMessage` (a message can exist without ever
+/// completing a provider call, e.g. if the request errored before any
+/// content streamed back).
+model AiRequestLog {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  conversationId   String?  @map("conversation_id") @db.Uuid
+  provider         String   @db.VarChar(60)
+  model            String   @db.VarChar(120)
+  promptTokens     Int?     @map("prompt_tokens")
+  completionTokens Int?     @map("completion_tokens")
+  durationMs       Int?     @map("duration_ms")
+  status           String   @db.VarChar(20)
+  error            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("ai_request_logs")
 }
