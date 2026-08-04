@@ -10,6 +10,7 @@ import { persistStore } from 'redux-persist';
 import { GlobalLoader } from '@/components/loading/global-loader';
 import { NavigationProgressProvider } from '@/components/navigation-progress-provider';
 import { Toaster } from '@/components/ui/sonner';
+import { AiLauncherButton } from '@/features/ai-assistant/components/ai-launcher-button';
 import { makeStore, registerActiveStore, type AppStore } from '@/store';
 import { AuthProvider } from './auth-provider';
 
@@ -39,6 +40,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
                 </NavigationProgressProvider>
               </React.Suspense>
               <Toaster />
+              <AiLauncherButton />
             </AuthProvider>
           </ThemeProvider>
         </QueryClientProvider>

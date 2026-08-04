@@ -8,6 +8,7 @@ const TABS = [
   { href: '/gym-settings/business', label: 'Business Settings' },
   { href: '/gym-settings/branding', label: 'Branding' },
   { href: '/gym-settings/invoice', label: 'Invoice Settings' },
+  { href: '/gym-settings/ai', label: 'AI Assistant' },
 ] as const;
 
 /** Shared secondary nav across the Gym Settings pages (mirrors IamNav / BillingNav). */

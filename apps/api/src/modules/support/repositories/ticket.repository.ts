@@ -3,11 +3,11 @@ import type { TicketPriority, TicketStatus } from '@prisma/client';
 import type { TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 
 /**
- * `SupportTicket` has NO RLS policy (it's queried cross-tenant by the admin
- * plane via the raw client — see `admin-support/repositories`) — the
- * `tenantId` filter below is what actually enforces isolation here, not the
- * DB. Still constructed with the tenant-scoped client for consistency with
- * every other tenant module and in case RLS is ever added to this table.
+ * RLS-enforced via the tenant-scoped client (`20260804060000_enable_rls_support_tickets`)
+ * — the `tenantId` filter below is kept anyway as defense-in-depth and to
+ * match every other repository's shape. The admin plane reads this table
+ * cross-tenant via the raw, non-tenant-scoped client — see
+ * `admin-support/repositories` — which is unaffected by this table's RLS.
  */
 export class TicketRepository {
   constructor(private readonly db: TenantScopedPrisma) {}

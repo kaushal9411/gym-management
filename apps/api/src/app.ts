@@ -10,6 +10,7 @@ import { env } from './config/env';
 import { isAllowedOrigin } from './core/http/cors-origin';
 import { sendSuccess } from './core/http/response';
 import { errorHandlerMiddleware, notFoundMiddleware } from './core/middleware/error-handler.middleware';
+import { apiRateLimiter } from './core/middleware/rate-limiter';
 import { requestContextMiddleware } from './core/middleware/request-context.middleware';
 import { requestLoggerMiddleware } from './core/middleware/request-logger.middleware';
 import { requestTimeoutMiddleware } from './core/middleware/request-timeout.middleware';
@@ -76,6 +77,7 @@ export function createApp(): Express {
   app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
 
   app.use(tenantMiddleware(PLATFORM_ROUTE_PREFIXES));
+  app.use(apiRateLimiter());
   app.use(`/api/${env.apiVersion}`, v1Router);
 
   app.use(notFoundMiddleware);

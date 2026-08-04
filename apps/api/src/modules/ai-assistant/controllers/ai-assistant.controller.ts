@@ -1,27 +1,50 @@
 import type { Request, Response } from 'express';
 
-import { env } from '../../../config/env';
 import { ValidationError } from '../../../core/errors/app-error';
 import { sendSuccess } from '../../../core/http/response';
 import { logger } from '../../../core/logging/logger';
 import { actorFrom } from '../../authentication/utils/actor.util';
 import type { AiActionProposal } from '../constants/action-types';
+import { getEffectiveAiConfig } from '../providers/factory';
 import { executeAiAction } from '../services/ai-actions.service';
 import { AiChatService } from '../services/ai-chat.service';
+import { AiTenantSettingsService } from '../services/ai-tenant-settings.service';
 
 function serviceFor(req: Request): AiChatService {
   return new AiChatService(req.tenant!.id);
 }
 
+function tenantSettingsServiceFor(req: Request): AiTenantSettingsService {
+  return new AiTenantSettingsService(req.tenant!.id);
+}
+
 export class AiAssistantController {
-  async getConfig(_req: Request, res: Response): Promise<void> {
+  /** Reflects the EFFECTIVE config for this tenant — their own BYOK override if set, else the platform default — never the raw API key either way. */
+  async getConfig(req: Request, res: Response): Promise<void> {
+    const override = await tenantSettingsServiceFor(req).resolveProviderOverride();
+    const effective = getEffectiveAiConfig(override);
     sendSuccess(res, {
-      provider: env.ai.provider,
-      model: env.ai.model,
-      temperature: env.ai.temperature,
-      maxTokens: env.ai.maxTokens,
-      isConfigured: env.ai.isConfigured,
+      provider: effective.provider,
+      model: effective.model,
+      temperature: effective.temperature,
+      maxTokens: effective.maxTokens,
+      isConfigured: effective.provider === 'ollama' || Boolean(effective.apiKey),
+      usingOwnKey: Boolean(override?.apiKey),
     });
+  }
+
+  async getTenantAiSettings(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await tenantSettingsServiceFor(req).getView());
+  }
+
+  async updateTenantAiSettings(req: Request, res: Response): Promise<void> {
+    const updated = await tenantSettingsServiceFor(req).update(req.body);
+    sendSuccess(res, updated, 'AI settings updated.');
+  }
+
+  async resetTenantAiSettings(req: Request, res: Response): Promise<void> {
+    await tenantSettingsServiceFor(req).reset();
+    sendSuccess(res, null, 'Reverted to the platform default AI configuration.');
   }
 
   async listConversations(req: Request, res: Response): Promise<void> {
@@ -57,7 +80,7 @@ export class AiAssistantController {
     let result: { messageId: string; content: string; action: AiActionProposal | null } | null = null;
     for await (const event of service.respond(actor, req.tenant!.name, req.params.id!, content, false)) {
       if (event.type === 'done') result = event;
-      if (event.type === 'error') throw new ValidationError(event.message);
+      if (event.type === 'error') throw new ValidationError(event.message, { code: event.code });
     }
     sendSuccess(res, result, 'Message sent.', 201);
   }

@@ -53,6 +53,47 @@ services:
       - "1025:1025" # SMTP
       - "8025:8025" # Web UI
 
+  # S3-compatible object storage for file/image uploads (`core/storage/`) —
+  # was base64-in-Postgres before (Prompt 37 perf pass). Same `@aws-sdk/client-s3`
+  # code talks to real AWS S3/Cloudflare R2 in production by swapping the
+  # S3_* env vars; nothing else changes.
+  minio:
+    image: minio/minio:latest
+    container_name: gym-saas-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: gymminio
+      MINIO_ROOT_PASSWORD: gymminio123
+    ports:
+      - "9000:9000" # S3 API
+      - "9001:9001" # Web console
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # One-shot: creates the bucket + a public-read policy on its `public/`
+  # prefix (avatars/logos/exercise images — anything already rendered as a
+  # plain `<img src>` with no auth check today), then exits. `private/`
+  # (member documents, expense receipts) gets no policy — those are only
+  # ever reached via a freshly-signed, short-lived GET URL.
+  minio-init:
+    image: minio/mc:latest
+    container_name: gym-saas-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 gymminio gymminio123 &&
+      mc mb -p local/fitcloud-uploads &&
+      mc anonymous set download local/fitcloud-uploads/public
+      "
+
   nginx:
     image: nginx:1.27-alpine
     container_name: gym-saas-nginx
@@ -67,3 +108,4 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  minio-data:

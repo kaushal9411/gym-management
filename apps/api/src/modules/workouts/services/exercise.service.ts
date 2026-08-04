@@ -1,5 +1,6 @@
 import { ConflictError, NotFoundError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
+import { isDataUrl, uploadDataUrl } from '../../../core/storage/storage.service';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
@@ -55,6 +56,7 @@ export class ExerciseService {
 
   async create(input: CreateExerciseInput, actor: IamActor): Promise<ExerciseDto> {
     await this.assertNameAvailable(input.name);
+    const imageUrl = isDataUrl(input.imageUrl) ? await uploadDataUrl(input.imageUrl, { keyPrefix: 'exercise-images', visibility: 'public' }) : input.imageUrl;
     const exercise = await this.exercises.create({
       tenantId: this.tenantId,
       name: input.name,
@@ -63,7 +65,7 @@ export class ExerciseService {
       equipment: input.equipment,
       difficultyLevel: input.difficultyLevel ?? 'BEGINNER',
       instructions: input.instructions,
-      imageUrl: input.imageUrl,
+      imageUrl,
       videoUrl: input.videoUrl,
       durationSeconds: input.durationSeconds,
       defaultSets: input.defaultSets,
@@ -79,6 +81,7 @@ export class ExerciseService {
   async update(id: string, input: UpdateExerciseInput, actor: IamActor): Promise<ExerciseDto> {
     const existing = await this.mustFind(id);
     if (input.name && input.name.toLowerCase() !== existing.name.toLowerCase()) await this.assertNameAvailable(input.name);
+    const imageUrl = isDataUrl(input.imageUrl) ? await uploadDataUrl(input.imageUrl, { keyPrefix: 'exercise-images', visibility: 'public' }) : input.imageUrl;
 
     await this.exercises.update(id, {
       name: input.name,
@@ -87,7 +90,7 @@ export class ExerciseService {
       equipment: input.equipment,
       difficultyLevel: input.difficultyLevel,
       instructions: input.instructions,
-      imageUrl: input.imageUrl,
+      imageUrl,
       videoUrl: input.videoUrl,
       durationSeconds: input.durationSeconds,
       defaultSets: input.defaultSets,

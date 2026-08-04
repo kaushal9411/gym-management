@@ -1,8 +1,9 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { toast } from 'sonner';
-import { Settings as SettingsIcon } from 'lucide-react';
+import { Bot, ChevronRight, Settings as SettingsIcon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -82,6 +83,21 @@ export default function SettingsPage() {
           <p className="text-muted-foreground">System configuration — stored as key-value JSON, editable per integration.</p>
         </div>
       </div>
+
+      <Link href="/settings/ai" className="block">
+        <Card className="transition-colors hover:bg-accent/40">
+          <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Bot className="size-4.5" aria-hidden />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium">AI Assistant</p>
+              <p className="text-xs text-muted-foreground">Bring your own provider key for the platform team&apos;s AI assistant.</p>
+            </div>
+            <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
+          </CardContent>
+        </Card>
+      </Link>
 
       <div className="grid gap-4 sm:grid-cols-2">
         {KNOWN_SETTINGS.map((meta) => <SettingEditor key={meta.key} meta={meta} existing={byKey.get(meta.key)} />)}

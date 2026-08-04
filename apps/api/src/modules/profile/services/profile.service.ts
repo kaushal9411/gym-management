@@ -1,4 +1,5 @@
 import { NotFoundError } from '../../../core/errors/app-error';
+import { isDataUrl, uploadDataUrl } from '../../../core/storage/storage.service';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
@@ -102,13 +103,14 @@ export class ProfileService {
           ),
         )
       : undefined;
+    const avatarUrl = isDataUrl(input.avatarUrl) ? await uploadDataUrl(input.avatarUrl, { keyPrefix: 'avatars', visibility: 'public' }) : input.avatarUrl;
 
     await this.db.user.update({
       where: { id: userId },
       data: {
         name: input.name,
         phone: input.phone,
-        avatarUrl: input.avatarUrl,
+        avatarUrl,
         emergencyContactName: input.emergencyContactName,
         emergencyContactPhone: input.emergencyContactPhone,
         emergencyContactRelation: input.emergencyContactRelation,

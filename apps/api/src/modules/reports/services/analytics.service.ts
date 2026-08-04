@@ -161,25 +161,44 @@ export class AnalyticsService {
     const branches = await this.db.branch.findMany({
       where: { tenantId: this.tenantId, isActive: true, ...(branchScope ? { id: branchScope } : {}) },
     });
+    if (branches.length === 0) return [];
+    const branchIds = branches.map((b) => b.id);
 
     const todayIso = new Date().toISOString().slice(0, 10);
     const monthStart = new Date(`${todayIso.slice(0, 7)}-01T00:00:00.000Z`);
     const todayEnd = new Date(`${todayIso}T23:59:59.999Z`);
 
-    return Promise.all(
-      branches.map(async (b) => {
-        const [members, revenue, attendance] = await Promise.all([
-          this.db.member.count({ where: { tenantId: this.tenantId, deletedAt: null, branchId: b.id, status: 'ACTIVE' } }),
-          this.db.income.aggregate({
-            where: { tenantId: this.tenantId, deletedAt: null, branchId: b.id, incomeDate: { gte: monthStart, lte: todayEnd } },
-            _sum: { amount: true },
-          }),
-          this.db.attendance.count({
-            where: { tenantId: this.tenantId, deletedAt: null, branchId: b.id, attendanceDate: { gte: monthStart, lte: todayEnd } },
-          }),
-        ]);
-        return { branchId: b.id, branch: b.name, members, revenue: Number(revenue._sum.amount) || 0, attendance };
+    // Grouped aggregates instead of 3 queries per branch (Prompt 37 perf
+    // pass — same fan-out shape as reports.service.ts's branch/trainer
+    // reports had).
+    const [members, revenue, attendance] = await Promise.all([
+      this.db.member.groupBy({
+        by: ['branchId'],
+        where: { tenantId: this.tenantId, deletedAt: null, branchId: { in: branchIds }, status: 'ACTIVE' },
+        _count: { _all: true },
       }),
-    );
+      this.db.income.groupBy({
+        by: ['branchId'],
+        where: { tenantId: this.tenantId, deletedAt: null, branchId: { in: branchIds }, incomeDate: { gte: monthStart, lte: todayEnd } },
+        _sum: { amount: true },
+      }),
+      this.db.attendance.groupBy({
+        by: ['branchId'],
+        where: { tenantId: this.tenantId, deletedAt: null, branchId: { in: branchIds }, attendanceDate: { gte: monthStart, lte: todayEnd } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const membersMap = new Map(members.map((r) => [r.branchId, r._count._all]));
+    const revenueMap = new Map(revenue.map((r) => [r.branchId, Number(r._sum.amount) || 0]));
+    const attendanceMap = new Map(attendance.map((r) => [r.branchId, r._count._all]));
+
+    return branches.map((b) => ({
+      branchId: b.id,
+      branch: b.name,
+      members: membersMap.get(b.id) ?? 0,
+      revenue: revenueMap.get(b.id) ?? 0,
+      attendance: attendanceMap.get(b.id) ?? 0,
+    }));
   }
 }

@@ -3,6 +3,7 @@ import { ErrorCode } from '../../../core/errors/error-codes';
 import { AuthEvents, eventBus } from '../../../core/events/event-bus';
 import { passwordService } from '../../../core/security/password.service';
 import { generateOpaqueToken, hashToken } from '../../../core/security/token.util';
+import { isDataUrl, uploadDataUrl } from '../../../core/storage/storage.service';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import { RoleRepository } from '../../authentication/repositories/role.repository';
@@ -217,12 +218,13 @@ export class StaffService {
     const firstName = input.firstName ?? staffMember.staffProfile?.firstName;
     const lastName = input.lastName ?? staffMember.staffProfile?.lastName;
     const nameChanged = input.firstName !== undefined || input.lastName !== undefined;
+    const avatarUrl = isDataUrl(input.avatarUrl) ? await uploadDataUrl(input.avatarUrl, { keyPrefix: 'avatars', visibility: 'public' }) : input.avatarUrl;
 
     await this.users.update(userId, {
       ...(nameChanged ? { name: `${firstName} ${lastName}`.trim() } : {}),
       email: input.email?.toLowerCase(),
       phone: input.phone,
-      avatarUrl: input.avatarUrl,
+      avatarUrl,
       emergencyContactName: input.emergencyContactName,
       emergencyContactPhone: input.emergencyContactPhone,
       emergencyContactRelation: input.emergencyContactRelation,

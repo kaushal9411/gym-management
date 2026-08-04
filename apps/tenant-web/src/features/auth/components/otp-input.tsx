@@ -104,6 +104,7 @@ export function OtpInput({
           onPaste={handlePaste}
           onFocus={(e) => e.target.select()}
           disabled={disabled}
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate: caller-gated (not unconditional) auto-focus on a dedicated OTP-entry screen, the standard expected UX for this input type.
           autoFocus={autoFocus && index === 0}
           inputMode="numeric"
           autoComplete={index === 0 ? 'one-time-code' : 'off'}

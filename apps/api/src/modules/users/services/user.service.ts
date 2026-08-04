@@ -1,6 +1,7 @@
 import { AppError, ConflictError, NotFoundError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { passwordService } from '../../../core/security/password.service';
+import { isDataUrl, uploadDataUrl } from '../../../core/storage/storage.service';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import { RoleRepository } from '../../authentication/repositories/role.repository';
@@ -127,11 +128,12 @@ export class UserService {
     if (input.phone && input.phone !== user.phone) {
       await this.assertPhoneAvailable(input.phone);
     }
+    const avatarUrl = isDataUrl(input.avatarUrl) ? await uploadDataUrl(input.avatarUrl, { keyPrefix: 'avatars', visibility: 'public' }) : input.avatarUrl;
     await this.repository.update(userId, {
       name: input.name,
       email: input.email?.toLowerCase(),
       phone: input.phone,
-      avatarUrl: input.avatarUrl,
+      avatarUrl,
       emergencyContactName: input.emergencyContactName,
       emergencyContactPhone: input.emergencyContactPhone,
       emergencyContactRelation: input.emergencyContactRelation,

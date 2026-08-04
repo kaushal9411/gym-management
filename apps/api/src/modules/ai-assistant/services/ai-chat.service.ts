@@ -1,20 +1,21 @@
 import type { Prisma } from '@prisma/client';
 
-import { env } from '../../../config/env';
-import { NotFoundError, ValidationError } from '../../../core/errors/app-error';
+import { AppError, NotFoundError, ValidationError } from '../../../core/errors/app-error';
 import { logger } from '../../../core/logging/logger';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import type { IamActor } from '../../authentication/utils/actor.util';
 import { permissionEngine } from '../../permissions/services/permission-engine.service';
 import { extractActionProposal, type AiActionProposal } from '../constants/action-types';
 import { buildSystemPrompt } from '../constants/system-prompt';
-import { getAiProvider } from '../providers/factory';
+import type { AiErrorCode } from '../providers/error-classification';
+import { getAiProvider, getEffectiveAiConfig } from '../providers/factory';
 import type { AiChatMessage } from '../providers/types';
 import { AiConversationRepository } from '../repositories/ai-conversation.repository';
 import { AiMessageRepository } from '../repositories/ai-message.repository';
 import { AiRequestLogRepository } from '../repositories/ai-request-log.repository';
 
 import { buildTenantContext } from './ai-context.service';
+import { AiTenantSettingsService } from './ai-tenant-settings.service';
 
 const MAX_HISTORY_MESSAGES = 20;
 const TITLE_MAX_LENGTH = 60;
@@ -22,7 +23,12 @@ const TITLE_MAX_LENGTH = 60;
 export type ChatStreamEvent =
   | { type: 'delta'; text: string }
   | { type: 'done'; messageId: string; content: string; action: AiActionProposal | null }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string; code?: AiErrorCode };
+
+function errorCodeOf(error: unknown): AiErrorCode | undefined {
+  if (error instanceof AppError && typeof error.details?.code === 'string') return error.details.code as AiErrorCode;
+  return undefined;
+}
 
 function deriveTitle(content: string): string {
   const singleLine = content.replace(/\s+/g, ' ').trim();
@@ -89,11 +95,16 @@ export class AiChatService {
   ): AsyncGenerator<ChatStreamEvent> {
     await this.mustFindOwn(actor.userId, conversationId);
 
-    // Fail before persisting anything — otherwise a not-yet-configured provider leaves an orphaned user message with no reply once it IS configured.
-    if (!env.ai.isConfigured) {
-      yield { type: 'error', message: 'The AI assistant is not configured for this environment — set AI_API_KEY (or switch AI_PROVIDER=ollama for a local model).' };
+    // Resolve BEFORE persisting anything — a misconfigured/invalid provider (platform default or this tenant's own BYOK key) leaving an orphaned user message with no reply is worse than failing one step earlier.
+    const override = await new AiTenantSettingsService(this.tenantId).resolveProviderOverride();
+    let provider: ReturnType<typeof getAiProvider>;
+    try {
+      provider = getAiProvider(override);
+    } catch (error) {
+      yield { type: 'error', message: (error as Error).message, code: errorCodeOf(error) ?? 'NOT_CONFIGURED' };
       return;
     }
+    const effectiveConfig = getEffectiveAiConfig(override);
 
     if (regenerate) {
       await this.messages.deleteTrailingAssistantMessages(conversationId);
@@ -115,16 +126,15 @@ export class AiChatService {
       ...history.slice(-MAX_HISTORY_MESSAGES).map((m): AiChatMessage => ({ role: m.role.toLowerCase() as 'user' | 'assistant', content: m.content })),
     ];
 
-    const provider = getAiProvider();
     const startedAt = Date.now();
     let fullContent = '';
 
     try {
       for await (const delta of provider.stream({
         messages: chatMessages,
-        model: env.ai.model,
-        temperature: env.ai.temperature,
-        maxTokens: env.ai.maxTokens,
+        model: effectiveConfig.model,
+        temperature: effectiveConfig.temperature,
+        maxTokens: effectiveConfig.maxTokens,
         signal,
       })) {
         fullContent += delta;
@@ -146,7 +156,7 @@ export class AiChatService {
         userId: actor.userId,
         conversationId,
         provider: provider.name,
-        model: env.ai.model,
+        model: effectiveConfig.model,
         durationMs: Date.now() - startedAt,
         status: 'SUCCESS',
       });
@@ -154,18 +164,28 @@ export class AiChatService {
       yield { type: 'done', messageId: assistantMessage.id, content: cleanedContent, action };
     } catch (error) {
       const message = (error as Error).message;
-      logger.error('AI provider request failed', { tenantId: this.tenantId, provider: provider.name, error: message });
+      const code = errorCodeOf(error) ?? 'GENERIC';
+      logger.error('AI provider request failed', { tenantId: this.tenantId, provider: provider.name, error: message, code });
       await this.requestLogs.record({
         tenantId: this.tenantId,
         userId: actor.userId,
         conversationId,
         provider: provider.name,
-        model: env.ai.model,
+        model: effectiveConfig.model,
         durationMs: Date.now() - startedAt,
         status: 'ERROR',
         error: message,
       });
-      yield { type: 'error', message: 'The AI assistant could not complete this request. Please try again.' };
+      yield {
+        type: 'error',
+        message:
+          code === 'AUTH_INVALID'
+            ? "Your AI provider API key looks invalid or has been revoked. Update it in AI Settings."
+            : code === 'QUOTA_EXCEEDED'
+              ? 'Your AI provider is out of credit or rate-limited. Add credit or update your key in AI Settings.'
+              : 'The AI assistant could not complete this request. Please try again.',
+        code,
+      };
     }
   }
 

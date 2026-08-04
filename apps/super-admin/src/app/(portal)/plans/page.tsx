@@ -170,6 +170,7 @@ export default function PlansPage() {
                 </div>
                 <p className="text-xs text-muted-foreground">{p.trialDays}-day trial · up to {p.maxBranches} branch{p.maxBranches === 1 ? '' : 'es'} · {p.maxMembers} members</p>
 
+                {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions -- onClick here only stops this row's clicks from bubbling to the card's own click handler; the real interactive elements are the Buttons inside, already keyboard-accessible on their own. */}
                 <div className="flex gap-2 border-t pt-3" onClick={(e) => e.stopPropagation()}>
                   <Button size="sm" variant="outline" className="flex-1" onClick={() => openEdit(p)}>Edit</Button>
                   <Button

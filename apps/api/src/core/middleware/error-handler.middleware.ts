@@ -4,6 +4,7 @@ import { AppError, ValidationError } from '../errors/app-error';
 import { ErrorCode } from '../errors/error-codes';
 import { sendError, type ApiResponseBody } from '../http/response';
 import { logger } from '../logging/logger';
+import { captureError } from '../observability/sentry';
 
 /**
  * Single global error handler. AppError instances map to their declared
@@ -20,6 +21,7 @@ export function errorHandlerMiddleware(
   if (err instanceof AppError) {
     if (err.httpStatus >= 500) {
       logger.error(err.message, { code: err.code, stack: err.stack, details: err.details });
+      captureError(err, { code: err.code, path: req.originalUrl });
     }
 
     let errors: ApiResponseBody['errors'] = [{ code: err.code, message: err.message }];
@@ -40,6 +42,7 @@ export function errorHandlerMiddleware(
     stack: (err as Error)?.stack,
     path: req.originalUrl,
   });
+  captureError(err, { path: req.originalUrl });
   sendError(res, 500, 'Something went wrong. Please try again.', [
     { code: ErrorCode.INTERNAL_ERROR, message: 'Internal server error' },
   ]);

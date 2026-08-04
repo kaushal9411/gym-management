@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { WebVitalsReporter } from '@/components/web-vitals-reporter';
 import { AppProviders } from '@/providers/app-providers';
 
 import './globals.css';
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body>
+        <WebVitalsReporter />
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

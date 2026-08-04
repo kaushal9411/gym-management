@@ -1,82 +1,11 @@
-import ExcelJS from 'exceljs';
-import PDFDocument from 'pdfkit';
-
 import { ValidationError } from '../../../core/errors/app-error';
 import type { ReportFilters, ReportType } from '../dto/reports.dto';
 
 import { AnalyticsService } from './analytics.service';
+import type { ExportTable } from './export-render';
+import { renderCsv } from './export-render';
+import { renderInWorker } from './export-worker-runner';
 import { ReportsService } from './reports.service';
-
-/**
- * `rows` deliberately stays `unknown[]` — the report/analytics DTOs are
- * concrete interfaces without an index signature (by design, for type
- * safety everywhere else they're used), so building a generic export table
- * out of any of them needs a cast at the call site rather than widening
- * every DTO. `asRecord` narrows just at the point of use.
- */
-interface ExportTable {
-  title: string;
-  columns: string[];
-  rows: unknown[];
-}
-
-function asRecord(row: unknown): Record<string, unknown> {
-  return row as Record<string, unknown>;
-}
-
-function escapeCsv(value: unknown): string {
-  const str = String(value ?? '');
-  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
-}
-
-function toCsv(table: ExportTable): string {
-  const lines = [table.columns.join(',')];
-  for (const row of table.rows) {
-    lines.push(table.columns.map((c) => escapeCsv(asRecord(row)[c])).join(','));
-  }
-  return lines.join('\n');
-}
-
-async function toExcel(table: ExportTable): Promise<ExcelJS.Buffer> {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet(table.title.slice(0, 31));
-  sheet.columns = table.columns.map((c) => ({ header: c, key: c, width: Math.max(14, c.length + 2) }));
-  sheet.getRow(1).font = { bold: true };
-  for (const row of table.rows) sheet.addRow(asRecord(row));
-  return workbook.xlsx.writeBuffer();
-}
-
-function toPdf(table: ExportTable): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 40, size: 'A4', layout: table.columns.length > 5 ? 'landscape' : 'portrait' });
-    const chunks: Buffer[] = [];
-    doc.on('data', (chunk) => chunks.push(chunk));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-
-    doc.fontSize(16).text(table.title);
-    doc.moveDown();
-
-    const colWidth = (doc.page.width - 80) / table.columns.length;
-    let y = doc.y;
-    doc.fontSize(8).font('Helvetica-Bold');
-    table.columns.forEach((c, i) => doc.text(c, 40 + i * colWidth, y, { width: colWidth }));
-    y += 16;
-    doc.moveTo(40, y).lineTo(doc.page.width - 40, y).stroke();
-    y += 4;
-    doc.font('Helvetica');
-
-    for (const row of table.rows) {
-      if (y > doc.page.height - 60) {
-        doc.addPage();
-        y = 40;
-      }
-      table.columns.forEach((c, i) => doc.text(String(asRecord(row)[c] ?? ''), 40 + i * colWidth, y, { width: colWidth }));
-      y += 14;
-    }
-    doc.end();
-  });
-}
 
 export class ReportExportService {
   private readonly reports: ReportsService;
@@ -179,16 +108,18 @@ export class ReportExportService {
 
   async exportCsv(reportType: ReportType, userId: string, filters: ReportFilters): Promise<{ filename: string; content: string }> {
     const table = await this.buildTable(reportType, userId, filters);
-    return { filename: `${reportType}-${new Date().toISOString().slice(0, 10)}.csv`, content: toCsv(table) };
+    return { filename: `${reportType}-${new Date().toISOString().slice(0, 10)}.csv`, content: renderCsv(table) };
   }
 
-  async exportExcel(reportType: ReportType, userId: string, filters: ReportFilters): Promise<{ filename: string; content: ExcelJS.Buffer }> {
+  async exportExcel(reportType: ReportType, userId: string, filters: ReportFilters): Promise<{ filename: string; content: Buffer }> {
     const table = await this.buildTable(reportType, userId, filters);
-    return { filename: `${reportType}-${new Date().toISOString().slice(0, 10)}.xlsx`, content: await toExcel(table) };
+    const content = await renderInWorker('excel', table);
+    return { filename: `${reportType}-${new Date().toISOString().slice(0, 10)}.xlsx`, content };
   }
 
   async exportPdf(reportType: ReportType, userId: string, filters: ReportFilters): Promise<{ filename: string; content: Buffer }> {
     const table = await this.buildTable(reportType, userId, filters);
-    return { filename: `${reportType}-${new Date().toISOString().slice(0, 10)}.pdf`, content: await toPdf(table) };
+    const content = await renderInWorker('pdf', table);
+    return { filename: `${reportType}-${new Date().toISOString().slice(0, 10)}.pdf`, content };
   }
 }

@@ -16,6 +16,7 @@ const markdownComponents = {
   ol: (props: React.ComponentPropsWithoutRef<'ol'>) => <ol className="mb-2 list-decimal pl-5 last:mb-0" {...props} />,
   code: (props: React.ComponentPropsWithoutRef<'code'>) => <code className="rounded bg-black/10 px-1 py-0.5 font-mono text-[0.85em] dark:bg-white/10" {...props} />,
   pre: (props: React.ComponentPropsWithoutRef<'pre'>) => <pre className="mb-2 overflow-x-auto rounded-md bg-black/10 p-2 text-xs dark:bg-white/10 last:mb-0" {...props} />,
+  // eslint-disable-next-line jsx-a11y/anchor-has-content -- react-markdown supplies `children` via `...props` for every real link; the rule can't see through that.
   a: (props: React.ComponentPropsWithoutRef<'a'>) => <a className="underline underline-offset-2" target="_blank" rel="noreferrer" {...props} />,
   table: (props: React.ComponentPropsWithoutRef<'table'>) => (
     <div className="mb-2 overflow-x-auto last:mb-0">

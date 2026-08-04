@@ -49,6 +49,9 @@ const envSchema = z.object({
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
 
+  /** 32-byte AES-256 key, base64-encoded — `core/security/encryption.util.ts`. Generate with: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. Currently the only thing encrypted with it is a tenant's own AI provider API key. */
+  ENCRYPTION_KEY: z.string().min(1, 'ENCRYPTION_KEY is required'),
+
   /** Provider abstraction (`modules/ai-assistant/providers/`) — never hardcode a provider/key in code, this is the only place it's read from. */
   AI_PROVIDER: z.enum(['openrouter', 'openai', 'anthropic', 'gemini', 'azure-openai', 'ollama']).default('openrouter'),
   AI_MODEL: z.string().default('inclusionai/ling-3.0-flash:free'),
@@ -67,6 +70,33 @@ const envSchema = z.object({
   EMAIL_VERIFICATION_TTL_HOURS: z.coerce.number().int().positive().default(24),
 
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'http', 'debug']).default('info'),
+
+  /** Error tracking/APM (`core/observability/sentry.ts`) — unset means fully inert, zero overhead; the app never requires this to boot. */
+  SENTRY_DSN: z.string().optional(),
+  SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
+
+  /**
+   * Object storage (`core/storage/`) — MinIO in dev (docker-compose), real
+   * S3/R2/Spaces in production via the same `@aws-sdk/client-s3` client
+   * (just different endpoint/credentials). Unset means uploads stay as
+   * base64 data-URLs in Postgres (today's behavior) — never a hard
+   * requirement to boot, so a dev machine that hasn't run
+   * `docker compose up minio minio-init` yet keeps working unchanged.
+   */
+  S3_ENDPOINT: z.string().optional(),
+  S3_REGION: z.string().default('us-east-1'),
+  S3_BUCKET: z.string().optional(),
+  S3_ACCESS_KEY_ID: z.string().optional(),
+  S3_SECRET_ACCESS_KEY: z.string().optional(),
+  // MinIO (and most non-AWS S3-compatible stores) need path-style URLs
+  // (`endpoint/bucket/key`); real AWS S3 uses virtual-hosted-style by
+  // default and this must be "false" there.
+  S3_FORCE_PATH_STYLE: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  /** Base URL used to build the direct (non-presigned) URL stored for `public/`-prefixed objects — e.g. `http://localhost:9000/fitcloud-uploads` in dev, a CDN/custom domain in production. */
+  S3_PUBLIC_URL_BASE: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -96,6 +126,7 @@ export const env = {
 
   databaseUrl: raw.DATABASE_URL,
   redisUrl: raw.REDIS_URL,
+  encryptionKey: raw.ENCRYPTION_KEY,
 
   jwt: {
     privateKey: decodeBase64Pem(raw.JWT_PRIVATE_KEY_B64, 'JWT_PRIVATE_KEY_B64'),
@@ -171,6 +202,27 @@ export const env = {
   },
 
   logLevel: raw.LOG_LEVEL,
+
+  sentry: {
+    dsn: raw.SENTRY_DSN,
+    tracesSampleRate: raw.SENTRY_TRACES_SAMPLE_RATE,
+    get isConfigured() {
+      return Boolean(raw.SENTRY_DSN);
+    },
+  },
+
+  storage: {
+    endpoint: raw.S3_ENDPOINT,
+    region: raw.S3_REGION,
+    bucket: raw.S3_BUCKET,
+    accessKeyId: raw.S3_ACCESS_KEY_ID,
+    secretAccessKey: raw.S3_SECRET_ACCESS_KEY,
+    forcePathStyle: raw.S3_FORCE_PATH_STYLE,
+    publicUrlBase: raw.S3_PUBLIC_URL_BASE,
+    get isConfigured() {
+      return Boolean(raw.S3_ENDPOINT && raw.S3_BUCKET && raw.S3_ACCESS_KEY_ID && raw.S3_SECRET_ACCESS_KEY && raw.S3_PUBLIC_URL_BASE);
+    },
+  },
 } as const;
 
 export type Env = typeof env;

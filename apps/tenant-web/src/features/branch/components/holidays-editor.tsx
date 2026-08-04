@@ -39,7 +39,15 @@ export function HolidaysEditor({ value, onChange, disabled }: HolidaysEditorProp
                 {holiday.date}
                 {holiday.label ? ` — ${holiday.label}` : ''}
               </span>
-              <Button type="button" variant="ghost" size="icon" className="size-6" disabled={disabled} onClick={() => remove(index)}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-6"
+                disabled={disabled}
+                onClick={() => remove(index)}
+                aria-label={`Remove ${holiday.date}${holiday.label ? ` (${holiday.label})` : ''}`}
+              >
                 <Trash2 className="size-3.5" />
               </Button>
             </li>

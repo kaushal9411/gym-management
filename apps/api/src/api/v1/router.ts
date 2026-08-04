@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { NotFoundError } from '../../core/errors/app-error';
 import { sendSuccess } from '../../core/http/response';
+import { adminAiAssistantRouter } from '../../modules/admin-ai-assistant/routes/admin-ai-assistant.routes';
 import { adminAuditRouter } from '../../modules/admin-audit/routes/admin-audit.routes';
 import { adminAuthRouter } from '../../modules/admin-auth/routes/admin-auth.routes';
 import { adminCmsRouter } from '../../modules/admin-cms/routes/admin-cms.routes';
@@ -48,6 +49,7 @@ import { dashboardRouter } from '../../modules/reports/routes/dashboard.routes';
 import { reportsRouter } from '../../modules/reports/routes/reports.routes';
 import { scheduledReportRouter } from '../../modules/reports/routes/scheduled-report.routes';
 import { roleRouter } from '../../modules/roles/routes/role.routes';
+import { rumRouter } from '../../modules/rum/routes/rum.routes';
 import { adminSchedulerRouter } from '../../modules/scheduler/routes/admin-scheduler.routes';
 import { sessionRouter } from '../../modules/sessions/routes/session.routes';
 import { settingsRouter } from '../../modules/settings/routes/settings.routes';
@@ -67,6 +69,7 @@ export const v1Router: Router = Router();
 
 v1Router.use('/auth', authRouter);
 v1Router.use('/admin/auth', adminAuthRouter);
+v1Router.use('/admin/ai', adminAiAssistantRouter);
 v1Router.use('/admin/dashboard', adminDashboardRouter);
 v1Router.use('/admin/tenants', adminTenantRouter);
 v1Router.use('/admin/tenants', adminTenantBillingRouter);
@@ -136,6 +139,7 @@ v1Router.use('/reports', reportsRouter);
 v1Router.use('/analytics', analyticsRouter);
 // Platform-plane (no tenant check — mounted under /public, see PLATFORM_ROUTE_PREFIXES).
 v1Router.use('/public/contact', contactRouter);
+v1Router.use('/public/rum', rumRouter);
 
 /**
  * @openapi

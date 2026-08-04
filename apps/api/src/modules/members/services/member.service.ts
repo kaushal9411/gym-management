@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { AppError, ConflictError, NotFoundError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { generateOpaqueToken } from '../../../core/security/token.util';
+import { isDataUrl, presignGetUrl, uploadDataUrl } from '../../../core/storage/storage.service';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
@@ -117,7 +118,8 @@ function toDetail(member: MemberRow): MemberDetailDto {
 }
 
 async function buildQrCode(tenantId: string, token: string): Promise<string> {
-  return QRCode.toDataURL(`fitcloud-member:${tenantId}:${token}`, { width: 320, margin: 1 });
+  const dataUrl = await QRCode.toDataURL(`fitcloud-member:${tenantId}:${token}`, { width: 320, margin: 1 });
+  return uploadDataUrl(dataUrl, { keyPrefix: 'qr-codes', visibility: 'public' });
 }
 
 export class MemberService {
@@ -215,6 +217,9 @@ export class MemberService {
       input.memberId && input.memberId !== existing.memberId
         ? await this.assertMemberCodeAvailable(input.memberId)
         : undefined;
+    const profilePhotoUrl = isDataUrl(input.profilePhotoUrl)
+      ? await uploadDataUrl(input.profilePhotoUrl, { keyPrefix: 'member-photos', visibility: 'public' })
+      : input.profilePhotoUrl;
 
     await this.members.update(id, {
       ...(memberCode ? { memberId: memberCode } : {}),
@@ -222,7 +227,7 @@ export class MemberService {
       lastName: input.lastName,
       email: input.email,
       phone: input.phone,
-      profilePhotoUrl: input.profilePhotoUrl,
+      profilePhotoUrl,
       gender: input.gender,
       dateOfBirth: input.dateOfBirth === null ? null : input.dateOfBirth ? new Date(input.dateOfBirth) : undefined,
       bloodGroup: input.bloodGroup,
@@ -462,30 +467,36 @@ export class MemberService {
   async listDocuments(id: string): Promise<MemberDocumentDto[]> {
     await this.mustFind(id);
     const rows = await this.documents.list(this.tenantId, id);
-    return rows.map((d) => ({
-      id: d.id,
-      type: d.type,
-      fileName: d.fileName,
-      fileDataUrl: d.fileDataUrl,
-      uploadedAt: d.uploadedAt.toISOString(),
-    }));
+    return Promise.all(
+      rows.map(async (d) => ({
+        id: d.id,
+        type: d.type,
+        fileName: d.fileName,
+        fileDataUrl: await presignGetUrl(d.fileDataUrl),
+        uploadedAt: d.uploadedAt.toISOString(),
+      })),
+    );
   }
 
   async uploadDocument(id: string, input: UploadDocumentInput, actor: IamActor): Promise<MemberDocumentDto> {
     await this.mustFind(id);
+    // Documents (medical records, ID proof) are genuinely sensitive — stored
+    // under the bucket's private/ prefix; `fileDataUrl` in the DB is a bare
+    // object key from here on, never a directly-usable URL (see storage.service.ts).
+    const fileDataUrl = await uploadDataUrl(input.fileDataUrl, { keyPrefix: 'member-documents', visibility: 'private' });
     const doc = await this.documents.create({
       tenantId: this.tenantId,
       memberId: id,
       type: input.type,
       fileName: input.fileName,
-      fileDataUrl: input.fileDataUrl,
+      fileDataUrl,
     });
     await this.audit(actor, 'member.document_uploaded', id);
     return {
       id: doc.id,
       type: doc.type,
       fileName: doc.fileName,
-      fileDataUrl: doc.fileDataUrl,
+      fileDataUrl: await presignGetUrl(doc.fileDataUrl),
       uploadedAt: doc.uploadedAt.toISOString(),
     };
   }
@@ -524,11 +535,29 @@ export class MemberService {
     return [header, ...lines].join('\n');
   }
 
-  /** Bulk import — one bad row never rolls back the others. */
+  /**
+   * Bulk import — one bad row never rolls back the others, so each row's
+   * `create()`/`assignMembership()` stays sequential (memberId auto-generation
+   * and the subscription member-cap check both read-then-write and would
+   * race under real concurrency). The N+1 this used to have was the
+   * branch-name/trainer-email/plan-name LOOKUPS, not the writes — a CSV
+   * with 500 rows referencing the same 3 branches previously ran 500
+   * near-identical `findFirst` queries. Pre-fetch each reference set once
+   * (Prompt 37 perf pass) instead.
+   */
   async bulkImport(rows: MemberBulkImportRow[], actor: IamActor): Promise<MemberBulkImportResult> {
     const defaultBranch =
       (await this.db.branch.findFirst({ where: { tenantId: this.tenantId, isDefault: true } })) ??
       (await this.db.branch.findFirst({ where: { tenantId: this.tenantId, isActive: true } }));
+
+    const [branches, trainers, plans] = await Promise.all([
+      this.db.branch.findMany({ where: { tenantId: this.tenantId }, select: { id: true, name: true } }),
+      this.db.user.findMany({ where: { tenantId: this.tenantId, deletedAt: null }, select: { id: true, email: true } }),
+      this.db.membershipPlan.findMany({ where: { tenantId: this.tenantId, deletedAt: null }, select: { id: true, name: true } }),
+    ]);
+    const branchByName = new Map(branches.map((b) => [b.name.toLowerCase(), b.id]));
+    const trainerByEmail = new Map(trainers.filter((u) => u.email).map((u) => [u.email!.toLowerCase(), u.id]));
+    const planByName = new Map(plans.map((p) => [p.name.toLowerCase(), p.id]));
 
     const result: MemberBulkImportResult = { created: 0, failed: [] };
     for (const [index, row] of rows.entries()) {
@@ -536,20 +565,12 @@ export class MemberService {
       try {
         let branchId = defaultBranch?.id;
         if (row.branchName) {
-          const branch = await this.db.branch.findFirst({
-            where: { tenantId: this.tenantId, name: { equals: row.branchName, mode: 'insensitive' } },
-          });
-          if (branch) branchId = branch.id;
+          const matched = branchByName.get(row.branchName.toLowerCase());
+          if (matched) branchId = matched;
         }
         if (!branchId) throw new Error('No branch available to assign — create a branch first.');
 
-        let trainerId: string | undefined;
-        if (row.trainerEmail) {
-          const trainer = await this.db.user.findFirst({
-            where: { tenantId: this.tenantId, email: row.trainerEmail.toLowerCase(), deletedAt: null },
-          });
-          if (trainer) trainerId = trainer.id;
-        }
+        const trainerId = row.trainerEmail ? trainerByEmail.get(row.trainerEmail.toLowerCase()) : undefined;
 
         const member = await this.create(
           {
@@ -564,10 +585,8 @@ export class MemberService {
           actor,
         );
 
-        if (row.planName) {
-          const plan = await this.membershipPlans.findByName(this.tenantId, row.planName);
-          if (plan) await this.assignMembership(member.id, { planId: plan.id }, actor);
-        }
+        const planId = row.planName ? planByName.get(row.planName.toLowerCase()) : undefined;
+        if (planId) await this.assignMembership(member.id, { planId }, actor);
         result.created += 1;
       } catch (error) {
         result.failed.push({ row: index + 1, name, reason: error instanceof Error ? error.message : 'Unknown error' });
@@ -590,19 +609,33 @@ export class MemberService {
 
   // ── internals ───────────────────────────────────────────────────────────
 
+  /**
+   * Each row targets a different member and shares no mutable aggregate
+   * (unlike `bulkImport`'s capacity check/memberId generation), so — unlike
+   * that one — these are safe to run concurrently. Chunked rather than one
+   * big `Promise.all` to cap how many connections a large selection can
+   * pull from the pool at once (Prompt 37 perf pass; was a fully
+   * sequential `for` loop).
+   */
   private async bulkAction(
     memberIds: string[],
     actor: IamActor,
     action: (id: string, actor: IamActor) => Promise<void>,
   ): Promise<BulkMemberActionResult> {
     const result: BulkMemberActionResult = { succeeded: [], failed: [] };
-    for (const memberId of memberIds) {
-      try {
-        await action(memberId, actor);
-        result.succeeded.push(memberId);
-      } catch (error) {
-        result.failed.push({ memberId, reason: error instanceof Error ? error.message : 'Unknown error' });
-      }
+    const CONCURRENCY = 10;
+    for (let i = 0; i < memberIds.length; i += CONCURRENCY) {
+      const batch = memberIds.slice(i, i + CONCURRENCY);
+      await Promise.all(
+        batch.map(async (memberId) => {
+          try {
+            await action(memberId, actor);
+            result.succeeded.push(memberId);
+          } catch (error) {
+            result.failed.push({ memberId, reason: error instanceof Error ? error.message : 'Unknown error' });
+          }
+        }),
+      );
     }
     return result;
   }

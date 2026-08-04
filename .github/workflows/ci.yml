@@ -47,6 +47,104 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck
 
+  audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Report-only for now: this repo has pre-existing high/critical advisories
+      # in deep transitive deps (dev-tooling chains, not runtime-reachable) that
+      # predate this job and aren't a one-line fix — see PROJECT-STATE.md. Once
+      # those are cleared, drop `continue-on-error` so new criticals actually
+      # block merges instead of just surfacing in the Actions log.
+      - run: pnpm audit --audit-level=high
+        continue-on-error: true
+
+  a11y:
+    name: Accessibility (axe)
+    runs-on: ubuntu-latest
+    needs: build
+    # NOTE: this job spins up the full stack (API + both Next.js apps) from
+    # scratch and hasn't been exercised against a real GitHub Actions run
+    # yet — the Playwright/axe test itself (e2e/a11y.spec.ts) IS verified,
+    # live, against the actual dev stack; only this orchestration around it
+    # (background-server startup + readiness wait) is new and unproven in CI.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gym
+          POSTGRES_PASSWORD: gym
+          POSTGRES_DB: gym_saas_a11y
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U gym"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://gym:gym@localhost:5432/gym_saas_a11y?schema=public
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Copy frontend env defaults (NEXT_PUBLIC_API_URL etc.)
+        run: |
+          cp apps/tenant-web/.env.example apps/tenant-web/.env
+          cp apps/super-admin/.env.example apps/super-admin/.env
+      - name: Generate throwaway secrets (this job's DB is wiped after the run — nothing here is a real credential)
+        run: |
+          openssl genrsa -out /tmp/jwt-private.pem 2048
+          openssl rsa -in /tmp/jwt-private.pem -pubout -out /tmp/jwt-public.pem
+          echo "JWT_PRIVATE_KEY_B64=$(base64 -w0 /tmp/jwt-private.pem)" >> "$GITHUB_ENV"
+          echo "JWT_PUBLIC_KEY_B64=$(base64 -w0 /tmp/jwt-public.pem)" >> "$GITHUB_ENV"
+          echo "ENCRYPTION_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")" >> "$GITHUB_ENV"
+      - name: Migrate + seed
+        working-directory: apps/api
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm run prisma:seed
+      - name: Start API + both frontends in the background
+        run: |
+          (cd apps/api && nohup pnpm run dev > /tmp/api.log 2>&1 &)
+          (cd apps/tenant-web && nohup pnpm run dev > /tmp/tenant-web.log 2>&1 &)
+          (cd apps/super-admin && nohup pnpm run dev > /tmp/super-admin.log 2>&1 &)
+      - name: Wait for all three to respond
+        run: |
+          for url in http://localhost:4000/health http://localhost:3001/login http://localhost:3002/login; do
+            for i in $(seq 1 60); do
+              curl -sf "$url" -o /dev/null && break
+              sleep 2
+            done
+          done
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:a11y
+      - if: failure()
+        run: |
+          echo "--- api.log ---"; tail -100 /tmp/api.log
+          echo "--- tenant-web.log ---"; tail -100 /tmp/tenant-web.log
+          echo "--- super-admin.log ---"; tail -100 /tmp/super-admin.log
+
   test:
     name: Test
     runs-on: ubuntu-latest

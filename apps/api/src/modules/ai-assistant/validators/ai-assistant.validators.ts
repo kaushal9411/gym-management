@@ -19,3 +19,15 @@ export const streamMessageBodySchema = z
     regenerate: z.boolean().optional().default(false),
   })
   .refine((data) => data.regenerate || !!data.content, { message: 'content is required unless regenerate is true' });
+
+const AI_PROVIDERS = ['openrouter', 'openai', 'anthropic', 'gemini', 'azure-openai', 'ollama'] as const;
+
+/** Every field optional — omitted = leave unchanged, `''` = clear back to the platform default (see `AiTenantSettingsService#update`). */
+export const updateTenantAiSettingsBodySchema = z.object({
+  provider: z.union([z.enum(AI_PROVIDERS), z.literal('')]).optional(),
+  model: z.string().trim().max(120).optional(),
+  apiKey: z.string().trim().max(500).optional(),
+  baseUrl: z.string().trim().max(500).optional(),
+  temperature: z.coerce.number().min(0).max(2).optional(),
+  maxTokens: z.coerce.number().int().positive().max(32_000).optional(),
+});

@@ -4,6 +4,7 @@ import { createApp } from './app';
 import { env } from './config/env';
 import { container } from './core/container';
 import { logger } from './core/logging/logger';
+import { captureError, initSentry } from './core/observability/sentry';
 import { disconnectRedis } from './infrastructure/cache/redis';
 import { disconnectPrisma } from './infrastructure/database/prisma';
 import { emailQueue } from './infrastructure/queue/email.queue';
@@ -15,6 +16,22 @@ import { registerOnboardingEmailListeners } from './modules/onboarding/events/on
 import { initScheduler, stopScheduler } from './modules/scheduler/services/scheduler-engine.service';
 import { registerStaffEmailListeners } from './modules/staff/events/staff-email.listeners';
 import { registerBillingEmailListeners } from './modules/subscription/events/billing-email.listeners';
+
+initSentry();
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled promise rejection', { message: (reason as Error)?.message, stack: (reason as Error)?.stack });
+  captureError(reason);
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception', { message: error.message, stack: error.stack });
+  captureError(error);
+  // The process is in an undefined state past this point (Node's own
+  // guidance) — exit rather than keep serving requests on a corrupted heap;
+  // the process manager (pm2/systemd/k8s) is responsible for restarting it.
+  process.exit(1);
+});
 
 async function bootstrap(): Promise<void> {
   registerAuthEmailListeners();

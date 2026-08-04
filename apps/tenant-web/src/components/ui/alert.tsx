@@ -30,6 +30,7 @@ Alert.displayName = 'Alert';
 
 const AlertTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
   ({ className, ...props }, ref) => (
+    // eslint-disable-next-line jsx-a11y/heading-has-content -- content arrives via `...props.children` at every real call site; the rule can't see through that.
     <h5 ref={ref} className={cn('col-start-2 font-medium leading-tight', className)} {...props} />
   ),
 );

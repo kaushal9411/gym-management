@@ -1,6 +1,7 @@
 import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 
+import { classifyProviderHttpStatus } from './error-classification';
 import { readSseDataLines } from './sse-parser';
 import type { AiChatMessage, AiCompletionRequest, AiCompletionResult, AiProvider } from './types';
 
@@ -119,6 +120,7 @@ export class OpenAiCompatibleProvider implements AiProvider {
       ErrorCode.INTERNAL_ERROR,
       `${this.name} request failed (${response.status}): ${text.slice(0, 300) || response.statusText}`,
       502,
+      { code: classifyProviderHttpStatus(response.status) },
     );
   }
 }

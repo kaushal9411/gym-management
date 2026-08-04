@@ -22,6 +22,7 @@ CardHeader.displayName = 'CardHeader';
 
 const CardTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
   ({ className, ...props }, ref) => (
+    // eslint-disable-next-line jsx-a11y/heading-has-content -- content arrives via `...props.children` at every real call site; the rule can't see through that.
     <h1 ref={ref} className={cn('text-xl font-semibold leading-none tracking-tight', className)} {...props} />
   ),
 );

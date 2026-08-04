@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import type { TenantBranding, TenantInvoiceSettings, TenantProfile, TenantSettings } from '@prisma/client';
 
+import { uploadDataUrl } from '../../../core/storage/storage.service';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
@@ -226,7 +227,11 @@ export class SettingsService {
     actor: IamActor,
     action: string,
   ): Promise<BrandingDto> {
-    const updated = await this.brandingRepository.update(this.tenantId, { [field]: dataUrl });
+    // Branding assets are shown on public, unauthenticated surfaces (login
+    // page background/logo, browser-tab favicon) — always public/, a
+    // stable direct URL stored in place of the old data-URL.
+    const url = await uploadDataUrl(dataUrl, { keyPrefix: `branding/${field}`, visibility: 'public' });
+    const updated = await this.brandingRepository.update(this.tenantId, { [field]: url });
     await this.invalidateTenantCache();
     await this.audit(actor, action, field);
     return toBrandingDto(updated);

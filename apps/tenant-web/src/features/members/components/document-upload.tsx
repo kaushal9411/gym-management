@@ -109,6 +109,7 @@ export function DocumentUpload({ memberId, disabled }: DocumentUploadProps) {
                   size="icon"
                   className="size-8 shrink-0"
                   disabled={remove.isPending}
+                  aria-label={`Delete ${doc.fileName}`}
                   onClick={() => remove.mutate({ id: memberId, documentId: doc.id }, { onSuccess: () => toast.success('Document deleted') })}
                 >
                   <Trash2 className="size-4" />

@@ -274,18 +274,41 @@ export class ReportsService {
       },
       select: { id: true, name: true },
     });
+    if (trainers.length === 0) return [];
+    const trainerIds = trainers.map((t) => t.id);
 
-    const rows = await Promise.all(
-      trainers.map(async (t) => {
-        const [assignedMembers, activeWorkoutPlans, activeDietPlans] = await Promise.all([
-          this.db.member.count({ where: { tenantId: this.tenantId, deletedAt: null, trainerId: t.id, branchId } }),
-          this.db.workoutPlan.count({ where: { tenantId: this.tenantId, deletedAt: null, trainerId: t.id, isActive: true } }),
-          this.db.dietPlan.count({ where: { tenantId: this.tenantId, deletedAt: null, trainerId: t.id, isActive: true } }),
-        ]);
-        return { trainerId: t.id, name: t.name, assignedMembers, activeWorkoutPlans, activeDietPlans };
+    // Grouped aggregates instead of 3 queries per trainer — was N×3 round
+    // trips (Prompt 20's original shape), now a fixed 3 regardless of
+    // trainer count (Prompt 37 perf pass).
+    const [memberCounts, workoutCounts, dietCounts] = await Promise.all([
+      this.db.member.groupBy({
+        by: ['trainerId'],
+        where: { tenantId: this.tenantId, deletedAt: null, trainerId: { in: trainerIds }, branchId },
+        _count: { _all: true },
       }),
-    );
-    return rows;
+      this.db.workoutPlan.groupBy({
+        by: ['trainerId'],
+        where: { tenantId: this.tenantId, deletedAt: null, trainerId: { in: trainerIds }, isActive: true },
+        _count: { _all: true },
+      }),
+      this.db.dietPlan.groupBy({
+        by: ['trainerId'],
+        where: { tenantId: this.tenantId, deletedAt: null, trainerId: { in: trainerIds }, isActive: true },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const memberMap = new Map(memberCounts.map((r) => [r.trainerId, r._count._all]));
+    const workoutMap = new Map(workoutCounts.map((r) => [r.trainerId, r._count._all]));
+    const dietMap = new Map(dietCounts.map((r) => [r.trainerId, r._count._all]));
+
+    return trainers.map((t) => ({
+      trainerId: t.id,
+      name: t.name,
+      assignedMembers: memberMap.get(t.id) ?? 0,
+      activeWorkoutPlans: workoutMap.get(t.id) ?? 0,
+      activeDietPlans: dietMap.get(t.id) ?? 0,
+    }));
   }
 
   async memberProgressReport(userId: string, filters: ReportFilters): Promise<Paginated<MemberProgressRow>> {
@@ -330,36 +353,63 @@ export class ReportsService {
     const branches = await this.db.branch.findMany({
       where: { tenantId: this.tenantId, isActive: true, ...(branchScope ? { id: branchScope } : {}) },
     });
+    if (branches.length === 0) return [];
+    const branchIds = branches.map((b) => b.id);
 
     const todayIso = todayStr();
     const monthStart = new Date(`${todayIso.slice(0, 7)}-01T00:00:00.000Z`);
     const todayEnd = new Date(`${todayIso}T23:59:59.999Z`);
 
-    return Promise.all(
-      branches.map(async (b) => {
-        const [totalMembers, activeMembers, revenue, attendance, staffCount] = await Promise.all([
-          this.db.member.count({ where: { tenantId: this.tenantId, deletedAt: null, branchId: b.id } }),
-          this.db.member.count({ where: { tenantId: this.tenantId, deletedAt: null, branchId: b.id, status: 'ACTIVE' } }),
-          this.db.income.aggregate({
-            where: { tenantId: this.tenantId, deletedAt: null, branchId: b.id, incomeDate: { gte: monthStart, lte: todayEnd } },
-            _sum: { amount: true },
-          }),
-          this.db.attendance.count({
-            where: { tenantId: this.tenantId, deletedAt: null, branchId: b.id, attendanceDate: { gte: monthStart, lte: todayEnd } },
-          }),
-          this.db.user.count({ where: { tenantId: this.tenantId, deletedAt: null, userBranches: { some: { branchId: b.id } } } }),
-        ]);
-        return {
-          branchId: b.id,
-          branch: b.name,
-          totalMembers,
-          activeMembers,
-          monthlyRevenue: (Number(revenue._sum.amount) || 0).toFixed(2),
-          monthlyAttendance: attendance,
-          staffCount,
-        };
+    // Grouped aggregates instead of 5 queries per branch — was N×5 round
+    // trips (Prompt 20's original shape), now a fixed 5 regardless of
+    // branch count (Prompt 37 perf pass). `staffCounts` counts UserBranch
+    // rows per branch, which is exactly the distinct-user count the
+    // original `user.count({some: {branchId}})` produced — `UserBranch`
+    // carries `@@unique([userId, branchId])`, so a user contributes at
+    // most one row per branch.
+    const [totalMembers, activeMembers, revenue, attendance, staffCounts] = await Promise.all([
+      this.db.member.groupBy({
+        by: ['branchId'],
+        where: { tenantId: this.tenantId, deletedAt: null, branchId: { in: branchIds } },
+        _count: { _all: true },
       }),
-    );
+      this.db.member.groupBy({
+        by: ['branchId'],
+        where: { tenantId: this.tenantId, deletedAt: null, branchId: { in: branchIds }, status: 'ACTIVE' },
+        _count: { _all: true },
+      }),
+      this.db.income.groupBy({
+        by: ['branchId'],
+        where: { tenantId: this.tenantId, deletedAt: null, branchId: { in: branchIds }, incomeDate: { gte: monthStart, lte: todayEnd } },
+        _sum: { amount: true },
+      }),
+      this.db.attendance.groupBy({
+        by: ['branchId'],
+        where: { tenantId: this.tenantId, deletedAt: null, branchId: { in: branchIds }, attendanceDate: { gte: monthStart, lte: todayEnd } },
+        _count: { _all: true },
+      }),
+      this.db.userBranch.groupBy({
+        by: ['branchId'],
+        where: { branchId: { in: branchIds }, user: { tenantId: this.tenantId, deletedAt: null } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const totalMap = new Map(totalMembers.map((r) => [r.branchId, r._count._all]));
+    const activeMap = new Map(activeMembers.map((r) => [r.branchId, r._count._all]));
+    const revenueMap = new Map(revenue.map((r) => [r.branchId, Number(r._sum.amount) || 0]));
+    const attendanceMap = new Map(attendance.map((r) => [r.branchId, r._count._all]));
+    const staffMap = new Map(staffCounts.map((r) => [r.branchId, r._count._all]));
+
+    return branches.map((b) => ({
+      branchId: b.id,
+      branch: b.name,
+      totalMembers: totalMap.get(b.id) ?? 0,
+      activeMembers: activeMap.get(b.id) ?? 0,
+      monthlyRevenue: (revenueMap.get(b.id) ?? 0).toFixed(2),
+      monthlyAttendance: attendanceMap.get(b.id) ?? 0,
+      staffCount: staffMap.get(b.id) ?? 0,
+    }));
   }
 
   async expiringMembershipReport(userId: string, filters: ReportFilters & { withinDays?: number }): Promise<Paginated<ExpiringMembershipRow>> {

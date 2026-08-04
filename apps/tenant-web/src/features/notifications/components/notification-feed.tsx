@@ -42,8 +42,8 @@ interface NotificationFeedProps {
  */
 export function NotificationFeed({ tab, onTabChange, items, isLoading, onMarkRead, onDelete, compact = false }: NotificationFeedProps) {
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap gap-1.5">
+    <div className={cn('space-y-3', compact && 'flex min-h-0 flex-1 flex-col gap-3 space-y-0')}>
+      <div className={cn('flex flex-wrap gap-1.5', compact && 'shrink-0')}>
         {NOTIFICATION_TABS.map((t) => (
           <button
             key={t.value}
@@ -61,7 +61,7 @@ export function NotificationFeed({ tab, onTabChange, items, isLoading, onMarkRea
         ))}
       </div>
 
-      <div className={cn('space-y-2', compact && 'flex-1 overflow-y-auto')}>
+      <div className={cn('space-y-2', compact && 'min-h-0 flex-1 overflow-y-auto')}>
         {isLoading ? (
           Array.from({ length: compact ? 4 : 5 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)
         ) : items.length === 0 ? (

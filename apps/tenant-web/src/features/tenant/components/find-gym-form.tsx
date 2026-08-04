@@ -74,6 +74,7 @@ export function FindGymForm({ bare = false, dark = false }: FindGymFormProps) {
             id="slug"
             placeholder="yourgym"
             autoComplete="off"
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate: the sole field on a single-purpose "find your gym" form.
             autoFocus
             invalid={!!form.formState.errors.slug}
             aria-describedby={form.formState.errors.slug ? 'slug-error' : undefined}

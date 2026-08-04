@@ -83,6 +83,7 @@ export function ChatWindow({ conversationId }: ChatWindowProps) {
           {pendingMessages.map((message) => (
             <MessageBubble key={message.id} role={message.role} content={message.content} />
           ))}
+          {/* eslint-disable-next-line jsx-a11y/aria-role -- `role` here is MessageBubbleProps' own sender-type prop (USER/ASSISTANT/SYSTEM), not a DOM ARIA role; never spread onto an element. */}
           {isStreaming && <MessageBubble role="ASSISTANT" content={streamingText || '…'} />}
         </div>
       )}

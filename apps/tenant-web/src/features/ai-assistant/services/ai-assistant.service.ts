@@ -1,7 +1,15 @@
 import { apiClient, toAuthServiceError } from '@/features/auth/services/api-client';
 import { getCurrentTenantSlug } from '@/features/auth/utils/tenant-detection';
 import { getActiveStore } from '@/store';
-import type { AiConfig, AiConversation, AiConversationDetail, ChatStreamEvent, PaginatedResult } from '../types';
+import type {
+  AiConfig,
+  AiConversation,
+  AiConversationDetail,
+  ChatStreamEvent,
+  PaginatedResult,
+  TenantAiSettings,
+  UpdateTenantAiSettingsInput,
+} from '../types';
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -16,6 +24,32 @@ class AiAssistantService {
     try {
       const res = await apiClient.get<ApiEnvelope<AiConfig>>('/ai/config');
       return res.data.data;
+    } catch (error) {
+      throw toAuthServiceError(error);
+    }
+  }
+
+  async getTenantSettings(): Promise<TenantAiSettings> {
+    try {
+      const res = await apiClient.get<ApiEnvelope<TenantAiSettings>>('/ai/settings');
+      return res.data.data;
+    } catch (error) {
+      throw toAuthServiceError(error);
+    }
+  }
+
+  async updateTenantSettings(input: UpdateTenantAiSettingsInput): Promise<TenantAiSettings> {
+    try {
+      const res = await apiClient.put<ApiEnvelope<TenantAiSettings>>('/ai/settings', input);
+      return res.data.data;
+    } catch (error) {
+      throw toAuthServiceError(error);
+    }
+  }
+
+  async resetTenantSettings(): Promise<void> {
+    try {
+      await apiClient.delete('/ai/settings');
     } catch (error) {
       throw toAuthServiceError(error);
     }

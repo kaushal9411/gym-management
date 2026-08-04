@@ -229,6 +229,7 @@ model Tenant {
   aiConversations       AiConversation[]
   aiMessages            AiMessage[]
   aiRequestLogs         AiRequestLog[]
+  aiSettings            TenantAiSettings?
 
   @@map("tenants")
 }
@@ -2419,13 +2420,83 @@ model AdminUser {
   updatedAt           DateTime        @updatedAt @map("updated_at")
   deletedAt           DateTime?       @map("deleted_at")
 
-  role            AdminRole           @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  refreshTokens   AdminRefreshToken[]
-  auditLogs       AdminAuditLog[]
-  assignedTickets SupportTicket[]     @relation("TicketAssignee")
-  ticketNotes     SupportTicketNote[]
+  role              AdminRole            @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  refreshTokens     AdminRefreshToken[]
+  auditLogs         AdminAuditLog[]
+  assignedTickets   SupportTicket[]      @relation("TicketAssignee")
+  ticketNotes       SupportTicketNote[]
+  aiConversations   AdminAiConversation[]
 
   @@map("admin_users")
+}
+
+/// AI Business Assistant, admin-plane side (Prompt 35.5) — a super admin's
+/// own chat history, scoped to that admin (not shared across the platform
+/// team). No RLS — same as every other admin-plane table, isolation is a
+/// non-concept here (there's no "tenant" to isolate from).
+model AdminAiConversation {
+  id          String   @id @default(uuid()) @db.Uuid
+  adminUserId String   @map("admin_user_id") @db.Uuid
+  title       String   @default("New conversation") @db.VarChar(200)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  adminUser AdminUser        @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  messages  AdminAiMessage[]
+
+  @@index([adminUserId, updatedAt])
+  @@map("admin_ai_conversations")
+}
+
+model AdminAiMessage {
+  id             String        @id @default(uuid()) @db.Uuid
+  conversationId String        @map("conversation_id") @db.Uuid
+  role           AiMessageRole
+  content        String
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  conversation AdminAiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("admin_ai_messages")
+}
+
+model AdminAiRequestLog {
+  id               String   @id @default(uuid()) @db.Uuid
+  adminUserId      String   @map("admin_user_id") @db.Uuid
+  conversationId   String?  @map("conversation_id") @db.Uuid
+  provider         String   @db.VarChar(60)
+  model            String   @db.VarChar(120)
+  promptTokens     Int?     @map("prompt_tokens")
+  completionTokens Int?     @map("completion_tokens")
+  durationMs       Int?     @map("duration_ms")
+  status           String   @db.VarChar(20)
+  error            String?
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@map("admin_ai_request_logs")
+}
+
+/// Single-row (application-enforced) platform-wide AI provider override for
+/// the super-admin assistant — analogous to `TenantAiSettings` but there's
+/// only ever one "tenant" here (the platform team), so no per-user/per-role
+/// scoping. Any super admin with `settings:manage` can view/edit it; it's
+/// shared across the whole admin team, same sharing model as every other
+/// platform-wide admin setting (feature flags, system settings).
+model PlatformAiSettings {
+  id              String   @id @default(uuid()) @db.Uuid
+  provider        String?  @db.VarChar(30)
+  model           String?  @db.VarChar(120)
+  apiKeyEncrypted String?  @map("api_key_encrypted")
+  baseUrl         String?  @map("base_url")
+  temperature     Float?
+  maxTokens       Int?     @map("max_tokens")
+  updatedBy       String?  @map("updated_by") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_ai_settings")
 }
 
 /// Mirrors the tenant `RefreshToken` rotation/reuse-detection design, scoped
@@ -2966,4 +3037,27 @@ model AiRequestLog {
 
   @@index([tenantId, createdAt])
   @@map("ai_request_logs")
+}
+
+/// Per-tenant "bring your own key" override for the AI Business Assistant —
+/// every field is optional and `null` means "fall through to the platform
+/// default" (`env.ai.*`). `apiKeyEncrypted` is AES-256-GCM ciphertext
+/// (`core/security/encryption.util.ts`), never the raw key — decrypted only
+/// at the moment a provider call is actually made, never sent back to the
+/// frontend (`GET` returns a masked last-4 indicator instead).
+model TenantAiSettings {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @unique @map("tenant_id") @db.Uuid
+  provider        String?  @db.VarChar(30)
+  model           String?  @db.VarChar(120)
+  apiKeyEncrypted String?  @map("api_key_encrypted")
+  baseUrl         String?  @map("base_url")
+  temperature     Float?
+  maxTokens       Int?     @map("max_tokens")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_ai_settings")
 }

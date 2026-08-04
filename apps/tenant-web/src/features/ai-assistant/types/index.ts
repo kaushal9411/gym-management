@@ -37,6 +37,31 @@ export interface AiConfig {
   temperature: number;
   maxTokens: number;
   isConfigured: boolean;
+  /** `true` when this tenant is using their own BYOK key rather than the platform default. */
+  usingOwnKey: boolean;
+}
+
+export type AiProviderName = 'openrouter' | 'openai' | 'anthropic' | 'gemini' | 'azure-openai' | 'ollama';
+
+/** This tenant's own AI provider override ("bring your own key") — every field `null` means "using the platform default" for that field. The raw API key is never returned, only a masked last-4 indicator. */
+export interface TenantAiSettings {
+  provider: AiProviderName | null;
+  model: string | null;
+  baseUrl: string | null;
+  temperature: number | null;
+  maxTokens: number | null;
+  hasApiKey: boolean;
+  apiKeyMasked: string | null;
+  usingPlatformDefault: boolean;
+}
+
+export interface UpdateTenantAiSettingsInput {
+  provider?: string;
+  model?: string;
+  apiKey?: string;
+  baseUrl?: string;
+  temperature?: number;
+  maxTokens?: number;
 }
 
 export interface PaginatedResult<T> {
@@ -47,8 +72,10 @@ export interface PaginatedResult<T> {
   totalPages: number;
 }
 
+export type AiErrorCode = 'AUTH_INVALID' | 'QUOTA_EXCEEDED' | 'NOT_CONFIGURED' | 'GENERIC';
+
 /** Mirrors the backend's SSE event shape (`ChatStreamEvent`) verbatim. */
 export type ChatStreamEvent =
   | { type: 'delta'; text: string }
   | { type: 'done'; messageId: string; content: string; action: AiActionProposal | null }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string; code?: AiErrorCode };

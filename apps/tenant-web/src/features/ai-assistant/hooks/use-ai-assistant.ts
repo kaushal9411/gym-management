@@ -1,14 +1,44 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { aiAssistantService } from '../services/ai-assistant.service';
-import type { AiMessage } from '../types';
+import type { AiErrorCode, AiMessage, UpdateTenantAiSettingsInput } from '../types';
+
+/** `AUTH_INVALID`/`QUOTA_EXCEEDED`/`NOT_CONFIGURED` all mean "something about the AI key/provider config needs attention" — surfaced as a toast with a direct link to fix it, instead of a dead-end error. */
+const ACTIONABLE_ERROR_CODES: ReadonlySet<AiErrorCode> = new Set(['AUTH_INVALID', 'QUOTA_EXCEEDED', 'NOT_CONFIGURED']);
 
 export function useAiConfig() {
   return useQuery({ queryKey: ['ai-assistant', 'config'], queryFn: () => aiAssistantService.getConfig(), staleTime: 5 * 60_000 });
+}
+
+export function useTenantAiSettings() {
+  return useQuery({ queryKey: ['ai-assistant', 'tenant-settings'], queryFn: () => aiAssistantService.getTenantSettings() });
+}
+
+export function useUpdateTenantAiSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateTenantAiSettingsInput) => aiAssistantService.updateTenantSettings(input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['ai-assistant', 'tenant-settings'] });
+      void queryClient.invalidateQueries({ queryKey: ['ai-assistant', 'config'] });
+    },
+  });
+}
+
+export function useResetTenantAiSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => aiAssistantService.resetTenantSettings(),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['ai-assistant', 'tenant-settings'] });
+      void queryClient.invalidateQueries({ queryKey: ['ai-assistant', 'config'] });
+    },
+  });
 }
 
 export function useAiConversations(params: { page: number; limit: number }) {
@@ -83,6 +113,7 @@ interface UseAiChatStreamResult {
  */
 export function useAiChatStream(conversationId: string | null): UseAiChatStreamResult {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [pendingMessages, setPendingMessages] = React.useState<AiMessage[]>([]);
   const [streamingText, setStreamingText] = React.useState('');
   const [isStreaming, setIsStreaming] = React.useState(false);
@@ -110,7 +141,11 @@ export function useAiChatStream(conversationId: string | null): UseAiChatStreamR
             setStreamingText(accumulated);
           } else if (event.type === 'error') {
             // Surfaced explicitly — otherwise a failed send (e.g. the AI provider isn't configured) silently drops the optimistic user message with zero feedback, confirmed live as a real gap before this fix.
-            toast.error(event.message);
+            if (event.code && ACTIONABLE_ERROR_CODES.has(event.code)) {
+              toast.error(event.message, { action: { label: 'Open AI Settings', onClick: () => router.push('/gym-settings/ai') } });
+            } else {
+              toast.error(event.message);
+            }
           }
         }
       } catch {
@@ -123,7 +158,7 @@ export function useAiChatStream(conversationId: string | null): UseAiChatStreamR
         void queryClient.invalidateQueries({ queryKey: ['ai-assistant', 'conversations'], exact: false });
       }
     },
-    [conversationId, queryClient],
+    [conversationId, queryClient, router],
   );
 
   const send = React.useCallback((content: string) => void run({ content }), [run]);

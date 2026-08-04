@@ -1,6 +1,7 @@
 import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 
+import { classifyProviderHttpStatus } from './error-classification';
 import { readSseDataLines } from './sse-parser';
 import type { AiChatMessage, AiCompletionRequest, AiCompletionResult, AiProvider } from './types';
 
@@ -80,6 +81,11 @@ export class GeminiProvider implements AiProvider {
 
   private async toProviderError(response: Response): Promise<AppError> {
     const text = await response.text().catch(() => '');
-    return new AppError(ErrorCode.INTERNAL_ERROR, `gemini request failed (${response.status}): ${text.slice(0, 300) || response.statusText}`, 502);
+    return new AppError(
+      ErrorCode.INTERNAL_ERROR,
+      `gemini request failed (${response.status}): ${text.slice(0, 300) || response.statusText}`,
+      502,
+      { code: classifyProviderHttpStatus(response.status) },
+    );
   }
 }

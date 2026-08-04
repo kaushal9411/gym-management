@@ -10,6 +10,7 @@ import {
   messageParamSchema,
   sendMessageBodySchema,
   streamMessageBodySchema,
+  updateTenantAiSettingsBodySchema,
 } from '../validators/ai-assistant.validators';
 
 export const aiAssistantRouter: Router = Router();
@@ -24,6 +25,20 @@ aiAssistantRouter.use(authenticateMiddleware, requirePermission('ai:use'));
 
 /** @openapi { "/ai/config": { get: { tags: [AI Assistant], summary: Get AI Configuration, security: [{bearerAuth: []}], responses: { 200: { description: Provider/model config (no secrets) } } } } } */
 aiAssistantRouter.get('/config', asyncHandler(aiAssistantController.getConfig.bind(aiAssistantController)));
+
+/** @openapi { "/ai/settings": { get: { tags: [AI Assistant], summary: Get this tenant's own AI provider override ("bring your own key"), security: [{bearerAuth: []}], responses: { 200: { description: Masked settings } } } } } */
+aiAssistantRouter.get('/settings', requirePermission('settings:read'), asyncHandler(aiAssistantController.getTenantAiSettings.bind(aiAssistantController)));
+
+/** @openapi { "/ai/settings": { put: { tags: [AI Assistant], summary: Update this tenant's own AI provider override, security: [{bearerAuth: []}], responses: { 200: { description: Updated } } } } } */
+aiAssistantRouter.put(
+  '/settings',
+  requirePermission('settings:manage'),
+  validate({ body: updateTenantAiSettingsBodySchema }),
+  asyncHandler(aiAssistantController.updateTenantAiSettings.bind(aiAssistantController)),
+);
+
+/** @openapi { "/ai/settings": { delete: { tags: [AI Assistant], summary: Revert to the platform default AI configuration, security: [{bearerAuth: []}], responses: { 200: { description: Reset } } } } } */
+aiAssistantRouter.delete('/settings', requirePermission('settings:manage'), asyncHandler(aiAssistantController.resetTenantAiSettings.bind(aiAssistantController)));
 
 /** @openapi { "/ai/conversations": { get: { tags: [AI Assistant], summary: Get Conversation History (list), security: [{bearerAuth: []}], responses: { 200: { description: Paginated conversations } } } } } */
 aiAssistantRouter.get(

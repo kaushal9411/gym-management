@@ -4,6 +4,7 @@ import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 
 import { InitialLoadOverlay } from '@/components/initial-load-overlay';
+import { WebVitalsReporter } from '@/components/web-vitals-reporter';
 import { AppProviders } from '@/providers/app-providers';
 import { resolveTenant } from '@/features/tenant/resolve';
 
@@ -48,6 +49,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         }
       >
         <InitialLoadOverlay />
+        <WebVitalsReporter />
         <AppProviders tenant={tenant}>{children}</AppProviders>
       </body>
     </html>

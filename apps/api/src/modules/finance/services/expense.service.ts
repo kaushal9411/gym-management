@@ -1,13 +1,15 @@
 import ExcelJS from 'exceljs';
 
 import { NotFoundError } from '../../../core/errors/app-error';
+import { isDataUrl, presignGetUrl, uploadDataUrl } from '../../../core/storage/storage.service';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
 import type { CreateExpenseInput, ExpenseDto, ListExpensesQuery, UpdateExpenseInput } from '../dto/finance.dto';
 import { ExpenseRepository, type ExpenseRow } from '../repositories/expense.repository';
 
-function toDto(row: ExpenseRow): ExpenseDto {
+/** Receipts are financial records — private/ prefix, `receiptDataUrl` is a bare object key from creation on, presigned fresh on every read (same posture as MemberDocument). */
+async function toDto(row: ExpenseRow): Promise<ExpenseDto> {
   return {
     id: row.id,
     category: row.category,
@@ -16,7 +18,7 @@ function toDto(row: ExpenseRow): ExpenseDto {
     branch: row.branch ? { id: row.branch.id, name: row.branch.name } : null,
     description: row.description,
     receiptFileName: row.receiptFileName,
-    receiptDataUrl: row.receiptDataUrl,
+    receiptDataUrl: row.receiptDataUrl ? await presignGetUrl(row.receiptDataUrl) : row.receiptDataUrl,
     recordedBy: row.recordedByUser ? { id: row.recordedByUser.id, name: row.recordedByUser.name } : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -40,7 +42,7 @@ export class ExpenseService {
 
   async list(query: ListExpensesQuery) {
     const { items, total } = await this.expenses.list(this.tenantId, query);
-    return { items: items.map(toDto), total, page: query.page, limit: query.limit, totalPages: Math.max(1, Math.ceil(total / query.limit)) };
+    return { items: await Promise.all(items.map(toDto)), total, page: query.page, limit: query.limit, totalPages: Math.max(1, Math.ceil(total / query.limit)) };
   }
 
   async getById(id: string): Promise<ExpenseDto> {
@@ -48,6 +50,9 @@ export class ExpenseService {
   }
 
   async create(input: CreateExpenseInput, actor: IamActor): Promise<ExpenseDto> {
+    const receiptDataUrl = isDataUrl(input.receiptDataUrl)
+      ? await uploadDataUrl(input.receiptDataUrl, { keyPrefix: 'expense-receipts', visibility: 'private' })
+      : input.receiptDataUrl;
     const expense = await this.expenses.create({
       tenantId: this.tenantId,
       category: input.category,
@@ -56,7 +61,7 @@ export class ExpenseService {
       branchId: input.branchId,
       description: input.description,
       receiptFileName: input.receiptFileName,
-      receiptDataUrl: input.receiptDataUrl,
+      receiptDataUrl,
       recordedBy: actor.userId,
     });
     await this.audit(actor, 'expense.created', expense.id);
@@ -65,6 +70,9 @@ export class ExpenseService {
 
   async update(id: string, input: UpdateExpenseInput, actor: IamActor): Promise<ExpenseDto> {
     await this.mustFind(id);
+    const receiptDataUrl = isDataUrl(input.receiptDataUrl)
+      ? await uploadDataUrl(input.receiptDataUrl, { keyPrefix: 'expense-receipts', visibility: 'private' })
+      : input.receiptDataUrl;
     await this.expenses.update(id, {
       category: input.category,
       amount: input.amount,
@@ -72,7 +80,7 @@ export class ExpenseService {
       branchId: input.branchId,
       description: input.description,
       receiptFileName: input.receiptFileName,
-      receiptDataUrl: input.receiptDataUrl,
+      receiptDataUrl,
     });
     await this.audit(actor, 'expense.updated', id);
     return this.getById(id);

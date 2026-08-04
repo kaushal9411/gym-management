@@ -62,12 +62,13 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
             size="icon"
             className="size-7 rounded-md"
             title={t.label}
+            aria-label={t.label}
             onClick={() => exec(t.command)}
           >
             <t.icon className="size-3.5" />
           </Button>
         ))}
-        <Button type="button" variant="ghost" size="icon" className="size-7 rounded-md" title="Link" onClick={addLink}>
+        <Button type="button" variant="ghost" size="icon" className="size-7 rounded-md" title="Link" aria-label="Insert link" onClick={addLink}>
           <LinkIcon className="size-3.5" />
         </Button>
       </div>
