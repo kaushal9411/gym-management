@@ -7,8 +7,9 @@ import swaggerUi from 'swagger-ui-express';
 
 import { v1Router } from './api/v1/router';
 import { env } from './config/env';
+import { checkHealth } from './core/health/health-check.util';
 import { isAllowedOrigin } from './core/http/cors-origin';
-import { sendSuccess } from './core/http/response';
+import { sendError, sendSuccess } from './core/http/response';
 import { errorHandlerMiddleware, notFoundMiddleware } from './core/middleware/error-handler.middleware';
 import { apiRateLimiter } from './core/middleware/rate-limiter';
 import { requestContextMiddleware } from './core/middleware/request-context.middleware';
@@ -41,9 +42,40 @@ export function createApp(): Express {
   app.disable('x-powered-by');
   app.set('trust proxy', 1); // behind Nginx/Cloudflare — req.ip reflects the real client
 
+  // Every response from this API is pure JSON — there is no legitimate
+  // reason for one to load a script/image/frame/anything, so the default is
+  // maximally locked down rather than helmet's own generic
+  // `default-src 'self'` (which implies a "self" page worth trusting that
+  // doesn't exist here). Enabled in every environment, not just production
+  // — a JSON API response is never affected by this, so there's no dev-mode
+  // cost to leaving it on, and it keeps local testing honest. `/api/docs`
+  // (Swagger UI, mounted below) overrides this with its own, more
+  // permissive CSP — `helmet()` calls `res.setHeader`, so a second call
+  // later in the chain for that path genuinely replaces this one; passing
+  // `contentSecurityPolicy: false` there instead would NOT work, since a
+  // disabled directive just skips setting the header rather than clearing
+  // whatever an earlier middleware already set.
   app.use(
     helmet({
-      contentSecurityPolicy: env.isProduction ? undefined : false,
+      contentSecurityPolicy: {
+        // Every directive explicit and 'none' — helmet fills in its own
+        // (less strict) defaults for anything left unspecified, which would
+        // otherwise quietly undermine "maximally locked down" with e.g. its
+        // default `img-src 'self' data:` or `style-src 'self' https:
+        // 'unsafe-inline'`. This app never legitimately needs any of them.
+        directives: {
+          defaultSrc: ["'none'"],
+          scriptSrc: ["'none'"],
+          styleSrc: ["'none'"],
+          imgSrc: ["'none'"],
+          fontSrc: ["'none'"],
+          connectSrc: ["'none'"],
+          formAction: ["'none'"],
+          frameAncestors: ["'none'"],
+          objectSrc: ["'none'"],
+          baseUri: ["'none'"],
+        },
+      },
       crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
   );
@@ -72,8 +104,41 @@ export function createApp(): Express {
   app.use(requestLoggerMiddleware);
   app.use(requestTimeoutMiddleware());
 
-  app.get('/health', (_req, res) => sendSuccess(res, { status: 'ok', uptimeSeconds: process.uptime() }));
-  app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+  // Real connectivity checks (Postgres `SELECT 1`, Redis `PING`), not a
+  // "the process is alive" no-op — a load balancer/uptime monitor needs to
+  // know when the app can't actually serve traffic, not just that Node is
+  // running. 503 only when the database is down (nothing works without it);
+  // Redis-down alone is 'degraded' but still 200 (sessions/rate-limiting/
+  // caching misbehave, most traffic still serves).
+  app.get('/health', async (_req, res) => {
+    const result = await checkHealth();
+    if (result.status === 'unhealthy') {
+      sendError(res, 503, 'Service unavailable', [{ code: 'UNHEALTHY', message: 'Database is unreachable' }], result);
+      return;
+    }
+    sendSuccess(res, result, result.status === 'degraded' ? 'Degraded' : 'OK');
+  });
+
+  // Swagger UI ships an inline bootstrap script/style — it genuinely needs
+  // `'unsafe-inline'`, which the app-wide CSP above deliberately doesn't
+  // grant anything. This replaces (not weakens app-wide) that header for
+  // just this one path — see the comment on the app-wide `helmet()` call.
+  app.use(
+    '/api/docs',
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          scriptSrc: ["'self'", "'unsafe-inline'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          imgSrc: ["'self'", 'data:'],
+        },
+      },
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec),
+  );
   app.get('/api/docs.json', (_req, res) => res.json(swaggerSpec));
 
   app.use(tenantMiddleware(PLATFORM_ROUTE_PREFIXES));

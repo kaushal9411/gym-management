@@ -12,6 +12,7 @@ import { startEmailWorker, stopEmailWorker } from './infrastructure/queue/email.
 import { initSocketServer } from './infrastructure/realtime/socket-server';
 import { registerAuthEmailListeners } from './modules/authentication/events/auth-email.listeners';
 import { registerInvitationEmailListeners } from './modules/invitations/events/invitation-email.listeners';
+import { registerMemberAuthEmailListeners } from './modules/member-auth/events/member-auth-email.listeners';
 import { registerOnboardingEmailListeners } from './modules/onboarding/events/onboarding-email.listeners';
 import { initScheduler, stopScheduler } from './modules/scheduler/services/scheduler-engine.service';
 import { registerStaffEmailListeners } from './modules/staff/events/staff-email.listeners';
@@ -39,6 +40,7 @@ async function bootstrap(): Promise<void> {
   registerBillingEmailListeners();
   registerInvitationEmailListeners();
   registerStaffEmailListeners();
+  registerMemberAuthEmailListeners();
   startEmailWorker();
   await initScheduler();
 

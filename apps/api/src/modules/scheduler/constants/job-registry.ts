@@ -1,4 +1,5 @@
 import { dailyAttendanceSummary, monthlyAttendanceSummary, weeklyAttendanceSummary } from '../handlers/attendance.handlers';
+import { classSessionGeneration } from '../handlers/class-session.handlers';
 import {
   cacheRefresh,
   cleanupAuditLogs,
@@ -215,6 +216,17 @@ export const JOB_REGISTRY: JobDefinition[] = [
     cronPattern: '0 0 1 * *',
     priority: 3,
     handler: monthlyReportsRollup,
+  }),
+
+  // ── Class ────────────────────────────────────────────────────────────────
+  job({
+    name: 'class-session-generation',
+    category: 'CLASS',
+    description: 'Generates the next 4 weeks of dated ClassSession rows from every active recurring weekly class schedule, across every active tenant.',
+    cronPattern: '0 2 * * *',
+    priority: 2,
+    timeoutMs: 10 * MIN,
+    handler: classSessionGeneration,
   }),
 
   // ── Maintenance ──────────────────────────────────────────────────────────

@@ -24,6 +24,8 @@ const envSchema = z.object({
    *  verification against the admin audience and vice versa, so gym owners are
    *  structurally locked out of the admin portal, not just permission-gated. */
   JWT_ADMIN_AUDIENCE: z.string().default('fitcloud-admin-app'),
+  /** Third distinct audience — a member portal token structurally can't authenticate against the staff or admin planes, same enforcement mechanism as JWT_ADMIN_AUDIENCE. */
+  JWT_MEMBER_AUDIENCE: z.string().default('fitcloud-member-app'),
 
   PLATFORM_DOMAIN: z.string().default('fitcloud.local'),
   CORS_ORIGINS: z.string().default(''),
@@ -136,6 +138,7 @@ export const env = {
     issuer: raw.JWT_ISSUER,
     audience: raw.JWT_AUDIENCE,
     adminAudience: raw.JWT_ADMIN_AUDIENCE,
+    memberAudience: raw.JWT_MEMBER_AUDIENCE,
   },
 
   platformDomain: raw.PLATFORM_DOMAIN,

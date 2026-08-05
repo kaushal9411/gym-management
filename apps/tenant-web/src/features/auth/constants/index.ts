@@ -8,6 +8,7 @@ export const AUTH_ROUTES = {
   verifyOtp: '/verify-otp',
   resendOtp: '/resend-otp',
   twoFactor: '/two-factor',
+  mfaSetup: '/mfa-setup',
   invitation: '/invitation',
   sessionExpired: '/session-expired',
   accessDenied: '/access-denied',

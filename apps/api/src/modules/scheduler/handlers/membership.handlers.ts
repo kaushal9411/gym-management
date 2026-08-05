@@ -1,5 +1,6 @@
 import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
+import { decryptMemberContact } from '../../members/utils/member-pii.util';
 import { notifyMembershipExpired, notifyMembershipExpiring } from '../../tenant-notifications/services/notification-trigger.service';
 import type { JobHandler } from '../types';
 
@@ -14,10 +15,12 @@ const DEDUPE_TTL_SECONDS = 8 * 86_400;
  */
 export const membershipRenewalReminder: JobHandler = async () => {
   const windowEnd = new Date(Date.now() + REMINDER_WINDOW_DAYS * DAY_MS);
-  const memberships = await prisma.membership.findMany({
-    where: { status: 'ACTIVE', endDate: { gte: new Date(), lte: windowEnd } },
-    include: { member: true, plan: { select: { name: true } } },
-  });
+  const memberships = (
+    await prisma.membership.findMany({
+      where: { status: 'ACTIVE', endDate: { gte: new Date(), lte: windowEnd } },
+      include: { member: true, plan: { select: { name: true } } },
+    })
+  ).map((membership) => ({ ...membership, member: decryptMemberContact(membership.member) }));
 
   let reminded = 0;
   for (const membership of memberships) {
@@ -68,10 +71,12 @@ const RECENTLY_EXPIRED_DEDUPE_TTL_SECONDS = 20 * 86_400; // must outlive the win
  */
 export const membershipExpiredNotification: JobHandler = async () => {
   const windowStart = new Date(Date.now() - RECENTLY_EXPIRED_WINDOW_DAYS * DAY_MS);
-  const memberships = await prisma.membership.findMany({
-    where: { status: 'EXPIRED', endDate: { gte: windowStart, lt: new Date() } },
-    include: { member: true, plan: { select: { name: true } } },
-  });
+  const memberships = (
+    await prisma.membership.findMany({
+      where: { status: 'EXPIRED', endDate: { gte: windowStart, lt: new Date() } },
+      include: { member: true, plan: { select: { name: true } } },
+    })
+  ).map((membership) => ({ ...membership, member: decryptMemberContact(membership.member) }));
 
   let notified = 0;
   for (const membership of memberships) {

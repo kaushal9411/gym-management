@@ -24,16 +24,17 @@ export function sendSuccess<T>(res: Response, data: T, message = 'OK', statusCod
   res.status(statusCode).json(body);
 }
 
-export function sendError(
+export function sendError<T = never>(
   res: Response,
   statusCode: number,
   message: string,
   errors: ApiResponseBody['errors'] = null,
+  data: T | null = null,
 ): void {
-  const body: ApiResponseBody<never> = {
+  const body: ApiResponseBody<T> = {
     success: false,
     message,
-    data: null,
+    data,
     errors,
     timestamp: new Date().toISOString(),
     requestId: getRequestContext()?.requestId ?? 'unknown',

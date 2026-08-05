@@ -13,6 +13,7 @@ import {
   updateGymProfileSchema,
   updateInvoiceSettingsSchema,
   updateNotificationSettingsSchema,
+  updateSecuritySettingsSchema,
   updateSocialLinksSchema,
   uploadBrandingAssetSchema,
   uploadImageSchema,
@@ -232,4 +233,28 @@ settingsRouter.patch(
   canManage,
   validate({ body: updateNotificationSettingsSchema }),
   asyncHandler(settingsController.updateNotificationSettings.bind(settingsController)),
+);
+
+/**
+ * @openapi
+ * /settings/security:
+ *   get:
+ *     tags: [Gym Settings]
+ *     summary: Get Security Settings (which staff role tiers require 2FA before completing login)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: "{ mfaRequiredRoles: string[] }" }
+ *   patch:
+ *     tags: [Gym Settings]
+ *     summary: Update Security Settings — set which staff role tiers must have 2FA enabled
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Security settings updated }
+ */
+settingsRouter.get('/security', canRead, asyncHandler(settingsController.getSecuritySettings.bind(settingsController)));
+settingsRouter.patch(
+  '/security',
+  canManage,
+  validate({ body: updateSecuritySettingsSchema }),
+  asyncHandler(settingsController.updateSecuritySettings.bind(settingsController)),
 );

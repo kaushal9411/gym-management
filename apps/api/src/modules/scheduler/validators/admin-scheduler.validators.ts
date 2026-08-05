@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const JOB_CATEGORIES = ['MEMBERSHIP', 'ATTENDANCE', 'PAYMENT', 'NOTIFICATION', 'REPORT', 'MAINTENANCE'] as const;
+const JOB_CATEGORIES = ['MEMBERSHIP', 'ATTENDANCE', 'PAYMENT', 'NOTIFICATION', 'REPORT', 'MAINTENANCE', 'CLASS'] as const;
 const JOB_RUN_STATUSES = ['PENDING', 'SCHEDULED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED', 'PAUSED'] as const;
 
 export const listJobsQuerySchema = z.object({

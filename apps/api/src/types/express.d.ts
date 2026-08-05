@@ -1,5 +1,6 @@
 import type { AdminAccessTokenClaims } from '../core/security/admin-jwt.service';
 import type { AccessTokenClaims } from '../core/security/jwt.service';
+import type { MemberAccessTokenClaims } from '../core/security/member-jwt.service';
 import type { ResolvedTenant } from '../modules/tenants/interfaces/tenant.interface';
 
 declare global {
@@ -11,6 +12,8 @@ declare global {
       auth?: AccessTokenClaims;
       /** Populated by adminAuthenticateMiddleware — completely separate from `auth` (see admin-jwt.service.ts). */
       admin?: AdminAccessTokenClaims;
+      /** Populated by memberAuthenticateMiddleware — completely separate from `auth`/`admin` (see member-jwt.service.ts). */
+      memberAuth?: MemberAccessTokenClaims;
     }
   }
 }

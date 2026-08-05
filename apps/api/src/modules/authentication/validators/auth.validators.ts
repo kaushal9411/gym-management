@@ -56,7 +56,11 @@ export const resendVerificationSchema = z.object({
 
 export const verifyOtpSchema = z.object({
   email: emailSchema,
-  code: otpCodeSchema,
+  // Loosened from `otpCodeSchema` (strictly 6 digits) — 'login' purpose is
+  // still always a 6-digit emailed code, but '2fa' accepts EITHER a 6-digit
+  // TOTP code or a backup-recovery code (e.g. "ABCD-123456"); the service
+  // layer, not this validator, decides which shape a given purpose expects.
+  code: z.string().trim().min(6).max(24),
   purpose: z.enum(['login', '2fa']).default('login'),
 });
 
@@ -77,4 +81,21 @@ export const changePasswordSchema = z
 
 export const sessionIdParamSchema = z.object({
   sessionId: z.string().uuid(),
+});
+
+export const mfaSetupBeginSchema = z.object({
+  setupToken: z.string().min(1),
+});
+
+export const mfaSetupConfirmSchema = z.object({
+  setupToken: z.string().min(1),
+  code: otpCodeSchema,
+});
+
+export const twoFactorConfirmSchema = z.object({
+  code: otpCodeSchema,
+});
+
+export const twoFactorDisableSchema = z.object({
+  password: z.string().min(1),
 });

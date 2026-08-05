@@ -65,4 +65,12 @@ export class UserRepository implements IUserRepository {
   async touchLastLogin(tenantId: string, userId: string): Promise<void> {
     await this.db.user.update({ where: { id: userId, tenantId }, data: { lastLoginAt: new Date() } });
   }
+
+  async setMfaSecret(tenantId: string, userId: string, encryptedSecret: string | null): Promise<void> {
+    await this.db.user.update({ where: { id: userId, tenantId }, data: { mfaSecret: encryptedSecret } });
+  }
+
+  async setMfaEnabled(tenantId: string, userId: string, enabled: boolean): Promise<void> {
+    await this.db.user.update({ where: { id: userId, tenantId }, data: { mfaEnabled: enabled } });
+  }
 }

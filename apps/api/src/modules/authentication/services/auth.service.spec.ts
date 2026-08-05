@@ -1,9 +1,14 @@
+import { generateSync } from 'otplib';
 import { describe, expect, it, vi } from 'vitest';
 
+import { encryptSecret } from '../../../core/security/encryption.util';
 import { passwordService } from '../../../core/security/password.service';
+import { hashToken } from '../../../core/security/token.util';
+import { generateTotpSecret, normalizeBackupCode } from '../../../core/security/totp.util';
 import type {
   IAuditLogRepository,
   ILoginHistoryRepository,
+  IMfaRepository,
   IRoleRepository,
   ISessionRepository,
   IUserRepository,
@@ -29,6 +34,7 @@ interface FakeUser {
   passwordHash: string;
   status: string;
   mfaEnabled: boolean;
+  mfaSecret: string | null;
   createdAt: Date;
   emailVerifiedAt: Date | null;
   lastLoginAt: Date | null;
@@ -54,6 +60,7 @@ function buildFakes() {
         passwordHash: input.passwordHash,
         status: input.status ?? 'PENDING_VERIFICATION',
         mfaEnabled: false,
+        mfaSecret: null,
         createdAt: new Date(),
         emailVerifiedAt: null,
         lastLoginAt: null,
@@ -74,6 +81,12 @@ function buildFakes() {
     async recordFailedLogin() {},
     async resetFailedLogins() {},
     async touchLastLogin() {},
+    async setMfaSecret(_t, userId, encryptedSecret) {
+      users.get(userId)!.mfaSecret = encryptedSecret;
+    },
+    async setMfaEnabled(_t, userId, enabled) {
+      users.get(userId)!.mfaEnabled = enabled;
+    },
   };
 
   const roleRepository: IRoleRepository = {
@@ -146,7 +159,39 @@ function buildFakes() {
 
   const auditLogRepository: IAuditLogRepository = { record: vi.fn(async () => {}) };
 
-  return { users, userRepository, roleRepository, sessionRepository, verificationRepository, loginHistoryRepository, auditLogRepository };
+  const backupCodes = new Map<string, Set<string>>(); // userId -> unused code hashes
+  const setupTokens = new Map<string, { tenantId: string; userId: string; consumed: boolean }>();
+  const mfaRepository: IMfaRepository = {
+    async getMfaRequiredRoles() {
+      return [];
+    },
+    async createSetupToken(tenantIdArg, userId, tokenHash) {
+      setupTokens.set(tokenHash, { tenantId: tenantIdArg, userId, consumed: false });
+    },
+    async findValidSetupToken(tokenHash) {
+      const record = setupTokens.get(tokenHash);
+      if (!record || record.consumed) return null;
+      return { tenantId: record.tenantId, userId: record.userId };
+    },
+    async consumeSetupToken(tokenHash) {
+      const record = setupTokens.get(tokenHash);
+      if (record) record.consumed = true;
+    },
+    async replaceBackupCodes(_t, userId, codeHashes) {
+      backupCodes.set(userId, new Set(codeHashes));
+    },
+    async consumeBackupCodeIfValid(_t, userId, codeHash) {
+      const codes = backupCodes.get(userId);
+      if (!codes?.has(codeHash)) return false;
+      codes.delete(codeHash);
+      return true;
+    },
+    async deleteAllBackupCodes(_t, userId) {
+      backupCodes.delete(userId);
+    },
+  };
+
+  return { users, userRepository, roleRepository, sessionRepository, verificationRepository, mfaRepository, loginHistoryRepository, auditLogRepository };
 }
 
 describe('AuthService (unit, mocked repositories)', () => {
@@ -160,6 +205,7 @@ describe('AuthService (unit, mocked repositories)', () => {
       roleRepository: fakes.roleRepository,
       sessionRepository: fakes.sessionRepository,
       verificationRepository: fakes.verificationRepository,
+      mfaRepository: fakes.mfaRepository,
       loginHistoryRepository: fakes.loginHistoryRepository,
       auditLogRepository: fakes.auditLogRepository,
       sendEmail: vi.fn(async () => {}),
@@ -179,7 +225,7 @@ describe('AuthService (unit, mocked repositories)', () => {
     const passwordHash = await passwordService.hash('Str0ng!Passw0rd');
     fakes.users.set('usr_1', {
       id: 'usr_1', tenantId, name: 'Test', email: 'owner@example.com', phone: null,
-      passwordHash, status: 'PENDING_VERIFICATION', mfaEnabled: false,
+      passwordHash, status: 'PENDING_VERIFICATION', mfaEnabled: false, mfaSecret: null,
       createdAt: new Date(), emailVerifiedAt: null, lastLoginAt: null,
     });
 
@@ -193,7 +239,7 @@ describe('AuthService (unit, mocked repositories)', () => {
     const passwordHash = await passwordService.hash('Str0ng!Passw0rd');
     fakes.users.set('usr_1', {
       id: 'usr_1', tenantId, name: 'Test Owner', email: 'owner@example.com', phone: null,
-      passwordHash, status: 'ACTIVE', mfaEnabled: false,
+      passwordHash, status: 'ACTIVE', mfaEnabled: false, mfaSecret: null,
       createdAt: new Date(), emailVerifiedAt: null, lastLoginAt: null,
     });
 
@@ -203,5 +249,109 @@ describe('AuthService (unit, mocked repositories)', () => {
       expect(result.user.email).toBe('owner@example.com');
       expect(result.accessToken).toBeTypeOf('string');
     }
+  });
+});
+
+describe('AuthService — mandatory 2FA (unit, mocked repositories)', () => {
+  const tenantId = 'tnt_test';
+
+  function buildService(requiredRoles: string[] = []) {
+    const fakes = buildFakes();
+    fakes.mfaRepository.getMfaRequiredRoles = async () => requiredRoles;
+    const service = new AuthService({
+      tenantId,
+      userRepository: fakes.userRepository,
+      roleRepository: fakes.roleRepository,
+      sessionRepository: fakes.sessionRepository,
+      verificationRepository: fakes.verificationRepository,
+      mfaRepository: fakes.mfaRepository,
+      loginHistoryRepository: fakes.loginHistoryRepository,
+      auditLogRepository: fakes.auditLogRepository,
+      sendEmail: vi.fn(async () => {}),
+    });
+    return { service, fakes };
+  }
+
+  async function seedActiveUser(fakes: ReturnType<typeof buildFakes>, overrides: Partial<{ mfaEnabled: boolean; mfaSecret: string | null }> = {}) {
+    const passwordHash = await passwordService.hash('Str0ng!Passw0rd');
+    fakes.users.set('usr_1', {
+      id: 'usr_1', tenantId, name: 'Test Owner', email: 'owner@example.com', phone: null,
+      passwordHash, status: 'ACTIVE', mfaEnabled: false, mfaSecret: null,
+      createdAt: new Date(), emailVerifiedAt: null, lastLoginAt: null,
+      ...overrides,
+    });
+  }
+
+  it('blocks login with a setup-required challenge when the role requires 2FA and it is not set up yet', async () => {
+    const { service, fakes } = buildService(['OWNER']);
+    await seedActiveUser(fakes);
+
+    const result = await service.login('owner@example.com', 'Str0ng!Passw0rd', {});
+    expect(result).toMatchObject({ challenge: 'mfa_setup_required', email: 'owner@example.com' });
+  });
+
+  it('does not block login when the user role is not in the required-roles policy', async () => {
+    const { service, fakes } = buildService(['MANAGER']); // user's role is OWNER (see fake roleRepository)
+    await seedActiveUser(fakes);
+
+    const result = await service.login('owner@example.com', 'Str0ng!Passw0rd', {});
+    expect('accessToken' in result).toBe(true);
+  });
+
+  it('full mandatory-setup grace flow: begin → confirm with a real TOTP code → issues a real session + backup codes', async () => {
+    const { service, fakes } = buildService(['OWNER']);
+    await seedActiveUser(fakes);
+
+    const challenge = await service.login('owner@example.com', 'Str0ng!Passw0rd', {});
+    if (!('challenge' in challenge) || challenge.challenge !== 'mfa_setup_required') throw new Error('expected mfa_setup_required');
+
+    const setup = await service.beginMandatorySetup(challenge.setupToken);
+    expect(setup.secret).toBeTypeOf('string');
+    expect(setup.otpauthUri).toContain('otpauth://totp/');
+
+    const code = generateSync({ secret: setup.secret });
+
+    const completed = await service.completeMandatorySetup(challenge.setupToken, code);
+    expect(completed.accessToken).toBeTypeOf('string');
+    expect(completed.backupCodes).toHaveLength(10);
+    expect(fakes.users.get('usr_1')!.mfaEnabled).toBe(true);
+
+    // The grace token is single-use.
+    await expect(service.completeMandatorySetup(challenge.setupToken, code)).rejects.toMatchObject({ code: 'TOKEN_INVALID' });
+  });
+
+  it('login with mfaEnabled=true issues an otp_required(2fa) challenge, and a real TOTP code completes it', async () => {
+    const { service, fakes } = buildService();
+    const secret = generateTotpSecret();
+    await seedActiveUser(fakes, { mfaEnabled: true, mfaSecret: encryptSecret(secret) });
+
+    const challenge = await service.login('owner@example.com', 'Str0ng!Passw0rd', {});
+    expect(challenge).toMatchObject({ challenge: 'otp_required', purpose: '2fa' });
+
+    const code = generateSync({ secret });
+    const result = await service.verifyOtpAndCompleteLogin('owner@example.com', code, '2fa');
+    expect(result.accessToken).toBeTypeOf('string');
+  });
+
+  it('a backup code completes the 2fa challenge and is single-use', async () => {
+    const { service, fakes } = buildService();
+    const secret = generateTotpSecret();
+    await seedActiveUser(fakes, { mfaEnabled: true, mfaSecret: encryptSecret(secret) });
+    await fakes.mfaRepository.replaceBackupCodes(tenantId, 'usr_1', [hashToken(normalizeBackupCode('ABCD-123456'))]);
+
+    const result = await service.verifyOtpAndCompleteLogin('owner@example.com', 'abcd-123456', '2fa');
+    expect(result.accessToken).toBeTypeOf('string');
+
+    await expect(service.verifyOtpAndCompleteLogin('owner@example.com', 'abcd-123456', '2fa')).rejects.toMatchObject({ code: 'OTP_INVALID' });
+  });
+
+  it('disableTwoFactor requires the correct current password', async () => {
+    const { service, fakes } = buildService();
+    await seedActiveUser(fakes, { mfaEnabled: true, mfaSecret: encryptSecret(generateTotpSecret()) });
+
+    await expect(service.disableTwoFactor('usr_1', 'wrong-password')).rejects.toBeTruthy();
+    await service.disableTwoFactor('usr_1', 'Str0ng!Passw0rd');
+    expect(fakes.users.get('usr_1')!.mfaEnabled).toBe(false);
+    expect(fakes.users.get('usr_1')!.mfaSecret).toBeNull();
   });
 });

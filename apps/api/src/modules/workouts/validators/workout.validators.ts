@@ -23,7 +23,7 @@ export const createExerciseSchema = z.object({
     .string()
     .trim()
     .max(400_000)
-    .regex(/^data:image\/(png|jpeg|jpg|webp|svg\+xml);base64,/, 'Must be a base64 image data URL')
+    .regex(/^data:image\/(png|jpeg|jpg|webp|gif);base64,/, 'Must be a base64 image data URL')
     .optional(),
   videoUrl: z.string().trim().url().max(2000).optional(),
   durationSeconds: z.coerce.number().int().positive().optional(),

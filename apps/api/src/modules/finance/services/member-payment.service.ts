@@ -5,6 +5,7 @@ import { ErrorCode } from '../../../core/errors/error-codes';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
+import { decryptMemberContactNullable } from '../../members/utils/member-pii.util';
 import { notifyPaymentFailed, notifyPaymentReceived } from '../../tenant-notifications/services/notification-trigger.service';
 import type {
   CreatePaymentInput,
@@ -83,7 +84,7 @@ export class MemberPaymentService {
   }
 
   async create(input: CreatePaymentInput, actor: IamActor): Promise<MemberPaymentDetailDto> {
-    const member = await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null } });
+    const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null } }));
     if (!member) throw new NotFoundError('Member not found.');
     const branchId = input.branchId ?? member.branchId;
 
@@ -152,7 +153,7 @@ export class MemberPaymentService {
    * what flips it to `SUCCESS`/`FAILED` once the member has paid.
    */
   async createPaymentLink(input: CreatePaymentLinkInput, actor: IamActor): Promise<PaymentLinkDto> {
-    const member = await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null } });
+    const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null } }));
     if (!member) throw new NotFoundError('Member not found.');
     if (!member.email && !member.phone) {
       throw new ValidationError('This member has no email or phone on file — add one before sending a payment link.');
@@ -262,7 +263,7 @@ export class MemberPaymentService {
 
     const updated = await this.mustFind(id);
     if (!wasSuccess && updated.status === 'SUCCESS') {
-      const member = await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: updated.member.id } });
+      const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: updated.member.id } }));
       await this.onPaymentSucceeded(updated, member!, updated.branch.id);
     }
     return toDetailDto((await this.payments.findById(this.tenantId, id))!);
@@ -298,7 +299,7 @@ export class MemberPaymentService {
       await this.payments.update(id, { status: 'SUCCESS', transactionReference: link.razorpayPaymentId ?? payment.transactionReference });
       await this.audit(actor, 'member_payment.payment_link_paid', id);
       const updated = await this.mustFind(id);
-      const member = await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: updated.member.id } });
+      const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: updated.member.id } }));
       await this.onPaymentSucceeded(updated, member!, updated.branch.id);
       return { status: 'SUCCESS', verifiedAt: new Date().toISOString() };
     }
@@ -306,7 +307,7 @@ export class MemberPaymentService {
     if (link.status === 'expired' || link.status === 'cancelled') {
       await this.payments.update(id, { status: 'FAILED' });
       await this.audit(actor, 'member_payment.payment_link_failed', id);
-      const member = await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: payment.member.id } });
+      const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: payment.member.id } }));
       if (member) {
         await notifyPaymentFailed(this.tenantId, {
           memberName: `${member.firstName} ${member.lastName}`.trim(),

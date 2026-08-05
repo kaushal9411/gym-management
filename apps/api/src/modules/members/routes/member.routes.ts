@@ -260,6 +260,14 @@ memberRouter.post(
   asyncHandler(memberController.regenerateQrCode.bind(memberController)),
 );
 
+/** @openapi { "/members/{id}/portal-invite": { post: { tags: [Members], summary: Enable member self-service portal access — emails an activation link, security: [{bearerAuth: []}], responses: { 200: { description: Invite sent } } } } } */
+memberRouter.post(
+  '/:id/portal-invite',
+  requirePermission('members:update'),
+  validate({ params: memberParamSchema }),
+  asyncHandler(memberController.sendPortalInvite.bind(memberController)),
+);
+
 /**
  * @openapi
  * /members/{id}/documents:
@@ -295,4 +303,20 @@ memberRouter.delete(
   requirePermission('members:update'),
   validate({ params: memberDocumentParamSchema }),
   asyncHandler(memberController.deleteDocument.bind(memberController)),
+);
+
+/** @openapi { "/members/{id}/gdpr-export": { get: { tags: [Members], summary: "GDPR data-portability export — every genuinely personal record this member has (profile, attendance, plans, invoices, payments, documents, bookings)", security: [{bearerAuth: []}], responses: { 200: { description: Full export bundle } } } } } */
+memberRouter.get(
+  '/:id/gdpr-export',
+  requirePermission('members:view'),
+  validate({ params: memberParamSchema }),
+  asyncHandler(memberController.gdprExport.bind(memberController)),
+);
+
+/** @openapi { "/members/{id}/gdpr-erase": { post: { tags: [Members], summary: "GDPR right-to-erasure — anonymizes the member's profile/contact/medical fields, revokes portal access, deletes uploaded documents. Irreversible.", security: [{bearerAuth: []}], responses: { 200: { description: Data erased } } } } } */
+memberRouter.post(
+  '/:id/gdpr-erase',
+  requirePermission('members:erase-data'),
+  validate({ params: memberParamSchema }),
+  asyncHandler(memberController.gdprErase.bind(memberController)),
 );

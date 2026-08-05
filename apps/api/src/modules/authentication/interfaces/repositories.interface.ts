@@ -19,6 +19,9 @@ export interface IUserRepository {
   recordFailedLogin(tenantId: string, userId: string, lockedUntil: Date | null): Promise<void>;
   resetFailedLogins(tenantId: string, userId: string): Promise<void>;
   touchLastLogin(tenantId: string, userId: string): Promise<void>;
+  /** Stores the TOTP secret (already `encryptSecret`-encrypted by the caller) without yet flipping `mfaEnabled` — see `AuthService#beginTwoFactorSetup`. */
+  setMfaSecret(tenantId: string, userId: string, encryptedSecret: string | null): Promise<void>;
+  setMfaEnabled(tenantId: string, userId: string, enabled: boolean): Promise<void>;
 }
 
 export interface IRoleRepository {
@@ -96,6 +99,22 @@ export interface ILoginHistoryRepository {
     userAgent?: string;
   }): Promise<void>;
   countRecentFailures(tenantId: string, email: string, sinceMinutesAgo: number): Promise<number>;
+}
+
+export interface IMfaRepository {
+  /** System role NAMES this tenant requires `mfaEnabled` for (`TenantSettings.mfaRequiredRoles`). */
+  getMfaRequiredRoles(tenantId: string): Promise<string[]>;
+
+  createSetupToken(tenantId: string, userId: string, tokenHash: string, expiresAt: Date): Promise<void>;
+  /** Consuming is separate from creating one — the same token is looked up at "begin setup" (not consumed) and consumed only once setup is actually confirmed. */
+  findValidSetupToken(tokenHash: string): Promise<{ tenantId: string; userId: string } | null>;
+  consumeSetupToken(tokenHash: string): Promise<void>;
+
+  /** Replaces any existing backup codes for this user with a fresh set — always called after a real TOTP re-confirmation, never silently. */
+  replaceBackupCodes(tenantId: string, userId: string, codeHashes: string[]): Promise<void>;
+  /** Finds an unused backup code matching the hash and marks it consumed in one step — returns whether a match was found. */
+  consumeBackupCodeIfValid(tenantId: string, userId: string, codeHash: string): Promise<boolean>;
+  deleteAllBackupCodes(tenantId: string, userId: string): Promise<void>;
 }
 
 export interface IAuditLogRepository {

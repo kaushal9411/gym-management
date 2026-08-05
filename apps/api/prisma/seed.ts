@@ -92,6 +92,7 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'members:export', description: 'Export the member list as CSV' },
   { key: 'members:assign-trainer', description: "Assign or change a member's trainer" },
   { key: 'members:assign-membership', description: "Assign, renew, upgrade, freeze, or unfreeze a member's membership" },
+  { key: 'members:erase-data', description: "Erase a member's personal data (GDPR right-to-erasure request) — irreversible" },
 
   // Membership Plans (Prompt 15) — the plan catalog itself, distinct from
   // `members:assign-membership` (acting on ONE member's subscription) and
@@ -178,6 +179,20 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'branches:delete', description: 'Soft-delete a branch' },
   { key: 'branches:restore', description: 'Restore a soft-deleted branch' },
   { key: 'branches:activate', description: 'Activate or deactivate a branch' },
+
+  // Class/Session Booking (Prompt 39) — granular keys distinct from the
+  // pre-existing speculative `classes:manage`/`classes:read`/`bookings:create`/
+  // `bookings:read`/`trainers:manage` (left seeded but unused, same
+  // precedent as every prior module). `bookings:manage` covers staff
+  // booking/cancelling ANY member into a session (front desk); the member
+  // portal's own self-booking bypasses this permission system entirely — it
+  // has no RBAC, see modules/member-auth.
+  { key: 'classes:view', description: 'View the class catalog, weekly schedule, and calendar of upcoming sessions' },
+  { key: 'classes:create', description: 'Create a class and its weekly recurring schedule' },
+  { key: 'classes:update', description: "Edit a class, its schedule, or an individual session's trainer/capacity" },
+  { key: 'classes:delete', description: 'Soft-delete a class' },
+  { key: 'classes:restore', description: 'Restore a soft-deleted class' },
+  { key: 'bookings:manage', description: 'Book or cancel any member into a class session (front desk)' },
 ];
 
 const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
@@ -199,7 +214,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'staff:view', 'staff:create', 'staff:update', 'staff:delete', 'staff:restore',
     'staff:activate', 'staff:invite', 'staff:assign-branch', 'staff:assign-role',
     'members:view', 'members:create', 'members:update', 'members:delete', 'members:restore',
-    'members:import', 'members:export', 'members:assign-trainer', 'members:assign-membership',
+    'members:import', 'members:export', 'members:erase-data', 'members:assign-trainer', 'members:assign-membership',
     'memberships:view', 'memberships:create', 'memberships:update', 'memberships:delete', 'memberships:restore',
     'memberships:assign', 'memberships:renew', 'memberships:upgrade', 'memberships:freeze',
     'attendance:view', 'attendance:checkin', 'attendance:checkout', 'attendance:update', 'attendance:delete', 'attendance:export',
@@ -211,6 +226,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'notifications:view', 'announcements:view', 'announcements:create', 'announcements:update', 'announcements:delete', 'announcements:publish',
     'branches:view', 'branches:create', 'branches:update', 'branches:delete', 'branches:restore', 'branches:activate',
     'support:view', 'support:create', 'ai:use',
+    'classes:view', 'classes:create', 'classes:update', 'classes:delete', 'classes:restore', 'bookings:manage',
   ],
   TRAINER: [
     'members:read', 'attendance:create', 'attendance:read',
@@ -237,6 +253,10 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     // activation/default-setting stays a Manager decision.
     'branches:view',
     'support:view', 'support:create', 'ai:use',
+    // Trainers can see the class calendar (e.g. their own sessions), but
+    // creating/editing classes or booking members in stays a Manager/
+    // front-desk decision.
+    'classes:view',
   ],
   RECEPTIONIST: [
     'members:manage', 'members:read',
@@ -270,6 +290,9 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     // activation/default-setting stays a Manager decision.
     'branches:view',
     'support:view', 'support:create', 'ai:use',
+    // Front-desk books/cancels members into class sessions — same tier as
+    // recording payments or checking a member in/out.
+    'classes:view', 'bookings:manage',
   ],
   MEMBER: ['profile:read', 'profile:update', 'bookings:create', 'bookings:read', 'payments:read', 'chat:use', 'support:view', 'support:create'],
 };
@@ -329,7 +352,7 @@ function featureChecklist(included: Partial<Record<string, boolean>>): PlanFeatu
     { key: 'white_label', label: 'White-label branding' },
     { key: 'custom_domain', label: 'Custom domain' },
     { key: 'video_training', label: 'Video training (coming soon)' },
-    { key: 'live_classes', label: 'Live classes (coming soon)' },
+    { key: 'live_classes', label: 'Class & Session Booking' },
     { key: 'ai_coach', label: 'AI Business Assistant' },
     { key: 'marketplace', label: 'Marketplace (coming soon)' },
   ];
@@ -348,6 +371,9 @@ const PROFESSIONAL_FEATURES = {
   // AI Business Assistant — was an architecture-only "coming soon" catalog
   // entry (every tier `false`) until this module actually existed.
   ai_coach: true,
+  // Class/Session Booking (Prompt 39) — same "coming soon" catalog entry
+  // (`live_classes`), same flip-on-when-built pattern as ai_coach above.
+  live_classes: true,
 };
 const ENTERPRISE_FEATURES = {
   ...PROFESSIONAL_FEATURES,

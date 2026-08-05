@@ -14,6 +14,8 @@ import {
   forgotPasswordSchema,
   loginSchema,
   logoutSchema,
+  mfaSetupBeginSchema,
+  mfaSetupConfirmSchema,
   refreshSchema,
   registerGymSchema,
   resendOtpSchema,
@@ -152,6 +154,54 @@ authRouter.post(
   otpRateLimiter(),
   validate({ body: resendOtpSchema }),
   asyncHandler(authController.resendOtp.bind(authController)),
+);
+
+/**
+ * @openapi
+ * /auth/mfa/setup/begin:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Begin mandatory 2FA setup (grace flow) — generates a TOTP secret + QR code for a just-password-verified user whose role requires 2FA
+ *     description: Takes the `setupToken` returned by `/auth/login`'s `mfa_setup_required` challenge, NOT a bearer token — this happens before a real session exists.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [setupToken], properties: { setupToken: { type: string } } }
+ *     responses:
+ *       200: { description: "{ secret, otpauthUri, qrDataUrl }" }
+ *       401: { description: "Setup link expired or invalid — log in again" }
+ */
+authRouter.post(
+  '/mfa/setup/begin',
+  otpRateLimiter(),
+  validate({ body: mfaSetupBeginSchema }),
+  asyncHandler(authController.beginMfaSetup.bind(authController)),
+);
+
+/**
+ * @openapi
+ * /auth/mfa/setup/confirm:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Confirm mandatory 2FA setup with an authenticator code — enables 2FA AND completes login in one step
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [setupToken, code]
+ *             properties: { setupToken: { type: string }, code: { type: string, example: "123456" } }
+ *     responses:
+ *       200: { description: "AuthSuccess + { backupCodes: string[] }" }
+ *       401: { description: "Incorrect code, or setup link expired" }
+ */
+authRouter.post(
+  '/mfa/setup/confirm',
+  otpRateLimiter(),
+  validate({ body: mfaSetupConfirmSchema }),
+  asyncHandler(authController.confirmMfaSetup.bind(authController)),
 );
 
 /**

@@ -10,12 +10,14 @@ import type {
   GymProfile,
   InvoiceSettings,
   NotificationSettings,
+  SecuritySettings,
   SocialLinks,
   UpdateBrandingPayload,
   UpdateBusinessSettingsPayload,
   UpdateContactInfoPayload,
   UpdateGymProfilePayload,
   UpdateInvoiceSettingsPayload,
+  UpdateSecuritySettingsPayload,
 } from '../types';
 
 interface ApiEnvelope<T> {
@@ -113,6 +115,17 @@ class GymSettingsService {
 
   async updateInvoiceSettings(payload: UpdateInvoiceSettingsPayload): Promise<InvoiceSettings> {
     const res = await apiClient.patch<ApiEnvelope<InvoiceSettings>>('/settings/invoice', payload);
+    return res.data.data;
+  }
+
+  // ── Security Settings ──────────────────────────────────────────────────
+  async getSecuritySettings(): Promise<SecuritySettings> {
+    const res = await apiClient.get<ApiEnvelope<SecuritySettings>>('/settings/security');
+    return res.data.data;
+  }
+
+  async updateSecuritySettings(payload: UpdateSecuritySettingsPayload): Promise<SecuritySettings> {
+    const res = await apiClient.patch<ApiEnvelope<SecuritySettings>>('/settings/security', payload);
     return res.data.data;
   }
 

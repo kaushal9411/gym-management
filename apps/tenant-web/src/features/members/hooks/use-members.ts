@@ -155,6 +155,19 @@ export function useRegenerateQrCode() {
   return useMutation({ mutationFn: (id: string) => memberService.regenerateQrCode(id), onSuccess: invalidate });
 }
 
+export function useSendPortalInvite() {
+  return useMutation({ mutationFn: (id: string) => memberService.sendPortalInvite(id) });
+}
+
+export function useGdprExport() {
+  return useMutation({ mutationFn: ({ id, memberCode }: { id: string; memberCode: string }) => memberService.gdprExport(id, memberCode) });
+}
+
+export function useEraseGdprData() {
+  const invalidate = useInvalidateMembers();
+  return useMutation({ mutationFn: (id: string) => memberService.eraseGdprData(id), onSuccess: invalidate });
+}
+
 export function useMemberDocuments(id: string | null) {
   return useQuery({
     queryKey: ['members', 'documents', id],

@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import type { TenantBranding, TenantInvoiceSettings, TenantProfile, TenantSettings } from '@prisma/client';
 
+import { securityLogger } from '../../../core/logging/logger';
 import { uploadDataUrl } from '../../../core/storage/storage.service';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
@@ -13,6 +14,7 @@ import type {
   GymProfileDto,
   InvoiceSettingsDto,
   NotificationSettingsDto,
+  SecuritySettingsDto,
   UpdateBrandingInput,
   UpdateBusinessSettingsInput,
   UpdateContactInfoInput,
@@ -20,6 +22,7 @@ import type {
   UpdateGymProfileInput,
   UpdateInvoiceSettingsInput,
   UpdateNotificationSettingsInput,
+  UpdateSecuritySettingsInput,
 } from '../dto/settings.dto';
 import { TenantBrandingSettingsRepository } from '../repositories/tenant-branding-settings.repository';
 import { TenantBusinessSettingsRepository } from '../repositories/tenant-business-settings.repository';
@@ -101,6 +104,10 @@ function toNotificationSettingsDto(settings: TenantSettings): NotificationSettin
     smsNotificationsEnabled: settings.smsNotificationsEnabled,
     smsProviderConfig: (settings.smsProviderConfig as Record<string, unknown> | null) ?? null,
   };
+}
+
+function toSecuritySettingsDto(settings: TenantSettings): SecuritySettingsDto {
+  return { mfaRequiredRoles: (settings.mfaRequiredRoles as string[] | null) ?? [] };
 }
 
 /**
@@ -280,6 +287,19 @@ export class SettingsService {
     });
     await this.audit(actor, 'settings.notification_settings_updated');
     return toNotificationSettingsDto(updated);
+  }
+
+  // ── Security Settings (mandatory 2FA policy, Prompt 42) ─────────────────
+
+  async getSecuritySettings(): Promise<SecuritySettingsDto> {
+    return toSecuritySettingsDto(await this.mustFindBusinessSettings());
+  }
+
+  async updateSecuritySettings(input: UpdateSecuritySettingsInput, actor: IamActor): Promise<SecuritySettingsDto> {
+    const updated = await this.businessRepository.update(this.tenantId, { mfaRequiredRoles: input.mfaRequiredRoles });
+    await this.audit(actor, 'settings.security_settings_updated');
+    securityLogger.warn('Tenant mandatory-2FA policy changed', { tenantId: this.tenantId, mfaRequiredRoles: input.mfaRequiredRoles });
+    return toSecuritySettingsDto(updated);
   }
 
   // ── internals ─────────────────────────────────────────────────────────

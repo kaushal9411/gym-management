@@ -109,7 +109,15 @@ export interface EstablishedSession {
 
 export type LoginResult =
   | ({ kind: 'success' } & EstablishedSession)
-  | { kind: 'otp_required'; email: string; flow: OtpFlow };
+  | { kind: 'otp_required'; email: string; flow: OtpFlow }
+  | { kind: 'mfa_setup_required'; email: string; setupToken: string };
+
+/** Returned by both the self-service and mandatory-grace 2FA setup flows — same shape either way. */
+export interface TwoFactorSetup {
+  secret: string;
+  otpauthUri: string;
+  qrDataUrl: string;
+}
 
 export interface Invitation {
   token: string;

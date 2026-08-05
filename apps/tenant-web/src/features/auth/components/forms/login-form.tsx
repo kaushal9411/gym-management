@@ -7,19 +7,21 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Dumbbell, Lock, Mail } from 'lucide-react';
+import { Dumbbell, Lock, User } from 'lucide-react';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { cn } from '@/lib/utils';
+import { MEMBER_PORTAL_ROUTES } from '@/features/member-portal/constants';
+import { useMemberAuth, useMemberLogin } from '@/features/member-portal/hooks/use-member-auth';
 import { FindGymForm } from '@/features/tenant/components/find-gym-form';
 import { TenantLogo } from '@/features/tenant/components/tenant-logo';
 import { useTenant } from '@/features/tenant/tenant-provider';
 import { useAppSelector } from '@/store/hooks';
 import { AUTH_ROUTES, POST_LOGIN_REDIRECT } from '../../constants';
 import { useLogin, toAuthError } from '../../hooks/use-auth';
-import { loginSchema, type LoginFormValues } from '../../schemas';
+import { unifiedLoginSchema, type UnifiedLoginFormValues } from '../../schemas';
 import { getRememberedEmail, setRememberedEmail } from '../../utils/remember-me';
 import { FormAlert } from '../form-alert';
 import { IconField } from '../icon-field';
@@ -48,9 +50,16 @@ const itemVariants = {
 const DARK_FIELD_CLASS =
   'h-12 border-white/10 bg-white/4 text-white placeholder:text-white/35 focus-visible:border-orange-400/50 focus-visible:ring-orange-400/20';
 
+/** A staff email always contains "@"; a Member ID (e.g. "MEM-0007") never does — the one signal needed to route a shared identifier field to the right of two cryptographically distinct auth planes. */
+function looksLikeEmail(identifier: string): boolean {
+  return identifier.includes('@');
+}
+
 export function LoginForm() {
   const router = useRouter();
   const login = useLogin();
+  const memberLogin = useMemberLogin();
+  const { isAuthenticated: isMemberAuthenticated, isBootstrapping: isMemberBootstrapping } = useMemberAuth();
   const tenant = useTenant();
   const authenticatedUser = useAppSelector((state) => state.auth.user);
   const [inlineError, setInlineError] = React.useState<{ locked: boolean; message: string } | null>(null);
@@ -58,56 +67,81 @@ export function LoginForm() {
   const [ripples, setRipples] = React.useState<{ id: number; x: number; y: number }[]>([]);
   const rippleId = React.useRef(0);
 
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '', rememberMe: false },
+  const form = useForm<UnifiedLoginFormValues>({
+    resolver: zodResolver(unifiedLoginSchema),
+    defaultValues: { identifier: '', password: '', rememberMe: false },
   });
 
-  // Prefill remembered email after mount (localStorage is client-only).
+  // Prefill remembered email after mount (localStorage is client-only). Member logins are never remembered.
   React.useEffect(() => {
     const remembered = getRememberedEmail();
     if (remembered) {
-      form.setValue('email', remembered);
+      form.setValue('identifier', remembered);
       form.setValue('rememberMe', true);
     }
   }, [form]);
 
   const onSubmit = form.handleSubmit((values) => {
     setInlineError(null);
-    login.mutate(values, {
-      onSuccess: (result) => {
-        setRememberedEmail(values.rememberMe ? values.email : null);
-        if (result.kind === 'otp_required') {
-          const route = result.flow === '2fa' ? AUTH_ROUTES.twoFactor : AUTH_ROUTES.verifyOtp;
-          router.push(`${route}?email=${encodeURIComponent(result.email)}&flow=${result.flow}`);
-          return;
-        }
-        toast.success(`Welcome back, ${result.user.name.split(' ')[0]}!`);
-        router.push(POST_LOGIN_REDIRECT);
+
+    if (!looksLikeEmail(values.identifier)) {
+      memberLogin.mutate(
+        { memberId: values.identifier, password: values.password },
+        {
+          onSuccess: (result) => {
+            toast.success(`Welcome back, ${result.member.name.split(' ')[0]}!`);
+            router.push(MEMBER_PORTAL_ROUTES.dashboard);
+          },
+          onError: (error) => {
+            setInlineError({ locked: false, message: error.message });
+          },
+        },
+      );
+      return;
+    }
+
+    login.mutate(
+      { email: values.identifier, password: values.password, rememberMe: values.rememberMe },
+      {
+        onSuccess: (result) => {
+          setRememberedEmail(values.rememberMe ? values.identifier : null);
+          if (result.kind === 'otp_required') {
+            const route = result.flow === '2fa' ? AUTH_ROUTES.twoFactor : AUTH_ROUTES.verifyOtp;
+            router.push(`${route}?email=${encodeURIComponent(result.email)}&flow=${result.flow}`);
+            return;
+          }
+          if (result.kind === 'mfa_setup_required') {
+            router.push(`${AUTH_ROUTES.mfaSetup}?email=${encodeURIComponent(result.email)}&setupToken=${encodeURIComponent(result.setupToken)}`);
+            return;
+          }
+          toast.success(`Welcome back, ${result.user.name.split(' ')[0]}!`);
+          router.push(POST_LOGIN_REDIRECT);
+        },
+        onError: (error) => {
+          const authError = toAuthError(error);
+          if (authError.code === 'EMAIL_NOT_VERIFIED') {
+            router.push(`${AUTH_ROUTES.verifyEmail}?status=pending&email=${encodeURIComponent(values.identifier)}`);
+            return;
+          }
+          const redirect = REDIRECT_ERRORS[authError.code];
+          if (redirect) {
+            router.push(redirect);
+            return;
+          }
+          setInlineError({ locked: authError.code === 'ACCOUNT_LOCKED', message: authError.message });
+        },
       },
-      onError: (error) => {
-        const authError = toAuthError(error);
-        if (authError.code === 'EMAIL_NOT_VERIFIED') {
-          router.push(`${AUTH_ROUTES.verifyEmail}?status=pending&email=${encodeURIComponent(values.email)}`);
-          return;
-        }
-        const redirect = REDIRECT_ERRORS[authError.code];
-        if (redirect) {
-          router.push(redirect);
-          return;
-        }
-        setInlineError({ locked: authError.code === 'ACCOUNT_LOCKED', message: authError.message });
-      },
-    });
+    );
   });
 
-  // Already signed in (e.g. navigated back to /login manually) — bounce to the dashboard.
+  // Already signed in (e.g. navigated back to /login manually) — bounce to whichever plane's dashboard.
   React.useEffect(() => {
     if (authenticatedUser) router.replace(POST_LOGIN_REDIRECT);
-  }, [authenticatedUser, router]);
+    else if (!isMemberBootstrapping && isMemberAuthenticated) router.replace(MEMBER_PORTAL_ROUTES.dashboard);
+  }, [authenticatedUser, isMemberAuthenticated, isMemberBootstrapping, router]);
 
-  const isSubmitting = login.isPending;
-  const emailValue = form.watch('email');
+  const isSubmitting = login.isPending || memberLogin.isPending;
+  const identifierValue = form.watch('identifier');
   const passwordValue = form.watch('password');
 
   function spawnRipple(e: React.MouseEvent<HTMLButtonElement>) {
@@ -200,27 +234,27 @@ export function LoginForm() {
 
                   <form onSubmit={onSubmit} noValidate className="space-y-5" style={{ marginTop: inlineError?.message ? '1.25rem' : 0 }}>
                     <div className="space-y-2">
-                      <Label htmlFor="email" className="text-xs font-medium uppercase tracking-wide text-white/60">
-                        Email
+                      <Label htmlFor="identifier" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                        Email or Member ID
                       </Label>
                       <IconField
-                        id="email"
-                        icon={Mail}
-                        type="email"
-                        autoComplete="email"
-                        placeholder="you@example.com"
-                        invalid={!!form.formState.errors.email}
-                        showSuccess={form.formState.touchedFields.email && !!emailValue}
-                        aria-describedby={form.formState.errors.email ? 'email-error' : undefined}
+                        id="identifier"
+                        icon={User}
+                        type="text"
+                        autoComplete="username"
+                        placeholder="you@example.com or MEM-0001"
+                        invalid={!!form.formState.errors.identifier}
+                        showSuccess={form.formState.touchedFields.identifier && !!identifierValue}
+                        aria-describedby={form.formState.errors.identifier ? 'identifier-error' : undefined}
                         disabled={isSubmitting}
                         iconClassName="text-white/40 group-focus-within:text-orange-400"
                         glowClassName="shadow-[0_0_0_4px_rgba(255,138,61,0.18)]"
                         className={DARK_FIELD_CLASS}
-                        {...form.register('email')}
+                        {...form.register('identifier')}
                       />
-                      {form.formState.errors.email ? (
-                        <p id="email-error" role="alert" className="text-xs text-red-400">
-                          {form.formState.errors.email.message}
+                      {form.formState.errors.identifier ? (
+                        <p id="identifier-error" role="alert" className="text-xs text-red-400">
+                          {form.formState.errors.identifier.message}
                         </p>
                       ) : null}
                     </div>
@@ -231,7 +265,7 @@ export function LoginForm() {
                           Password
                         </Label>
                         <Link
-                          href={AUTH_ROUTES.forgotPassword}
+                          href={identifierValue && !looksLikeEmail(identifierValue) ? MEMBER_PORTAL_ROUTES.forgotPassword : AUTH_ROUTES.forgotPassword}
                           className="text-xs font-medium text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 rounded-sm"
                         >
                           Forgot password?
@@ -297,7 +331,7 @@ export function LoginForm() {
                       onMouseDown={spawnRipple}
                       loading={isSubmitting}
                       loadingText="Signing in…"
-                      disabled={!emailValue || !passwordValue}
+                      disabled={!identifierValue || !passwordValue}
                       className="login-ripple-btn relative h-12 w-full overflow-hidden border-0 text-[15px] font-bold uppercase tracking-wide text-white"
                     >
                       Sign In

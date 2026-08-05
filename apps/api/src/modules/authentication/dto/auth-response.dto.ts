@@ -33,7 +33,31 @@ export interface OtpChallengeDto {
 
 export type OtpPurposeDto = 'login' | '2fa';
 
-export type LoginResultDto = AuthSuccessDto | OtpChallengeDto;
+/**
+ * Password was correct but the account's role requires 2FA
+ * (`TenantSettings.mfaRequiredRoles`) and it isn't set up yet — `setupToken`
+ * is a short-lived, single-purpose credential (see `MfaSetupToken`) that
+ * proves the password check already passed without granting a real
+ * session; it only authorizes the `/auth/mfa/setup/*` endpoints.
+ */
+export interface MfaSetupRequiredDto {
+  challenge: 'mfa_setup_required';
+  email: string;
+  setupToken: string;
+  expiresInSeconds: number;
+}
+
+export type LoginResultDto = AuthSuccessDto | OtpChallengeDto | MfaSetupRequiredDto;
+
+export interface TwoFactorSetupDto {
+  secret: string;
+  otpauthUri: string;
+  qrDataUrl: string;
+}
+
+export interface TwoFactorConfirmDto {
+  backupCodes: string[];
+}
 
 export interface SessionDto {
   id: string;

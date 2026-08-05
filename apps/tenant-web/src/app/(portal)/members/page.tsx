@@ -349,7 +349,7 @@ export default function MembersListPage() {
       <div className="flex flex-wrap items-center gap-2">
         <SearchBar
           containerClassName="max-w-xs"
-          placeholder="Search name, email, phone, member ID…"
+          placeholder="Search name or member ID…"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);

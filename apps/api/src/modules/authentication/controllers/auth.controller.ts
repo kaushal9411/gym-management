@@ -13,6 +13,8 @@ import type {
   changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
+  mfaSetupBeginSchema,
+  mfaSetupConfirmSchema,
   refreshSchema,
   registerGymSchema,
   resendOtpSchema,
@@ -226,6 +228,23 @@ export class AuthController {
   async validateToken(req: Request, res: Response): Promise<void> {
     const auth = requireAuth(req);
     sendSuccess(res, { valid: true, userId: auth.sub, tenantId: auth.tenantId, roles: auth.roles });
+  }
+
+  // ── Mandatory-2FA grace flow — unauthenticated except for the setup token ──
+
+  async beginMfaSetup(req: TypedBodyRequest<z.infer<typeof mfaSetupBeginSchema>>, res: Response): Promise<void> {
+    const tenant = requireTenant(req);
+    const authService = buildAuthModule(tenant.id);
+    sendSuccess(res, await authService.beginMandatorySetup(req.body.setupToken));
+  }
+
+  async confirmMfaSetup(req: TypedBodyRequest<z.infer<typeof mfaSetupConfirmSchema>>, res: Response): Promise<void> {
+    const tenant = requireTenant(req);
+    const authService = buildAuthModule(tenant.id);
+    const result = await authService.completeMandatorySetup(req.body.setupToken, req.body.code);
+
+    setRefreshCookie(res, result.refreshToken, new Date(Date.now() + env.jwt.refreshTtlDays * 86_400_000));
+    sendSuccess(res, result, 'Two-factor authentication enabled — login completed. Save your backup codes somewhere safe.');
   }
 }
 

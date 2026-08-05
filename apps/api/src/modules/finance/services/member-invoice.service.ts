@@ -5,6 +5,7 @@ import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrast
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
+import { decryptMemberContactNullable } from '../../members/utils/member-pii.util';
 import { TenantInvoiceSettingsRepository } from '../../settings/repositories/tenant-invoice-settings.repository';
 import type {
   GenerateInvoiceInput,
@@ -192,7 +193,7 @@ export class MemberInvoiceService {
   /** "Email Invoice" — reuses the existing `enqueueEmail` queue; no attachment support exists in the mail infra, so this sends a summary with the key details rather than the PDF itself. */
   async email(id: string, actor: IamActor, overrideEmail?: string): Promise<void> {
     const invoice = toDetailDto(await this.mustFind(id));
-    const member = await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: invoice.member.id } });
+    const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: invoice.member.id } }));
     const to = overrideEmail ?? member?.email;
     if (!to) throw new ValidationError('This member has no email on file — provide one explicitly.');
 

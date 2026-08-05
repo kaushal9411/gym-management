@@ -27,9 +27,10 @@ export function useLogin() {
     onSuccess: (result) => {
       if (result.kind === 'success') {
         dispatch(sessionEstablished({ user: result.user, permissions: result.permissions, tokens: result.tokens }));
-      } else {
+      } else if (result.kind === 'otp_required') {
         dispatch(otpChallengeIssued({ email: result.email, flow: result.flow }));
       }
+      // 'mfa_setup_required' has no Redux state of its own — login-form.tsx redirects using the mutation result directly.
     },
     onError: (error) => {
       const { code, message } = toAuthError(error);
@@ -96,6 +97,34 @@ export function useInvitation(token: string) {
 
 export function useAcceptInvitation() {
   return useMutation({ mutationFn: authService.acceptInvitation.bind(authService) });
+}
+
+// ── Two-factor authentication ────────────────────────────────────────────
+
+/** Confirms the mandatory-setup grace flow AND completes login in one step — establishes a real session. */
+export function useConfirmMfaSetup() {
+  const dispatch = useAppDispatch();
+  return useMutation({
+    mutationFn: ({ setupToken, code }: { setupToken: string; code: string }) => authService.confirmMfaSetup(setupToken, code),
+    onMutate: () => dispatch(authStarted()),
+    onSuccess: (result) => dispatch(sessionEstablished({ user: result.user, permissions: result.permissions, tokens: result.tokens })),
+    onError: (error) => {
+      const { code, message } = toAuthError(error);
+      dispatch(authFailed({ code, message }));
+    },
+  });
+}
+
+export function useConfirmTwoFactorSetup() {
+  return useMutation({ mutationFn: (code: string) => authService.confirmTwoFactorSetup(code) });
+}
+
+export function useDisableTwoFactor() {
+  return useMutation({ mutationFn: (password: string) => authService.disableTwoFactor(password) });
+}
+
+export function useRegenerateBackupCodes() {
+  return useMutation({ mutationFn: (code: string) => authService.regenerateBackupCodes(code) });
 }
 
 /**

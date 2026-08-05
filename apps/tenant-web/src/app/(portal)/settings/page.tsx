@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { LogOut, MonitorSmartphone, Settings2 } from 'lucide-react';
+import { LogOut, MonitorSmartphone, ShieldCheck, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -14,22 +14,27 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
+import { DisableTwoFactorDialog } from '@/features/auth/components/disable-two-factor-dialog';
+import { EnableTwoFactorDialog } from '@/features/auth/components/enable-two-factor-dialog';
+import { RegenerateBackupCodesDialog } from '@/features/auth/components/regenerate-backup-codes-dialog';
 import { useCurrentUser } from '@/features/auth/hooks/use-current-user';
 import { useLogoutAllDevices } from '@/features/auth/hooks/use-logout';
 import { ChangePasswordForm } from '@/features/auth/components/forms/change-password-form';
 import {
   toIamError,
   useActiveSessions,
+  useIamProfile,
   useLoginHistory,
   useRevokeSession,
 } from '@/features/iam/hooks/use-iam';
 import { useTenant } from '@/features/tenant/tenant-provider';
 
-type SettingsTab = 'account' | 'password' | 'notifications' | 'sessions';
+type SettingsTab = 'account' | 'password' | 'security' | 'notifications' | 'sessions';
 
 const TABS: Array<{ value: SettingsTab; label: string }> = [
   { value: 'account', label: 'Account' },
   { value: 'password', label: 'Password' },
+  { value: 'security', label: 'Security' },
   { value: 'notifications', label: 'Notifications' },
   { value: 'sessions', label: 'Sessions' },
 ];
@@ -44,7 +49,7 @@ export default function SettingsPage() {
   const searchParams = useSearchParams();
   const requested = searchParams.get('tab');
   const [tab, setTab] = React.useState<SettingsTab>(
-    requested === 'password' || requested === 'notifications' || requested === 'sessions' ? requested : 'account',
+    requested === 'password' || requested === 'security' || requested === 'notifications' || requested === 'sessions' ? requested : 'account',
   );
 
   const user = useCurrentUser();
@@ -98,6 +103,10 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
+        <TabsContent value="security">
+          <SecurityPanel />
+        </TabsContent>
+
         <TabsContent value="notifications">
           <Card>
             <CardHeader>
@@ -127,6 +136,57 @@ export default function SettingsPage() {
           <SessionsPanel />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+/** Self-service TOTP 2FA — enable/disable and backup-code management, layered on `GET /profile`'s `mfaEnabled` flag. */
+function SecurityPanel() {
+  const profile = useIamProfile();
+  const [enableOpen, setEnableOpen] = React.useState(false);
+  const [disableOpen, setDisableOpen] = React.useState(false);
+  const [regenerateOpen, setRegenerateOpen] = React.useState(false);
+
+  const mfaEnabled = profile.data?.mfaEnabled ?? false;
+
+  return (
+    <div className="space-y-5">
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <ShieldCheck className="size-4.5" aria-hidden />
+            </div>
+            <div>
+              <CardTitle className="text-base">Two-factor authentication</CardTitle>
+              <CardDescription>Require a code from an authenticator app in addition to your password.</CardDescription>
+            </div>
+          </div>
+          {profile.isPending ? null : <Badge variant={mfaEnabled ? 'success' : 'outline'}>{mfaEnabled ? 'Enabled' : 'Disabled'}</Badge>}
+        </CardHeader>
+        <CardContent>
+          {profile.isPending ? (
+            <Skeleton className="h-9 w-40" />
+          ) : mfaEnabled ? (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => setRegenerateOpen(true)}>
+                Regenerate backup codes
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => setDisableOpen(true)}>
+                Disable 2FA
+              </Button>
+            </div>
+          ) : (
+            <Button size="sm" onClick={() => setEnableOpen(true)}>
+              Enable 2FA
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      <EnableTwoFactorDialog open={enableOpen} onOpenChange={setEnableOpen} />
+      <DisableTwoFactorDialog open={disableOpen} onOpenChange={setDisableOpen} />
+      <RegenerateBackupCodesDialog open={regenerateOpen} onOpenChange={setRegenerateOpen} />
     </div>
   );
 }

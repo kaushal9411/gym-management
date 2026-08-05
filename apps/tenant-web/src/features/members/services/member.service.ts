@@ -14,6 +14,7 @@ import type {
   MemberDetail,
   MemberDocument,
   MemberDocumentType,
+  MemberGdprExport,
   MemberListItem,
   MembershipPlan,
   Paginated,
@@ -27,6 +28,17 @@ interface ApiEnvelope<T> {
   success: boolean;
   message: string;
   data: T;
+}
+
+/** GDPR export comes back as JSON (not a server-generated blob) — build the download client-side. */
+function downloadJson(data: unknown, filename: string) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 class MemberService {
@@ -123,6 +135,10 @@ class MemberService {
     return res.data.data;
   }
 
+  async sendPortalInvite(id: string): Promise<void> {
+    await apiClient.post(`/members/${id}/portal-invite`);
+  }
+
   async listDocuments(id: string): Promise<MemberDocument[]> {
     const res = await apiClient.get<ApiEnvelope<MemberDocument[]>>(`/members/${id}/documents`);
     return res.data.data;
@@ -142,6 +158,15 @@ class MemberService {
   async exportCsvUrl(): Promise<string> {
     const res = await apiClient.get('/members/export', { responseType: 'blob' });
     return URL.createObjectURL(res.data as Blob);
+  }
+
+  async gdprExport(id: string, memberCode: string): Promise<void> {
+    const res = await apiClient.get<ApiEnvelope<MemberGdprExport>>(`/members/${id}/gdpr-export`);
+    downloadJson(res.data.data, `${memberCode}-data-export-${new Date().toISOString().slice(0, 10)}.json`);
+  }
+
+  async eraseGdprData(id: string): Promise<void> {
+    await apiClient.post(`/members/${id}/gdpr-erase`);
   }
 
   async bulkImport(rows: MemberBulkImportRow[]): Promise<MemberBulkImportResult> {

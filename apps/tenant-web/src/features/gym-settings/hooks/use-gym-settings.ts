@@ -15,6 +15,7 @@ import type {
   UpdateContactInfoPayload,
   UpdateGymProfilePayload,
   UpdateInvoiceSettingsPayload,
+  UpdateSecuritySettingsPayload,
 } from '../types';
 
 export function toGymSettingsError(error: unknown): AuthServiceError {
@@ -150,6 +151,20 @@ export function useUpdateInvoiceSettings() {
   return useMutation({
     mutationFn: (payload: UpdateInvoiceSettingsPayload) => gymSettingsService.updateInvoiceSettings(payload),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['gym-settings', 'invoice'] }),
+  });
+}
+
+// ── Security Settings ────────────────────────────────────────────────────
+
+export function useSecuritySettings() {
+  return useQuery({ queryKey: ['gym-settings', 'security'], queryFn: () => gymSettingsService.getSecuritySettings(), staleTime: SETTINGS_STALE_TIME_MS });
+}
+
+export function useUpdateSecuritySettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: UpdateSecuritySettingsPayload) => gymSettingsService.updateSecuritySettings(payload),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['gym-settings', 'security'] }),
   });
 }
 

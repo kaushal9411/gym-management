@@ -13,6 +13,7 @@ export interface ProfileDto {
   roles: string[];
   emergencyContact: { name: string | null; phone: string | null; relation: string | null };
   notificationPreferences: Record<string, boolean>;
+  mfaEnabled: boolean;
   branchAccess: {
     allBranches: boolean;
     branches: Array<{ branchId: string; branchName: string; isPrimary: boolean; expiresAt: string | null }>;
@@ -78,6 +79,7 @@ export class ProfileService {
       notificationPreferences: Object.fromEntries(
         NOTIFICATION_PREFERENCE_KEYS.map((key) => [key, prefs[key] ?? true]),
       ),
+      mfaEnabled: user.mfaEnabled,
       branchAccess: {
         allBranches: user.allBranches,
         branches: user.userBranches.map((ub) => ({

@@ -34,12 +34,15 @@ import {
   useAssignTrainer,
   useCancelMembership,
   useDowngradeMembership,
+  useEraseGdprData,
   useExtendMembership,
   useFreezeMember,
+  useGdprExport,
   useMemberDetail,
   useMemberStatusAction,
   useRenewMembership,
   useResumeMembership,
+  useSendPortalInvite,
   useTransferBranch,
   useUpdateMember,
   useUpgradeMembership,
@@ -131,6 +134,9 @@ export default function MemberDetailPage() {
   const resumeMembership = useResumeMembership();
   const transferBranch = useTransferBranch();
   const assignTrainer = useAssignTrainer();
+  const sendPortalInvite = useSendPortalInvite();
+  const gdprExport = useGdprExport();
+  const eraseGdprData = useEraseGdprData();
   const memberAttendance = useMemberAttendance(memberId, 1, 5);
   const manualCheckIn = useManualCheckIn();
   const manualCheckOut = useManualCheckOut();
@@ -145,11 +151,13 @@ export default function MemberDetailPage() {
   const canFreeze = hasPermission('memberships:freeze');
   const canCheckIn = hasPermission('attendance:checkin');
   const canCheckOut = hasPermission('attendance:checkout');
+  const canEraseData = hasPermission('members:erase-data');
 
   const [form, setForm] = React.useState<FormState | null>(null);
   const [confirmStatusAction, setConfirmStatusAction] = React.useState<StatusActionKind | null>(null);
   const [confirmFreeze, setConfirmFreeze] = React.useState(false);
   const [confirmCancel, setConfirmCancel] = React.useState(false);
+  const [confirmErase, setConfirmErase] = React.useState(false);
   const [branchId, setBranchId] = React.useState<string | null>(null);
   const [trainerId, setTrainerId] = React.useState<string | null>(null);
   const [assignPlanId, setAssignPlanId] = React.useState('');
@@ -811,12 +819,75 @@ export default function MemberDetailPage() {
         </CardContent>
       </Card>
 
+      {canUpdate && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Member portal</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">
+              Let {data.name} log in on their own to view attendance, workout/diet plans, invoices, and their QR code.
+              {!data.email ? ' Add an email on file first.' : ''}
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              disabled={sendPortalInvite.isPending || !data.email}
+              onClick={() =>
+                sendPortalInvite.mutate(memberId, {
+                  onSuccess: () => toast.success('Portal activation email sent.'),
+                  onError: (err) => toast.error(toMemberError(err).message),
+                })
+              }
+            >
+              {sendPortalInvite.isPending ? 'Sending…' : 'Enable portal access'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Documents</CardTitle>
         </CardHeader>
         <CardContent>
           <DocumentUpload memberId={memberId} disabled={!canUpdate} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Data & privacy</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm text-muted-foreground">Download everything on file for {data.name} — profile, attendance, plans, invoices, payments, and bookings — as a JSON file (GDPR data-portability request).</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              disabled={gdprExport.isPending}
+              onClick={() =>
+                gdprExport.mutate(
+                  { id: memberId, memberCode: data.memberId },
+                  { onError: (err) => toast.error(toMemberError(err).message) },
+                )
+              }
+            >
+              {gdprExport.isPending ? 'Preparing…' : 'Export data'}
+            </Button>
+          </div>
+          {canEraseData && (
+            <div className="flex items-center justify-between gap-4 border-t pt-4">
+              <p className="text-sm text-muted-foreground">Erase {data.name}&apos;s personal data (GDPR right-to-erasure request). Profile, contact, and medical fields are anonymized and portal access is revoked — financial records are retained for accounting, stripped of identifying info. This cannot be undone.</p>
+              <Button type="button" variant="destructive" size="sm" className="shrink-0" onClick={() => setConfirmErase(true)}>
+                Erase data
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -847,6 +918,24 @@ export default function MemberDetailPage() {
         destructive
         loading={cancelMembership.isPending}
         onConfirm={handleCancelMembership}
+      />
+
+      <ConfirmDialog
+        open={confirmErase}
+        onOpenChange={setConfirmErase}
+        title={`Erase ${data.name}'s personal data?`}
+        description="Profile, contact, and medical fields are permanently anonymized, portal access is revoked, and uploaded documents are deleted. This cannot be undone."
+        destructive
+        loading={eraseGdprData.isPending}
+        onConfirm={() =>
+          eraseGdprData.mutate(memberId, {
+            onSuccess: () => {
+              setConfirmErase(false);
+              toast.success("Member's personal data has been erased.");
+            },
+            onError: (err) => toast.error(toMemberError(err).message),
+          })
+        }
       />
     </div>
   );

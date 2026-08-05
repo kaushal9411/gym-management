@@ -82,6 +82,20 @@ export function invitationEmail(
   };
 }
 
+/** Member self-service portal activation invite — distinct copy from `invitationEmail` (that one's staff-onboarding phrasing, "X invited you as a Y", doesn't read naturally for a gym member). */
+export function memberPortalInviteEmail(branding: EmailBranding, memberName: string, acceptUrl: string) {
+  return {
+    subject: `Activate your ${branding.tenantName} member portal`,
+    html: renderEmailLayout(
+      branding,
+      `<h1 style="font-size:20px;margin:0 0 12px;">You're invited!</h1>
+       <p>Hi ${memberName}, <strong>${branding.tenantName}</strong> has enabled portal access for you — set a password to check your own attendance, workout & diet plans, invoices, and class bookings any time.</p>
+       ${actionButton(acceptUrl, 'Activate my account', branding.primaryColor)}
+       <p style="margin-top:20px;font-size:13px;color:#6b7280;">This invitation expires in 72 hours.</p>`,
+    ),
+  };
+}
+
 export function subscriptionAlertEmail(
   branding: EmailBranding,
   name: string,

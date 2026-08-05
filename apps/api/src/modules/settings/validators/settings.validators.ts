@@ -119,7 +119,7 @@ export const uploadImageSchema = z.object({
     .trim()
     .min(1)
     .max(400_000)
-    .regex(/^data:image\/(png|jpeg|jpg|webp|svg\+xml);base64,/, 'Must be a base64 image data URL'),
+    .regex(/^data:image\/(png|jpeg|jpg|webp|gif);base64,/, 'Must be a base64 image data URL'),
 });
 
 export const uploadBrandingAssetSchema = z.object({
@@ -163,3 +163,10 @@ export const updateNotificationSettingsSchema = z
     smsProviderConfig: z.record(z.unknown()).nullable().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'Provide at least one field to update' });
+
+// ── Security Settings (mandatory 2FA policy, Prompt 42) ──────────────────
+
+/** SUPER_ADMIN isn't tenant-scoped; MEMBER uses a wholly separate, RBAC-less auth plane with no 2FA concept — only these four staff role tiers are meaningful here. */
+export const updateSecuritySettingsSchema = z.object({
+  mfaRequiredRoles: z.array(z.enum(['OWNER', 'MANAGER', 'TRAINER', 'RECEPTIONIST'])),
+});

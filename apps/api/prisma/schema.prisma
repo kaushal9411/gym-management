@@ -181,6 +181,8 @@ model Tenant {
   passwordResets        PasswordReset[]
   emailVerifications    EmailVerification[]
   otpCodes              OtpCode[]
+  mfaBackupCodes        MfaBackupCode[]
+  mfaSetupTokens        MfaSetupToken[]
   loginHistory          LoginHistory[]
   userSessions          UserSession[]
   auditLogs             AuditLog[]
@@ -230,6 +232,13 @@ model Tenant {
   aiMessages            AiMessage[]
   aiRequestLogs         AiRequestLog[]
   aiSettings            TenantAiSettings?
+  memberCredentials     MemberCredential[]
+  memberSessions        MemberSession[]
+  memberVerifications   MemberVerification[]
+  groupClasses          GroupClass[]
+  groupClassSchedules   GroupClassSchedule[]
+  classSessions         ClassSession[]
+  classBookings         ClassBooking[]
 
   @@map("tenants")
 }
@@ -271,6 +280,13 @@ model TenantSettings {
   /// records intent + provider config for when a real SMS provider ships.
   smsNotificationsEnabled   Boolean         @default(false) @map("sms_notifications_enabled")
   smsProviderConfig         Json?           @map("sms_provider_config")
+  /// Security policy (Prompt 42) — system role NAMES (e.g. `["OWNER","MANAGER"]`)
+  /// that must have `User.mfaEnabled` before they can complete login. Checked
+  /// against `RoleRepository#getRoleNamesForUser` at login time, not stored
+  /// per-role, since system roles (OWNER/MANAGER/TRAINER/RECEPTIONIST) are
+  /// immutable — a tenant-wide policy list here sidesteps needing to clone a
+  /// system role just to flag it as MFA-required.
+  mfaRequiredRoles          Json            @default("[]") @map("mfa_required_roles")
   createdAt                 DateTime        @default(now()) @map("created_at")
   updatedAt                 DateTime        @updatedAt @map("updated_at")
 
@@ -324,6 +340,8 @@ model User {
   passwordResets               PasswordReset[]
   emailVerifications           EmailVerification[]
   otpCodes                     OtpCode[]
+  mfaBackupCodes               MfaBackupCode[]
+  mfaSetupTokens               MfaSetupToken[]
   loginHistory                 LoginHistory[]
   sessions                     UserSession[]
   auditLogsAsActor             AuditLog[]            @relation("AuditActor")
@@ -345,6 +363,9 @@ model User {
   scheduledReportsCreated      ScheduledReport[]     @relation("ScheduledReportCreatedBy")
   tenantAnnouncementsCreated   TenantAnnouncement[]  @relation("TenantAnnouncementCreatedBy")
   aiConversations              AiConversation[]
+  groupClassesAsTrainer        GroupClass[]          @relation("GroupClassTrainer")
+  classSessionsAsTrainer       ClassSession[]        @relation("ClassSessionTrainer")
+  classBookingsMade            ClassBooking[]        @relation("ClassBookingBookedBy")
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
@@ -733,8 +754,19 @@ model Member {
   firstName                String       @map("first_name") @db.VarChar(80)
   lastName                 String       @map("last_name") @db.VarChar(80)
   profilePhotoUrl          String?      @map("profile_photo_url")
-  email                    String?      @db.VarChar(255)
-  phone                    String?      @db.VarChar(20)
+  /// AES-256-GCM ciphertext (Prompt 43, field-level encryption) — never a
+  /// plaintext email. Decrypt via `modules/members/utils/member-pii.util.ts`.
+  /// No `@db.VarChar` cap: ciphertext (iv:tag:ciphertext, all base64) runs
+  /// longer than the plaintext it replaces.
+  email                    String?
+  /// HMAC-SHA256 blind index of the normalized (lowercased/trimmed) email —
+  /// the only thing `findByEmail`/uniqueness checks can equality-match on,
+  /// since GCM ciphertext is non-deterministic.
+  emailHash                String?      @map("email_hash")
+  /// AES-256-GCM ciphertext — see `email` above.
+  phone                    String?
+  /// Blind index of the normalized (trimmed) phone — see `emailHash` above.
+  phoneHash                String?      @map("phone_hash")
   gender                   Gender?
   dateOfBirth              DateTime?    @map("date_of_birth") @db.Date
   bloodGroup               BloodGroup?  @map("blood_group")
@@ -767,17 +799,21 @@ model Member {
   updatedAt                DateTime     @updatedAt @map("updated_at")
   deletedAt                DateTime?    @map("deleted_at")
 
-  tenant       Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch       Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  trainer      User?               @relation("MemberTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
-  memberships  Membership[]
-  freezes      MembershipFreeze[]
-  documents    MemberDocument[]
-  attendances  Attendance[]
-  workoutPlans MemberWorkoutPlan[]
-  dietPlans    MemberDietPlan[]
-  invoices     MemberInvoice[]
-  payments     MemberPayment[]
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch        Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  trainer       User?                @relation("MemberTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+  memberships   Membership[]
+  freezes       MembershipFreeze[]
+  documents     MemberDocument[]
+  attendances   Attendance[]
+  workoutPlans  MemberWorkoutPlan[]
+  dietPlans     MemberDietPlan[]
+  invoices      MemberInvoice[]
+  payments      MemberPayment[]
+  credential    MemberCredential?
+  sessions      MemberSession[]
+  verifications MemberVerification[]
+  classBookings ClassBooking[]
 
   @@unique([tenantId, memberId])
   @@index([tenantId, status])
@@ -788,7 +824,95 @@ model Member {
   @@index([tenantId, createdAt])
   /// Covers the trainer-filtered member list.
   @@index([tenantId, trainerId])
+  /// Exact-match email/phone lookups (uniqueness checks, findByEmail/
+  /// findByPhone) — see the `emailHash`/`phoneHash` doc comments above.
+  @@index([tenantId, emailHash])
+  @@index([tenantId, phoneHash])
   @@map("members")
+}
+
+enum MemberPortalStatus {
+  PENDING_ACTIVATION
+  ACTIVE
+  SUSPENDED
+
+  @@map("member_portal_status")
+}
+
+/// The auth-capable sibling to profile-only `Member` — same relationship
+/// shape as `StaffProfile`↔`User`, just inverted: there `User` holds auth
+/// and `StaffProfile` is the bolted-on profile; here `Member` is the
+/// pre-existing profile and this is the new bolted-on auth capability
+/// (Prompt 39 — member self-service portal). A member only ever exists in
+/// this table once staff explicitly enables portal access
+/// (`MemberService#sendPortalInvite`) — most members will never have one.
+model MemberCredential {
+  id                  String             @id @default(uuid()) @db.Uuid
+  tenantId            String             @map("tenant_id") @db.Uuid
+  memberId            String             @unique @map("member_id") @db.Uuid
+  passwordHash        String             @map("password_hash")
+  status              MemberPortalStatus @default(PENDING_ACTIVATION)
+  failedLoginAttempts Int                @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime?          @map("locked_until")
+  lastLoginAt         DateTime?          @map("last_login_at")
+  createdAt           DateTime           @default(now()) @map("created_at")
+  updatedAt           DateTime           @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@map("member_credentials")
+}
+
+/// Refresh-token rotation for the member portal — same shape as
+/// `RefreshToken` (tenant staff plane), scoped to `Member` instead of `User`.
+model MemberSession {
+  id                  String    @id @default(uuid()) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  memberId            String    @map("member_id") @db.Uuid
+  tokenHash           String    @unique @map("token_hash")
+  family              String    @db.Uuid
+  userAgent           String?   @map("user_agent")
+  ipAddress           String?   @map("ip_address")
+  expiresAt           DateTime  @map("expires_at")
+  revokedAt           DateTime? @map("revoked_at")
+  replacedByTokenHash String?   @map("replaced_by_token_hash")
+  createdAt           DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@index([family])
+  @@map("member_sessions")
+}
+
+enum MemberVerificationPurpose {
+  ACTIVATION
+  PASSWORD_RESET
+
+  @@map("member_verification_purpose")
+}
+
+/// One opaque-token table covering both the staff-sent portal-activation
+/// invite and member-initiated forgot-password — same dual-purpose reuse
+/// the staff activation flow already does with `PasswordReset`, just
+/// purpose-tagged since `Member` isn't `User` and can't share that table.
+model MemberVerification {
+  id         String                    @id @default(uuid()) @db.Uuid
+  tenantId   String                    @map("tenant_id") @db.Uuid
+  memberId   String                    @map("member_id") @db.Uuid
+  purpose    MemberVerificationPurpose
+  tokenHash  String                    @unique @map("token_hash")
+  expiresAt  DateTime                  @map("expires_at")
+  consumedAt DateTime?                 @map("consumed_at")
+  createdAt  DateTime                  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId])
+  @@map("member_verifications")
 }
 
 /// One row per membership period — renewals/upgrades create a NEW row
@@ -926,6 +1050,148 @@ model Attendance {
   /// trendBetween), which filter tenantId+branchId+attendanceDate together.
   @@index([tenantId, branchId, attendanceDate])
   @@map("attendance_records")
+}
+
+// ── Class/session booking (Prompt 39) ──────────────────────────────────────
+// GroupClass (recurring template) + GroupClassSchedule (weekly pattern) →
+// ClassSession (concrete dated occurrence, auto-generated by a BullMQ job —
+// see modules/scheduler/) → ClassBooking (one member's seat in one session,
+// capacity-limited). Mirrors WorkoutPlan's shape where it fits (catalog +
+// trainer validation + soft-delete) but diverges where it must: a session is
+// a specific date/time with a hard capacity cap, not an open-ended
+// assignment — closer in spirit to Attendance than to MemberWorkoutPlan.
+
+enum ClassSessionStatus {
+  SCHEDULED
+  CANCELLED
+  COMPLETED
+
+  @@map("class_session_status")
+}
+
+enum ClassBookingStatus {
+  BOOKED
+  CANCELLED
+  ATTENDED
+  NO_SHOW
+
+  @@map("class_booking_status")
+}
+
+/// The reusable class "template" — Yoga, Spin, HIIT, etc. Its actual
+/// bookable occurrences live in `ClassSession`, generated from
+/// `GroupClassSchedule`'s weekly pattern.
+model GroupClass {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenantId        String    @map("tenant_id") @db.Uuid
+  name            String    @db.VarChar(150)
+  description     String?
+  /// Author/instructor — must be an active User holding the TRAINER role,
+  /// same `assertTrainerActive()` business rule as WorkoutPlan/DietPlan.
+  /// Optional so a Manager can create a class with no instructor yet.
+  trainerId       String?   @map("trainer_id") @db.Uuid
+  branchId        String    @map("branch_id") @db.Uuid
+  capacity        Int
+  durationMinutes Int       @map("duration_minutes")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  trainer  User?                @relation("GroupClassTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+  branch   Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  schedule GroupClassSchedule[]
+  sessions ClassSession[]
+
+  @@unique([tenantId, branchId, name])
+  @@index([tenantId, isActive])
+  @@map("group_classes")
+}
+
+/// The recurring weekly pattern a class occurs on — e.g. "Monday 18:00".
+/// `startTime` is "HH:mm" text, same time-of-day-as-string convention
+/// `Branch.operatingHours` already uses (no native Prisma TIME type).
+model GroupClassSchedule {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  groupClassId String   @map("group_class_id") @db.Uuid
+  dayOfWeek    WeekDay  @map("day_of_week")
+  startTime    String   @map("start_time") @db.VarChar(5)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  groupClass GroupClass @relation(fields: [groupClassId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, groupClassId])
+  @@map("group_class_schedules")
+}
+
+/// One concrete, dated, bookable occurrence — generated from
+/// `GroupClassSchedule` by a rolling-window BullMQ job (see
+/// modules/scheduler/), idempotently (the unique constraint below makes
+/// re-running generation for an already-generated date a no-op). `capacity`
+/// is snapshotted from the class at generation time so changing the class's
+/// capacity later doesn't retroactively resize an already-booked session.
+model ClassSession {
+  id           String             @id @default(uuid()) @db.Uuid
+  tenantId     String             @map("tenant_id") @db.Uuid
+  groupClassId String             @map("group_class_id") @db.Uuid
+  branchId     String             @map("branch_id") @db.Uuid
+  /// Snapshot, substitutable per-session (a trainer swap for one occurrence
+  /// shouldn't require editing the whole recurring class).
+  trainerId    String?            @map("trainer_id") @db.Uuid
+  sessionDate  DateTime           @map("session_date") @db.Date
+  startTime    String             @map("start_time") @db.VarChar(5)
+  endTime      String             @map("end_time") @db.VarChar(5)
+  capacity     Int
+  status       ClassSessionStatus @default(SCHEDULED)
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  groupClass GroupClass     @relation(fields: [groupClassId], references: [id], onDelete: Cascade)
+  branch     Branch         @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  trainer    User?          @relation("ClassSessionTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+  bookings   ClassBooking[]
+
+  @@unique([groupClassId, sessionDate, startTime])
+  @@index([tenantId, branchId, sessionDate])
+  @@index([tenantId, sessionDate])
+  @@map("class_sessions")
+}
+
+/// One member's seat in one session. `@@unique([classSessionId, memberId])`
+/// stops a member double-booking the same session; actual capacity
+/// enforcement (count of BOOKED rows < session.capacity) happens in
+/// `class-booking.service.ts` — a small race window exists under true
+/// concurrent bookings on the last seat, an accepted limitation for a
+/// low-frequency write path (documented there, not solved with distributed
+/// locking).
+model ClassBooking {
+  id             String             @id @default(uuid()) @db.Uuid
+  tenantId       String             @map("tenant_id") @db.Uuid
+  classSessionId String             @map("class_session_id") @db.Uuid
+  memberId       String             @map("member_id") @db.Uuid
+  status         ClassBookingStatus @default(BOOKED)
+  /// Who made the booking — a member via the self-service portal, or staff
+  /// booking on a member's behalf from the front desk. Free-text like
+  /// `AuditLog.actorRole`, not an FK — mirrors that same established pattern
+  /// for "which plane made this write" rather than inventing a new one.
+  bookedByRole   String             @map("booked_by_role") @db.VarChar(20)
+  bookedByUserId String?            @map("booked_by_user_id") @db.Uuid
+  bookedAt       DateTime           @default(now()) @map("booked_at")
+  cancelledAt    DateTime?          @map("cancelled_at")
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  classSession ClassSession @relation(fields: [classSessionId], references: [id], onDelete: Cascade)
+  member       Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  bookedByUser User?        @relation("ClassBookingBookedBy", fields: [bookedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([classSessionId, memberId])
+  @@index([tenantId, memberId])
+  @@index([tenantId, classSessionId])
+  @@map("class_bookings")
 }
 
 enum ExerciseDifficultyLevel {
@@ -1678,6 +1944,48 @@ model OtpCode {
   @@map("otp_codes")
 }
 
+/// One-time recovery codes for a user's TOTP 2FA (Prompt 42) — generated
+/// once at `confirmTwoFactorSetup` time (10 codes, shown to the user exactly
+/// once, never displayed again), each consumable exactly once as a fallback
+/// login path if the authenticator device is lost. Same "hash, never store
+/// plaintext" discipline as every other credential-adjacent table here.
+model MfaBackupCode {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  codeHash  String    @map("code_hash")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mfa_backup_codes")
+}
+
+/// Short-lived grace token issued at login when a user's password is
+/// correct but their role now requires 2FA and they haven't set it up yet
+/// (`TenantSettings.mfaRequiredRoles`) — proves "this request already knows
+/// the account's password" without granting a real session, scoping access
+/// to only the TOTP-setup endpoints until setup completes. Same
+/// hash-and-expire shape as `PasswordReset`.
+model MfaSetupToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("mfa_setup_tokens")
+}
+
 // ── Observability ──────────────────────────────────────────────────────────
 
 /// Every login attempt, success or failure — durable brute-force evidence
@@ -1994,6 +2302,8 @@ model Branch {
   expenses            Expense[]
   scheduledReports    ScheduledReport[]
   tenantAnnouncements TenantAnnouncement[]
+  groupClasses        GroupClass[]
+  classSessions       ClassSession[]
 
   @@unique([tenantId, branchCode])
   @@unique([tenantId, name])
@@ -2420,12 +2730,12 @@ model AdminUser {
   updatedAt           DateTime        @updatedAt @map("updated_at")
   deletedAt           DateTime?       @map("deleted_at")
 
-  role              AdminRole            @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  refreshTokens     AdminRefreshToken[]
-  auditLogs         AdminAuditLog[]
-  assignedTickets   SupportTicket[]      @relation("TicketAssignee")
-  ticketNotes       SupportTicketNote[]
-  aiConversations   AdminAiConversation[]
+  role            AdminRole             @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  refreshTokens   AdminRefreshToken[]
+  auditLogs       AdminAuditLog[]
+  assignedTickets SupportTicket[]       @relation("TicketAssignee")
+  ticketNotes     SupportTicketNote[]
+  aiConversations AdminAiConversation[]
 
   @@map("admin_users")
 }
@@ -2582,6 +2892,7 @@ enum JobCategory {
   NOTIFICATION
   REPORT
   MAINTENANCE
+  CLASS
 }
 
 /// Shared status domain for both `ScheduledJob` (the job definition's

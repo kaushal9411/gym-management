@@ -51,7 +51,7 @@ export class ExpenseService {
 
   async create(input: CreateExpenseInput, actor: IamActor): Promise<ExpenseDto> {
     const receiptDataUrl = isDataUrl(input.receiptDataUrl)
-      ? await uploadDataUrl(input.receiptDataUrl, { keyPrefix: 'expense-receipts', visibility: 'private' })
+      ? await uploadDataUrl(input.receiptDataUrl, { keyPrefix: 'expense-receipts', visibility: 'private', accept: ['image', 'pdf'] })
       : input.receiptDataUrl;
     const expense = await this.expenses.create({
       tenantId: this.tenantId,
@@ -71,7 +71,7 @@ export class ExpenseService {
   async update(id: string, input: UpdateExpenseInput, actor: IamActor): Promise<ExpenseDto> {
     await this.mustFind(id);
     const receiptDataUrl = isDataUrl(input.receiptDataUrl)
-      ? await uploadDataUrl(input.receiptDataUrl, { keyPrefix: 'expense-receipts', visibility: 'private' })
+      ? await uploadDataUrl(input.receiptDataUrl, { keyPrefix: 'expense-receipts', visibility: 'private', accept: ['image', 'pdf'] })
       : input.receiptDataUrl;
     await this.expenses.update(id, {
       category: input.category,

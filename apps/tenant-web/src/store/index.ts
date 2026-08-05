@@ -13,6 +13,7 @@ import storage from 'redux-persist/lib/storage'; // localStorage engine — clie
 import { authReducer } from '@/features/auth/store/auth-slice';
 import { branchReducer } from '@/features/branch/store/branch-slice';
 import { dashboardReducer } from '@/features/dashboard/store/dashboard-slice';
+import { memberAuthReducer } from '@/features/member-portal/store/member-auth-slice';
 import { navigationReducer } from '@/features/navigation/store/navigation-slice';
 import { notificationReducer } from '@/features/notifications/store/notification-slice';
 import { tenantReducer } from '@/features/tenant/store/tenant-slice';
@@ -46,8 +47,16 @@ const authPersistConfig = {
 const navigationPersistConfig = { key: 'navigation', storage };
 const branchPersistConfig = { key: 'branch', storage };
 
+/** Own persist key (`memberAuth`, not `auth`) — a member session must never share storage with a staff session. Same blacklist reasoning as `authPersistConfig`. */
+const memberAuthPersistConfig = {
+  key: 'memberAuth',
+  storage,
+  blacklist: ['status', 'error', 'bootstrapping'],
+};
+
 const rootReducer = combineReducers({
   auth: persistReducer(authPersistConfig, authReducer),
+  memberAuth: persistReducer(memberAuthPersistConfig, memberAuthReducer),
   ui: uiReducer,
   navigation: persistReducer(navigationPersistConfig, navigationReducer),
   branch: persistReducer(branchPersistConfig, branchReducer),

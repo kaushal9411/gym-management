@@ -27,6 +27,9 @@ import { auditLogRouter } from '../../modules/audit-logs/routes/audit-log.routes
 import { authRouter } from '../../modules/authentication/routes/auth.routes';
 import { billingRouter } from '../../modules/billing/routes/billing.routes';
 import { branchRouter } from '../../modules/branches/routes/branch.routes';
+import { classBookingRouter } from '../../modules/classes/routes/class-booking.routes';
+import { classSessionRouter } from '../../modules/classes/routes/class-session.routes';
+import { groupClassRouter } from '../../modules/classes/routes/group-class.routes';
 import { contactRouter } from '../../modules/contact/routes/contact.routes';
 import { couponRouter } from '../../modules/coupon/routes/coupon.routes';
 import { dietPlanRouter } from '../../modules/diet/routes/diet-plan.routes';
@@ -38,6 +41,8 @@ import { memberInvoiceRouter } from '../../modules/finance/routes/member-invoice
 import { memberPaymentRouter } from '../../modules/finance/routes/member-payment.routes';
 import { invitationRouter } from '../../modules/invitations/routes/invitation.routes';
 import { invoiceRouter } from '../../modules/invoice/routes/invoice.routes';
+import { memberAuthRouter } from '../../modules/member-auth/routes/member-auth.routes';
+import { memberPortalRouter } from '../../modules/member-portal/routes/member-portal.routes';
 import { memberRouter } from '../../modules/members/routes/member.routes';
 import { membershipPlanRouter } from '../../modules/members/routes/membership-plan.routes';
 import { onboardingRouter } from '../../modules/onboarding/routes/onboarding.routes';
@@ -51,6 +56,7 @@ import { scheduledReportRouter } from '../../modules/reports/routes/scheduled-re
 import { roleRouter } from '../../modules/roles/routes/role.routes';
 import { rumRouter } from '../../modules/rum/routes/rum.routes';
 import { adminSchedulerRouter } from '../../modules/scheduler/routes/admin-scheduler.routes';
+import { searchRouter } from '../../modules/search/routes/search.routes';
 import { sessionRouter } from '../../modules/sessions/routes/session.routes';
 import { settingsRouter } from '../../modules/settings/routes/settings.routes';
 import { staffRouter } from '../../modules/staff/routes/staff.routes';
@@ -68,6 +74,8 @@ import { workoutPlanRouter } from '../../modules/workouts/routes/workout-plan.ro
 export const v1Router: Router = Router();
 
 v1Router.use('/auth', authRouter);
+v1Router.use('/member/auth', memberAuthRouter);
+v1Router.use('/portal', memberPortalRouter);
 v1Router.use('/admin/auth', adminAuthRouter);
 v1Router.use('/admin/ai', adminAiAssistantRouter);
 v1Router.use('/admin/dashboard', adminDashboardRouter);
@@ -95,6 +103,9 @@ v1Router.use('/coupon', couponRouter);
 v1Router.use('/invoice', invoiceRouter);
 v1Router.use('/webhook', webhookRouter);
 v1Router.use('/branches', branchRouter);
+v1Router.use('/classes', groupClassRouter);
+v1Router.use('/class-sessions', classSessionRouter);
+v1Router.use('/bookings', classBookingRouter);
 // Notifications & Communication (Prompt 21) — /notifications/templates must
 // be mounted before the general /notifications router so it isn't shadowed
 // by that router's own `/:notificationId` param routes (same reasoning as
@@ -137,6 +148,7 @@ v1Router.use('/reports/dashboard', dashboardRouter);
 v1Router.use('/reports/scheduled', scheduledReportRouter);
 v1Router.use('/reports', reportsRouter);
 v1Router.use('/analytics', analyticsRouter);
+v1Router.use('/search', searchRouter);
 // Platform-plane (no tenant check — mounted under /public, see PLATFORM_ROUTE_PREFIXES).
 v1Router.use('/public/contact', contactRouter);
 v1Router.use('/public/rum', rumRouter);

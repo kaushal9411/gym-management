@@ -18,10 +18,15 @@ import type {
   UpgradeMembershipInput,
   UploadDocumentInput,
 } from '../dto/member.dto';
+import { MemberGdprService } from '../services/member-gdpr.service';
 import { MemberService } from '../services/member.service';
 
 function serviceFor(req: Request): MemberService {
   return new MemberService(req.tenant!.id);
+}
+
+function gdprServiceFor(req: Request): MemberGdprService {
+  return new MemberGdprService(req.tenant!.id);
 }
 
 export class MemberController {
@@ -123,6 +128,11 @@ export class MemberController {
     sendSuccess(res, result, 'QR code regenerated.');
   }
 
+  async sendPortalInvite(req: Request, res: Response): Promise<void> {
+    await serviceFor(req).sendPortalInvite(req.params.id!, actorFrom(req));
+    sendSuccess(res, null, 'Portal activation email sent.');
+  }
+
   async listDocuments(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await serviceFor(req).listDocuments(req.params.id!));
   }
@@ -168,6 +178,15 @@ export class MemberController {
     const { memberIds } = req.body as { memberIds: string[] };
     const result = await serviceFor(req).bulkDelete(memberIds, actorFrom(req));
     sendSuccess(res, result, `${result.succeeded.length} member(s) deleted.`);
+  }
+
+  async gdprExport(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await gdprServiceFor(req).exportData(req.params.id!));
+  }
+
+  async gdprErase(req: Request, res: Response): Promise<void> {
+    await gdprServiceFor(req).eraseData(req.params.id!, actorFrom(req));
+    sendSuccess(res, null, "Member's personal data has been erased.");
   }
 }
 

@@ -11,6 +11,7 @@ import {
   type RegisterGymPayload,
   type ResetPasswordPayload,
   type SessionTokens,
+  type TwoFactorSetup,
   type VerifyEmailResult,
   type VerifyOtpPayload,
 } from '../types';
@@ -37,6 +38,17 @@ export interface AuthService {
   fetchCurrentUser(): Promise<{ user: AuthUser; permissions: string[] }>;
   logoutCurrentDevice(refreshToken: string | null): Promise<void>;
   logoutAllDevices(): Promise<void>;
+
+  // ── Two-factor authentication (Prompt 42) ──────────────────────────────
+  /** Mandatory-setup grace flow — `setupToken` from a `mfa_setup_required` login challenge, no session yet. */
+  beginMfaSetup(setupToken: string): Promise<TwoFactorSetup>;
+  /** Confirms setup AND completes login in one step — returns a real session. */
+  confirmMfaSetup(setupToken: string, code: string): Promise<EstablishedSession & { backupCodes: string[] }>;
+  /** Self-service — already authenticated. */
+  beginTwoFactorSetup(): Promise<TwoFactorSetup>;
+  confirmTwoFactorSetup(code: string): Promise<{ backupCodes: string[] }>;
+  disableTwoFactor(password: string): Promise<void>;
+  regenerateBackupCodes(code: string): Promise<{ backupCodes: string[] }>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -71,6 +83,18 @@ interface OtpChallengeDto {
   purpose: 'login' | '2fa';
 }
 
+interface MfaSetupRequiredDto {
+  challenge: 'mfa_setup_required';
+  email: string;
+  setupToken: string;
+}
+
+interface TwoFactorSetupDto {
+  secret: string;
+  otpauthUri: string;
+  qrDataUrl: string;
+}
+
 function toAuthUser(dto: UserProfileDto): AuthUser {
   const roles = dto.roles.length > 0 ? dto.roles : ['MEMBER'];
   return {
@@ -101,16 +125,18 @@ function toSession(dto: AuthSuccessDto): EstablishedSession {
 class HttpAuthService implements AuthService {
   async login(payload: LoginPayload): Promise<LoginResult> {
     try {
-      const res = await apiClient.post<ApiEnvelope<AuthSuccessDto | OtpChallengeDto>>('/auth/login', {
+      const res = await apiClient.post<ApiEnvelope<AuthSuccessDto | OtpChallengeDto | MfaSetupRequiredDto>>('/auth/login', {
         email: payload.email,
         password: payload.password,
         rememberMe: payload.rememberMe,
       });
 
-      if ('challenge' in res.data.data) {
-        return { kind: 'otp_required', email: res.data.data.email, flow: res.data.data.purpose };
+      const data = res.data.data;
+      if ('challenge' in data) {
+        if (data.challenge === 'mfa_setup_required') return { kind: 'mfa_setup_required', email: data.email, setupToken: data.setupToken };
+        return { kind: 'otp_required', email: data.email, flow: data.purpose };
       }
-      return { kind: 'success', ...toSession(res.data.data) };
+      return { kind: 'success', ...toSession(data) };
     } catch (error) {
       throw toAuthServiceError(error);
     }
@@ -250,6 +276,61 @@ class HttpAuthService implements AuthService {
       throw toAuthServiceError(error);
     }
   }
+
+  // ── Two-factor authentication ───────────────────────────────────────
+
+  async beginMfaSetup(setupToken: string): Promise<TwoFactorSetup> {
+    try {
+      const res = await apiClient.post<ApiEnvelope<TwoFactorSetupDto>>('/auth/mfa/setup/begin', { setupToken });
+      return res.data.data;
+    } catch (error) {
+      throw toAuthServiceError(error);
+    }
+  }
+
+  async confirmMfaSetup(setupToken: string, code: string): Promise<EstablishedSession & { backupCodes: string[] }> {
+    try {
+      const res = await apiClient.post<ApiEnvelope<AuthSuccessDto & { backupCodes: string[] }>>('/auth/mfa/setup/confirm', { setupToken, code });
+      return { ...toSession(res.data.data), backupCodes: res.data.data.backupCodes };
+    } catch (error) {
+      throw toAuthServiceError(error);
+    }
+  }
+
+  async beginTwoFactorSetup(): Promise<TwoFactorSetup> {
+    try {
+      const res = await apiClient.post<ApiEnvelope<TwoFactorSetupDto>>('/profile/two-factor/setup');
+      return res.data.data;
+    } catch (error) {
+      throw toAuthServiceError(error);
+    }
+  }
+
+  async confirmTwoFactorSetup(code: string): Promise<{ backupCodes: string[] }> {
+    try {
+      const res = await apiClient.post<ApiEnvelope<{ backupCodes: string[] }>>('/profile/two-factor/setup/confirm', { code });
+      return res.data.data;
+    } catch (error) {
+      throw toAuthServiceError(error);
+    }
+  }
+
+  async disableTwoFactor(password: string): Promise<void> {
+    try {
+      await apiClient.post('/profile/two-factor/disable', { password });
+    } catch (error) {
+      throw toAuthServiceError(error);
+    }
+  }
+
+  async regenerateBackupCodes(code: string): Promise<{ backupCodes: string[] }> {
+    try {
+      const res = await apiClient.post<ApiEnvelope<{ backupCodes: string[] }>>('/profile/two-factor/backup-codes/regenerate', { code });
+      return res.data.data;
+    } catch (error) {
+      throw toAuthServiceError(error);
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -370,6 +451,42 @@ class MockAuthService implements AuthService {
   async acceptInvitation({ token }: AcceptInvitationPayload): Promise<void> {
     await delay(LATENCY_MS + 200);
     if (token === 'expired') throw new AuthServiceError('TOKEN_EXPIRED', 'This invitation has expired.');
+  }
+
+  private async mockTwoFactorSetup(): Promise<TwoFactorSetup> {
+    await delay(LATENCY_MS);
+    return { secret: 'MOCK2FASECRETMOCK2FASECRET', otpauthUri: 'otpauth://totp/FitCloud:mock@example.com?secret=MOCK2FASECRETMOCK2FASECRET&issuer=FitCloud', qrDataUrl: '' };
+  }
+
+  async beginMfaSetup(): Promise<TwoFactorSetup> {
+    return this.mockTwoFactorSetup();
+  }
+
+  async confirmMfaSetup(_setupToken: string, code: string): Promise<EstablishedSession & { backupCodes: string[] }> {
+    await delay(LATENCY_MS);
+    if (code !== MOCK_VALID_OTP) throw new AuthServiceError('OTP_INVALID', 'Incorrect code. Check and try again.');
+    return { ...mockSession('owner@example.com'), backupCodes: Array.from({ length: 10 }, (_, i) => `MOCK-${i}`) };
+  }
+
+  async beginTwoFactorSetup(): Promise<TwoFactorSetup> {
+    return this.mockTwoFactorSetup();
+  }
+
+  async confirmTwoFactorSetup(code: string): Promise<{ backupCodes: string[] }> {
+    await delay(LATENCY_MS);
+    if (code !== MOCK_VALID_OTP) throw new AuthServiceError('OTP_INVALID', 'Incorrect code. Check and try again.');
+    return { backupCodes: Array.from({ length: 10 }, (_, i) => `MOCK-${i}`) };
+  }
+
+  async disableTwoFactor(password: string): Promise<void> {
+    await delay(LATENCY_MS);
+    if (password !== MOCK_HAPPY_PASSWORD) throw new AuthServiceError('INVALID_CREDENTIALS', 'Password is incorrect.');
+  }
+
+  async regenerateBackupCodes(code: string): Promise<{ backupCodes: string[] }> {
+    await delay(LATENCY_MS);
+    if (code !== MOCK_VALID_OTP) throw new AuthServiceError('OTP_INVALID', 'Incorrect code. Check and try again.');
+    return { backupCodes: Array.from({ length: 10 }, (_, i) => `MOCK-${i}`) };
   }
 }
 

@@ -2,6 +2,7 @@ import { getTenantScopedClient } from '../../../infrastructure/database/tenant-s
 import { mailer } from '../../../infrastructure/mail/mailer';
 import { AuditLogRepository } from '../repositories/audit-log.repository';
 import { LoginHistoryRepository } from '../repositories/login-history.repository';
+import { MfaRepository } from '../repositories/mfa.repository';
 import { RoleRepository } from '../repositories/role.repository';
 import { SessionRepository } from '../repositories/session.repository';
 import { UserRepository } from '../repositories/user.repository';
@@ -26,6 +27,7 @@ export function buildAuthModule(tenantId: string): AuthService {
     roleRepository: new RoleRepository(db),
     sessionRepository: new SessionRepository(db),
     verificationRepository: new VerificationRepository(db),
+    mfaRepository: new MfaRepository(db),
     loginHistoryRepository: new LoginHistoryRepository(db),
     auditLogRepository: new AuditLogRepository(db),
     sendEmail: (to, subject, html) => mailer.send({ to, subject, html }),

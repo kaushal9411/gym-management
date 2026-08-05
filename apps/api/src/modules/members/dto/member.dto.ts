@@ -336,3 +336,49 @@ export interface UpdateMembershipPlanInput extends MembershipPlanFeatureFields, 
   displayOrder?: number;
   notes?: string | null;
 }
+
+// ── GDPR export (Prompt 46) ─────────────────────────────────────────────
+
+export interface MemberGdprExportDto {
+  exportedAt: string;
+  profile: {
+    id: string;
+    memberId: string;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    phone: string | null;
+    gender: Gender | null;
+    dateOfBirth: string | null;
+    bloodGroup: BloodGroup | null;
+    height: string | null;
+    weight: string | null;
+    occupation: string | null;
+    addressLine: string | null;
+    city: string | null;
+    state: string | null;
+    country: string | null;
+    postalCode: string | null;
+    emergencyContactName: string | null;
+    emergencyContactPhone: string | null;
+    emergencyContactRelation: string | null;
+    medicalConditions: string | null;
+    allergies: string | null;
+    fitnessGoals: string | null;
+    notes: string | null;
+    branch: string;
+    trainer: string | null;
+    status: MemberStatus;
+    joiningDate: string;
+    createdAt: string;
+  };
+  memberships: { planName: string; startDate: string; endDate: string; status: MembershipStatus; priceAtAssignment: string; autoRenew: boolean }[];
+  freezes: { reason: string | null; frozenAt: string; unfrozenAt: string | null }[];
+  attendance: { checkInTime: string; checkOutTime: string | null; method: string; status: string }[];
+  workoutPlans: { planName: string; startDate: string; endDate: string | null; status: string; progressEntries: number }[];
+  dietPlans: { planName: string; startDate: string; endDate: string | null; status: string; dailyLogEntries: number }[];
+  invoices: { invoiceNumber: string; invoiceDate: string; totalAmount: string; status: string }[];
+  payments: { paymentNumber: string; paymentDate: string; finalAmount: string; method: string; status: string }[];
+  documents: { type: MemberDocumentType; fileName: string; uploadedAt: string }[];
+  classBookings: { className: string; sessionDate: string; status: string; bookedAt: string }[];
+}

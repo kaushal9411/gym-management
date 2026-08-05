@@ -143,3 +143,12 @@ export interface UpdateNotificationSettingsInput {
   smsNotificationsEnabled?: boolean;
   smsProviderConfig?: Record<string, unknown> | null;
 }
+
+/** System role NAMES (e.g. `["OWNER","MANAGER"]`) required to have 2FA enabled before they can complete login — see `AuthService#login` (Prompt 42). */
+export interface SecuritySettingsDto {
+  mfaRequiredRoles: string[];
+}
+
+export interface UpdateSecuritySettingsInput {
+  mfaRequiredRoles: string[];
+}

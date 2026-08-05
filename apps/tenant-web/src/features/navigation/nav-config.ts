@@ -7,6 +7,7 @@ import {
   Building2,
   IdCard,
   CalendarCheck,
+  CalendarRange,
   Dumbbell,
   Apple,
   CreditCard,
@@ -90,6 +91,15 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Dumbbell,
     permission: 'workouts:view',
     featureFlag: 'workout_plans',
+    section: 'Programs',
+  },
+  {
+    key: 'classes',
+    label: 'Classes',
+    href: '/classes',
+    icon: CalendarRange,
+    permission: 'classes:view',
+    featureFlag: 'live_classes',
     section: 'Programs',
   },
   {

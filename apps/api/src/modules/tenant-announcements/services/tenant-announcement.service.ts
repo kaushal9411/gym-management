@@ -1,5 +1,6 @@
 import { ConflictError, NotFoundError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
+import { sanitizeRichText } from '../../../core/security/html-sanitizer.util';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
@@ -65,7 +66,7 @@ export class TenantAnnouncementService {
     const row = await this.announcements.create({
       tenantId: this.tenantId,
       title: input.title,
-      body: input.body,
+      body: sanitizeRichText(input.body),
       audience: input.audience ?? 'ALL',
       branchId: input.branchId,
       expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined,
@@ -84,7 +85,7 @@ export class TenantAnnouncementService {
 
     await this.announcements.update(id, {
       title: input.title,
-      body: input.body,
+      body: input.body !== undefined ? sanitizeRichText(input.body) : undefined,
       audience: input.audience,
       branchId: input.branchId,
       expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined,

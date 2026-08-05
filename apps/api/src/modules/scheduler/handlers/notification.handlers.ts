@@ -1,6 +1,7 @@
 import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { dispatchNotification } from '../../admin-notifications/services/admin-notification.service';
+import { decryptMemberContactMany } from '../../members/utils/member-pii.util';
 import { TenantAnnouncementRepository } from '../../tenant-announcements/repositories/tenant-announcement.repository';
 import {
   notifyAnnouncementPublished,
@@ -60,10 +61,12 @@ function stripHtml(html: string): string {
 /** Members whose birthday (month + day) is today — no prior sweep existed for this; the `BIRTHDAY_WISHES` template existed but had no firing point. */
 export const birthdayWishes: JobHandler = async () => {
   const now = new Date();
-  const members = await prisma.member.findMany({
-    where: { dateOfBirth: { not: null } },
-    select: { id: true, tenantId: true, firstName: true, lastName: true, email: true, dateOfBirth: true },
-  });
+  const members = decryptMemberContactMany(
+    await prisma.member.findMany({
+      where: { dateOfBirth: { not: null } },
+      select: { id: true, tenantId: true, firstName: true, lastName: true, email: true, phone: true, dateOfBirth: true },
+    }),
+  );
 
   const todaysBirthdays = members.filter(
     (m) => m.dateOfBirth!.getUTCMonth() === now.getUTCMonth() && m.dateOfBirth!.getUTCDate() === now.getUTCDate(),
@@ -95,10 +98,12 @@ const WELCOME_CATCHUP_WINDOW_HOURS = 48;
  */
 export const welcomeMessages: JobHandler = async () => {
   const windowStart = new Date(Date.now() - WELCOME_CATCHUP_WINDOW_HOURS * 60 * 60_000);
-  const recentMembers = await prisma.member.findMany({
-    where: { createdAt: { gte: windowStart }, email: { not: null } },
-    select: { id: true, tenantId: true, firstName: true, lastName: true, email: true, memberId: true },
-  });
+  const recentMembers = decryptMemberContactMany(
+    await prisma.member.findMany({
+      where: { createdAt: { gte: windowStart }, email: { not: null } },
+      select: { id: true, tenantId: true, firstName: true, lastName: true, email: true, phone: true, memberId: true },
+    }),
+  );
 
   let caughtUp = 0;
   for (const member of recentMembers) {

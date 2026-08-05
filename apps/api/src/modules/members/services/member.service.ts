@@ -7,6 +7,7 @@ import { isDataUrl, presignGetUrl, uploadDataUrl } from '../../../core/storage/s
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
+import { MemberAuthService } from '../../member-auth/services/member-auth.service';
 import { notifyMembershipAssigned, notifyMembershipRenewed, notifyNewMemberRegistration } from '../../tenant-notifications/services/notification-trigger.service';
 import {
   type AssignMembershipInput,
@@ -455,6 +456,14 @@ export class MemberService {
     return this.getById(id);
   }
 
+  /** Staff-initiated — "Enable portal access" on the member detail page. The member sets their own password via the emailed activation link (member-auth module). */
+  async sendPortalInvite(id: string, actor: IamActor): Promise<void> {
+    const member = await this.mustFind(id);
+    if (!member.email) throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has no email on file — add one before enabling portal access.', 422);
+    await new MemberAuthService(this.tenantId).createOrResendInvite(id, `${member.firstName} ${member.lastName}`.trim(), member.email);
+    await this.audit(actor, 'member.portal_invite_sent', id);
+  }
+
   async regenerateQrCode(id: string, actor: IamActor): Promise<{ qrCodeToken: string; qrCodeImageUrl: string }> {
     await this.mustFind(id);
     const qrCodeToken = generateOpaqueToken(16);
@@ -483,7 +492,7 @@ export class MemberService {
     // Documents (medical records, ID proof) are genuinely sensitive — stored
     // under the bucket's private/ prefix; `fileDataUrl` in the DB is a bare
     // object key from here on, never a directly-usable URL (see storage.service.ts).
-    const fileDataUrl = await uploadDataUrl(input.fileDataUrl, { keyPrefix: 'member-documents', visibility: 'private' });
+    const fileDataUrl = await uploadDataUrl(input.fileDataUrl, { keyPrefix: 'member-documents', visibility: 'private', accept: ['image', 'pdf'] });
     const doc = await this.documents.create({
       tenantId: this.tenantId,
       memberId: id,

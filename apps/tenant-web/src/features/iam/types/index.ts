@@ -136,6 +136,7 @@ export interface ProfileDto {
   emergencyContact: { name: string | null; phone: string | null; relation: string | null };
   notificationPreferences: Record<string, boolean>;
   branchAccess: { allBranches: boolean; branches: UserBranchAccess[] };
+  mfaEnabled: boolean;
   emailVerifiedAt: string | null;
   lastLoginAt: string | null;
   createdAt: string;

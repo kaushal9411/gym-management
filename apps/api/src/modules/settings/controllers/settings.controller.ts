@@ -10,6 +10,7 @@ import type {
   UpdateGymProfileInput,
   UpdateInvoiceSettingsInput,
   UpdateNotificationSettingsInput,
+  UpdateSecuritySettingsInput,
 } from '../dto/settings.dto';
 import { SettingsService } from '../services/settings.service';
 
@@ -115,6 +116,16 @@ export class SettingsController {
       actorFrom(req),
     );
     sendSuccess(res, settings, 'Notification preferences updated.');
+  }
+
+  // ── Security Settings (mandatory 2FA policy) ──────────────────────────
+  async getSecuritySettings(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await serviceFor(req).getSecuritySettings());
+  }
+
+  async updateSecuritySettings(req: Request, res: Response): Promise<void> {
+    const settings = await serviceFor(req).updateSecuritySettings(req.body as UpdateSecuritySettingsInput, actorFrom(req));
+    sendSuccess(res, settings, 'Security settings updated.');
   }
 }
 

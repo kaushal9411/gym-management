@@ -47,6 +47,19 @@ export const loginSchema = z.object({
   rememberMe: z.boolean(),
 });
 
+/**
+ * The single shared `/login` page accepts either a staff email or a
+ * member's Member ID in one field — the two auth planes have different
+ * identifier shapes (email vs. e.g. "MEM-0007"), so this can't reuse
+ * `emailSchema`. Which backend actually gets called is decided at submit
+ * time by whether the value contains "@" (see `login-form.tsx`), not here.
+ */
+export const unifiedLoginSchema = z.object({
+  identifier: z.string().trim().min(1, 'Email or Member ID is required'),
+  password: z.string().min(1, 'Password is required'),
+  rememberMe: z.boolean(),
+});
+
 export const registerGymSchema = z
   .object({
     gymName: z.string().trim().min(2, 'Gym name is required').max(80),
@@ -113,6 +126,7 @@ export const acceptInvitationSchema = z
 
 // ── Inferred form types ─────────────────────────────────────────────────
 export type LoginFormValues = z.infer<typeof loginSchema>;
+export type UnifiedLoginFormValues = z.infer<typeof unifiedLoginSchema>;
 export type RegisterGymFormValues = z.infer<typeof registerGymSchema>;
 export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;

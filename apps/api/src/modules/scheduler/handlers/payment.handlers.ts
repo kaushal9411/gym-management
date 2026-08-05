@@ -3,6 +3,7 @@ import { prisma } from '../../../infrastructure/database/prisma';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { MemberInvoiceRepository } from '../../finance/repositories/member-invoice.repository';
+import { decryptMemberContact } from '../../members/utils/member-pii.util';
 import { notifyPaymentFailed } from '../../tenant-notifications/services/notification-trigger.service';
 import type { JobHandler } from '../types';
 
@@ -12,10 +13,12 @@ const DEDUPE_TTL_SECONDS = 3 * 86_400;
 /** Members with an UNPAID/OVERDUE invoice due within 3 days — a friendly heads-up before it's actually late. */
 export const paymentReminder: JobHandler = async () => {
   const windowEnd = new Date(Date.now() + 3 * DAY_MS);
-  const invoices = await prisma.memberInvoice.findMany({
-    where: { status: { in: ['UNPAID', 'PARTIALLY_PAID'] }, dueDate: { gte: new Date(), lte: windowEnd } },
-    include: { member: true, tenant: { select: { name: true } } },
-  });
+  const invoices = (
+    await prisma.memberInvoice.findMany({
+      where: { status: { in: ['UNPAID', 'PARTIALLY_PAID'] }, dueDate: { gte: new Date(), lte: windowEnd } },
+      include: { member: true, tenant: { select: { name: true } } },
+    })
+  ).map((invoice) => ({ ...invoice, member: decryptMemberContact(invoice.member) }));
 
   let reminded = 0;
   for (const invoice of invoices) {
@@ -40,10 +43,12 @@ export const paymentReminder: JobHandler = async () => {
 /** Member payments recorded as FAILED — nudges the member to retry, deduped so the same failed payment isn't re-nudged daily. */
 export const failedPaymentRetry: JobHandler = async () => {
   const windowStart = new Date(Date.now() - 14 * DAY_MS);
-  const payments = await prisma.memberPayment.findMany({
-    where: { status: 'FAILED', createdAt: { gte: windowStart } },
-    include: { member: true },
-  });
+  const payments = (
+    await prisma.memberPayment.findMany({
+      where: { status: 'FAILED', createdAt: { gte: windowStart } },
+      include: { member: true },
+    })
+  ).map((payment) => ({ ...payment, member: decryptMemberContact(payment.member) }));
 
   let notified = 0;
   for (const payment of payments) {
@@ -119,10 +124,12 @@ export const invoiceGeneration: JobHandler = async () => {
 /** Escalation reminder for invoices that are genuinely overdue (past due date by 7+ days), separate window from `payment-reminder`'s "due soon" heads-up. */
 export const outstandingPaymentReminder: JobHandler = async () => {
   const cutoff = new Date(Date.now() - 7 * DAY_MS);
-  const invoices = await prisma.memberInvoice.findMany({
-    where: { status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] }, dueDate: { lte: cutoff } },
-    include: { member: true, tenant: { select: { name: true } } },
-  });
+  const invoices = (
+    await prisma.memberInvoice.findMany({
+      where: { status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] }, dueDate: { lte: cutoff } },
+      include: { member: true, tenant: { select: { name: true } } },
+    })
+  ).map((invoice) => ({ ...invoice, member: decryptMemberContact(invoice.member) }));
 
   let reminded = 0;
   for (const invoice of invoices) {

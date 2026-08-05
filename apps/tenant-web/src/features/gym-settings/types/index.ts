@@ -112,6 +112,14 @@ export interface InvoiceSettings {
 
 export type UpdateInvoiceSettingsPayload = Partial<Omit<InvoiceSettings, 'updatedAt'>>;
 
+export type StaffRoleName = 'OWNER' | 'MANAGER' | 'TRAINER' | 'RECEPTIONIST';
+
+export interface SecuritySettings {
+  mfaRequiredRoles: StaffRoleName[];
+}
+
+export type UpdateSecuritySettingsPayload = SecuritySettings;
+
 export interface EmailSettings {
   emailFromName: string | null;
   emailFromAddress: string | null;
