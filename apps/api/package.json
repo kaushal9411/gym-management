@@ -37,7 +37,7 @@
     "helmet": "^8.0.0",
     "ioredis": "^5.4.2",
     "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^6.9.16",
+    "nodemailer": "^9.0.3",
     "otplib": "^13.4.1",
     "pdfkit": "^0.19.1",
     "pusher": "^5.2.0",
