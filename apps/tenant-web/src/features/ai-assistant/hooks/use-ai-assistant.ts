@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+import { notifyProgrammaticNavigation } from '@/components/navigation-progress-provider';
+
 import { aiAssistantService } from '../services/ai-assistant.service';
 import type { AiErrorCode, AiMessage, UpdateTenantAiSettingsInput } from '../types';
 
@@ -142,7 +144,7 @@ export function useAiChatStream(conversationId: string | null): UseAiChatStreamR
           } else if (event.type === 'error') {
             // Surfaced explicitly — otherwise a failed send (e.g. the AI provider isn't configured) silently drops the optimistic user message with zero feedback, confirmed live as a real gap before this fix.
             if (event.code && ACTIONABLE_ERROR_CODES.has(event.code)) {
-              toast.error(event.message, { action: { label: 'Open AI Settings', onClick: () => router.push('/gym-settings/ai') } });
+              toast.error(event.message, { action: { label: 'Open AI Settings', onClick: () => { notifyProgrammaticNavigation('/gym-settings/ai'); router.push('/gym-settings/ai'); } } });
             } else {
               toast.error(event.message);
             }

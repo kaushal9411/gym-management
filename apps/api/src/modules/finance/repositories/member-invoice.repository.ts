@@ -17,10 +17,18 @@ const DETAIL_INCLUDE = {
 export type MemberInvoiceListRow = Prisma.MemberInvoiceGetPayload<{ include: typeof LIST_INCLUDE }>;
 export type MemberInvoiceDetailRow = Prisma.MemberInvoiceGetPayload<{ include: typeof DETAIL_INCLUDE }>;
 
-function buildWhere(tenantId: string, query: Partial<ListInvoicesQuery>): Prisma.MemberInvoiceWhereInput {
+function buildWhere(tenantId: string, query: Partial<ListInvoicesQuery>, restrictToBranchIds?: string[]): Prisma.MemberInvoiceWhereInput {
   const where: Prisma.MemberInvoiceWhereInput = { tenantId };
   if (query.memberId) where.memberId = query.memberId;
-  if (query.branchId) where.branchId = query.branchId;
+  if (restrictToBranchIds) {
+    where.branchId = query.branchId
+      ? restrictToBranchIds.includes(query.branchId)
+        ? query.branchId
+        : { in: [] }
+      : { in: restrictToBranchIds };
+  } else if (query.branchId) {
+    where.branchId = query.branchId;
+  }
   if (query.status) where.status = query.status;
   if (query.dateFrom || query.dateTo) {
     where.invoiceDate = {};
@@ -37,8 +45,8 @@ function buildWhere(tenantId: string, query: Partial<ListInvoicesQuery>): Prisma
 export class MemberInvoiceRepository {
   constructor(private readonly db: TenantScopedPrisma) {}
 
-  async list(tenantId: string, query: ListInvoicesQuery): Promise<{ items: MemberInvoiceListRow[]; total: number }> {
-    const where = buildWhere(tenantId, query);
+  async list(tenantId: string, query: ListInvoicesQuery, restrictToBranchIds?: string[]): Promise<{ items: MemberInvoiceListRow[]; total: number }> {
+    const where = buildWhere(tenantId, query, restrictToBranchIds);
     const [items, total] = await Promise.all([
       this.db.memberInvoice.findMany({
         where,

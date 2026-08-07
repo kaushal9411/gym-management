@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { CreditCard, Users } from 'lucide-react';
 
+import { notifyProgrammaticNavigation } from '@/components/navigation-progress-provider';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -134,8 +135,8 @@ export default function PlansPage() {
               key={p.id}
               role="link"
               tabIndex={0}
-              onClick={() => router.push(`/plans/${p.id}`)}
-              onKeyDown={(e) => e.key === 'Enter' && router.push(`/plans/${p.id}`)}
+              onClick={() => { notifyProgrammaticNavigation(`/plans/${p.id}`); router.push(`/plans/${p.id}`); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { notifyProgrammaticNavigation(`/plans/${p.id}`); router.push(`/plans/${p.id}`); } }}
               className="cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
             >
               <CardHeader className="space-y-3">

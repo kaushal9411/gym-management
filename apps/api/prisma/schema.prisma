@@ -287,6 +287,12 @@ model TenantSettings {
   /// immutable — a tenant-wide policy list here sidesteps needing to clone a
   /// system role just to flag it as MFA-required.
   mfaRequiredRoles          Json            @default("[]") @map("mfa_required_roles")
+  /// Dashboard "get your gym set up" checklist — Owner/Manager can dismiss
+  /// it permanently (also auto-hidden client-side once every item is
+  /// complete, but an explicit dismiss should stick even if they never
+  /// finish every item). Not part of `ResolvedTenant`/the tenant-resolve
+  /// cache, so no `tenantService.invalidateCache` call is needed on write.
+  onboardingChecklistDismissed Boolean      @default(false) @map("onboarding_checklist_dismissed")
   createdAt                 DateTime        @default(now()) @map("created_at")
   updatedAt                 DateTime        @updatedAt @map("updated_at")
 

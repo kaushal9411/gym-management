@@ -39,6 +39,22 @@ export async function getBranchAccess(tenantId: string, userId: string): Promise
  * Requests without a branchId pass through — list endpoints scope their
  * own queries via getBranchAccess instead.
  */
+/**
+ * Entity-scoped branch check for service methods that operate on a record
+ * already fetched by ID (`GET/PATCH/DELETE /members/:id`, etc.) — the
+ * request itself carries no `branchId` for `requireBranchAccess` (a
+ * route-level, request-param-only check) to see, so those routes need this
+ * instead: fetch the record, then assert the actor can reach ITS branch.
+ * Found missing during a QA pass (Prompt 48) — a Receptionist scoped to one
+ * branch could freely view/edit/pay for a member registered at another.
+ */
+export async function assertBranchAccess(tenantId: string, userId: string, branchId: string): Promise<void> {
+  const access = await getBranchAccess(tenantId, userId);
+  if (!access.allBranches && !access.branchIds.includes(branchId)) {
+    throw new ForbiddenError('You do not have access to this branch.');
+  }
+}
+
 export function requireBranchAccess(paramName = 'branchId') {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {

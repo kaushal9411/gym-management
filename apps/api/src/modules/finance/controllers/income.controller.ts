@@ -11,11 +11,11 @@ function serviceFor(req: Request): IncomeService {
 
 export class IncomeController {
   async list(req: Request, res: Response): Promise<void> {
-    sendSuccess(res, await serviceFor(req).list(req.query as unknown as ListIncomeQuery));
+    sendSuccess(res, await serviceFor(req).list(req.query as unknown as ListIncomeQuery, req.auth!.sub));
   }
 
   async getById(req: Request, res: Response): Promise<void> {
-    sendSuccess(res, await serviceFor(req).getById(req.params.id!));
+    sendSuccess(res, await serviceFor(req).getById(req.params.id!, req.auth!.sub));
   }
 
   async create(req: Request, res: Response): Promise<void> {
@@ -34,7 +34,7 @@ export class IncomeController {
   }
 
   async exportCsv(req: Request, res: Response): Promise<void> {
-    const csv = await serviceFor(req).exportCsv(req.query as unknown as Partial<ListIncomeQuery>);
+    const csv = await serviceFor(req).exportCsv(req.query as unknown as Partial<ListIncomeQuery>, req.auth!.sub);
     res
       .status(200)
       .setHeader('Content-Type', 'text/csv; charset=utf-8')
@@ -43,7 +43,7 @@ export class IncomeController {
   }
 
   async exportExcel(req: Request, res: Response): Promise<void> {
-    const buffer = await serviceFor(req).exportExcel(req.query as unknown as Partial<ListIncomeQuery>);
+    const buffer = await serviceFor(req).exportExcel(req.query as unknown as Partial<ListIncomeQuery>, req.auth!.sub);
     res
       .status(200)
       .setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

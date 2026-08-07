@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
+import { notifyProgrammaticNavigation } from '@/components/navigation-progress-provider';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -49,7 +50,7 @@ export default function TicketDetailPage() {
           <h1 className="text-2xl font-semibold tracking-tight">{ticket.subject}</h1>
           <p className="text-muted-foreground">{ticket.createdByEmail} · {ticket.tenant?.name ?? 'No tenant'} · {ticket.priority}</p>
         </div>
-        <Button variant="outline" onClick={() => router.push('/support')}>Back to tickets</Button>
+        <Button variant="outline" onClick={() => { notifyProgrammaticNavigation('/support'); router.push('/support'); }}>Back to tickets</Button>
       </div>
 
       <div className="flex flex-wrap gap-2">

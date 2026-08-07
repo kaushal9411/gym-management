@@ -7,6 +7,7 @@ import { Building2, Copy, Globe, Mail, MapPin, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table';
+import { notifyProgrammaticNavigation } from '@/components/navigation-progress-provider';
 import { Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -328,7 +329,7 @@ export default function TenantDetailPage() {
             </div>
           </div>
         </div>
-        <Button variant="outline" onClick={() => router.push('/tenants')}>Back to tenants</Button>
+        <Button variant="outline" onClick={() => { notifyProgrammaticNavigation('/tenants'); router.push('/tenants'); }}>Back to tenants</Button>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -356,7 +357,7 @@ export default function TenantDetailPage() {
           variant="destructive"
           onClick={() => {
             if (!window.confirm(`Delete ${tenant.name}? This is a soft delete.`)) return;
-            remove.mutate(params.tenantId, { onSuccess: () => router.push('/tenants') });
+            remove.mutate(params.tenantId, { onSuccess: () => { notifyProgrammaticNavigation('/tenants'); router.push('/tenants'); } });
           }}
           disabled={remove.isPending}
         >

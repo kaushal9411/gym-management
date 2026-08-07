@@ -31,11 +31,11 @@ function gdprServiceFor(req: Request): MemberGdprService {
 
 export class MemberController {
   async list(req: Request, res: Response): Promise<void> {
-    sendSuccess(res, await serviceFor(req).list(req.query as unknown as ListMembersQuery));
+    sendSuccess(res, await serviceFor(req).list(req.query as unknown as ListMembersQuery, req.auth!.sub));
   }
 
   async getById(req: Request, res: Response): Promise<void> {
-    sendSuccess(res, await serviceFor(req).getById(req.params.id!));
+    sendSuccess(res, await serviceFor(req).getById(req.params.id!, req.auth!.sub));
   }
 
   async create(req: Request, res: Response): Promise<void> {
@@ -134,7 +134,7 @@ export class MemberController {
   }
 
   async listDocuments(req: Request, res: Response): Promise<void> {
-    sendSuccess(res, await serviceFor(req).listDocuments(req.params.id!));
+    sendSuccess(res, await serviceFor(req).listDocuments(req.params.id!, req.auth!.sub));
   }
 
   async uploadDocument(req: Request, res: Response): Promise<void> {
@@ -148,7 +148,7 @@ export class MemberController {
   }
 
   async exportCsv(req: Request, res: Response): Promise<void> {
-    const csv = await serviceFor(req).exportCsv();
+    const csv = await serviceFor(req).exportCsv(req.auth!.sub);
     res
       .status(200)
       .setHeader('Content-Type', 'text/csv; charset=utf-8')

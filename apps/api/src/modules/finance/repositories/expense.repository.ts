@@ -10,11 +10,20 @@ const INCLUDE = {
 
 export type ExpenseRow = Prisma.ExpenseGetPayload<{ include: typeof INCLUDE }>;
 
-function buildWhere(tenantId: string, query: Partial<ListExpensesQuery>): Prisma.ExpenseWhereInput {
+/** `branchId` is nullable on Expense (tenant-wide entries) — a branch-restricted actor can still see those, just not another branch's. */
+function buildWhere(tenantId: string, query: Partial<ListExpensesQuery>, restrictToBranchIds?: string[]): Prisma.ExpenseWhereInput {
   const where: Prisma.ExpenseWhereInput = { tenantId };
   if (!query.includeDeleted) where.deletedAt = null;
   if (query.category) where.category = query.category;
-  if (query.branchId) where.branchId = query.branchId;
+  if (restrictToBranchIds) {
+    if (query.branchId) {
+      where.branchId = restrictToBranchIds.includes(query.branchId) ? query.branchId : { in: [] };
+    } else {
+      where.OR = [{ branchId: null }, { branchId: { in: restrictToBranchIds } }];
+    }
+  } else if (query.branchId) {
+    where.branchId = query.branchId;
+  }
   if (query.dateFrom || query.dateTo) {
     where.expenseDate = {};
     if (query.dateFrom) where.expenseDate.gte = new Date(query.dateFrom);
@@ -27,8 +36,8 @@ function buildWhere(tenantId: string, query: Partial<ListExpensesQuery>): Prisma
 export class ExpenseRepository {
   constructor(private readonly db: TenantScopedPrisma) {}
 
-  async list(tenantId: string, query: ListExpensesQuery): Promise<{ items: ExpenseRow[]; total: number }> {
-    const where = buildWhere(tenantId, query);
+  async list(tenantId: string, query: ListExpensesQuery, restrictToBranchIds?: string[]): Promise<{ items: ExpenseRow[]; total: number }> {
+    const where = buildWhere(tenantId, query, restrictToBranchIds);
     const [items, total] = await Promise.all([
       this.db.expense.findMany({
         where,

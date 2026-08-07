@@ -22,6 +22,19 @@ const SAFETY_TIMEOUT_MS = 20_000;
 
 let historyPatched = false;
 
+let latestNotifyStart: ((targetUrl?: string | URL | null) => void) | null = null;
+
+/**
+ * Ported from tenant-web's identical provider — see that file for the full
+ * write-up. For a `router.push()` triggered by something other than a real
+ * `<a href>` click (a `<button>`, a table row, a toast action's `onClick`),
+ * call this immediately before the `router.push()` to get the same early,
+ * generation-tracked loader signal a real link click gets for free.
+ */
+export function notifyProgrammaticNavigation(targetUrl?: string | URL | null): void {
+  latestNotifyStart?.(targetUrl);
+}
+
 /**
  * `pushState`/`replaceState`'s third argument is the target URL — `null`/
  * `undefined` means "keep the current URL," exactly what `router.refresh()`
@@ -114,6 +127,7 @@ export function NavigationProgressProvider({ children }: { children: React.React
 
   const notifyStartRef = React.useRef(notifyStart);
   notifyStartRef.current = notifyStart;
+  latestNotifyStart = notifyStart;
 
   // Patch history exactly once for the page's lifetime — see doc comment above for why this is split from the listener effect below.
   React.useEffect(() => {

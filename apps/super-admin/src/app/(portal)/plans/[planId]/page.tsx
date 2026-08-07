@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Check, Copy, CreditCard, X } from 'lucide-react';
 
 import { DataTable, type DataTableColumn } from '@/components/data-table';
+import { notifyProgrammaticNavigation } from '@/components/navigation-progress-provider';
 import { Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -232,7 +233,7 @@ export default function PlanDetailPage() {
       header: '',
       render: (s) => (
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => router.push(`/tenants/${s.tenant.id}`)}>
+          <Button size="sm" variant="outline" onClick={() => { notifyProgrammaticNavigation(`/tenants/${s.tenant.id}`); router.push(`/tenants/${s.tenant.id}`); }}>
             View tenant
           </Button>
           {canManageBilling ? (
@@ -267,7 +268,7 @@ export default function PlanDetailPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push('/plans')}>Back to plans</Button>
+          <Button variant="outline" onClick={() => { notifyProgrammaticNavigation('/plans'); router.push('/plans'); }}>Back to plans</Button>
           <Button onClick={openEdit}>Edit plan</Button>
         </div>
       </div>

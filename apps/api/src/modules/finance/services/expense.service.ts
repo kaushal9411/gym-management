@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import { NotFoundError } from '../../../core/errors/app-error';
 import { isDataUrl, presignGetUrl, uploadDataUrl } from '../../../core/storage/storage.service';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
+import { assertBranchAccess, getBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
 import type { CreateExpenseInput, ExpenseDto, ListExpensesQuery, UpdateExpenseInput } from '../dto/finance.dto';
@@ -40,16 +41,18 @@ export class ExpenseService {
     this.auditLog = new AuditLogRepository(db);
   }
 
-  async list(query: ListExpensesQuery) {
-    const { items, total } = await this.expenses.list(this.tenantId, query);
+  async list(query: ListExpensesQuery, actorUserId: string) {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { items, total } = await this.expenses.list(this.tenantId, query, restrictToBranchIds);
     return { items: await Promise.all(items.map(toDto)), total, page: query.page, limit: query.limit, totalPages: Math.max(1, Math.ceil(total / query.limit)) };
   }
 
-  async getById(id: string): Promise<ExpenseDto> {
-    return toDto(await this.mustFind(id));
+  async getById(id: string, actorUserId: string): Promise<ExpenseDto> {
+    return toDto(await this.mustFind(id, actorUserId));
   }
 
   async create(input: CreateExpenseInput, actor: IamActor): Promise<ExpenseDto> {
+    if (input.branchId) await assertBranchAccess(this.tenantId, actor.userId, input.branchId);
     const receiptDataUrl = isDataUrl(input.receiptDataUrl)
       ? await uploadDataUrl(input.receiptDataUrl, { keyPrefix: 'expense-receipts', visibility: 'private', accept: ['image', 'pdf'] })
       : input.receiptDataUrl;
@@ -69,7 +72,8 @@ export class ExpenseService {
   }
 
   async update(id: string, input: UpdateExpenseInput, actor: IamActor): Promise<ExpenseDto> {
-    await this.mustFind(id);
+    await this.mustFind(id, actor.userId);
+    if (input.branchId) await assertBranchAccess(this.tenantId, actor.userId, input.branchId);
     const receiptDataUrl = isDataUrl(input.receiptDataUrl)
       ? await uploadDataUrl(input.receiptDataUrl, { keyPrefix: 'expense-receipts', visibility: 'private', accept: ['image', 'pdf'] })
       : input.receiptDataUrl;
@@ -83,24 +87,22 @@ export class ExpenseService {
       receiptDataUrl,
     });
     await this.audit(actor, 'expense.updated', id);
-    return this.getById(id);
+    return this.getById(id, actor.userId);
   }
 
   async softDelete(id: string, actor: IamActor): Promise<void> {
-    await this.mustFind(id);
+    await this.mustFind(id, actor.userId);
     await this.expenses.softDelete(id);
     await this.audit(actor, 'expense.deleted', id);
   }
 
-  async exportCsv(query: Partial<ListExpensesQuery>): Promise<string> {
-    const { items } = await this.expenses.list(this.tenantId, {
-      page: 1,
-      limit: 10_000,
-      includeDeleted: false,
-      sortBy: 'expenseDate',
-      sortDir: 'desc',
-      ...query,
-    });
+  async exportCsv(query: Partial<ListExpensesQuery>, actorUserId: string): Promise<string> {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { items } = await this.expenses.list(
+      this.tenantId,
+      { page: 1, limit: 10_000, includeDeleted: false, sortBy: 'expenseDate', sortDir: 'desc', ...query },
+      restrictToBranchIds,
+    );
     const header = 'Date,Category,Amount,Branch,Description,Receipt';
     const rows = items.map((row) =>
       [
@@ -117,15 +119,13 @@ export class ExpenseService {
     return [header, ...rows].join('\n');
   }
 
-  async exportExcel(query: Partial<ListExpensesQuery>): Promise<ExcelJS.Buffer> {
-    const { items } = await this.expenses.list(this.tenantId, {
-      page: 1,
-      limit: 10_000,
-      includeDeleted: false,
-      sortBy: 'expenseDate',
-      sortDir: 'desc',
-      ...query,
-    });
+  async exportExcel(query: Partial<ListExpensesQuery>, actorUserId: string): Promise<ExcelJS.Buffer> {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { items } = await this.expenses.list(
+      this.tenantId,
+      { page: 1, limit: 10_000, includeDeleted: false, sortBy: 'expenseDate', sortDir: 'desc', ...query },
+      restrictToBranchIds,
+    );
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Expenses');
     sheet.columns = [
@@ -152,10 +152,16 @@ export class ExpenseService {
 
   // ── internals ───────────────────────────────────────────────────────────
 
-  private async mustFind(id: string, opts?: { includeDeleted?: boolean }): Promise<ExpenseRow> {
+  private async mustFind(id: string, actorUserId: string, opts?: { includeDeleted?: boolean }): Promise<ExpenseRow> {
     const expense = await this.expenses.findById(this.tenantId, id, opts);
     if (!expense) throw new NotFoundError('Expense not found.');
+    if (expense.branchId) await assertBranchAccess(this.tenantId, actorUserId, expense.branchId);
     return expense;
+  }
+
+  private async resolveBranchRestriction(actorUserId: string): Promise<string[] | undefined> {
+    const access = await getBranchAccess(this.tenantId, actorUserId);
+    return access.allBranches ? undefined : access.branchIds;
   }
 
   private async audit(actor: IamActor, action: string, entityId: string): Promise<void> {

@@ -46,6 +46,7 @@ import { memberPortalRouter } from '../../modules/member-portal/routes/member-po
 import { memberRouter } from '../../modules/members/routes/member.routes';
 import { membershipPlanRouter } from '../../modules/members/routes/membership-plan.routes';
 import { onboardingRouter } from '../../modules/onboarding/routes/onboarding.routes';
+import { onboardingChecklistRouter } from '../../modules/onboarding-checklist/routes/onboarding-checklist.routes';
 import { paymentRouter } from '../../modules/payment/routes/payment.routes';
 import { permissionRouter } from '../../modules/permissions/routes/permission.routes';
 import { profileRouter } from '../../modules/profile/routes/profile.routes';
@@ -126,6 +127,7 @@ v1Router.use('/sessions', sessionRouter);
 v1Router.use('/profile', profileRouter);
 v1Router.use('/audit-logs', auditLogRouter);
 v1Router.use('/settings', settingsRouter);
+v1Router.use('/onboarding-checklist', onboardingChecklistRouter);
 v1Router.use('/staff', staffRouter);
 v1Router.use('/support/tickets', ticketRouter);
 v1Router.use('/members', memberRouter);

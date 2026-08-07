@@ -11,6 +11,7 @@ import { RecentActivity } from '@/features/dashboard/components/recent-activity'
 import { StatsGrid } from '@/features/dashboard/components/stats-grid';
 import { UpcomingBirthdays } from '@/features/dashboard/components/upcoming-birthdays';
 import { useCurrentUser } from '@/features/auth/hooks/use-current-user';
+import { OnboardingChecklistCard } from '@/features/onboarding-checklist/components/onboarding-checklist-card';
 import { useTenant } from '@/features/tenant/tenant-provider';
 
 // Global Loading & Performance Optimization (Prompt 23) — Recharts is a
@@ -81,6 +82,8 @@ export default function DashboardPage() {
           <DateRangeSelector />
         </div>
       </div>
+
+      <OnboardingChecklistCard />
 
       <StatsGrid />
       <ChartsGrid />

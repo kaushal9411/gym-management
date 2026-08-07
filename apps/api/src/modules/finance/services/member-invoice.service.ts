@@ -3,6 +3,7 @@ import PDFDocument from 'pdfkit';
 import { NotFoundError, ValidationError } from '../../../core/errors/app-error';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
+import { assertBranchAccess, getBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
 import { decryptMemberContactNullable } from '../../members/utils/member-pii.util';
@@ -74,13 +75,14 @@ export class MemberInvoiceService {
     this.auditLog = new AuditLogRepository(this.db);
   }
 
-  async list(query: ListInvoicesQuery) {
-    const { items, total } = await this.invoices.list(this.tenantId, query);
+  async list(query: ListInvoicesQuery, actorUserId: string) {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { items, total } = await this.invoices.list(this.tenantId, query, restrictToBranchIds);
     return { items: items.map(toListDto), total, page: query.page, limit: query.limit, totalPages: Math.max(1, Math.ceil(total / query.limit)) };
   }
 
-  async getById(id: string): Promise<MemberInvoiceDetailDto> {
-    return toDetailDto(await this.mustFind(id));
+  async getById(id: string, actorUserId: string): Promise<MemberInvoiceDetailDto> {
+    return toDetailDto(await this.mustFind(id, actorUserId));
   }
 
   /** Manual "Generate Invoice" — e.g. billing an upcoming renewal in advance, with no payment yet. */
@@ -88,6 +90,7 @@ export class MemberInvoiceService {
     const member = await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null } });
     if (!member) throw new NotFoundError('Member not found.');
     const branchId = input.branchId ?? member.branchId;
+    await assertBranchAccess(this.tenantId, actor.userId, branchId);
 
     const invoice = await this.createInvoiceRow(
       {
@@ -136,8 +139,35 @@ export class MemberInvoiceService {
   }
 
   /** "Download Invoice (PDF)" — a real binary PDF via pdfkit (the platform's own invoice module uses HTML-only since no renderer existed at the time; this module explicitly needs PDF per spec). */
-  async renderPdf(id: string, tenantName: string): Promise<Buffer> {
-    const invoice = toDetailDto(await this.mustFind(id));
+  async renderPdf(id: string, tenantName: string, actorUserId: string): Promise<Buffer> {
+    return this.renderPdfFor(toDetailDto(await this.mustFind(id, actorUserId)), tenantName);
+  }
+
+  // ── Member-portal self-view (Prompt 48) ─────────────────────────────────
+  // No branch check on any of these three — a member has an unconditional
+  // right to their own invoices, and `MemberPortalService` already scopes
+  // every call to `memberId` (an ownership check strictly narrower than
+  // "any invoice in a branch this actor can reach"). Mirrors
+  // `MemberService#getOwnProfile`'s same rationale/precedent.
+
+  async listOwn(query: ListInvoicesQuery) {
+    const { items, total } = await this.invoices.list(this.tenantId, query);
+    return { items: items.map(toListDto), total, page: query.page, limit: query.limit, totalPages: Math.max(1, Math.ceil(total / query.limit)) };
+  }
+
+  async getOwnById(id: string): Promise<MemberInvoiceDetailDto> {
+    const invoice = await this.invoices.findById(this.tenantId, id);
+    if (!invoice) throw new NotFoundError('Invoice not found.');
+    return toDetailDto(invoice);
+  }
+
+  async renderOwnPdf(id: string, tenantName: string): Promise<Buffer> {
+    const invoice = await this.invoices.findById(this.tenantId, id);
+    if (!invoice) throw new NotFoundError('Invoice not found.');
+    return this.renderPdfFor(toDetailDto(invoice), tenantName);
+  }
+
+  private renderPdfFor(invoice: MemberInvoiceDetailDto, tenantName: string): Promise<Buffer> {
     const money = (amount: string | number) => `$${Number(amount).toFixed(2)}`;
 
     return new Promise((resolve, reject) => {
@@ -192,7 +222,7 @@ export class MemberInvoiceService {
 
   /** "Email Invoice" — reuses the existing `enqueueEmail` queue; no attachment support exists in the mail infra, so this sends a summary with the key details rather than the PDF itself. */
   async email(id: string, actor: IamActor, overrideEmail?: string): Promise<void> {
-    const invoice = toDetailDto(await this.mustFind(id));
+    const invoice = toDetailDto(await this.mustFind(id, actor.userId));
     const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: invoice.member.id } }));
     const to = overrideEmail ?? member?.email;
     if (!to) throw new ValidationError('This member has no email on file — provide one explicitly.');
@@ -207,10 +237,16 @@ export class MemberInvoiceService {
 
   // ── internals ───────────────────────────────────────────────────────────
 
-  private async mustFind(id: string): Promise<MemberInvoiceDetailRow> {
+  private async mustFind(id: string, actorUserId: string): Promise<MemberInvoiceDetailRow> {
     const invoice = await this.invoices.findById(this.tenantId, id);
     if (!invoice) throw new NotFoundError('Invoice not found.');
+    await assertBranchAccess(this.tenantId, actorUserId, invoice.branch.id);
     return invoice;
+  }
+
+  private async resolveBranchRestriction(actorUserId: string): Promise<string[] | undefined> {
+    const access = await getBranchAccess(this.tenantId, actorUserId);
+    return access.allBranches ? undefined : access.branchIds;
   }
 
   private async createInvoiceRow(input: {

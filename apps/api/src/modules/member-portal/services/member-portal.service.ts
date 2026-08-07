@@ -45,7 +45,7 @@ export class MemberPortalService {
 
   /** Reuses the exact same DTO the staff-side member detail page renders — it's the member's own data, so nothing needs hiding. */
   async getProfile(memberId: string) {
-    return new MemberService(this.tenantId).getById(memberId);
+    return new MemberService(this.tenantId).getOwnProfile(memberId);
   }
 
   async getAttendance(memberId: string, pagination: { page: number; limit: number }) {
@@ -118,15 +118,15 @@ export class MemberPortalService {
   }
 
   async getInvoices(memberId: string, pagination: { page: number; limit: number }) {
-    return this.invoices.list({ page: pagination.page, limit: pagination.limit, memberId, sortBy: 'invoiceDate', sortDir: 'desc' });
+    return this.invoices.listOwn({ page: pagination.page, limit: pagination.limit, memberId, sortBy: 'invoiceDate', sortDir: 'desc' });
   }
 
   async downloadInvoicePdf(memberId: string, invoiceId: string): Promise<{ filename: string; content: Buffer }> {
-    const invoice = await this.invoices.getById(invoiceId);
+    const invoice = await this.invoices.getOwnById(invoiceId);
     if (invoice.member.id !== memberId) throw new NotFoundError('Invoice not found.');
     const tenant = await tenantService.resolveById(this.tenantId);
     if (!tenant) throw new AppError(ErrorCode.NOT_FOUND, 'Tenant not found.', 404);
-    const content = await this.invoices.renderPdf(invoiceId, tenant.name);
+    const content = await this.invoices.renderOwnPdf(invoiceId, tenant.name);
     return { filename: `${invoice.invoiceNumber}.pdf`, content };
   }
 

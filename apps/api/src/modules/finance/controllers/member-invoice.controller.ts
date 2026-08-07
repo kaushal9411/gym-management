@@ -11,11 +11,11 @@ function serviceFor(req: Request): MemberInvoiceService {
 
 export class MemberInvoiceController {
   async list(req: Request, res: Response): Promise<void> {
-    sendSuccess(res, await serviceFor(req).list(req.query as unknown as ListInvoicesQuery));
+    sendSuccess(res, await serviceFor(req).list(req.query as unknown as ListInvoicesQuery, req.auth!.sub));
   }
 
   async getById(req: Request, res: Response): Promise<void> {
-    sendSuccess(res, await serviceFor(req).getById(req.params.id!));
+    sendSuccess(res, await serviceFor(req).getById(req.params.id!, req.auth!.sub));
   }
 
   async generate(req: Request, res: Response): Promise<void> {
@@ -24,7 +24,7 @@ export class MemberInvoiceController {
   }
 
   async downloadPdf(req: Request, res: Response): Promise<void> {
-    const buffer = await serviceFor(req).renderPdf(req.params.id!, req.tenant!.name);
+    const buffer = await serviceFor(req).renderPdf(req.params.id!, req.tenant!.name, req.auth!.sub);
     res
       .status(200)
       .setHeader('Content-Type', 'application/pdf')

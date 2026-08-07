@@ -5,6 +5,7 @@ import { ErrorCode } from '../../../core/errors/error-codes';
 import { generateOpaqueToken } from '../../../core/security/token.util';
 import { isDataUrl, presignGetUrl, uploadDataUrl } from '../../../core/storage/storage.service';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
+import { assertBranchAccess, getBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
 import { MemberAuthService } from '../../member-auth/services/member-auth.service';
@@ -140,8 +141,9 @@ export class MemberService {
     this.auditLog = new AuditLogRepository(this.db);
   }
 
-  async list(query: ListMembersQuery) {
-    const { items, total } = await this.members.list(this.tenantId, query);
+  async list(query: ListMembersQuery, actorUserId: string) {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { items, total } = await this.members.list(this.tenantId, query, restrictToBranchIds);
     return {
       items: items.map(toListItem),
       total,
@@ -151,8 +153,22 @@ export class MemberService {
     };
   }
 
-  async getById(id: string): Promise<MemberDetailDto> {
-    return toDetail(await this.mustFind(id));
+  async getById(id: string, actorUserId: string): Promise<MemberDetailDto> {
+    return toDetail(await this.mustFind(id, actorUserId));
+  }
+
+  /**
+   * Member-portal self-view ONLY (`MemberPortalService#getProfile`) — no
+   * branch check. A member has an unconditional right to see their own
+   * record; `assertBranchAccess` is a staff-vs-member-record check via
+   * `getBranchAccess`'s `User`/`UserBranches` lookup, which doesn't apply
+   * here at all (the caller's id is a `Member`, not a `User`). Never call
+   * this for a staff-initiated lookup — use `getById` for that.
+   */
+  async getOwnProfile(id: string): Promise<MemberDetailDto> {
+    const member = await this.members.findDetail(this.tenantId, id);
+    if (!member) throw new NotFoundError('Member not found.');
+    return toDetail(member);
   }
 
   async create(input: CreateMemberInput, actor: IamActor): Promise<MemberDetailDto> {
@@ -160,6 +176,7 @@ export class MemberService {
     if (input.email) await this.assertEmailAvailable(input.email);
     if (input.phone) await this.assertPhoneAvailable(input.phone);
     await this.assertBranchExists(input.branchId);
+    await assertBranchAccess(this.tenantId, actor.userId, input.branchId);
     if (input.trainerId) await this.assertTrainerValid(input.trainerId);
 
     const memberCode = input.memberId
@@ -211,7 +228,7 @@ export class MemberService {
   }
 
   async update(id: string, input: UpdateMemberInput, actor: IamActor): Promise<MemberDetailDto> {
-    const existing = await this.mustFind(id);
+    const existing = await this.mustFind(id, actor.userId);
     if (input.email && input.email !== existing.email) await this.assertEmailAvailable(input.email);
     if (input.phone && input.phone !== existing.phone) await this.assertPhoneAvailable(input.phone);
     const memberCode =
@@ -249,23 +266,23 @@ export class MemberService {
       notes: input.notes,
     });
     await this.audit(actor, 'member.updated', id);
-    return this.getById(id);
+    return this.getById(id, actor.userId);
   }
 
   async activate(id: string, actor: IamActor): Promise<void> {
-    await this.mustFind(id);
+    await this.mustFind(id, actor.userId);
     await this.members.setStatus(id, 'ACTIVE');
     await this.audit(actor, 'member.activated', id);
   }
 
   async deactivate(id: string, actor: IamActor): Promise<void> {
-    await this.mustFind(id);
+    await this.mustFind(id, actor.userId);
     await this.members.setStatus(id, 'INACTIVE');
     await this.audit(actor, 'member.deactivated', id);
   }
 
   async freeze(id: string, input: FreezeMembershipInput, actor: IamActor): Promise<void> {
-    const member = await this.mustFind(id);
+    const member = await this.mustFind(id, actor.userId);
     if (member.status === 'FROZEN') throw new ConflictError(ErrorCode.CONFLICT, 'This member is already frozen.');
     const activeMembership = member.memberships.find((m) => m.status === 'ACTIVE');
     await this.memberships.createFreeze({
@@ -279,7 +296,7 @@ export class MemberService {
   }
 
   async unfreeze(id: string, actor: IamActor): Promise<void> {
-    const member = await this.mustFind(id);
+    const member = await this.mustFind(id, actor.userId);
     if (member.status !== 'FROZEN') throw new ConflictError(ErrorCode.CONFLICT, 'This member is not frozen.');
     const freeze = await this.memberships.findActiveFreeze(this.tenantId, id);
     if (freeze) await this.memberships.unfreeze(freeze.id);
@@ -288,13 +305,13 @@ export class MemberService {
   }
 
   async softDelete(id: string, actor: IamActor): Promise<void> {
-    await this.mustFind(id);
+    await this.mustFind(id, actor.userId);
     await this.members.softDelete(id);
     await this.audit(actor, 'member.deleted', id);
   }
 
   async restore(id: string, actor: IamActor): Promise<void> {
-    const member = await this.mustFind(id, { includeDeleted: true });
+    const member = await this.mustFind(id, actor.userId, { includeDeleted: true });
     if (member.deletedAt) {
       await this.members.restore(id);
     } else {
@@ -304,7 +321,7 @@ export class MemberService {
   }
 
   async assignMembership(id: string, input: AssignMembershipInput, actor: IamActor): Promise<MemberDetailDto> {
-    const member = await this.mustFind(id);
+    const member = await this.mustFind(id, actor.userId);
     const existingActive = member.memberships.find((m) => m.status === 'ACTIVE');
     if (existingActive) {
       throw new ConflictError(
@@ -337,11 +354,11 @@ export class MemberService {
       planName: plan.name,
       endDate: endDate.toISOString().slice(0, 10),
     });
-    return this.getById(id);
+    return this.getById(id, actor.userId);
   }
 
   async renewMembership(id: string, input: RenewMembershipInput, actor: IamActor): Promise<MemberDetailDto> {
-    const member = await this.mustFind(id);
+    const member = await this.mustFind(id, actor.userId);
     const current = member.memberships.find((m) => m.status === 'ACTIVE');
     if (!current) {
       throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has no active membership to renew — assign one first.', 422);
@@ -371,7 +388,7 @@ export class MemberService {
       endDate: endDate.toISOString().slice(0, 10),
       memberEmail: member.email,
     });
-    return this.getById(id);
+    return this.getById(id, actor.userId);
   }
 
   async upgradeMembership(id: string, input: UpgradeMembershipInput, actor: IamActor): Promise<MemberDetailDto> {
@@ -383,7 +400,7 @@ export class MemberService {
   }
 
   private async changePlan(id: string, planId: string, actor: IamActor, auditAction: string): Promise<MemberDetailDto> {
-    const member = await this.mustFind(id);
+    const member = await this.mustFind(id, actor.userId);
     const current = member.memberships.find((m) => m.status === 'ACTIVE');
     if (!current) {
       throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has no active membership to change — assign one first.', 422);
@@ -406,11 +423,11 @@ export class MemberService {
       autoRenew: current.autoRenew,
     });
     await this.audit(actor, auditAction, id);
-    return this.getById(id);
+    return this.getById(id, actor.userId);
   }
 
   async extendMembership(id: string, input: ExtendMembershipInput, actor: IamActor): Promise<MemberDetailDto> {
-    const member = await this.mustFind(id);
+    const member = await this.mustFind(id, actor.userId);
     const current = member.memberships.find((m) => m.status === 'ACTIVE');
     if (!current) {
       throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has no active membership to extend — assign one first.', 422);
@@ -421,18 +438,18 @@ export class MemberService {
       durationDays: current.durationDays + input.days,
     });
     await this.audit(actor, 'member.membership_extended', id);
-    return this.getById(id);
+    return this.getById(id, actor.userId);
   }
 
   async cancelMembership(id: string, input: CancelMembershipInput, actor: IamActor): Promise<MemberDetailDto> {
-    const member = await this.mustFind(id);
+    const member = await this.mustFind(id, actor.userId);
     const current = member.memberships.find((m) => m.status === 'ACTIVE');
     if (!current) {
       throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has no active membership to cancel.', 422);
     }
     await this.memberships.cancel(current.id);
     await this.audit(actor, 'member.membership_cancelled', id);
-    return this.getById(id);
+    return this.getById(id, actor.userId);
   }
 
   /** "Resume" is the Membership Plans module's name for what Prompt 14 called "unfreeze" — same underlying action. */
@@ -441,31 +458,35 @@ export class MemberService {
   }
 
   async transferBranch(id: string, input: TransferBranchInput, actor: IamActor): Promise<MemberDetailDto> {
-    await this.mustFind(id);
+    await this.mustFind(id, actor.userId);
     await this.assertBranchExists(input.branchId);
+    // The actor must also have access to the DESTINATION branch, not just
+    // the member's current one — otherwise a branch transfer becomes a way
+    // to move a member somewhere the actor themselves can't reach.
+    await assertBranchAccess(this.tenantId, actor.userId, input.branchId);
     await this.members.update(id, { branchId: input.branchId });
     await this.audit(actor, 'member.branch_transferred', id);
-    return this.getById(id);
+    return this.getById(id, actor.userId);
   }
 
   async assignTrainer(id: string, input: AssignTrainerInput, actor: IamActor): Promise<MemberDetailDto> {
-    await this.mustFind(id);
+    await this.mustFind(id, actor.userId);
     if (input.trainerId) await this.assertTrainerValid(input.trainerId);
     await this.members.update(id, { trainerId: input.trainerId });
     await this.audit(actor, 'member.trainer_assigned', id);
-    return this.getById(id);
+    return this.getById(id, actor.userId);
   }
 
   /** Staff-initiated — "Enable portal access" on the member detail page. The member sets their own password via the emailed activation link (member-auth module). */
   async sendPortalInvite(id: string, actor: IamActor): Promise<void> {
-    const member = await this.mustFind(id);
+    const member = await this.mustFind(id, actor.userId);
     if (!member.email) throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has no email on file — add one before enabling portal access.', 422);
     await new MemberAuthService(this.tenantId).createOrResendInvite(id, `${member.firstName} ${member.lastName}`.trim(), member.email);
     await this.audit(actor, 'member.portal_invite_sent', id);
   }
 
   async regenerateQrCode(id: string, actor: IamActor): Promise<{ qrCodeToken: string; qrCodeImageUrl: string }> {
-    await this.mustFind(id);
+    await this.mustFind(id, actor.userId);
     const qrCodeToken = generateOpaqueToken(16);
     const qrCodeImageUrl = await buildQrCode(this.tenantId, qrCodeToken);
     await this.members.update(id, { qrCodeToken, qrCodeImageUrl });
@@ -473,8 +494,8 @@ export class MemberService {
     return { qrCodeToken, qrCodeImageUrl };
   }
 
-  async listDocuments(id: string): Promise<MemberDocumentDto[]> {
-    await this.mustFind(id);
+  async listDocuments(id: string, actorUserId: string): Promise<MemberDocumentDto[]> {
+    await this.mustFind(id, actorUserId);
     const rows = await this.documents.list(this.tenantId, id);
     return Promise.all(
       rows.map(async (d) => ({
@@ -488,7 +509,7 @@ export class MemberService {
   }
 
   async uploadDocument(id: string, input: UploadDocumentInput, actor: IamActor): Promise<MemberDocumentDto> {
-    await this.mustFind(id);
+    await this.mustFind(id, actor.userId);
     // Documents (medical records, ID proof) are genuinely sensitive — stored
     // under the bucket's private/ prefix; `fileDataUrl` in the DB is a bare
     // object key from here on, never a directly-usable URL (see storage.service.ts).
@@ -511,7 +532,7 @@ export class MemberService {
   }
 
   async deleteDocument(id: string, documentId: string, actor: IamActor): Promise<void> {
-    await this.mustFind(id);
+    await this.mustFind(id, actor.userId);
     const doc = await this.documents.findById(this.tenantId, documentId);
     if (!doc || doc.memberId !== id) throw new NotFoundError('Document not found.');
     await this.documents.delete(documentId);
@@ -519,8 +540,9 @@ export class MemberService {
   }
 
   /** CSV export — Excel opens CSV natively. */
-  async exportCsv(): Promise<string> {
-    const rows = await this.members.listForExport(this.tenantId);
+  async exportCsv(actorUserId: string): Promise<string> {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const rows = await this.members.listForExport(this.tenantId, restrictToBranchIds);
     const header =
       'Member ID,First Name,Last Name,Email,Phone,Status,Branch,Trainer,Current Plan,Membership Status,Membership End Date,Joining Date';
     const escape = (value: string) => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
@@ -649,10 +671,17 @@ export class MemberService {
     return result;
   }
 
-  private async mustFind(id: string, opts?: { includeDeleted?: boolean }): Promise<MemberRow> {
+  private async mustFind(id: string, actorUserId: string, opts?: { includeDeleted?: boolean }): Promise<MemberRow> {
     const member = await this.members.findDetail(this.tenantId, id, opts);
     if (!member) throw new NotFoundError('Member not found.');
+    await assertBranchAccess(this.tenantId, actorUserId, member.branchId);
     return member;
+  }
+
+  /** `undefined` = unrestricted (allBranches staff) — matches `MemberRepository#list`/`listForExport`'s "omit to skip the filter" convention. */
+  private async resolveBranchRestriction(actorUserId: string): Promise<string[] | undefined> {
+    const access = await getBranchAccess(this.tenantId, actorUserId);
+    return access.allBranches ? undefined : access.branchIds;
   }
 
   private async mustFindPlan(planId: string) {

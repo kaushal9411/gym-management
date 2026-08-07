@@ -18,10 +18,18 @@ const DETAIL_INCLUDE = {
 export type MemberPaymentListRow = Prisma.MemberPaymentGetPayload<{ include: typeof LIST_INCLUDE }>;
 export type MemberPaymentDetailRow = Prisma.MemberPaymentGetPayload<{ include: typeof DETAIL_INCLUDE }>;
 
-function buildWhere(tenantId: string, query: Partial<ListPaymentsQuery>): Prisma.MemberPaymentWhereInput {
+function buildWhere(tenantId: string, query: Partial<ListPaymentsQuery>, restrictToBranchIds?: string[]): Prisma.MemberPaymentWhereInput {
   const where: Prisma.MemberPaymentWhereInput = { tenantId };
   if (query.memberId) where.memberId = query.memberId;
-  if (query.branchId) where.branchId = query.branchId;
+  if (restrictToBranchIds) {
+    where.branchId = query.branchId
+      ? restrictToBranchIds.includes(query.branchId)
+        ? query.branchId
+        : { in: [] }
+      : { in: restrictToBranchIds };
+  } else if (query.branchId) {
+    where.branchId = query.branchId;
+  }
   if (query.method) where.method = query.method;
   if (query.status) where.status = query.status;
   if (query.dateFrom || query.dateTo) {
@@ -44,8 +52,8 @@ function buildWhere(tenantId: string, query: Partial<ListPaymentsQuery>): Prisma
 export class MemberPaymentRepository {
   constructor(private readonly db: TenantScopedPrisma) {}
 
-  async list(tenantId: string, query: ListPaymentsQuery): Promise<{ items: MemberPaymentListRow[]; total: number }> {
-    const where = buildWhere(tenantId, query);
+  async list(tenantId: string, query: ListPaymentsQuery, restrictToBranchIds?: string[]): Promise<{ items: MemberPaymentListRow[]; total: number }> {
+    const where = buildWhere(tenantId, query, restrictToBranchIds);
     const [items, total] = await Promise.all([
       this.db.memberPayment.findMany({
         where,

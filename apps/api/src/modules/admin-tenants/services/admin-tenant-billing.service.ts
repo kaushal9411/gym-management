@@ -16,6 +16,7 @@ import { createPaymentLink, fetchPaymentLink, notifyPaymentLink } from '../../fi
 import { InvoiceService } from '../../invoice/services/invoice.service';
 import { addBillingPeriod } from '../../onboarding/utils/billing-period';
 import { SubscriptionRepository } from '../../subscription/repositories/subscription.repository';
+import { tenantService } from '../../tenants/service/tenant.service';
 import { adminTenantRepository } from '../repositories/admin-tenant.repository';
 
 export type ChangePlanMode = 'manual' | 'payment_link';
@@ -347,8 +348,46 @@ export class AdminTenantBillingService {
     // tenantMiddleware gates every request on — must stay in lockstep.
     await this.db.tenant.update({ where: { id: this.tenantId }, data: { status: 'ACTIVE', subscriptionExpiresAt: null, suspendedAt: null } });
 
+    // A plan change is meaningless without this: TenantLimit is otherwise
+    // only ever written once, at provisioning (see
+    // tenant-provisioning.service.ts) — nothing else in the codebase ever
+    // updates it, so an upgrade/downgrade previously had zero effect on the
+    // tenant's actual enforced caps. Mirrors provisioning's own logic
+    // (update in place instead of create, since the row already exists).
+    await this.db.tenantLimit.update({
+      where: { tenantId: this.tenantId },
+      data: {
+        maxBranches: targetPlan.maxBranches,
+        maxManagers: targetPlan.maxManagers,
+        maxTrainers: targetPlan.maxTrainers,
+        maxReceptionists: targetPlan.maxReceptionists,
+        maxStaff: targetPlan.maxStaff,
+        maxMembers: targetPlan.maxMembers,
+        maxStorageMb: targetPlan.maxStorageMb,
+      },
+    });
+
+    // Same gap for feature-gated module visibility (`TenantModule.enabled`,
+    // read by tenantService as `ResolvedTenant.featureFlags`) — upsert
+    // rather than update since a target plan could reference a feature key
+    // that predates this tenant's TenantModule rows.
+    for (const feature of targetPlan.features) {
+      // eslint-disable-next-line no-await-in-loop -- plan feature lists are small (~25 rows) and this only runs on the rare admin plan-change action, not a request-path hot loop
+      await this.db.tenantModule.upsert({
+        where: { tenantId_key: { tenantId: this.tenantId, key: feature.key } },
+        create: { tenantId: this.tenantId, key: feature.key, enabled: feature.included },
+        update: { enabled: feature.included },
+      });
+    }
+
     const owner = await adminTenantRepository.findOwner(this.tenantId);
     const tenant = await adminTenantRepository.findById(this.tenantId);
+    // Both of the writes above (and the Tenant.status write before them) feed
+    // the same 5-minute cache-aside ResolvedTenant read every request goes
+    // through — without this, a plan change silently doesn't take effect
+    // until that cache expires (confirmed live: limits/featureFlags stayed
+    // on the old plan's values immediately after a downgrade).
+    if (tenant) await tenantService.invalidateCache(tenant.slug, this.tenantId);
     if (owner && tenant) {
       eventBus.emitEvent('billing.subscription_activated', {
         tenantId: this.tenantId,

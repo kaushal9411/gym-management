@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Building2, UserCog, Users } from 'lucide-react';
 
 import { SearchBar } from '@/components/ui/search-bar';
+import { notifyProgrammaticNavigation } from '@/components/navigation-progress-provider';
 import { useGlobalSearch } from '@/features/search/hooks/use-search';
 import type { GlobalSearchResultItem } from '@/features/search/types';
 import { useFilteredNav } from '@/features/navigation/use-filtered-nav';
@@ -35,6 +36,7 @@ export function GlobalSearch() {
   ].filter((group) => group.items.length > 0);
 
   const goTo = (href: string) => {
+    notifyProgrammaticNavigation(href);
     router.push(href);
     setQuery('');
   };

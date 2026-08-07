@@ -18,11 +18,11 @@ function serviceFor(req: Request): MemberPaymentService {
 
 export class MemberPaymentController {
   async list(req: Request, res: Response): Promise<void> {
-    sendSuccess(res, await serviceFor(req).list(req.query as unknown as ListPaymentsQuery));
+    sendSuccess(res, await serviceFor(req).list(req.query as unknown as ListPaymentsQuery, req.auth!.sub));
   }
 
   async getById(req: Request, res: Response): Promise<void> {
-    sendSuccess(res, await serviceFor(req).getById(req.params.id!));
+    sendSuccess(res, await serviceFor(req).getById(req.params.id!, req.auth!.sub));
   }
 
   async create(req: Request, res: Response): Promise<void> {
@@ -60,7 +60,7 @@ export class MemberPaymentController {
   }
 
   async exportCsv(req: Request, res: Response): Promise<void> {
-    const csv = await serviceFor(req).exportCsv(req.query as unknown as Partial<ListPaymentsQuery>);
+    const csv = await serviceFor(req).exportCsv(req.query as unknown as Partial<ListPaymentsQuery>, req.auth!.sub);
     res
       .status(200)
       .setHeader('Content-Type', 'text/csv; charset=utf-8')
@@ -69,7 +69,7 @@ export class MemberPaymentController {
   }
 
   async exportExcel(req: Request, res: Response): Promise<void> {
-    const buffer = await serviceFor(req).exportExcel(req.query as unknown as Partial<ListPaymentsQuery>);
+    const buffer = await serviceFor(req).exportExcel(req.query as unknown as Partial<ListPaymentsQuery>, req.auth!.sub);
     res
       .status(200)
       .setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

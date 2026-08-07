@@ -11,6 +11,7 @@ import { passwordResetEmail } from '../../../infrastructure/mail/templates/auth-
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
 import { VerificationRepository } from '../../authentication/repositories/verification.repository';
+import { tenantService } from '../../tenants/service/tenant.service';
 import { adminTenantRepository } from '../repositories/admin-tenant.repository';
 
 const PASSWORD_RESET_TOKEN_BYTES = 32;
@@ -53,6 +54,12 @@ export class AdminTenantService {
     const before = await this.getById(tenantId);
     const extra = status === 'SUSPENDED' ? { suspendedAt: new Date() } : { suspendedAt: null };
     await adminTenantRepository.updateStatus(tenantId, status, extra);
+    // Every tenant request resolves through a 5-minute cache-aside read
+    // (tenantMiddleware → tenantService.resolveBySlug) — without this, a
+    // suspend/reactivate doesn't take effect until that cache naturally
+    // expires (confirmed live: a suspended tenant's owner could still log
+    // in for several minutes). Must invalidate immediately.
+    await tenantService.invalidateCache(before.slug, tenantId);
 
     await adminAuditLogRepository.record({
       adminUserId,
@@ -66,8 +73,9 @@ export class AdminTenantService {
   }
 
   async softDelete(tenantId: string, adminUserId: string, adminRole: string): Promise<void> {
-    await this.getById(tenantId);
+    const before = await this.getById(tenantId);
     await adminTenantRepository.softDelete(tenantId);
+    await tenantService.invalidateCache(before.slug, tenantId);
     await adminAuditLogRepository.record({ adminUserId, actorRole: adminRole, action: 'admin.tenant_deleted', entityType: 'Tenant', entityId: tenantId });
   }
 

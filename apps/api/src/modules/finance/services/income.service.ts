@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 
 import { NotFoundError } from '../../../core/errors/app-error';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
+import { assertBranchAccess, getBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
 import type { CreateIncomeInput, IncomeDto, ListIncomeQuery, UpdateIncomeInput } from '../dto/finance.dto';
@@ -37,16 +38,18 @@ export class IncomeService {
     this.auditLog = new AuditLogRepository(db);
   }
 
-  async list(query: ListIncomeQuery) {
-    const { items, total } = await this.income.list(this.tenantId, query);
+  async list(query: ListIncomeQuery, actorUserId: string) {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { items, total } = await this.income.list(this.tenantId, query, restrictToBranchIds);
     return { items: items.map(toDto), total, page: query.page, limit: query.limit, totalPages: Math.max(1, Math.ceil(total / query.limit)) };
   }
 
-  async getById(id: string): Promise<IncomeDto> {
-    return toDto(await this.mustFind(id));
+  async getById(id: string, actorUserId: string): Promise<IncomeDto> {
+    return toDto(await this.mustFind(id, actorUserId));
   }
 
   async create(input: CreateIncomeInput, actor: IamActor): Promise<IncomeDto> {
+    if (input.branchId) await assertBranchAccess(this.tenantId, actor.userId, input.branchId);
     const income = await this.income.create({
       tenantId: this.tenantId,
       category: input.category,
@@ -61,10 +64,11 @@ export class IncomeService {
   }
 
   async update(id: string, input: UpdateIncomeInput, actor: IamActor): Promise<IncomeDto> {
-    const existing = await this.mustFind(id);
+    const existing = await this.mustFind(id, actor.userId);
     if (existing.sourcePaymentId) {
       throw new NotFoundError('This income entry was auto-generated from a payment and cannot be edited directly.');
     }
+    if (input.branchId) await assertBranchAccess(this.tenantId, actor.userId, input.branchId);
     await this.income.update(id, {
       category: input.category,
       amount: input.amount,
@@ -73,11 +77,11 @@ export class IncomeService {
       description: input.description,
     });
     await this.audit(actor, 'income.updated', id);
-    return this.getById(id);
+    return this.getById(id, actor.userId);
   }
 
   async softDelete(id: string, actor: IamActor): Promise<void> {
-    const existing = await this.mustFind(id);
+    const existing = await this.mustFind(id, actor.userId);
     if (existing.sourcePaymentId) {
       throw new NotFoundError('This income entry was auto-generated from a payment and cannot be deleted directly.');
     }
@@ -85,15 +89,13 @@ export class IncomeService {
     await this.audit(actor, 'income.deleted', id);
   }
 
-  async exportCsv(query: Partial<ListIncomeQuery>): Promise<string> {
-    const { items } = await this.income.list(this.tenantId, {
-      page: 1,
-      limit: 10_000,
-      includeDeleted: false,
-      sortBy: 'incomeDate',
-      sortDir: 'desc',
-      ...query,
-    });
+  async exportCsv(query: Partial<ListIncomeQuery>, actorUserId: string): Promise<string> {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { items } = await this.income.list(
+      this.tenantId,
+      { page: 1, limit: 10_000, includeDeleted: false, sortBy: 'incomeDate', sortDir: 'desc', ...query },
+      restrictToBranchIds,
+    );
     const header = 'Date,Category,Amount,Branch,Description';
     const rows = items.map((row) =>
       [row.incomeDate.toISOString().slice(0, 10), row.category, row.amount.toString(), row.branch?.name ?? '', row.description ?? '']
@@ -103,15 +105,13 @@ export class IncomeService {
     return [header, ...rows].join('\n');
   }
 
-  async exportExcel(query: Partial<ListIncomeQuery>): Promise<ExcelJS.Buffer> {
-    const { items } = await this.income.list(this.tenantId, {
-      page: 1,
-      limit: 10_000,
-      includeDeleted: false,
-      sortBy: 'incomeDate',
-      sortDir: 'desc',
-      ...query,
-    });
+  async exportExcel(query: Partial<ListIncomeQuery>, actorUserId: string): Promise<ExcelJS.Buffer> {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { items } = await this.income.list(
+      this.tenantId,
+      { page: 1, limit: 10_000, includeDeleted: false, sortBy: 'incomeDate', sortDir: 'desc', ...query },
+      restrictToBranchIds,
+    );
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Income');
     sheet.columns = [
@@ -136,10 +136,16 @@ export class IncomeService {
 
   // ── internals ───────────────────────────────────────────────────────────
 
-  private async mustFind(id: string, opts?: { includeDeleted?: boolean }): Promise<IncomeRow> {
+  private async mustFind(id: string, actorUserId: string, opts?: { includeDeleted?: boolean }): Promise<IncomeRow> {
     const income = await this.income.findById(this.tenantId, id, opts);
     if (!income) throw new NotFoundError('Income entry not found.');
+    if (income.branchId) await assertBranchAccess(this.tenantId, actorUserId, income.branchId);
     return income;
+  }
+
+  private async resolveBranchRestriction(actorUserId: string): Promise<string[] | undefined> {
+    const access = await getBranchAccess(this.tenantId, actorUserId);
+    return access.allBranches ? undefined : access.branchIds;
   }
 
   private async audit(actor: IamActor, action: string, entityId: string): Promise<void> {

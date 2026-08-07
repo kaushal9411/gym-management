@@ -31,16 +31,34 @@ export type MemberRow = Prisma.MemberGetPayload<{ include: typeof MEMBER_INCLUDE
  * matching is gone (name/Member ID search is unaffected). Confirmed
  * trade-off with the user before building field-level encryption.
  */
-function buildWhere(tenantId: string, query: Partial<ListMembersQuery>): Prisma.MemberWhereInput {
+/**
+ * `restrictToBranchIds` is the actor's OWN branch scope (omitted entirely
+ * for `allBranches` staff) — found missing during a QA pass (Prompt 48):
+ * without it, a single-branch-scoped Receptionist could list every
+ * member in the tenant, not just their own branch's, simply by omitting
+ * the `branchId` query filter. An explicit `query.branchId` outside the
+ * actor's own scope is intersected down to zero rows, not silently
+ * widened to "show everything" or ignored.
+ */
+function buildWhere(tenantId: string, query: Partial<ListMembersQuery>, restrictToBranchIds?: string[]): Prisma.MemberWhereInput {
   const where: Prisma.MemberWhereInput = { tenantId };
   if (!query.includeDeleted) where.deletedAt = null;
   if (query.status) where.status = query.status;
-  if (query.branchId) where.branchId = query.branchId;
   if (query.trainerId) where.trainerId = query.trainerId;
   if (query.membershipStatus) where.memberships = { some: { status: query.membershipStatus } };
   if (query.search) {
     const contains = { contains: query.search, mode: 'insensitive' as const };
     where.AND = [{ OR: [{ firstName: contains }, { lastName: contains }, { memberId: contains }] }];
+  }
+
+  if (restrictToBranchIds) {
+    where.branchId = query.branchId
+      ? restrictToBranchIds.includes(query.branchId)
+        ? query.branchId
+        : { in: [] }
+      : { in: restrictToBranchIds };
+  } else if (query.branchId) {
+    where.branchId = query.branchId;
   }
   return where;
 }
@@ -76,8 +94,8 @@ function encryptContact(
 export class MemberRepository {
   constructor(private readonly db: TenantScopedPrisma) {}
 
-  async list(tenantId: string, query: ListMembersQuery): Promise<{ items: MemberRow[]; total: number }> {
-    const where = buildWhere(tenantId, query);
+  async list(tenantId: string, query: ListMembersQuery, restrictToBranchIds?: string[]): Promise<{ items: MemberRow[]; total: number }> {
+    const where = buildWhere(tenantId, query, restrictToBranchIds);
     const orderBy: Prisma.MemberOrderByWithRelationInput =
       query.sortBy === 'name'
         ? { firstName: query.sortDir }
@@ -150,9 +168,9 @@ export class MemberRepository {
   }
 
   /** Unpaginated projection for CSV export (capped). */
-  async listForExport(tenantId: string, cap = 10_000): Promise<MemberRow[]> {
+  async listForExport(tenantId: string, restrictToBranchIds?: string[], cap = 10_000): Promise<MemberRow[]> {
     const rows = await this.db.member.findMany({
-      where: { tenantId, deletedAt: null },
+      where: { tenantId, deletedAt: null, ...(restrictToBranchIds ? { branchId: { in: restrictToBranchIds } } : {}) },
       include: MEMBER_INCLUDE,
       orderBy: { createdAt: 'asc' },
       take: cap,

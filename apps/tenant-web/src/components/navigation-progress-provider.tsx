@@ -29,6 +29,24 @@ const SAFETY_TIMEOUT_MS = 20_000;
 
 let historyPatched = false;
 
+let latestNotifyStart: ((targetUrl?: string | URL | null) => void) | null = null;
+
+/**
+ * For a `router.push()` triggered by something other than a real `<a href>`
+ * click — a `<button>`, a table row, a toast action's `onClick` — the
+ * capture-phase click listener below has nothing to attach to, so the
+ * loader would otherwise only appear once `pushState` fires deep inside the
+ * App Router's own navigation machinery (i.e. after the RSC fetch has
+ * already resolved — too late to show anything, reproducing the exact
+ * "click, nothing happens, then the page suddenly changes" gap this whole
+ * provider exists to close for `<Link>`s). Call this immediately before
+ * such a `router.push()` to get the same early, generation-tracked signal a
+ * real link click gets for free.
+ */
+export function notifyProgrammaticNavigation(targetUrl?: string | URL | null): void {
+  latestNotifyStart?.(targetUrl);
+}
+
 /**
  * `pushState`/`replaceState`'s third argument is the target URL — `null`/
  * `undefined` means "keep the current URL." A same-URL call is exactly
@@ -168,6 +186,7 @@ export function NavigationProgressProvider({ children }: { children: React.React
 
   const notifyStartRef = React.useRef(notifyStart);
   notifyStartRef.current = notifyStart;
+  latestNotifyStart = notifyStart;
 
   // Patch history exactly once for the page's lifetime — see doc comment above for why this is split from the listener effect below.
   React.useEffect(() => {

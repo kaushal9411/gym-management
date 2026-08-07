@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import { ConflictError, NotFoundError, ValidationError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
+import { assertBranchAccess, getBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
 import { decryptMemberContactNullable } from '../../members/utils/member-pii.util';
@@ -74,19 +75,21 @@ export class MemberPaymentService {
     this.auditLog = new AuditLogRepository(this.db);
   }
 
-  async list(query: ListPaymentsQuery) {
-    const { items, total } = await this.payments.list(this.tenantId, query);
+  async list(query: ListPaymentsQuery, actorUserId: string) {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { items, total } = await this.payments.list(this.tenantId, query, restrictToBranchIds);
     return { items: items.map(toListDto), total, page: query.page, limit: query.limit, totalPages: Math.max(1, Math.ceil(total / query.limit)) };
   }
 
-  async getById(id: string): Promise<MemberPaymentDetailDto> {
-    return toDetailDto(await this.mustFind(id));
+  async getById(id: string, actorUserId: string): Promise<MemberPaymentDetailDto> {
+    return toDetailDto(await this.mustFind(id, actorUserId));
   }
 
   async create(input: CreatePaymentInput, actor: IamActor): Promise<MemberPaymentDetailDto> {
     const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null } }));
     if (!member) throw new NotFoundError('Member not found.');
     const branchId = input.branchId ?? member.branchId;
+    await assertBranchAccess(this.tenantId, actor.userId, branchId);
 
     if (input.membershipId) {
       const membership = await this.db.membership.findFirst({ where: { tenantId: this.tenantId, id: input.membershipId, memberId: input.memberId } });
@@ -163,6 +166,7 @@ export class MemberPaymentService {
     if (notifyEmail && !member.email) throw new ValidationError('This member has no email on file — uncheck "Notify by email" or add one first.');
     if (notifySms && !member.phone) throw new ValidationError('This member has no phone on file — uncheck "Notify by SMS" or add one first.');
     const branchId = input.branchId ?? member.branchId;
+    await assertBranchAccess(this.tenantId, actor.userId, branchId);
 
     if (input.membershipId) {
       const membership = await this.db.membership.findFirst({ where: { tenantId: this.tenantId, id: input.membershipId, memberId: input.memberId } });
@@ -226,7 +230,7 @@ export class MemberPaymentService {
 
   /** Staff-triggered resend of Razorpay's own Payment Link notification (e.g. the member says they never got the SMS) — doesn't cancel/recreate the link. */
   async resendPaymentLinkNotification(id: string, input: ResendPaymentLinkNotificationInput, actor: IamActor): Promise<void> {
-    const payment = await this.mustFind(id);
+    const payment = await this.mustFind(id, actor.userId);
     if (payment.method !== 'ONLINE_GATEWAY' || payment.status !== 'PENDING' || !payment.transactionReference) {
       throw new ConflictError(ErrorCode.CONFLICT, 'This payment has no active payment link to resend.');
     }
@@ -235,7 +239,7 @@ export class MemberPaymentService {
   }
 
   async update(id: string, input: UpdatePaymentInput, actor: IamActor): Promise<MemberPaymentDetailDto> {
-    const existing = await this.mustFind(id);
+    const existing = await this.mustFind(id, actor.userId);
     if (existing.status === 'REFUNDED' || existing.status === 'PARTIALLY_REFUNDED') {
       throw new ConflictError(ErrorCode.CONFLICT, 'A refunded payment cannot be edited.');
     }
@@ -261,7 +265,7 @@ export class MemberPaymentService {
     });
     await this.audit(actor, 'member_payment.updated', id);
 
-    const updated = await this.mustFind(id);
+    const updated = await this.mustFind(id, actor.userId);
     if (!wasSuccess && updated.status === 'SUCCESS') {
       const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: updated.member.id } }));
       await this.onPaymentSucceeded(updated, member!, updated.branch.id);
@@ -270,7 +274,7 @@ export class MemberPaymentService {
   }
 
   async cancel(id: string, actor: IamActor): Promise<void> {
-    const payment = await this.mustFind(id);
+    const payment = await this.mustFind(id, actor.userId);
     if (payment.status === 'REFUNDED' || payment.status === 'PARTIALLY_REFUNDED') {
       throw new ConflictError(ErrorCode.CONFLICT, 'A refunded payment cannot be cancelled.');
     }
@@ -288,7 +292,7 @@ export class MemberPaymentService {
    * Payment Link and flips the payment to SUCCESS/FAILED accordingly.
    */
   async verifyStatus(id: string, actor: IamActor): Promise<{ status: MemberPaymentDetailRow['status']; verifiedAt: string }> {
-    const payment = await this.mustFind(id);
+    const payment = await this.mustFind(id, actor.userId);
     if (payment.method !== 'ONLINE_GATEWAY' || payment.status !== 'PENDING' || !payment.transactionReference) {
       return { status: payment.status, verifiedAt: new Date().toISOString() };
     }
@@ -298,7 +302,7 @@ export class MemberPaymentService {
     if (link.status === 'paid') {
       await this.payments.update(id, { status: 'SUCCESS', transactionReference: link.razorpayPaymentId ?? payment.transactionReference });
       await this.audit(actor, 'member_payment.payment_link_paid', id);
-      const updated = await this.mustFind(id);
+      const updated = await this.mustFind(id, actor.userId);
       const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: updated.member.id } }));
       await this.onPaymentSucceeded(updated, member!, updated.branch.id);
       return { status: 'SUCCESS', verifiedAt: new Date().toISOString() };
@@ -323,7 +327,7 @@ export class MemberPaymentService {
 
   /** "Refunds must create financial history" — always a NEW row, the original payment is never mutated beyond its status flag. */
   async refund(id: string, input: RefundPaymentInput, actor: IamActor): Promise<MemberPaymentDetailDto> {
-    const payment = await this.mustFind(id);
+    const payment = await this.mustFind(id, actor.userId);
     if (payment.status !== 'SUCCESS' && payment.status !== 'PARTIALLY_REFUNDED') {
       throw new ConflictError(ErrorCode.CONFLICT, 'Only a successful payment can be refunded.');
     }
@@ -352,8 +356,9 @@ export class MemberPaymentService {
     return toDetailDto((await this.payments.findById(this.tenantId, id))!);
   }
 
-  async exportCsv(query: Partial<ListPaymentsQuery>): Promise<string> {
-    const { items: rawItems } = await this.payments.list(this.tenantId, { page: 1, limit: 10_000, sortBy: 'paymentDate', sortDir: 'desc', ...query });
+  async exportCsv(query: Partial<ListPaymentsQuery>, actorUserId: string): Promise<string> {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { items: rawItems } = await this.payments.list(this.tenantId, { page: 1, limit: 10_000, sortBy: 'paymentDate', sortDir: 'desc', ...query }, restrictToBranchIds);
     const items = rawItems.map(toListDto);
     const escape = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
     const header = 'Payment Number,Member,Amount,Discount,Tax,Final Amount,Method,Payment Date,Status,Transaction Reference';
@@ -376,8 +381,9 @@ export class MemberPaymentService {
     return [header, ...rows].join('\n');
   }
 
-  async exportExcel(query: Partial<ListPaymentsQuery>): Promise<ExcelJS.Buffer> {
-    const { items: rawItems } = await this.payments.list(this.tenantId, { page: 1, limit: 10_000, sortBy: 'paymentDate', sortDir: 'desc', ...query });
+  async exportExcel(query: Partial<ListPaymentsQuery>, actorUserId: string): Promise<ExcelJS.Buffer> {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { items: rawItems } = await this.payments.list(this.tenantId, { page: 1, limit: 10_000, sortBy: 'paymentDate', sortDir: 'desc', ...query }, restrictToBranchIds);
     const items = rawItems.map(toListDto);
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Payments');
@@ -407,10 +413,16 @@ export class MemberPaymentService {
 
   // ── internals ───────────────────────────────────────────────────────────
 
-  private async mustFind(id: string): Promise<MemberPaymentDetailRow> {
+  private async mustFind(id: string, actorUserId: string): Promise<MemberPaymentDetailRow> {
     const payment = await this.payments.findById(this.tenantId, id);
     if (!payment) throw new NotFoundError('Payment not found.');
+    await assertBranchAccess(this.tenantId, actorUserId, payment.branch.id);
     return payment;
+  }
+
+  private async resolveBranchRestriction(actorUserId: string): Promise<string[] | undefined> {
+    const access = await getBranchAccess(this.tenantId, actorUserId);
+    return access.allBranches ? undefined : access.branchIds;
   }
 
   /**

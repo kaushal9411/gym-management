@@ -5,6 +5,7 @@ import bcrypt from '@node-rs/bcrypt';
 import { env } from '../../../config/env';
 import { AppError, ConflictError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
+import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
 import { adminUserRepository } from '../../admin-auth/repositories/admin-user.repository';
@@ -78,6 +79,10 @@ export class AdminRoleService {
 
   async setStatus(adminUserId: string, status: 'ACTIVE' | 'SUSPENDED' | 'DEACTIVATED', actorAdminId: string, actorRole: string) {
     const admin = await adminUserRepository.updateStatus(adminUserId, status);
+    // adminAuthenticateMiddleware caches live status for 30 min — without
+    // this, a suspended admin's already-issued access token kept working
+    // for the rest of its life instead of being rejected on the next request.
+    await cache.del(`admin-status:${adminUserId}`);
     await adminAuditLogRepository.record({ adminUserId: actorAdminId, actorRole, action: 'admin.admin_user_status_changed', entityType: 'AdminUser', entityId: adminUserId, after: { status } });
     return admin;
   }

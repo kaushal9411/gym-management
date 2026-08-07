@@ -15,6 +15,20 @@ function isPlatformOnlyPath(path: string): boolean {
 }
 
 /**
+ * Segment-boundary-safe prefix match — a plain `path.startsWith(prefix)`
+ * has no awareness of path segments, so a prefix like `/api/v1/onboarding`
+ * would ALSO match an unrelated route such as `/api/v1/onboarding-checklist`
+ * (confirmed live, Prompt 49 — a new route was silently treated as
+ * platform-plane/tenant-agnostic and its JWT's real `tenantId` no longer
+ * matched `req.tenant`, a confusing "Token does not match the current
+ * tenant" failure with no other obvious cause). Every prefix list below
+ * must be matched through this, not a bare `.startsWith`.
+ */
+function matchesPrefix(path: string, prefix: string): boolean {
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+/**
  * The billing rescue path: these areas stay reachable when the tenant's
  * trial/subscription has EXPIRED (not suspended), so an owner can log in
  * and pay their way back in. Everything else keeps returning 402.
@@ -29,7 +43,7 @@ const EXPIRY_EXEMPT_PREFIXES = [
 ];
 
 function isExpiryExemptPath(path: string): boolean {
-  return EXPIRY_EXEMPT_PREFIXES.some((prefix) => path.startsWith(prefix));
+  return EXPIRY_EXEMPT_PREFIXES.some((prefix) => matchesPrefix(path, prefix));
 }
 
 /**
@@ -66,7 +80,7 @@ export function tenantMiddleware(platformRoutePrefixes: string[]) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const isPlatformRoute =
-        isPlatformOnlyPath(req.path) || platformRoutePrefixes.some((prefix) => req.path.startsWith(prefix));
+        isPlatformOnlyPath(req.path) || platformRoutePrefixes.some((prefix) => matchesPrefix(req.path, prefix));
 
       // Platform routes (registration, health, docs) never resolve a tenant —
       // even if a stray X-Tenant-Slug header is present — since by definition
