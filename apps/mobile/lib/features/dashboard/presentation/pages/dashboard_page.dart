@@ -7,6 +7,7 @@ import '../../../../bloc/session/session_state.dart';
 import '../../../../theme/app_theme.dart';
 import '../../../../widgets/app_card.dart';
 import '../../../../widgets/app_top_bar.dart';
+import '../../../../widgets/kpi_tile.dart';
 import '../../../../widgets/sparkline_chart.dart';
 import '../../data/dashboard_models.dart';
 import '../../data/dashboard_repository.dart';
@@ -76,13 +77,22 @@ class _DashboardView extends StatelessWidget {
                       AppTopBar(
                         caption: 'All branches',
                         title: 'Overview',
-                        trailing: CircleAvatar(
-                          radius: 17,
-                          backgroundColor: colors.accentSoft,
+                        trailing: Container(
+                          width: 34,
+                          height: 34,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withValues(alpha: .18),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: .32),
+                              width: 1.5,
+                            ),
+                          ),
                           child: Text(
                             user?.initials ?? '?',
-                            style: TextStyle(
-                              color: colors.accent,
+                            style: const TextStyle(
+                              color: Colors.white,
                               fontWeight: FontWeight.w800,
                               fontSize: 12,
                             ),
@@ -90,36 +100,47 @@ class _DashboardView extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      GridView.count(
+                      GridView(
                         // Phone stays 2-up, exactly as designed; a tablet's
                         // extra width goes to more columns instead of
-                        // stretched tiles or empty side gutters.
-                        crossAxisCount: MediaQuery.sizeOf(context).width >= 900
-                            ? 4
-                            : MediaQuery.sizeOf(context).width >= 600
-                                ? 3
-                                : 2,
+                        // stretched tiles or empty side gutters. Tile
+                        // height is now fixed (mainAxisExtent) instead of
+                        // aspect-ratio-driven, so it no longer balloons as
+                        // columns get wider on a large tablet.
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        mainAxisSpacing: 10,
-                        crossAxisSpacing: 10,
-                        childAspectRatio: 1.5,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount:
+                              MediaQuery.sizeOf(context).width >= 900
+                                  ? 4
+                                  : MediaQuery.sizeOf(context).width >= 600
+                                      ? 3
+                                      : 2,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          mainAxisExtent: 138,
+                        ),
                         children: [
-                          _KpiTile(
+                          KpiTile(
                             label: 'Active members',
                             value: '${kpis.activeMembers}',
+                            icon: Icons.groups_outlined,
                           ),
-                          _KpiTile(
+                          KpiTile(
                             label: 'Check-ins today',
                             value: '${kpis.todaysAttendance}',
+                            icon: Icons.login,
                           ),
-                          _KpiTile(
+                          KpiTile(
                             label: 'Revenue (MTD)',
                             value: _formatCurrency(kpis.monthlyRevenue),
+                            icon: Icons.currency_rupee,
                           ),
-                          _KpiTile(
+                          KpiTile(
                             label: 'Expiring in 7d',
                             value: '${kpis.expiringMemberships}',
+                            icon: Icons.warning_amber_rounded,
+                            warn: true,
                             delta:
                                 kpis.expiringMemberships > 0 ? 'Review' : null,
                             deltaColor: colors.warning,
@@ -235,66 +256,6 @@ class _DashboardView extends StatelessWidget {
     if (value >= 100000) return '₹${(value / 100000).toStringAsFixed(1)}L';
     if (value >= 1000) return '₹${(value / 1000).toStringAsFixed(1)}K';
     return '₹${value.toStringAsFixed(0)}';
-  }
-}
-
-class _KpiTile extends StatelessWidget {
-  final String label;
-  final String value;
-  final String? delta;
-  final Color? deltaColor;
-
-  const _KpiTile({
-    required this.label,
-    required this.value,
-    this.delta,
-    this.deltaColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).extension<AppSemanticColors>()!;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
-      decoration: BoxDecoration(
-        border: Border.all(color: colors.border),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w800,
-              letterSpacing: .6,
-              color: colors.inkFaint,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: const TextStyle(
-              fontFamily: 'Bebas Neue',
-              fontSize: 26,
-              height: 1.0,
-            ),
-          ),
-          if (delta != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              delta!,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: deltaColor ?? colors.success,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
   }
 }
 

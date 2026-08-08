@@ -24,7 +24,11 @@ class AppCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: backgroundColor ?? colors.surface2,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor ?? colors.border),
+        // Real elevation instead of a flat hairline border — the border is
+        // now opt-in (pass borderColor) rather than always-on, since the
+        // shadow does the job of separating the card from the page.
+        border: borderColor != null ? Border.all(color: borderColor!) : null,
+        boxShadow: AppShadows.sm,
       ),
       child: child,
     );

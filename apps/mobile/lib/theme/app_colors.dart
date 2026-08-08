@@ -7,8 +7,10 @@ class AppColors {
 
   static const accentStaff = Color(0xFF2E56D6);
   static const accentStaffSoft = Color(0xFFE7EDFC);
+  static const accentStaffDeep = Color(0xFF16307E);
   static const accentMember = Color(0xFFD97A1F);
   static const accentMemberSoft = Color(0xFFFBEBD8);
+  static const accentMemberDeep = Color(0xFF8C4C10);
 
   static const success = Color(0xFF3F9142);
   static const successSoft = Color(0xFFE6F2E6);

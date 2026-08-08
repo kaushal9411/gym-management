@@ -12,6 +12,7 @@ class AppTheme {
         brightness: Brightness.light,
         accent: AppColors.accentStaff,
         accentSoft: AppColors.accentStaffSoft,
+        accentDeep: AppColors.accentStaffDeep,
         pageBg: AppColors.pageBgLight,
         surface: AppColors.surfaceLight,
         surface2: AppColors.surface2Light,
@@ -24,6 +25,7 @@ class AppTheme {
         brightness: Brightness.dark,
         accent: AppColors.accentMember,
         accentSoft: AppColors.accentMemberSoft,
+        accentDeep: AppColors.accentMemberDeep,
         pageBg: AppColors.pageBgDark,
         surface: AppColors.surfaceDark,
         surface2: AppColors.surface2Dark,
@@ -36,6 +38,7 @@ class AppTheme {
     required Brightness brightness,
     required Color accent,
     required Color accentSoft,
+    required Color accentDeep,
     required Color pageBg,
     required Color surface,
     required Color surface2,
@@ -161,6 +164,7 @@ class AppTheme {
         AppSemanticColors(
           accent: accent,
           accentSoft: accentSoft,
+          accentDeep: accentDeep,
           surface2: surface2,
           border: border,
           inkSoft: inkSoft,
@@ -183,6 +187,11 @@ class AppTheme {
 class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   final Color accent;
   final Color accentSoft;
+
+  /// A darker/deeper shade of [accent] used as the second stop of the
+  /// gradient header treatment (`AppTopBar`) — cobalt-deep for staff
+  /// screens, amber-deep for member screens.
+  final Color accentDeep;
   final Color surface2;
   final Color border;
   final Color inkSoft;
@@ -197,6 +206,7 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   const AppSemanticColors({
     required this.accent,
     required this.accentSoft,
+    required this.accentDeep,
     required this.surface2,
     required this.border,
     required this.inkSoft,
@@ -215,4 +225,20 @@ class AppSemanticColors extends ThemeExtension<AppSemanticColors> {
   @override
   AppSemanticColors lerp(ThemeExtension<AppSemanticColors>? other, double t) =>
       this;
+}
+
+/// Elevation scale ported from the reference design's `--shadow-sm`/
+/// `--shadow-md` CSS custom properties — a barely-there ambient shadow for
+/// resting surfaces (cards, KPI tiles) and a stronger one for surfaces that
+/// sit visually "above" the page (the gradient header bar).
+class AppShadows {
+  AppShadows._();
+
+  static const List<BoxShadow> sm = [
+    BoxShadow(color: Color(0x14000000), blurRadius: 10, offset: Offset(0, 2)),
+  ];
+
+  static const List<BoxShadow> md = [
+    BoxShadow(color: Color(0x22000000), blurRadius: 22, offset: Offset(0, 8)),
+  ];
 }

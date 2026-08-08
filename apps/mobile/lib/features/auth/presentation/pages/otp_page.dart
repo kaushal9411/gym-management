@@ -6,6 +6,7 @@ import '../../../../bloc/session/session_cubit.dart';
 import '../../../../bloc/session/session_state.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../theme/app_theme.dart';
+import '../../../../widgets/app_top_bar.dart';
 import '../../data/auth_repository.dart';
 import '../../data/login_result.dart';
 
@@ -68,62 +69,82 @@ class _OtpPageState extends State<OtpPage> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).extension<AppSemanticColors>()!;
     return Scaffold(
-      appBar: AppBar(),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 28),
+      body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 8),
-            Icon(Icons.shield_outlined, color: colors.accent, size: 34),
-            const SizedBox(height: 12),
-            const Text(
-              'Verify it\'s you',
-              style: TextStyle(fontFamily: 'Bebas Neue', fontSize: 26),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              widget.purpose == '2fa'
-                  ? "Enter the 6-digit code from your authenticator app"
-                  : "Enter the 6-digit code we emailed to ${widget.email}",
-              style: TextStyle(fontSize: 13, color: colors.inkFaint),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            TextField(
-              controller: _codeController,
-              keyboardType: TextInputType.text,
-              textAlign: TextAlign.center,
-              maxLength: 24,
-              onSubmitted: (_) => _verify(),
-              style: const TextStyle(
-                fontFamily: 'Bebas Neue',
-                fontSize: 22,
-                letterSpacing: 6,
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+              child: AppTopBar(
+                caption: 'Security',
+                title: 'Verify OTP',
+                showBackButton: true,
               ),
-              decoration: const InputDecoration(counterText: ''),
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                _error!,
-                style: TextStyle(color: colors.danger, fontSize: 13),
-              ),
-            ],
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: _loading ? null : _verify,
-              child: _loading
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 20),
+                    Icon(
+                      Icons.shield_outlined,
+                      color: colors.accent,
+                      size: 34,
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Verify it\'s you',
+                      style: TextStyle(fontFamily: 'Bebas Neue', fontSize: 26),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.purpose == '2fa'
+                          ? "Enter the 6-digit code from your authenticator app"
+                          : "Enter the 6-digit code we emailed to ${widget.email}",
+                      style: TextStyle(fontSize: 13, color: colors.inkFaint),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    TextField(
+                      controller: _codeController,
+                      keyboardType: TextInputType.text,
+                      textAlign: TextAlign.center,
+                      maxLength: 24,
+                      onSubmitted: (_) => _verify(),
+                      style: const TextStyle(
+                        fontFamily: 'Bebas Neue',
+                        fontSize: 22,
+                        letterSpacing: 6,
                       ),
-                    )
-                  : const Text('Verify & continue'),
+                      decoration: const InputDecoration(counterText: ''),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        _error!,
+                        style: TextStyle(color: colors.danger, fontSize: 13),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    ElevatedButton(
+                      onPressed: _loading ? null : _verify,
+                      child: _loading
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Verify & continue'),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
