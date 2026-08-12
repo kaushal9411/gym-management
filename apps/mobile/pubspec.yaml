@@ -29,6 +29,9 @@ dependencies:
   # Typography — Bricolage Grotesque + Hanken Grotesk (exact families used by the approved design)
   google_fonts: ^6.2.1
 
+  # QR check-in scanner (Receptionist front-desk flow)
+  mobile_scanner: ^5.2.3
+
 dev_dependencies:
   flutter_lints: ^5.0.0
   flutter_test:

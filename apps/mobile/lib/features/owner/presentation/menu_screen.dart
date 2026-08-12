@@ -64,6 +64,7 @@ const _sections = <String, List<_MenuEntry>>{
       icon: Icons.groups_outlined,
       title: 'Team & Access',
       subtitle: 'Staff, roles, permissions',
+      route: AppRoutes.roles,
     ),
   ],
   'Finance': [
@@ -83,6 +84,7 @@ const _sections = <String, List<_MenuEntry>>{
       icon: Icons.credit_card_outlined,
       title: 'Billing',
       subtitle: 'FitCloud subscription',
+      route: AppRoutes.billing,
     ),
   ],
   'Communication': [
@@ -90,23 +92,27 @@ const _sections = <String, List<_MenuEntry>>{
       icon: Icons.campaign_outlined,
       title: 'Announcements',
       subtitle: 'Published & drafts',
+      route: AppRoutes.announcements,
     ),
     _MenuEntry(
       icon: Icons.support_agent_outlined,
       title: 'Support',
       subtitle: 'Open tickets',
+      route: AppRoutes.support,
     ),
   ],
   'Administration': [
     _MenuEntry(
       icon: Icons.settings_outlined,
       title: 'Gym Settings',
-      subtitle: 'Profile, branding, security',
+      subtitle: 'Profile & business',
+      route: AppRoutes.gymSettings,
     ),
     _MenuEntry(
       icon: Icons.notifications_outlined,
       title: 'Notifications',
       subtitle: 'Unread alerts',
+      route: AppRoutes.notifications,
     ),
   ],
 };

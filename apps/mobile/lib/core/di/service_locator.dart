@@ -7,18 +7,32 @@ import '../../bloc/dashboard/dashboard_cubit.dart';
 import '../../bloc/finance/finance_summary_cubit.dart';
 import '../../bloc/session/session_cubit.dart';
 import '../../repositories/analytics_repository.dart';
+import '../../repositories/announcement_repository.dart';
+import '../../repositories/attendance_repository.dart';
 import '../../repositories/auth_repository.dart';
+import '../../repositories/billing_repository.dart';
 import '../../repositories/branch_repository.dart';
+import '../../repositories/class_session_repository.dart';
 import '../../repositories/dashboard_repository.dart';
 import '../../repositories/diet_plan_repository.dart';
+import '../../repositories/exercise_repository.dart';
 import '../../repositories/expense_repository.dart';
 import '../../repositories/finance_repository.dart';
+import '../../repositories/food_repository.dart';
+import '../../repositories/gym_settings_repository.dart';
 import '../../repositories/income_repository.dart';
+import '../../repositories/invoice_repository.dart';
 import '../../repositories/member_auth_repository.dart';
+import '../../repositories/member_portal_repository.dart';
+import '../../repositories/member_repository.dart';
 import '../../repositories/membership_plan_repository.dart';
 import '../../repositories/public_tenant_repository.dart';
 import '../../repositories/reports_repository.dart';
 import '../../repositories/scheduled_report_repository.dart';
+import '../../repositories/staff_repository.dart';
+import '../../repositories/support_ticket_repository.dart';
+import '../../repositories/tenant_notification_repository.dart';
+import '../../repositories/tenant_role_repository.dart';
 import '../../repositories/workout_plan_repository.dart';
 import '../network/auth_event_bus.dart';
 import '../network/dio_client.dart';
@@ -80,6 +94,48 @@ void setupServiceLocator() {
   );
   getIt.registerLazySingleton<ScheduledReportRepository>(
     () => ScheduledReportRepository(getIt()),
+  );
+  getIt.registerLazySingleton<TenantNotificationRepository>(
+    () => TenantNotificationRepository(getIt()),
+  );
+  getIt.registerLazySingleton<AnnouncementRepository>(
+    () => AnnouncementRepository(getIt()),
+  );
+  getIt.registerLazySingleton<SupportTicketRepository>(
+    () => SupportTicketRepository(getIt()),
+  );
+  getIt.registerLazySingleton<TenantRoleRepository>(
+    () => TenantRoleRepository(getIt()),
+  );
+  getIt.registerLazySingleton<BillingRepository>(
+    () => BillingRepository(getIt()),
+  );
+  getIt.registerLazySingleton<GymSettingsRepository>(
+    () => GymSettingsRepository(getIt()),
+  );
+  getIt.registerLazySingleton<StaffRepository>(
+    () => StaffRepository(getIt()),
+  );
+  getIt.registerLazySingleton<MemberRepository>(
+    () => MemberRepository(getIt()),
+  );
+  getIt.registerLazySingleton<AttendanceRepository>(
+    () => AttendanceRepository(getIt()),
+  );
+  getIt.registerLazySingleton<InvoiceRepository>(
+    () => InvoiceRepository(getIt()),
+  );
+  getIt.registerLazySingleton<ClassSessionRepository>(
+    () => ClassSessionRepository(getIt()),
+  );
+  getIt.registerLazySingleton<ExerciseRepository>(
+    () => ExerciseRepository(getIt()),
+  );
+  getIt.registerLazySingleton<FoodRepository>(
+    () => FoodRepository(getIt()),
+  );
+  getIt.registerLazySingleton<MemberPortalRepository>(
+    () => MemberPortalRepository(getIt()),
   );
 
   // Screen-scoped cubits — a fresh instance per screen, not app-wide state.
