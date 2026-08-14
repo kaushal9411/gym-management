@@ -82,6 +82,12 @@ const _sections = <String, List<_MenuEntry>>{
       route: AppRoutes.expenses,
     ),
     _MenuEntry(
+      icon: Icons.account_balance_wallet_outlined,
+      title: 'Payments',
+      subtitle: 'Member payment ledger',
+      route: AppRoutes.payments,
+    ),
+    _MenuEntry(
       icon: Icons.credit_card_outlined,
       title: 'Billing',
       subtitle: 'FitCloud subscription',
@@ -124,10 +130,10 @@ const _sections = <String, List<_MenuEntry>>{
   ],
 };
 
-/// Design frame "4a. Menu". Every section/tile from the design is wired to
-/// a real screen; `_MenuEntry.route` stays nullable so a future addition
-/// to `_sections` that isn't built yet degrades to an honest "coming soon"
-/// toast instead of a broken navigation.
+/// Design frame "4a. Menu". Every section/tile from the design is present
+/// and wired to a real screen. The `_MenuEntry.route == null` path (an
+/// honest "coming soon" toast rather than a fabricated screen) is kept for
+/// any tile added ahead of its module, but nothing uses it today.
 class MenuScreen extends StatelessWidget {
   const MenuScreen({super.key});
 

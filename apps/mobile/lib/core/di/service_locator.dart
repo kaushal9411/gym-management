@@ -139,6 +139,9 @@ void setupServiceLocator() {
   getIt.registerLazySingleton<FoodRepository>(
     () => FoodRepository(getIt()),
   );
+  getIt.registerLazySingleton<PaymentRepository>(
+    () => PaymentRepository(getIt()),
+  );
   getIt.registerLazySingleton<MemberPortalRepository>(
     () => MemberPortalRepository(getIt()),
   );
