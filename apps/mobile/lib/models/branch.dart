@@ -1,6 +1,49 @@
-/// Mirrors `BranchDto` (`apps/api/.../branches/dto/branch.dto.ts`). Only the
-/// address sub-fields the mobile screens actually render are kept typed;
-/// operating hours/holidays round-trip isn't needed until a screen displays them.
+const branchWeekdays = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday',
+];
+
+/// One weekday's `{open, close, closed}` — same shape at both the tenant
+/// and branch level (`operatingHoursDaySchema`).
+class DayHours {
+  const DayHours({this.open, this.close, this.closed = false});
+
+  final String? open;
+  final String? close;
+  final bool closed;
+
+  factory DayHours.fromJson(Map<String, dynamic> json) => DayHours(
+        open: json['open'] as String?,
+        close: json['close'] as String?,
+        closed: json['closed'] as bool? ?? false,
+      );
+
+  Map<String, dynamic> toJson() =>
+      {'open': open, 'close': close, 'closed': closed};
+}
+
+/// One `holidays[]` entry — `{date: 'YYYY-MM-DD', label?}`.
+class BranchHoliday {
+  const BranchHoliday({required this.date, this.label});
+
+  final String date;
+  final String? label;
+
+  factory BranchHoliday.fromJson(Map<String, dynamic> json) => BranchHoliday(
+        date: json['date'] as String,
+        label: json['label'] as String?,
+      );
+
+  Map<String, dynamic> toJson() =>
+      {'date': date, if (label != null && label!.isNotEmpty) 'label': label};
+}
+
+/// Mirrors `BranchDto` (`apps/api/.../branches/dto/branch.dto.ts`).
 class Branch {
   const Branch({
     required this.id,
@@ -16,6 +59,8 @@ class Branch {
     required this.timezone,
     required this.memberCount,
     required this.staffCount,
+    this.operatingHours = const {},
+    this.holidays = const [],
   });
 
   final String id;
@@ -31,6 +76,8 @@ class Branch {
   final String timezone;
   final int memberCount;
   final int staffCount;
+  final Map<String, DayHours> operatingHours;
+  final List<BranchHoliday> holidays;
 
   factory Branch.fromJson(Map<String, dynamic> json) => Branch(
         id: json['id'] as String,
@@ -46,5 +93,16 @@ class Branch {
         timezone: json['timezone'] as String? ?? 'UTC',
         memberCount: json['memberCount'] as int? ?? 0,
         staffCount: json['staffCount'] as int? ?? 0,
+        operatingHours: (json['operatingHours'] as Map<String, dynamic>?)?.map(
+              (k, v) => MapEntry(
+                k,
+                DayHours.fromJson(v as Map<String, dynamic>),
+              ),
+            ) ??
+            const {},
+        holidays: (json['holidays'] as List?)
+                ?.map((e) => BranchHoliday.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            const [],
       );
 }

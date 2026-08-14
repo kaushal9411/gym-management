@@ -45,10 +45,16 @@ const _entries = [
     subtitle: 'Mandatory 2FA roles',
     route: AppRoutes.securityPolicySettings,
   ),
+  _SettingsEntry(
+    icon: Icons.devices_outlined,
+    title: 'Sessions',
+    subtitle: 'Active devices',
+    route: AppRoutes.sessions,
+  ),
 ];
 
 /// Design frame "11. Gym settings" — the hub. Each row opens its own frame
-/// (11a–11d); this screen holds no fields of its own.
+/// (11a–11d, plus "11f. Sessions"); this screen holds no fields of its own.
 class GymSettingsScreen extends StatelessWidget {
   const GymSettingsScreen({super.key});
 

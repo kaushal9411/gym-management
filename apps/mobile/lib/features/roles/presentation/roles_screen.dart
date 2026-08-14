@@ -35,8 +35,8 @@ enum _RolesTab { matrix, roles }
 
 /// Design frame "13. Roles & permissions" — the Matrix/Roles toggle, with
 /// the matrix (Resource × role, ✓ / view / —) computed from each role's
-/// real permission keys. Still view-only: creating or editing custom roles
-/// has no mobile-facing endpoint in this pass.
+/// real permission keys. The "+" opens frame "13a. + Create role"
+/// (`RoleFormScreen`), which also handles editing an existing custom role.
 class RolesScreen extends StatefulWidget {
   const RolesScreen({super.key});
 
@@ -75,6 +75,15 @@ class _RolesScreenState extends State<RolesScreen> {
         backgroundColor: AppColors.bg,
         elevation: 0,
         title: Text('Roles & Permissions', style: AppText.display(size: 18)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_rounded),
+            tooltip: 'New role',
+            onPressed: () => context
+                .push(AppRoutes.roleForm)
+                .then((_) => _load()),
+          ),
+        ],
       ),
       body: SafeArea(
         top: false,

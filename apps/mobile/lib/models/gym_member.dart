@@ -51,7 +51,10 @@ class CurrentMembershipSummary {
 
 /// Mirrors `MemberListItemDto`/`MemberDetailDto` (`GET /members`,
 /// `/members/:id`) as one class, same pattern as [StaffMember] — list
-/// responses just leave detail-only fields null.
+/// responses just leave detail-only fields null. The personal/address/
+/// health fields (frames "7d"–"7f") are `MemberDetailDto`-only too, so a
+/// `GymMember` read off the list screen will have them null even though
+/// the member record itself may have real values.
 class GymMember {
   const GymMember({
     required this.id,
@@ -64,6 +67,24 @@ class GymMember {
     required this.trainer,
     required this.currentMembership,
     required this.joiningDate,
+    this.gender,
+    this.dateOfBirth,
+    this.bloodGroup,
+    this.height,
+    this.weight,
+    this.occupation,
+    this.addressLine,
+    this.city,
+    this.state,
+    this.country,
+    this.postalCode,
+    this.emergencyContactName,
+    this.emergencyContactPhone,
+    this.emergencyContactRelation,
+    this.medicalConditions,
+    this.allergies,
+    this.fitnessGoals,
+    this.notes,
   });
 
   final String id;
@@ -76,6 +97,24 @@ class GymMember {
   final MemberTrainerSummary? trainer;
   final CurrentMembershipSummary? currentMembership;
   final DateTime joiningDate;
+  final String? gender;
+  final String? dateOfBirth;
+  final String? bloodGroup;
+  final double? height;
+  final double? weight;
+  final String? occupation;
+  final String? addressLine;
+  final String? city;
+  final String? state;
+  final String? country;
+  final String? postalCode;
+  final String? emergencyContactName;
+  final String? emergencyContactPhone;
+  final String? emergencyContactRelation;
+  final String? medicalConditions;
+  final String? allergies;
+  final String? fitnessGoals;
+  final String? notes;
 
   factory GymMember.fromJson(Map<String, dynamic> json) => GymMember(
         id: json['id'] as String,
@@ -98,5 +137,24 @@ class GymMember {
                 json['currentMembership'] as Map<String, dynamic>,
               ),
         joiningDate: DateTime.parse(json['joiningDate'] as String),
+        gender: json['gender'] as String?,
+        dateOfBirth: json['dateOfBirth'] as String?,
+        bloodGroup: json['bloodGroup'] as String?,
+        height: (json['height'] as num?)?.toDouble(),
+        weight: (json['weight'] as num?)?.toDouble(),
+        occupation: json['occupation'] as String?,
+        addressLine: json['addressLine'] as String?,
+        city: json['city'] as String?,
+        state: json['state'] as String?,
+        country: json['country'] as String?,
+        postalCode: json['postalCode'] as String?,
+        emergencyContactName: json['emergencyContactName'] as String?,
+        emergencyContactPhone: json['emergencyContactPhone'] as String?,
+        emergencyContactRelation:
+            json['emergencyContactRelation'] as String?,
+        medicalConditions: json['medicalConditions'] as String?,
+        allergies: json['allergies'] as String?,
+        fitnessGoals: json['fitnessGoals'] as String?,
+        notes: json['notes'] as String?,
       );
 }

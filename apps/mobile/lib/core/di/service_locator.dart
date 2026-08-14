@@ -19,6 +19,7 @@ import '../../repositories/exercise_repository.dart';
 import '../../repositories/expense_repository.dart';
 import '../../repositories/finance_repository.dart';
 import '../../repositories/food_repository.dart';
+import '../../repositories/group_class_repository.dart';
 import '../../repositories/gym_settings_repository.dart';
 import '../../repositories/income_repository.dart';
 import '../../repositories/invoice_repository.dart';
@@ -127,6 +128,9 @@ void setupServiceLocator() {
   );
   getIt.registerLazySingleton<ClassSessionRepository>(
     () => ClassSessionRepository(getIt()),
+  );
+  getIt.registerLazySingleton<GroupClassRepository>(
+    () => GroupClassRepository(getIt()),
   );
   getIt.registerLazySingleton<ExerciseRepository>(
     () => ExerciseRepository(getIt()),

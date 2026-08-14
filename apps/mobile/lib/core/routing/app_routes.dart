@@ -13,6 +13,8 @@ class AppRoutes {
   static const branches = '/branches';
   static const branchDetail = '/branches/detail';
   static const branchForm = '/branches/form';
+  static const branchHours = '/branches/hours';
+  static const branchHolidays = '/branches/holidays';
 
   static const income = '/finance/income';
   static const incomeForm = '/finance/income/form';
@@ -35,31 +37,42 @@ class AppRoutes {
   static const scheduledReportForm = '/reports/scheduled/form';
 
   static const notifications = '/notifications';
+  static const notificationTemplates = '/notifications/templates';
+  static const editNotificationTemplate = '/notifications/templates/edit';
   static const announcements = '/announcements';
   static const announcementForm = '/announcements/form';
+  static const scheduleAnnouncement = '/announcements/schedule';
   static const support = '/support';
   static const supportTicketForm = '/support/form';
   static const supportTicketDetail = '/support/detail';
   static const roles = '/roles';
   static const roleDetail = '/roles/detail';
+  static const roleForm = '/roles/form';
   static const billing = '/billing';
   static const billingHistory = '/billing/history';
   static const gymSettings = '/settings';
   static const gymProfileSettings = '/settings/profile';
+  static const gymSocialSettings = '/settings/profile/social';
   static const brandingSettings = '/settings/branding';
   static const invoiceSettings = '/settings/invoice';
   static const securityPolicySettings = '/settings/security';
+  static const sessions = '/settings/sessions';
 
   static const finance = '/finance';
 
   static const staffForm = '/staff/form';
   static const staffDetail = '/staff/detail';
+  static const staffEditPersonal = '/staff/edit-personal';
+  static const staffEditEmployment = '/staff/edit-employment';
 
   static const memberForm = '/members/manage/form';
   static const memberDetail = '/members/manage/detail';
   static const memberRenew = '/members/manage/renew';
   static const memberFreeze = '/members/manage/freeze';
   static const memberUpgrade = '/members/manage/upgrade';
+  static const memberEditPersonal = '/members/manage/edit-personal';
+  static const memberEditAddress = '/members/manage/edit-address';
+  static const memberEditHealth = '/members/manage/edit-health';
 
   static const checkedIn = '/attendance/checked-in';
   static const searchMembers = '/attendance/search';
@@ -67,6 +80,8 @@ class AppRoutes {
   static const invoiceDetail = '/invoices/detail';
   static const classSessionDetail = '/classes/detail';
   static const classAddAttendee = '/classes/add-attendee';
+  static const classForm = '/classes/form';
+  static const classSchedule = '/classes/schedule';
   static const receptionistReports = '/reports/receptionist';
 
   // Trainer module (Chunk 4)

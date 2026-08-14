@@ -4,6 +4,7 @@ import '../core/network/api_exception.dart';
 import '../models/finance_summary.dart';
 import '../models/member_payment.dart';
 import '../models/member_summary.dart';
+import '../models/payment_link_result.dart';
 
 class FinanceRepository {
   FinanceRepository(this._dio);
@@ -52,6 +53,32 @@ class FinanceRepository {
         data: {'memberId': memberId, 'amount': amount, 'method': method},
       );
       return MemberPayment.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `POST /payments/razorpay/link` — staff never handle card details; the
+  /// payment row is created PENDING and the member pays via `shortUrl`.
+  Future<PaymentLinkResult> createPaymentLink({
+    required String memberId,
+    required double amount,
+    bool? notifyEmail,
+    bool? notifySms,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/payments/razorpay/link',
+        data: {
+          'memberId': memberId,
+          'amount': amount,
+          if (notifyEmail != null) 'notifyEmail': notifyEmail,
+          if (notifySms != null) 'notifySms': notifySms,
+        },
+      );
+      return PaymentLinkResult.fromJson(
         response.data!['data'] as Map<String, dynamic>,
       );
     } on DioException catch (e) {

@@ -16,9 +16,10 @@ import '../../../shared/widgets/app_state_views.dart';
 
 /// Design frame "8a. Branch detail". The design's "Capacity used 148/180"
 /// gauge is real here — `memberCount / capacity` from the live branch
-/// record — but the design's "Manager"/"Hours" detail rows are dropped:
-/// `BranchDto` has no manager assignment or business-hours summary field
-/// to show (operating hours exist but aren't in this simplified DTO read).
+/// record — but the design's "Manager" detail row is dropped: `BranchDto`
+/// has no manager-assignment field to show. Operating hours and holidays
+/// each get their own screen (frames "8c"/"8d") rather than a summary row
+/// here, since a weekday-by-weekday schedule doesn't compress into one line.
 class BranchDetailScreen extends StatefulWidget {
   const BranchDetailScreen({super.key, required this.branchId});
 
@@ -210,6 +211,32 @@ class _BranchDetailScreenState extends State<BranchDetailScreen> {
                 ),
               ),
             ],
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: AppButton(
+                label: 'Operating hours',
+                variant: AppButtonVariant.ghost,
+                size: AppButtonSize.small,
+                onPressed: () => context
+                    .push(AppRoutes.branchHours, extra: branch)
+                    .then((_) => _load()),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: AppButton(
+                label: 'Holidays',
+                variant: AppButtonVariant.ghost,
+                size: AppButtonSize.small,
+                onPressed: () => context
+                    .push(AppRoutes.branchHolidays, extra: branch)
+                    .then((_) => _load()),
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 10),

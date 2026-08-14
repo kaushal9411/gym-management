@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/tenant_role.dart';
 import '../../../repositories/tenant_role_repository.dart';
+import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
@@ -132,6 +135,16 @@ class _RoleDetailScreenState extends State<RoleDetailScreen> {
                 grouped[resource]!.map((key) => AppPill(label: key)).toList(),
           ),
           const SizedBox(height: 10),
+        ],
+        if (!role.isSystem) ...[
+          const SizedBox(height: 6),
+          AppButton(
+            label: 'Edit role',
+            size: AppButtonSize.small,
+            onPressed: () => context
+                .push(AppRoutes.roleForm, extra: role)
+                .then((_) => _load()),
+          ),
         ],
       ],
     );

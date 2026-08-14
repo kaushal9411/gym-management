@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/staff_member.dart';
@@ -23,6 +24,8 @@ const _roleTones = {
 /// (assigned clients / avg. progress) is Trainer-specific and would need
 /// cross-referencing workout/diet assignment data — omitted rather than
 /// faked; Contact + role/status + Edit role + Remove staff are all real.
+/// "Edit personal info" / "Edit employment details" open frames
+/// "5b-i"/"5b-ii" (`StaffEditPersonalScreen`/`StaffEditEmploymentScreen`).
 class StaffDetailScreen extends StatefulWidget {
   const StaffDetailScreen({super.key, required this.staffId});
 
@@ -250,6 +253,24 @@ class _StaffDetailScreenState extends State<StaffDetailScreen> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 8),
+        AppButton(
+          label: 'Edit personal info',
+          variant: AppButtonVariant.ghost,
+          size: AppButtonSize.small,
+          onPressed: () => context
+              .push(AppRoutes.staffEditPersonal, extra: staff)
+              .then((_) => _load()),
+        ),
+        const SizedBox(height: 8),
+        AppButton(
+          label: 'Edit employment details',
+          variant: AppButtonVariant.ghost,
+          size: AppButtonSize.small,
+          onPressed: () => context
+              .push(AppRoutes.staffEditEmployment, extra: staff)
+              .then((_) => _load()),
         ),
       ],
     );

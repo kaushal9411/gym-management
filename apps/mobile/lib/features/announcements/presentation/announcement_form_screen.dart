@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/announcement.dart';
@@ -23,7 +24,8 @@ class _AnnouncementFormScreenState extends State<AnnouncementFormScreen> {
   final _titleController = TextEditingController();
   final _bodyController = TextEditingController();
   AnnouncementAudience _audience = AnnouncementAudience.all;
-  bool _loading = false;
+  bool _publishingNow = false;
+  bool _schedulingNext = false;
   String? _error;
 
   @override
@@ -33,7 +35,10 @@ class _AnnouncementFormScreenState extends State<AnnouncementFormScreen> {
     super.dispose();
   }
 
-  Future<void> _submit() async {
+  /// Creates the draft, then either publishes it immediately or hands it
+  /// off to frame "15b. Schedule Announcement" — the design's two CTAs
+  /// map to the same draft, diverging only after it exists.
+  Future<void> _submit({required bool publishNow}) async {
     final title = _titleController.text.trim();
     final body = _bodyController.text.trim();
     if (title.isEmpty) {
@@ -45,22 +50,43 @@ class _AnnouncementFormScreenState extends State<AnnouncementFormScreen> {
       return;
     }
     setState(() {
-      _loading = true;
+      if (publishNow) {
+        _publishingNow = true;
+      } else {
+        _schedulingNext = true;
+      }
       _error = null;
     });
     try {
-      await getIt<AnnouncementRepository>().create(
+      final repo = getIt<AnnouncementRepository>();
+      final created = await repo.create(
         title: title,
         body: body,
         audience: _audience,
       );
-      if (!mounted) return;
-      context.pop();
+      if (publishNow) {
+        await repo.publish(created.id);
+        if (!mounted) return;
+        context.pop();
+      } else {
+        if (!mounted) return;
+        await context.push(
+          AppRoutes.scheduleAnnouncement,
+          extra: created,
+        );
+        if (!mounted) return;
+        context.pop();
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _publishingNow = false;
+          _schedulingNext = false;
+        });
+      }
     }
   }
 
@@ -106,10 +132,29 @@ class _AnnouncementFormScreenState extends State<AnnouncementFormScreen> {
                 onChanged: (a) => setState(() => _audience = a),
               ),
               const SizedBox(height: 24),
-              AppButton(
-                label: 'Save as draft',
-                loading: _loading,
-                onPressed: _submit,
+              Row(
+                children: [
+                  Expanded(
+                    child: AppButton(
+                      label: 'Schedule',
+                      variant: AppButtonVariant.ghost,
+                      loading: _schedulingNext,
+                      onPressed: _publishingNow
+                          ? null
+                          : () => _submit(publishNow: false),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: AppButton(
+                      label: 'Publish now',
+                      loading: _publishingNow,
+                      onPressed: _schedulingNext
+                          ? null
+                          : () => _submit(publishNow: true),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
             ],

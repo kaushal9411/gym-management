@@ -1,8 +1,34 @@
+/// `SocialLinks` (`GET /settings/profile`'s `socialLinks`,
+/// `PATCH /settings/profile/social-links`) — all five optional.
+class SocialLinks {
+  const SocialLinks({
+    this.facebook,
+    this.instagram,
+    this.twitter,
+    this.youtube,
+    this.linkedin,
+  });
+
+  final String? facebook;
+  final String? instagram;
+  final String? twitter;
+  final String? youtube;
+  final String? linkedin;
+
+  factory SocialLinks.fromJson(Map<String, dynamic> json) => SocialLinks(
+        facebook: json['facebook'] as String?,
+        instagram: json['instagram'] as String?,
+        twitter: json['twitter'] as String?,
+        youtube: json['youtube'] as String?,
+        linkedin: json['linkedin'] as String?,
+      );
+}
+
 /// Mirrors `GymProfileDto` (`GET/PATCH /settings/profile` +
 /// `PATCH /settings/profile/contact`). `businessHours` is modeled per-day
 /// server-side (open/close/closed for each weekday), which the design's
 /// single "Operating hours" field can't represent without flattening real
-/// per-day values — so it stays web-only; social links likewise.
+/// per-day values — so it stays web-only.
 class GymProfile {
   const GymProfile({
     required this.gymName,
@@ -15,6 +41,7 @@ class GymProfile {
     required this.state,
     required this.country,
     required this.postalCode,
+    this.socialLinks,
   });
 
   final String gymName;
@@ -27,6 +54,7 @@ class GymProfile {
   final String? state;
   final String? country;
   final String? postalCode;
+  final SocialLinks? socialLinks;
 
   factory GymProfile.fromJson(Map<String, dynamic> json) => GymProfile(
         gymName: json['gymName'] as String,
@@ -39,5 +67,8 @@ class GymProfile {
         state: json['state'] as String?,
         country: json['country'] as String?,
         postalCode: json['postalCode'] as String?,
+        socialLinks: json['socialLinks'] == null
+            ? null
+            : SocialLinks.fromJson(json['socialLinks'] as Map<String, dynamic>),
       );
 }

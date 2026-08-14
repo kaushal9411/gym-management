@@ -114,12 +114,19 @@ const _sections = <String, List<_MenuEntry>>{
       subtitle: 'Unread alerts',
       route: AppRoutes.notifications,
     ),
+    _MenuEntry(
+      icon: Icons.mark_email_unread_outlined,
+      title: 'Notification Templates',
+      subtitle: '10 system templates',
+      route: AppRoutes.notificationTemplates,
+    ),
   ],
 };
 
-/// Design frame "4a. Menu". Every section/tile from the design is present —
-/// only "Branches" is wired to a real screen in this pass; the rest show an
-/// honest "coming soon" toast rather than a fabricated screen.
+/// Design frame "4a. Menu". Every section/tile from the design is wired to
+/// a real screen; `_MenuEntry.route` stays nullable so a future addition
+/// to `_sections` that isn't built yet degrades to an honest "coming soon"
+/// toast instead of a broken navigation.
 class MenuScreen extends StatelessWidget {
   const MenuScreen({super.key});
 

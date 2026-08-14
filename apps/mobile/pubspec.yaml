@@ -7,24 +7,26 @@ environment:
   sdk: ">=3.4.0 <4.0.0"
 
 dependencies:
+  # Networking
+  dio: ^5.7.0
+
+  # State management
+  equatable: ^2.0.5
+
   flutter:
     sdk: flutter
 
   # State management
   flutter_bloc: ^8.1.6
-  equatable: ^2.0.5
 
-  # Networking
-  dio: ^5.7.0
+  # Secure session storage
+  flutter_secure_storage: ^9.2.2
 
   # DI
   get_it: ^7.7.0
 
   # Routing
   go_router: ^14.6.2
-
-  # Secure session storage
-  flutter_secure_storage: ^9.2.2
 
   # Typography — Bricolage Grotesque + Hanken Grotesk (exact families used by the approved design)
   google_fonts: ^6.2.1
@@ -33,10 +35,10 @@ dependencies:
   mobile_scanner: ^5.2.3
 
 dev_dependencies:
+  bloc_test: ^9.1.7
   flutter_lints: ^5.0.0
   flutter_test:
     sdk: flutter
-  bloc_test: ^9.1.7
   mocktail: ^1.0.4
 
 flutter:

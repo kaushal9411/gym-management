@@ -12,7 +12,9 @@ import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
 
-/// Design frame "7. Member detail".
+/// Design frame "7. Member detail" — the Edit buttons open frames
+/// "7d"–"7f" (`MemberEditPersonalScreen`/`MemberEditAddressScreen`/
+/// `MemberEditHealthScreen`).
 class MemberDetailScreen extends StatefulWidget {
   const MemberDetailScreen({super.key, required this.memberId});
 
@@ -171,6 +173,33 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               _DetailRow(label: 'Email', value: member.email ?? '—'),
             ],
           ),
+        ),
+        const SizedBox(height: 16),
+        AppButton(
+          label: 'Edit personal info',
+          variant: AppButtonVariant.ghost,
+          size: AppButtonSize.small,
+          onPressed: () => context
+              .push(AppRoutes.memberEditPersonal, extra: member)
+              .then((_) => _load()),
+        ),
+        const SizedBox(height: 8),
+        AppButton(
+          label: 'Edit address & emergency contact',
+          variant: AppButtonVariant.ghost,
+          size: AppButtonSize.small,
+          onPressed: () => context
+              .push(AppRoutes.memberEditAddress, extra: member)
+              .then((_) => _load()),
+        ),
+        const SizedBox(height: 8),
+        AppButton(
+          label: 'Edit health & notes',
+          variant: AppButtonVariant.ghost,
+          size: AppButtonSize.small,
+          onPressed: () => context
+              .push(AppRoutes.memberEditHealth, extra: member)
+              .then((_) => _load()),
         ),
       ],
     );

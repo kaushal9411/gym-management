@@ -73,6 +73,23 @@ class MemberRepository {
     }
   }
 
+  /// Partial `PATCH /members/:id` — pass only the fields a given edit
+  /// screen owns (personal / address / health), matching how
+  /// `GymSettingsRepository.saveProfile` scopes its own patches.
+  Future<GymMember> update(String memberId, Map<String, dynamic> fields) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/members/$memberId',
+        data: fields,
+      );
+      return GymMember.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   Future<void> assignMembership(String memberId, String planId) async {
     try {
       await _dio.put<void>(

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../bloc/session/session_cubit.dart';
 import '../../bloc/session/session_state.dart';
 import '../../features/announcements/presentation/announcement_form_screen.dart';
+import '../../features/announcements/presentation/schedule_announcement_screen.dart';
 import '../../features/announcements/presentation/announcements_screen.dart';
 import '../../features/auth/presentation/find_gym_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
@@ -14,6 +15,8 @@ import '../../features/billing/presentation/billing_history_screen.dart';
 import '../../features/billing/presentation/billing_screen.dart';
 import '../../features/branches/presentation/branch_detail_screen.dart';
 import '../../features/branches/presentation/branch_form_screen.dart';
+import '../../features/branches/presentation/branch_holidays_screen.dart';
+import '../../features/branches/presentation/branch_hours_screen.dart';
 import '../../features/branches/presentation/branches_list_screen.dart';
 import '../../features/catalog/presentation/diet_plans_screen.dart';
 import '../../features/catalog/presentation/membership_plan_form_screen.dart';
@@ -39,12 +42,21 @@ import '../../features/member/presentation/member_visit_detail_screen.dart';
 import '../../features/manager/presentation/member_form_screen.dart';
 import '../../features/manager/presentation/member_freeze_screen.dart';
 import '../../features/manager/presentation/member_renew_screen.dart';
+import '../../features/manager/presentation/member_edit_address_screen.dart';
+import '../../features/manager/presentation/member_edit_health_screen.dart';
+import '../../features/manager/presentation/member_edit_personal_screen.dart';
 import '../../features/manager/presentation/member_upgrade_screen.dart';
 import '../../features/manager/presentation/staff_detail_screen.dart';
+import '../../features/manager/presentation/staff_edit_employment_screen.dart';
+import '../../features/manager/presentation/staff_edit_personal_screen.dart';
 import '../../features/manager/presentation/staff_form_screen.dart';
+import '../../features/notifications/presentation/notification_template_form_screen.dart';
+import '../../features/notifications/presentation/notification_templates_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/receptionist/presentation/checked_in_screen.dart';
 import '../../features/receptionist/presentation/class_add_attendee_screen.dart';
+import '../../features/receptionist/presentation/class_form_screen.dart';
+import '../../features/receptionist/presentation/class_schedule_screen.dart';
 import '../../features/receptionist/presentation/class_session_detail_screen.dart';
 import '../../features/receptionist/presentation/receptionist_reports_screen.dart';
 import '../../features/receptionist/presentation/search_members_screen.dart';
@@ -57,12 +69,15 @@ import '../../features/reports/presentation/scheduled_report_form_screen.dart';
 import '../../features/reports/presentation/scheduled_reports_screen.dart';
 import '../../features/reports/presentation/staff_performance_screen.dart';
 import '../../features/roles/presentation/role_detail_screen.dart';
+import '../../features/roles/presentation/role_form_screen.dart';
 import '../../features/roles/presentation/roles_screen.dart';
 import '../../features/settings/presentation/branding_settings_screen.dart';
 import '../../features/settings/presentation/gym_profile_settings_screen.dart';
+import '../../features/settings/presentation/gym_social_screen.dart';
 import '../../features/settings/presentation/gym_settings_screen.dart';
 import '../../features/settings/presentation/invoice_settings_screen.dart';
 import '../../features/settings/presentation/security_policy_screen.dart';
+import '../../features/settings/presentation/sessions_screen.dart';
 import '../../features/support/presentation/support_ticket_detail_screen.dart';
 import '../../features/support/presentation/support_ticket_form_screen.dart';
 import '../../features/support/presentation/support_tickets_screen.dart';
@@ -81,14 +96,20 @@ import '../../features/trainer/presentation/trainer_workout_plans_screen.dart';
 import '../../features/trainer/presentation/workout_log_screen.dart';
 import '../../features/trainer/presentation/workout_plan_detail_screen.dart';
 import '../../features/trainer/presentation/workout_plan_form_screen.dart';
+import '../../models/announcement.dart';
 import '../../models/branch.dart';
 import '../../models/class_session.dart';
 import '../../models/diet_plan.dart';
 import '../../models/exercise.dart';
+import '../../models/group_class.dart';
+import '../../models/gym_profile.dart';
 import '../../models/food.dart';
 import '../../models/gym_member.dart';
 import '../../models/member_invoice.dart';
 import '../../models/member_visit.dart';
+import '../../models/notification_template.dart';
+import '../../models/staff_member.dart';
+import '../../models/tenant_role.dart';
 import 'app_routes.dart';
 import 'go_router_refresh_stream.dart';
 
@@ -170,6 +191,16 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
             BranchFormScreen(existing: state.extra as Branch?),
       ),
       GoRoute(
+        path: AppRoutes.branchHours,
+        builder: (context, state) =>
+            BranchHoursScreen(branch: state.extra as Branch),
+      ),
+      GoRoute(
+        path: AppRoutes.branchHolidays,
+        builder: (context, state) =>
+            BranchHolidaysScreen(branch: state.extra as Branch),
+      ),
+      GoRoute(
         path: AppRoutes.income,
         builder: (context, state) => const IncomeListScreen(),
       ),
@@ -242,12 +273,28 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
+        path: AppRoutes.notificationTemplates,
+        builder: (context, state) => const NotificationTemplatesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.editNotificationTemplate,
+        builder: (context, state) => NotificationTemplateFormScreen(
+          template: state.extra as NotificationTemplate,
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.announcements,
         builder: (context, state) => const AnnouncementsScreen(),
       ),
       GoRoute(
         path: AppRoutes.announcementForm,
         builder: (context, state) => const AnnouncementFormScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.scheduleAnnouncement,
+        builder: (context, state) => ScheduleAnnouncementScreen(
+          announcement: state.extra as Announcement,
+        ),
       ),
       GoRoute(
         path: AppRoutes.support,
@@ -272,6 +319,11 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
             RoleDetailScreen(roleId: state.extra as String),
       ),
       GoRoute(
+        path: AppRoutes.roleForm,
+        builder: (context, state) =>
+            RoleFormScreen(existing: state.extra as TenantRole?),
+      ),
+      GoRoute(
         path: AppRoutes.billing,
         builder: (context, state) => const BillingScreen(),
       ),
@@ -288,6 +340,11 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         builder: (context, state) => const GymProfileSettingsScreen(),
       ),
       GoRoute(
+        path: AppRoutes.gymSocialSettings,
+        builder: (context, state) =>
+            GymSocialScreen(socialLinks: state.extra as SocialLinks?),
+      ),
+      GoRoute(
         path: AppRoutes.brandingSettings,
         builder: (context, state) => const BrandingSettingsScreen(),
       ),
@@ -298,6 +355,10 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       GoRoute(
         path: AppRoutes.securityPolicySettings,
         builder: (context, state) => const SecurityPolicyScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.sessions,
+        builder: (context, state) => const SessionsScreen(),
       ),
       GoRoute(
         path: AppRoutes.finance,
@@ -311,6 +372,16 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         path: AppRoutes.staffDetail,
         builder: (context, state) =>
             StaffDetailScreen(staffId: state.extra as String),
+      ),
+      GoRoute(
+        path: AppRoutes.staffEditPersonal,
+        builder: (context, state) =>
+            StaffEditPersonalScreen(staff: state.extra as StaffMember),
+      ),
+      GoRoute(
+        path: AppRoutes.staffEditEmployment,
+        builder: (context, state) =>
+            StaffEditEmploymentScreen(staff: state.extra as StaffMember),
       ),
       GoRoute(
         path: AppRoutes.memberForm,
@@ -335,6 +406,21 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         path: AppRoutes.memberUpgrade,
         builder: (context, state) =>
             MemberUpgradeScreen(member: state.extra as GymMember),
+      ),
+      GoRoute(
+        path: AppRoutes.memberEditPersonal,
+        builder: (context, state) =>
+            MemberEditPersonalScreen(member: state.extra as GymMember),
+      ),
+      GoRoute(
+        path: AppRoutes.memberEditAddress,
+        builder: (context, state) =>
+            MemberEditAddressScreen(member: state.extra as GymMember),
+      ),
+      GoRoute(
+        path: AppRoutes.memberEditHealth,
+        builder: (context, state) =>
+            MemberEditHealthScreen(member: state.extra as GymMember),
       ),
       GoRoute(
         path: AppRoutes.checkedIn,
@@ -363,6 +449,15 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         path: AppRoutes.classAddAttendee,
         builder: (context, state) =>
             ClassAddAttendeeScreen(session: state.extra as ClassSession),
+      ),
+      GoRoute(
+        path: AppRoutes.classForm,
+        builder: (context, state) => const ClassFormScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.classSchedule,
+        builder: (context, state) =>
+            ClassScheduleScreen(groupClass: state.extra as GroupClass),
       ),
       GoRoute(
         path: AppRoutes.receptionistReports,

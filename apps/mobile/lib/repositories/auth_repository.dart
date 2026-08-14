@@ -5,6 +5,7 @@ import '../core/storage/secure_storage.dart';
 import '../models/mfa_setup.dart';
 import '../models/staff_login_result.dart';
 import '../models/user_profile.dart';
+import '../models/user_session.dart';
 
 /// Staff auth plane — `/auth/*` (Owner/Manager/Trainer/Receptionist).
 /// Tenant is resolved per-request via the `X-Tenant-Slug` header (see
@@ -119,6 +120,30 @@ class AuthRepository {
   Future<void> forgotPassword({required String email}) async {
     try {
       await _dio.post<void>('/auth/forgot-password', data: {'email': email});
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /auth/sessions` — active devices only. The backend has no
+  /// separate login-history endpoint (past, revoked sessions aren't
+  /// queryable), so frame "11f. Sessions"'s history list has no mobile
+  /// counterpart — only its active-devices half is real here.
+  Future<List<UserSession>> listSessions() async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>('/auth/sessions');
+      final list = response.data!['data'] as List;
+      return list
+          .map((e) => UserSession.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<void> logoutDevice(String sessionId) async {
+    try {
+      await _dio.delete<void>('/auth/sessions/$sessionId');
     } on DioException catch (e) {
       throw _mapError(e);
     }

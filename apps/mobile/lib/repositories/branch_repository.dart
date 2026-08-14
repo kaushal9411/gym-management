@@ -100,6 +100,40 @@ class BranchRepository {
     }
   }
 
+  /// `PATCH /branches/:id` with just `operatingHours` — same endpoint the
+  /// name/address form uses, scoped to one field (frame "8c. Operating hours").
+  Future<Branch> updateOperatingHours(
+    String branchId,
+    Map<String, DayHours> hours,
+  ) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/branches/$branchId',
+        data: {'operatingHours': hours.map((k, v) => MapEntry(k, v.toJson()))},
+      );
+      return Branch.fromJson(response.data!['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Same endpoint, scoped to `holidays` (frame "8d. Holidays") — the whole
+  /// list is replaced on each save, matching `operatingHours`'s shape.
+  Future<Branch> updateHolidays(
+    String branchId,
+    List<BranchHoliday> holidays,
+  ) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/branches/$branchId',
+        data: {'holidays': holidays.map((h) => h.toJson()).toList()},
+      );
+      return Branch.fromJson(response.data!['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   Future<void> softDelete(String branchId) async {
     try {
       await _dio.delete<void>('/branches/$branchId');

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/gym_business_settings.dart';
 import '../../../models/gym_profile.dart';
@@ -20,7 +23,9 @@ const _timeFormats = ['12h', '24h'];
 /// frame of its own but belongs with the profile. The design's "Operating
 /// hours" single field is not built: the API models hours per weekday and
 /// flattening that into one string would silently overwrite real per-day
-/// values.
+/// values (branches get a real per-day editor, frame "8c" — the gym-level
+/// hours don't have a mobile screen yet). "Social media" opens frame
+/// "11a-i" (`GymSocialScreen`).
 class GymProfileSettingsScreen extends StatefulWidget {
   const GymProfileSettingsScreen({super.key});
 
@@ -76,6 +81,8 @@ class _GymProfileSettingsScreenState extends State<GymProfileSettingsScreen> {
                     padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
                     children: [
                       _ProfileSection(profile: _profile!),
+                      const SizedBox(height: 16),
+                      _SocialLinksTile(profile: _profile!, onReturn: _load),
                       const SizedBox(height: 24),
                       _BusinessSection(business: _business!),
                     ],
@@ -301,6 +308,77 @@ class _BusinessSectionState extends State<_BusinessSection> {
           onPressed: _save,
         ),
       ],
+    );
+  }
+}
+
+class _SocialLinksTile extends StatelessWidget {
+  const _SocialLinksTile({required this.profile, required this.onReturn});
+
+  final GymProfile profile;
+  final VoidCallback onReturn;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        onTap: () => context
+            .push(AppRoutes.gymSocialSettings, extra: profile.socialLinks)
+            .then((_) => onReturn()),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(AppRadii.card),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.staffSoft,
+                  borderRadius: BorderRadius.circular(AppRadii.tile),
+                ),
+                alignment: Alignment.center,
+                child: const Icon(
+                  Icons.share_outlined,
+                  size: 18,
+                  color: AppColors.staffPillFg,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Social media',
+                      style: AppText.body(size: 13, weight: FontWeight.w700),
+                    ),
+                    Text(
+                      'Facebook, Instagram, Twitter, YouTube, LinkedIn',
+                      style: AppText.body(
+                        size: 11,
+                        color: AppColors.inkFaint,
+                        weight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppColors.inkFaint,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

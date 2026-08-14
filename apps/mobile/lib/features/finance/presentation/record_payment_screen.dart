@@ -12,13 +12,19 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../models/member_payment.dart';
 import '../../../models/member_summary.dart';
+import '../../../models/payment_link_result.dart';
 import '../../../repositories/finance_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/category_chip_selector.dart';
 
-/// Design frame "6. Record payment" + "7a. Recorded" confirmation.
+enum _Channel { offline, link }
+
+/// Design frame "6. Record payment" + "7a. Recorded" confirmation, plus the
+/// "Send payment link" channel (frame "6a. Send payment link") — an online
+/// Razorpay Payment Link the member pays themselves, instead of an
+/// offline/cash-style record.
 class RecordPaymentScreen extends StatefulWidget {
   const RecordPaymentScreen({super.key});
 
@@ -34,9 +40,13 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
   bool _searching = false;
   MemberSummary? _selectedMember;
   PaymentMethod _method = PaymentMethod.upi;
+  _Channel _channel = _Channel.offline;
+  bool _notifyEmail = true;
+  bool _notifySms = true;
   bool _submitting = false;
   String? _error;
   MemberPayment? _recorded;
+  PaymentLinkResult? _linkResult;
 
   @override
   void dispose() {
@@ -91,13 +101,24 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
       _error = null;
     });
     try {
-      final result = await getIt<FinanceRepository>().recordPayment(
-        memberId: member.id,
-        amount: amount,
-        method: _method.apiValue,
-      );
-      if (!mounted) return;
-      setState(() => _recorded = result);
+      if (_channel == _Channel.link) {
+        final result = await getIt<FinanceRepository>().createPaymentLink(
+          memberId: member.id,
+          amount: amount,
+          notifyEmail: _notifyEmail,
+          notifySms: _notifySms,
+        );
+        if (!mounted) return;
+        setState(() => _linkResult = result);
+      } else {
+        final result = await getIt<FinanceRepository>().recordPayment(
+          memberId: member.id,
+          amount: amount,
+          method: _method.apiValue,
+        );
+        if (!mounted) return;
+        setState(() => _recorded = result);
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
@@ -117,8 +138,11 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
       ),
       body: SafeArea(
         top: false,
-        child:
-            _recorded != null ? _buildConfirmation(_recorded!) : _buildForm(),
+        child: _recorded != null
+            ? _buildConfirmation(_recorded!)
+            : _linkResult != null
+                ? _buildLinkSent(_linkResult!)
+                : _buildForm(),
       ),
     );
   }
@@ -129,6 +153,26 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _ChannelChip(
+                  label: 'Offline / mark as paid',
+                  selected: _channel == _Channel.offline,
+                  onTap: () => setState(() => _channel = _Channel.offline),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _ChannelChip(
+                  label: 'Send payment link',
+                  selected: _channel == _Channel.link,
+                  onTap: () => setState(() => _channel = _Channel.link),
+                ),
+              ),
+            ],
+          ),
           if (_error != null) ...[
             const SizedBox(height: 8),
             FormAlert(message: _error!),
@@ -229,20 +273,107 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          Text('Method', style: AppText.eyebrow()),
-          const SizedBox(height: 8),
-          CategoryChipSelector<PaymentMethod>(
-            options: PaymentMethod.values,
-            labelOf: (m) => m.label,
-            value: _method,
-            onChanged: (m) => setState(() => _method = m),
-          ),
+          if (_channel == _Channel.offline) ...[
+            Text('Method', style: AppText.eyebrow()),
+            const SizedBox(height: 8),
+            CategoryChipSelector<PaymentMethod>(
+              options: PaymentMethod.values,
+              labelOf: (m) => m.label,
+              value: _method,
+              onChanged: (m) => setState(() => _method = m),
+            ),
+          ] else ...[
+            _NotifyToggle(
+              label: 'Notify by email',
+              value: _notifyEmail,
+              onChanged: (v) => setState(() => _notifyEmail = v),
+            ),
+            const SizedBox(height: 8),
+            _NotifyToggle(
+              label: 'Notify by SMS',
+              value: _notifySms,
+              onChanged: (v) => setState(() => _notifySms = v),
+            ),
+          ],
           const SizedBox(height: 24),
           AppButton(
-            label: 'Record payment',
+            label: _channel == _Channel.offline
+                ? 'Record payment'
+                : 'Send link',
             loading: _submitting,
             onPressed: _submit,
           ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLinkSent(PaymentLinkResult result) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      child: Column(
+        children: [
+          const SizedBox(height: 24),
+          GlassCard(
+            padding: const EdgeInsets.all(28),
+            gradientOverlay: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0x298B5CF6), Color(0x14FF6B5B)],
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: const BoxDecoration(
+                    color: AppColors.staffB,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.link_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  Formatters.currency(result.payment.finalAmount),
+                  style: AppText.display(size: 24),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Link sent · ${_selectedMember?.name ?? ''}',
+                  style: AppText.body(color: AppColors.inkFaint),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          AppCard(
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    result.shortUrl,
+                    style: AppText.body(size: 12, weight: FontWeight.w700),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  color: AppColors.inkFaint,
+                  onPressed: () => Clipboard.setData(
+                    ClipboardData(text: result.shortUrl),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          AppButton(label: 'Done', onPressed: () => context.pop()),
           const SizedBox(height: 24),
         ],
       ),
@@ -305,6 +436,93 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
           const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+}
+
+class _ChannelChip extends StatelessWidget {
+  const _ChannelChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: selected ? AppColors.staffGrad : null,
+          color: selected ? null : AppColors.surface3,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: AppText.body(
+            size: 11,
+            weight: FontWeight.w700,
+            color: selected ? Colors.white : AppColors.inkSoft,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotifyToggle extends StatelessWidget {
+  const _NotifyToggle({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: AppText.body(size: 13, weight: FontWeight.w700),
+          ),
+        ),
+        GestureDetector(
+          onTap: () => onChanged(!value),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: 44,
+            height: 26,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              gradient: value ? AppColors.staffGrad : null,
+              color: value ? null : AppColors.surface3,
+              borderRadius: BorderRadius.circular(99),
+            ),
+            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              width: 20,
+              height: 20,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

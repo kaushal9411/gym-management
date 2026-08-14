@@ -68,6 +68,25 @@ class StaffRepository {
     }
   }
 
+  /// Partial `PATCH /staff/:id` — same scoped-fields pattern as
+  /// `MemberRepository.update`.
+  Future<StaffMember> update(
+    String staffId,
+    Map<String, dynamic> fields,
+  ) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/staff/$staffId',
+        data: fields,
+      );
+      return StaffMember.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   Future<void> assignRole(String staffId, StaffRole role) async {
     try {
       await _dio.put<void>(

@@ -50,6 +50,19 @@ class AnnouncementRepository {
     }
   }
 
+  /// `publishAt` must be a future ISO instant — the backend rejects past
+  /// or unparsable values.
+  Future<void> schedule(String id, DateTime publishAt) async {
+    try {
+      await _dio.post<void>(
+        '/tenant-announcements/$id/schedule',
+        data: {'publishAt': publishAt.toIso8601String()},
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   Future<void> delete(String id) async {
     try {
       await _dio.delete<void>('/tenant-announcements/$id');

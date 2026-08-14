@@ -19,7 +19,8 @@ const _weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /// Design frame "9. Classes calendar" — a 7-day strip (today ± a few days)
 /// and that day's sessions. `GET /class-sessions` requires an explicit
-/// date range, so this fetches one week at a time.
+/// date range, so this fetches one week at a time. The "+" opens frame
+/// "18. Create class" (`ClassFormScreen`).
 class ClassesCalendarScreen extends StatefulWidget {
   const ClassesCalendarScreen({super.key});
 
@@ -73,8 +74,42 @@ class _ClassesCalendarScreenState extends State<ClassesCalendarScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(tenantName, style: AppText.eyebrow()),
-          Text('Classes', style: AppText.display(size: 22)),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(tenantName, style: AppText.eyebrow()),
+                    Text('Classes', style: AppText.display(size: 22)),
+                  ],
+                ),
+              ),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => context
+                      .push(AppRoutes.classForm)
+                      .then((_) => _load()),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.staffGrad,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.add_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
           Row(
             children: List.generate(7, (i) {

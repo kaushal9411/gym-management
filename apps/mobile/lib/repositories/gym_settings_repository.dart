@@ -67,6 +67,36 @@ class GymSettingsRepository {
     }
   }
 
+  /// `PATCH /settings/profile/social-links` — a distinct endpoint from the
+  /// rest of the profile, scoped to just the five link fields. The
+  /// backend's `urlOrEmptySchema` treats `''` (not `null`) as "clear this
+  /// field", so blank fields are sent as empty strings.
+  Future<GymProfile> updateSocialLinks({
+    String? facebook,
+    String? instagram,
+    String? twitter,
+    String? youtube,
+    String? linkedin,
+  }) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/settings/profile/social-links',
+        data: {
+          'facebook': facebook ?? '',
+          'instagram': instagram ?? '',
+          'twitter': twitter ?? '',
+          'youtube': youtube ?? '',
+          'linkedin': linkedin ?? '',
+        },
+      );
+      return GymProfile.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   Future<GymBusinessSettings> getBusinessSettings() async {
     try {
       final response =
