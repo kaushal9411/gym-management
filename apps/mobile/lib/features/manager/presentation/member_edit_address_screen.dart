@@ -111,6 +111,7 @@ class _MemberEditAddressScreenState extends State<MemberEditAddressScreen> {
               const SizedBox(height: 10),
               AppLabeledField(
                 label: 'Address line',
+                hintText: 'Street, building, area',
                 controller: _addressController,
               ),
               const SizedBox(height: 14),
@@ -119,6 +120,7 @@ class _MemberEditAddressScreenState extends State<MemberEditAddressScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'City',
+                      hintText: 'e.g. Mumbai',
                       controller: _cityController,
                     ),
                   ),
@@ -126,6 +128,7 @@ class _MemberEditAddressScreenState extends State<MemberEditAddressScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'State',
+                      hintText: 'e.g. Maharashtra',
                       controller: _stateController,
                     ),
                   ),
@@ -137,6 +140,7 @@ class _MemberEditAddressScreenState extends State<MemberEditAddressScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Country',
+                      hintText: 'e.g. India',
                       controller: _countryController,
                     ),
                   ),
@@ -144,6 +148,7 @@ class _MemberEditAddressScreenState extends State<MemberEditAddressScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Postal code',
+                      hintText: 'e.g. 400001',
                       controller: _postalCodeController,
                       keyboardType: TextInputType.number,
                     ),
@@ -155,6 +160,7 @@ class _MemberEditAddressScreenState extends State<MemberEditAddressScreen> {
               const SizedBox(height: 10),
               AppLabeledField(
                 label: 'Name',
+                hintText: 'e.g. Priya Sharma',
                 controller: _emergencyNameController,
               ),
               const SizedBox(height: 14),
@@ -163,6 +169,7 @@ class _MemberEditAddressScreenState extends State<MemberEditAddressScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Phone',
+                      hintText: 'e.g. 9876543210',
                       controller: _emergencyPhoneController,
                       keyboardType: TextInputType.phone,
                     ),
@@ -171,6 +178,7 @@ class _MemberEditAddressScreenState extends State<MemberEditAddressScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Relation',
+                      hintText: 'e.g. Spouse',
                       controller: _emergencyRelationController,
                     ),
                   ),

@@ -137,7 +137,11 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
                 ],
               ),
               const SizedBox(height: 14),
-              AppLabeledField(label: 'Notes', controller: _notesController),
+              AppLabeledField(
+                label: 'Notes',
+                hintText: 'Form cues, tips (optional)',
+                controller: _notesController,
+              ),
               const SizedBox(height: 24),
               AppButton(label: 'Save', loading: _loading, onPressed: _save),
             ],

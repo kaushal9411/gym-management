@@ -110,6 +110,7 @@ class _SearchMembersScreenState extends State<SearchMembersScreen> {
             children: [
               AppLabeledField(
                 label: 'Name, phone or Member ID',
+                hintText: 'e.g. Karan or MEM-0001',
                 controller: _searchController,
                 onSubmitted: (_) => _search(),
                 textInputAction: TextInputAction.search,

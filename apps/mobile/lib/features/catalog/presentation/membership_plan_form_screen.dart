@@ -100,12 +100,14 @@ class _MembershipPlanFormScreenState extends State<MembershipPlanFormScreen> {
               const SizedBox(height: 16),
               AppLabeledField(
                 label: 'Plan name',
+                hintText: 'e.g. Quarterly Pro',
                 controller: _nameController,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Price',
+                hintText: 'e.g. 4999',
                 controller: _priceController,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),

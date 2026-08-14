@@ -110,12 +110,14 @@ class _ProfileDataScreenState extends State<ProfileDataScreen> {
                   ],
                   AppLabeledField(
                     label: 'Full name',
+                    hintText: 'e.g. Priya Sharma',
                     controller: _nameController,
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 14),
                   AppLabeledField(
                     label: 'Phone',
+                    hintText: 'e.g. 9876543210',
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.done,

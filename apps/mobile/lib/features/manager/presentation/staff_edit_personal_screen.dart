@@ -113,6 +113,7 @@ class _StaffEditPersonalScreenState extends State<StaffEditPersonalScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Gender',
+                      hintText: 'e.g. Male, Female',
                       controller: _genderController,
                     ),
                   ),
@@ -120,6 +121,7 @@ class _StaffEditPersonalScreenState extends State<StaffEditPersonalScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Date of birth',
+                      hintText: 'YYYY-MM-DD',
                       controller: _dobController,
                       keyboardType: TextInputType.datetime,
                     ),
@@ -129,15 +131,21 @@ class _StaffEditPersonalScreenState extends State<StaffEditPersonalScreen> {
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Address line',
+                hintText: 'Street, building, area',
                 controller: _addressController,
               ),
               const SizedBox(height: 14),
-              AppLabeledField(label: 'City', controller: _cityController),
+              AppLabeledField(
+                label: 'City',
+                hintText: 'e.g. Mumbai',
+                controller: _cityController,
+              ),
               const SizedBox(height: 18),
               Text('Emergency contact', style: AppText.eyebrow()),
               const SizedBox(height: 10),
               AppLabeledField(
                 label: 'Name',
+                hintText: 'e.g. Priya Sharma',
                 controller: _emergencyNameController,
               ),
               const SizedBox(height: 14),
@@ -146,6 +154,7 @@ class _StaffEditPersonalScreenState extends State<StaffEditPersonalScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Phone',
+                      hintText: 'e.g. 9876543210',
                       controller: _emergencyPhoneController,
                       keyboardType: TextInputType.phone,
                     ),
@@ -154,13 +163,18 @@ class _StaffEditPersonalScreenState extends State<StaffEditPersonalScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Relation',
+                      hintText: 'e.g. Spouse',
                       controller: _emergencyRelationController,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 14),
-              AppLabeledField(label: 'Notes', controller: _notesController),
+              AppLabeledField(
+                label: 'Notes',
+                hintText: 'Any other notes about this staff member',
+                controller: _notesController,
+              ),
               const SizedBox(height: 24),
               AppButton(
                 label: 'Save changes',

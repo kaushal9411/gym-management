@@ -24,6 +24,7 @@ class AppLabeledField extends StatefulWidget {
     this.readOnly = false,
     this.onTap,
     this.suffixIcon,
+    this.hintText,
   });
 
   final String label;
@@ -37,6 +38,11 @@ class AppLabeledField extends StatefulWidget {
   final TextInputAction? textInputAction;
   final bool autofocus;
   final List<TextInputFormatter>? inputFormatters;
+
+  /// Example-value placeholder shown inside the field when empty (e.g.
+  /// "e.g. Jane Doe") — distinct from [label], which is the persistent
+  /// caption above the field per this design's non-floating-label pattern.
+  final String? hintText;
 
   /// Makes this a tap-to-open trigger (date pickers, etc.) instead of a
   /// normal editable field — the caret/keyboard never shows.
@@ -93,6 +99,12 @@ class _AppLabeledFieldState extends State<AppLabeledField> {
               isDense: true,
               filled: false,
               border: InputBorder.none,
+              hintText: widget.hintText,
+              hintStyle: AppText.body(
+                size: 15,
+                weight: FontWeight.w600,
+                color: AppColors.inkFaint,
+              ),
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
               suffixIcon: widget.obscureText

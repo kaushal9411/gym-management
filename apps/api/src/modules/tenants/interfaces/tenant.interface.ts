@@ -40,11 +40,19 @@ export interface ResolvedTenant {
   defaultBranch: { id: string; name: string; timezone: string } | null;
 }
 
+/** Minimal, public-safe row for the pre-login "pick your gym" list — name/slug/logo only, nothing else about the tenant. */
+export interface PublicTenantSummary {
+  slug: string;
+  name: string;
+  logoUrl: string | null;
+}
+
 export interface TenantRepositoryPort {
   findBySlug(slug: string): Promise<ResolvedTenantRecord | null>;
   findById(tenantId: string): Promise<ResolvedTenantRecord | null>;
   slugExists(slug: string): Promise<boolean>;
   createTenantWithSettings(input: CreateTenantInput): Promise<ResolvedTenantRecord>;
+  listActive(): Promise<PublicTenantSummary[]>;
 }
 
 export interface ResolvedTenantRecord {

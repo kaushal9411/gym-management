@@ -91,12 +91,14 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
               const SizedBox(height: 16),
               AppLabeledField(
                 label: 'Food name',
+                hintText: 'e.g. Grilled Chicken Breast',
                 controller: _nameController,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Serving size',
+                hintText: 'e.g. 100g, 1 cup',
                 controller: _servingController,
                 textInputAction: TextInputAction.next,
               ),
@@ -106,6 +108,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Calories (kcal)',
+                      hintText: 'e.g. 165',
                       controller: _kcalController,
                       keyboardType: TextInputType.number,
                       inputFormatters: [
@@ -117,6 +120,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Protein (g)',
+                      hintText: 'e.g. 31',
                       controller: _proteinController,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
@@ -135,6 +139,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Carbs (g)',
+                      hintText: 'e.g. 0',
                       controller: _carbsController,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
@@ -149,6 +154,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Fat (g)',
+                      hintText: 'e.g. 4',
                       controller: _fatController,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),

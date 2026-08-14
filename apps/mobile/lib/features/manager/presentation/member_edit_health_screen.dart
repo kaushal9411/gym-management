@@ -97,20 +97,27 @@ class _MemberEditHealthScreenState extends State<MemberEditHealthScreen> {
               const SizedBox(height: 10),
               AppLabeledField(
                 label: 'Medical conditions',
+                hintText: 'e.g. Asthma, diabetes (optional)',
                 controller: _medicalController,
               ),
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Allergies',
+                hintText: 'e.g. Peanuts, dust (optional)',
                 controller: _allergiesController,
               ),
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Fitness goals',
+                hintText: 'e.g. Weight loss, muscle gain',
                 controller: _fitnessGoalsController,
               ),
               const SizedBox(height: 14),
-              AppLabeledField(label: 'Notes', controller: _notesController),
+              AppLabeledField(
+                label: 'Notes',
+                hintText: 'Any other notes about this member',
+                controller: _notesController,
+              ),
               const SizedBox(height: 24),
               AppButton(
                 label: 'Save changes',

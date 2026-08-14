@@ -105,12 +105,14 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
               const SizedBox(height: 16),
               AppLabeledField(
                 label: 'Description',
+                hintText: 'e.g. Monthly electricity bill',
                 controller: _descriptionController,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Amount',
+                hintText: 'e.g. 2500',
                 controller: _amountController,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),

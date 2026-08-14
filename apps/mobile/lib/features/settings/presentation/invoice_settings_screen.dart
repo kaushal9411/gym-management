@@ -128,11 +128,13 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
                   ],
                   AppLabeledField(
                     label: 'Invoice prefix',
+                    hintText: 'e.g. INV-',
                     controller: _prefixController,
                   ),
                   const SizedBox(height: 14),
                   AppLabeledField(
                     label: 'Tax rate % (GST)',
+                    hintText: 'e.g. 18',
                     controller: _taxController,
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
@@ -145,6 +147,7 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
                   const SizedBox(height: 14),
                   AppLabeledField(
                     label: 'Payment terms (days)',
+                    hintText: 'e.g. 7 (0 = due on receipt)',
                     controller: _termsController,
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -152,6 +155,7 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
                   const SizedBox(height: 14),
                   AppLabeledField(
                     label: 'Footer note',
+                    hintText: 'e.g. Thank you for your business (optional)',
                     controller: _footerController,
                   ),
                   const SizedBox(height: 24),

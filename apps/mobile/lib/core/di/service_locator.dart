@@ -21,16 +21,20 @@ import '../../repositories/finance_repository.dart';
 import '../../repositories/food_repository.dart';
 import '../../repositories/group_class_repository.dart';
 import '../../repositories/gym_settings_repository.dart';
+import '../../repositories/iam_user_repository.dart';
 import '../../repositories/income_repository.dart';
+import '../../repositories/invitation_repository.dart';
 import '../../repositories/invoice_repository.dart';
 import '../../repositories/member_auth_repository.dart';
 import '../../repositories/member_portal_repository.dart';
 import '../../repositories/member_repository.dart';
 import '../../repositories/membership_plan_repository.dart';
+import '../../repositories/payment_repository.dart';
 import '../../repositories/profile_repository.dart';
 import '../../repositories/public_tenant_repository.dart';
 import '../../repositories/reports_repository.dart';
 import '../../repositories/scheduled_report_repository.dart';
+import '../../repositories/search_repository.dart';
 import '../../repositories/staff_repository.dart';
 import '../../repositories/support_ticket_repository.dart';
 import '../../repositories/tenant_notification_repository.dart';
@@ -141,6 +145,15 @@ void setupServiceLocator() {
   );
   getIt.registerLazySingleton<PaymentRepository>(
     () => PaymentRepository(getIt()),
+  );
+  getIt.registerLazySingleton<IamUserRepository>(
+    () => IamUserRepository(getIt()),
+  );
+  getIt.registerLazySingleton<InvitationRepository>(
+    () => InvitationRepository(getIt()),
+  );
+  getIt.registerLazySingleton<SearchRepository>(
+    () => SearchRepository(getIt()),
   );
   getIt.registerLazySingleton<MemberPortalRepository>(
     () => MemberPortalRepository(getIt()),

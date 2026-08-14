@@ -138,12 +138,14 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
                     const SizedBox(height: 16),
                     AppLabeledField(
                       label: 'Class name',
+                      hintText: 'e.g. Morning Yoga',
                       controller: _nameController,
                       textInputAction: TextInputAction.next,
                     ),
                     const SizedBox(height: 14),
                     AppLabeledField(
                       label: 'Description',
+                      hintText: 'What members can expect (optional)',
                       controller: _descriptionController,
                       textInputAction: TextInputAction.next,
                     ),

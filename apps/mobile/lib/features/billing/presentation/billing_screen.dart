@@ -168,6 +168,12 @@ class _BillingScreenState extends State<BillingScreen> {
           variant: AppButtonVariant.ghost,
           onPressed: () => context.push(AppRoutes.billingHistory),
         ),
+        const SizedBox(height: 10),
+        AppButton(
+          label: 'Billing address',
+          variant: AppButtonVariant.ghost,
+          onPressed: () => context.push(AppRoutes.billingAddress),
+        ),
       ],
     );
   }

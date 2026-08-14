@@ -1,7 +1,12 @@
 import { TenantError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { cache } from '../../../infrastructure/cache/redis';
-import type { ResolvedTenant, ResolvedTenantRecord, TenantRepositoryPort } from '../interfaces/tenant.interface';
+import type {
+  PublicTenantSummary,
+  ResolvedTenant,
+  ResolvedTenantRecord,
+  TenantRepositoryPort,
+} from '../interfaces/tenant.interface';
 import { tenantRepository } from '../repository/tenant.repository';
 import { RESERVED_SLUGS, SLUG_PATTERN } from '../types/tenant.types';
 
@@ -116,6 +121,11 @@ export class TenantService {
 
     if (!cached) await cache.set(idCacheKey(tenantId), record, CACHE_TTL_SECONDS);
     return toResolvedTenant(record);
+  }
+
+  /** Not cached — this list changes rarely and a stale-for-5-minutes picker is worse than one extra query per pre-login screen view. */
+  listActive(): Promise<PublicTenantSummary[]> {
+    return this.repository.listActive();
   }
 
   async invalidateCache(slug: string, tenantId?: string): Promise<void> {

@@ -152,6 +152,7 @@ class _StaffEditEmploymentScreenState
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Salary amount',
+                hintText: 'e.g. 25000',
                 controller: _salaryAmountController,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),
@@ -162,6 +163,7 @@ class _StaffEditEmploymentScreenState
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Shift',
+                hintText: 'e.g. 9 AM - 6 PM',
                 controller: _shiftController,
               ),
               const SizedBox(height: 14),

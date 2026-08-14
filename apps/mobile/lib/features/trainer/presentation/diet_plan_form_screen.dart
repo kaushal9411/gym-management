@@ -97,6 +97,7 @@ class _DietPlanFormScreenState extends State<DietPlanFormScreen> {
               const SizedBox(height: 16),
               AppLabeledField(
                 label: 'Plan name',
+                hintText: 'e.g. Cutting Phase',
                 controller: _nameController,
                 textInputAction: TextInputAction.next,
               ),
@@ -110,6 +111,7 @@ class _DietPlanFormScreenState extends State<DietPlanFormScreen> {
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Daily calorie target (kcal)',
+                hintText: 'e.g. 2000',
                 controller: _caloriesController,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],

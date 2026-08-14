@@ -113,12 +113,14 @@ class _AnnouncementFormScreenState extends State<AnnouncementFormScreen> {
               const SizedBox(height: 16),
               AppLabeledField(
                 label: 'Title',
+                hintText: 'e.g. Holiday hours this weekend',
                 controller: _titleController,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Message',
+                hintText: 'Write your announcement…',
                 controller: _bodyController,
                 textInputAction: TextInputAction.newline,
               ),

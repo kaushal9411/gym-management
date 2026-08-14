@@ -147,18 +147,21 @@ class _RoleFormScreenState extends State<RoleFormScreen> {
                         const SizedBox(height: 16),
                         AppLabeledField(
                           label: 'Role name',
+                          hintText: 'e.g. Shift Supervisor',
                           controller: _nameController,
                           textInputAction: TextInputAction.next,
                         ),
                         const SizedBox(height: 14),
                         AppLabeledField(
                           label: 'Description',
+                          hintText: 'What this role is for (optional)',
                           controller: _descriptionController,
                           textInputAction: TextInputAction.next,
                         ),
                         const SizedBox(height: 14),
                         AppLabeledField(
                           label: 'Priority',
+                          hintText: 'e.g. 10',
                           controller: _priorityController,
                           keyboardType: TextInputType.number,
                           inputFormatters: [

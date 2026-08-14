@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/network/auth_event_bus.dart';
 import '../../core/storage/secure_storage.dart';
+import '../../core/theme/app_colors.dart';
 import '../../models/member_profile.dart';
 import '../../models/tenant_branding.dart';
 import '../../models/user_profile.dart';
@@ -40,36 +41,73 @@ class SessionCubit extends Cubit<SessionState> {
   Future<void> restore() async {
     final actorType = await _storage.readActorType();
     final slug = await _storage.readTenantSlug();
-    try {
-      if (actorType == null || slug == null) {
-        emit(const SessionUnauthenticated());
-        return;
-      }
-      switch (actorType) {
-        case ActorType.staff:
-          final Future<UserProfile> userFuture = _authRepository.me();
-          final Future<TenantBranding> tenantFuture =
-              _publicTenantRepository.resolve(slug);
-          emit(SessionAuthenticatedStaff(await userFuture, await tenantFuture));
-        case ActorType.member:
-          final member = await _memberAuthRepository.restoreCachedProfile();
-          if (member == null) {
-            await _storage.clearSession();
-            emit(const SessionUnauthenticated());
-          } else {
+    if (actorType != null && slug != null) {
+      try {
+        switch (actorType) {
+          case ActorType.staff:
+            final Future<UserProfile> userFuture = _authRepository.me();
+            final Future<TenantBranding> tenantFuture =
+                _publicTenantRepository.resolve(slug);
             emit(
-              SessionAuthenticatedMember(
-                member,
-                await _publicTenantRepository.resolve(slug),
-              ),
+              SessionAuthenticatedStaff(await userFuture, await tenantFuture),
             );
-          }
+            return;
+          case ActorType.member:
+            final member = await _memberAuthRepository.restoreCachedProfile();
+            if (member != null) {
+              emit(
+                SessionAuthenticatedMember(
+                  member,
+                  await _publicTenantRepository.resolve(slug),
+                ),
+              );
+              return;
+            }
+        }
+      } catch (_) {
+        // Falls through to the remembered-gym lookup below.
       }
-    } catch (_) {
       await _storage.clearSession();
-      emit(const SessionUnauthenticated());
+    }
+    emit(await _unauthenticatedWithMemory());
+  }
+
+  /// No valid session, but this device may still remember which gym+role
+  /// it was last used for — resolved here so the router can send a
+  /// returning user straight to Login instead of Find Gym. Any failure
+  /// (nothing remembered, the remembered gym no longer resolves) falls
+  /// back to a bare unauthenticated state, which sends them to Find Gym.
+  Future<SessionUnauthenticated> _unauthenticatedWithMemory() async {
+    final slug = await _storage.readTenantSlug();
+    if (slug == null) return const SessionUnauthenticated();
+    try {
+      final recents = await _publicTenantRepository.recentGyms();
+      RecentGym? match;
+      for (final gym in recents) {
+        if (gym.slug == slug) {
+          match = gym;
+          break;
+        }
+      }
+      if (match == null) return const SessionUnauthenticated();
+      final tenant = await _publicTenantRepository.resolve(slug);
+      final role =
+          match.actorType == ActorType.staff ? AppRole.staff : AppRole.member;
+      return SessionUnauthenticated(
+        rememberedRole: role,
+        rememberedTenant: tenant,
+      );
+    } catch (_) {
+      return const SessionUnauthenticated();
     }
   }
+
+  /// Explicit "Change gym" — clears only the in-memory remembered
+  /// gym/role so the router allows Find Gym again this session. Storage
+  /// is left untouched until the user actually resolves a new gym
+  /// (`PublicTenantRepository.resolve` overwrites it then); backing out
+  /// without picking one keeps the old gym remembered for next launch.
+  void startGymChange() => emit(const SessionUnauthenticated());
 
   void staffSignedIn(UserProfile user, TenantBranding tenant) =>
       emit(SessionAuthenticatedStaff(user, tenant));
@@ -94,13 +132,13 @@ class SessionCubit extends Cubit<SessionState> {
     } else if (current is SessionAuthenticatedMember) {
       await _memberAuthRepository.logout();
     }
-    emit(const SessionUnauthenticated());
+    emit(await _unauthenticatedWithMemory());
   }
 
   Future<void> _handleForcedLogout() async {
     if (state is SessionUnauthenticated || state is SessionUnknown) return;
     await _storage.clearSession();
-    emit(const SessionUnauthenticated());
+    emit(await _unauthenticatedWithMemory());
   }
 
   @override

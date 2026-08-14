@@ -91,6 +91,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
               const SizedBox(height: 16),
               AppLabeledField(
                 label: 'Exercise name',
+                hintText: 'e.g. Barbell Squat',
                 controller: _nameController,
                 textInputAction: TextInputAction.next,
               ),
@@ -106,6 +107,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Equipment',
+                hintText: 'e.g. Barbell (optional)',
                 controller: _equipmentController,
                 textInputAction: TextInputAction.next,
               ),
@@ -117,6 +119,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Sets',
+                      hintText: 'e.g. 3',
                       controller: _setsController,
                       keyboardType: TextInputType.number,
                       inputFormatters: [
@@ -128,6 +131,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Reps',
+                      hintText: 'e.g. 10',
                       controller: _repsController,
                       keyboardType: TextInputType.number,
                       inputFormatters: [

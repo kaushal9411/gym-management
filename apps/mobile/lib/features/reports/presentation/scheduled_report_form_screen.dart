@@ -103,6 +103,7 @@ class _ScheduledReportFormScreenState extends State<ScheduledReportFormScreen> {
               const SizedBox(height: 16),
               AppLabeledField(
                 label: 'Report name',
+                hintText: 'e.g. Weekly revenue summary',
                 controller: _nameController,
                 textInputAction: TextInputAction.next,
               ),
@@ -127,6 +128,7 @@ class _ScheduledReportFormScreenState extends State<ScheduledReportFormScreen> {
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Recipient email(s)',
+                hintText: 'comma-separated, e.g. a@gym.com, b@gym.com',
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.done,

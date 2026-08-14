@@ -105,12 +105,14 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
               const SizedBox(height: 16),
               AppLabeledField(
                 label: 'Description',
+                hintText: 'e.g. Personal training package',
                 controller: _descriptionController,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Amount',
+                hintText: 'e.g. 2500',
                 controller: _amountController,
                 keyboardType:
                     const TextInputType.numberWithOptions(decimal: true),

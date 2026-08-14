@@ -169,6 +169,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
                 const SizedBox(height: 8),
                 AppLabeledField(
                   label: 'Trainer note',
+                  hintText: 'Feedback for this session (optional)',
                   controller: _noteController,
                 ),
                 const SizedBox(height: 20),

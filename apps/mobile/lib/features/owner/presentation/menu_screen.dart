@@ -28,6 +28,14 @@ class _MenuEntry {
 }
 
 const _sections = <String, List<_MenuEntry>>{
+  'Search': [
+    _MenuEntry(
+      icon: Icons.search_rounded,
+      title: 'Global Search',
+      subtitle: 'Members, staff & branches',
+      route: AppRoutes.globalSearch,
+    ),
+  ],
   'Business': [
     _MenuEntry(
       icon: Icons.storefront_outlined,

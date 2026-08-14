@@ -88,12 +88,14 @@ class _SupportTicketFormScreenState extends State<SupportTicketFormScreen> {
               const SizedBox(height: 16),
               AppLabeledField(
                 label: 'Subject',
+                hintText: 'e.g. Cannot check in members at Downtown branch',
                 controller: _subjectController,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Describe the issue',
+                hintText: 'What happened, and what did you expect?',
                 controller: _descriptionController,
                 textInputAction: TextInputAction.newline,
               ),

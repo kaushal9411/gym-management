@@ -11,6 +11,7 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/auth/presentation/staff_mfa_setup_screen.dart';
 import '../../features/auth/presentation/staff_otp_screen.dart';
+import '../../features/billing/presentation/billing_address_screen.dart';
 import '../../features/billing/presentation/billing_history_screen.dart';
 import '../../features/billing/presentation/billing_screen.dart';
 import '../../features/branches/presentation/branch_detail_screen.dart';
@@ -76,9 +77,16 @@ import '../../features/reports/presentation/revenue_report_screen.dart';
 import '../../features/reports/presentation/scheduled_report_form_screen.dart';
 import '../../features/reports/presentation/scheduled_reports_screen.dart';
 import '../../features/reports/presentation/staff_performance_screen.dart';
+import '../../features/roles/presentation/invite_user_screen.dart';
 import '../../features/roles/presentation/role_detail_screen.dart';
 import '../../features/roles/presentation/role_form_screen.dart';
 import '../../features/roles/presentation/roles_screen.dart';
+import '../../features/roles/presentation/user_detail_screen.dart';
+import '../../features/roles/presentation/user_edit_branches_screen.dart';
+import '../../features/roles/presentation/user_edit_permissions_screen.dart';
+import '../../features/roles/presentation/user_edit_roles_screen.dart';
+import '../../features/roles/presentation/user_form_screen.dart';
+import '../../features/search/presentation/global_search_screen.dart';
 import '../../features/settings/presentation/branding_settings_screen.dart';
 import '../../features/settings/presentation/gym_profile_settings_screen.dart';
 import '../../features/settings/presentation/gym_social_screen.dart';
@@ -109,10 +117,11 @@ import '../../models/branch.dart';
 import '../../models/class_session.dart';
 import '../../models/diet_plan.dart';
 import '../../models/exercise.dart';
-import '../../models/group_class.dart';
-import '../../models/gym_profile.dart';
 import '../../models/food.dart';
+import '../../models/group_class.dart';
 import '../../models/gym_member.dart';
+import '../../models/gym_profile.dart';
+import '../../models/iam_user.dart';
 import '../../models/member_invoice.dart';
 import '../../models/member_visit.dart';
 import '../../models/notification_template.dart';
@@ -144,9 +153,15 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         return path == AppRoutes.splash ? null : AppRoutes.splash;
       }
       if (session is SessionUnauthenticated) {
-        return _signedOutPaths.contains(path) && path != AppRoutes.splash
-            ? null
-            : AppRoutes.findGym;
+        if (_signedOutPaths.contains(path) && path != AppRoutes.splash) {
+          return null;
+        }
+        // No page-specific destination (fresh launch, or a stale `/home`
+        // hit while signed out) — a remembered gym+role sends the user
+        // straight to Login; otherwise Find Gym, same as before.
+        final hasRememberedGym = session.rememberedRole != null &&
+            session.rememberedTenant != null;
+        return hasRememberedGym ? AppRoutes.login : AppRoutes.findGym;
       }
       // Authenticated (staff or member) — keep out of the signed-out flow.
       return _signedOutPaths.contains(path) ? AppRoutes.home : null;
@@ -162,8 +177,24 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       ),
       GoRoute(
         path: AppRoutes.login,
-        builder: (context, state) =>
-            LoginScreen(args: state.extra as LoginScreenArgs),
+        builder: (context, state) {
+          final extra = state.extra as LoginScreenArgs?;
+          if (extra != null) return LoginScreen(args: extra);
+          // Reached via the redirect's remembered-gym path (no `extra`
+          // passed) — rebuild the same args from session state instead.
+          final session = sessionCubit.state;
+          if (session is SessionUnauthenticated &&
+              session.rememberedRole != null &&
+              session.rememberedTenant != null) {
+            return LoginScreen(
+              args: LoginScreenArgs(
+                role: session.rememberedRole!,
+                tenant: session.rememberedTenant!,
+              ),
+            );
+          }
+          return const FindGymScreen();
+        },
       ),
       GoRoute(
         path: AppRoutes.otp,
@@ -351,6 +382,45 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
             RoleDetailScreen(roleId: state.extra as String),
       ),
       GoRoute(
+        path: AppRoutes.roleForm,
+        builder: (context, state) =>
+            RoleFormScreen(existing: state.extra as TenantRole?),
+      ),
+      GoRoute(
+        path: AppRoutes.userDetail,
+        builder: (context, state) =>
+            UserDetailScreen(userId: state.extra as String),
+      ),
+      GoRoute(
+        path: AppRoutes.userForm,
+        builder: (context, state) =>
+            UserFormScreen(roles: state.extra as List<TenantRole>),
+      ),
+      GoRoute(
+        path: AppRoutes.userEditRoles,
+        builder: (context, state) =>
+            UserEditRolesScreen(user: state.extra as IamUser),
+      ),
+      GoRoute(
+        path: AppRoutes.userEditBranches,
+        builder: (context, state) =>
+            UserEditBranchesScreen(user: state.extra as IamUser),
+      ),
+      GoRoute(
+        path: AppRoutes.userEditPermissions,
+        builder: (context, state) =>
+            UserEditPermissionsScreen(user: state.extra as IamUser),
+      ),
+      GoRoute(
+        path: AppRoutes.inviteUser,
+        builder: (context, state) =>
+            InviteUserScreen(roles: state.extra as List<TenantRole>),
+      ),
+      GoRoute(
+        path: AppRoutes.globalSearch,
+        builder: (context, state) => const GlobalSearchScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.payments,
         builder: (context, state) => const PaymentsScreen(),
       ),
@@ -366,6 +436,10 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       GoRoute(
         path: AppRoutes.billingHistory,
         builder: (context, state) => const BillingHistoryScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.billingAddress,
+        builder: (context, state) => const BillingAddressScreen(),
       ),
       GoRoute(
         path: AppRoutes.gymSettings,

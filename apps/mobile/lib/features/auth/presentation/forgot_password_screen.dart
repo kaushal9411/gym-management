@@ -128,6 +128,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ],
                 AppLabeledField(
                   label: _isStaff ? 'Work email' : 'Member ID',
+                  hintText: _isStaff ? 'you@gym.com' : 'MEM-0001',
                   controller: _controller,
                   keyboardType: _isStaff
                       ? TextInputType.emailAddress

@@ -181,3 +181,22 @@ v1Router.get('/public/tenants/resolve', async (req, res, next) => {
     next(error);
   }
 });
+
+/**
+ * @openapi
+ * /public/tenants:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: List active gyms for the pre-login "select your gym" picker (no auth required)
+ *     description: Name/slug/logo only, for tenants a login attempt could actually succeed against (suspended/cancelled/maintenance-mode tenants are excluded).
+ *     responses:
+ *       200: { description: Array of { slug, name, logoUrl } }
+ */
+v1Router.get('/public/tenants', async (_req, res, next) => {
+  try {
+    const tenants = await tenantService.listActive();
+    sendSuccess(res, tenants);
+  } catch (error) {
+    next(error);
+  }
+});

@@ -56,8 +56,16 @@ class AppRoutes {
   static const roles = '/roles';
   static const roleDetail = '/roles/detail';
   static const roleForm = '/roles/form';
+  static const userDetail = '/users/detail';
+  static const userForm = '/users/form';
+  static const userEditRoles = '/users/edit-roles';
+  static const userEditBranches = '/users/edit-branches';
+  static const userEditPermissions = '/users/edit-permissions';
+  static const inviteUser = '/invitations/new';
+  static const globalSearch = '/search';
   static const billing = '/billing';
   static const billingHistory = '/billing/history';
+  static const billingAddress = '/billing/address';
   static const gymSettings = '/settings';
   static const gymProfileSettings = '/settings/profile';
   static const gymSocialSettings = '/settings/profile/social';

@@ -123,18 +123,21 @@ class _StaffFormScreenState extends State<StaffFormScreen> {
               const SizedBox(height: 16),
               AppLabeledField(
                 label: 'First name',
+                hintText: 'e.g. Arjun',
                 controller: _firstNameController,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Last name',
+                hintText: 'e.g. Trainer',
                 controller: _lastNameController,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Email',
+                hintText: 'staff@gym.com',
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,

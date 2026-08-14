@@ -137,18 +137,21 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
                     const SizedBox(height: 16),
                     AppLabeledField(
                       label: 'First name',
+                      hintText: 'e.g. Karan',
                       controller: _firstNameController,
                       textInputAction: TextInputAction.next,
                     ),
                     const SizedBox(height: 14),
                     AppLabeledField(
                       label: 'Last name',
+                      hintText: 'e.g. Reddy',
                       controller: _lastNameController,
                       textInputAction: TextInputAction.next,
                     ),
                     const SizedBox(height: 14),
                     AppLabeledField(
                       label: 'Phone',
+                      hintText: 'e.g. 9876543210',
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
                       textInputAction: TextInputAction.next,
@@ -156,6 +159,7 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
                     const SizedBox(height: 14),
                     AppLabeledField(
                       label: 'Email',
+                      hintText: 'member@example.com',
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,

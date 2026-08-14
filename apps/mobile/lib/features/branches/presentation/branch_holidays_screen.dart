@@ -118,6 +118,7 @@ class _BranchHolidaysScreenState extends State<BranchHolidaysScreen> {
               const SizedBox(height: 16),
               AppLabeledField(
                 label: 'Date',
+                hintText: 'Tap to pick a date',
                 controller: TextEditingController(
                   text: _date == null
                       ? ''
@@ -129,6 +130,7 @@ class _BranchHolidaysScreenState extends State<BranchHolidaysScreen> {
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Label',
+                hintText: 'e.g. Diwali (optional)',
                 controller: _labelController,
               ),
               const SizedBox(height: 10),

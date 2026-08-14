@@ -98,18 +98,21 @@ class _BranchFormScreenState extends State<BranchFormScreen> {
               const SizedBox(height: 16),
               AppLabeledField(
                 label: 'Branch name',
+                hintText: 'e.g. Bandra Branch',
                 controller: _nameController,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Address',
+                hintText: 'Street, building, area',
                 controller: _addressController,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 14),
               AppLabeledField(
                 label: 'Capacity',
+                hintText: 'e.g. 150',
                 controller: _capacityController,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],

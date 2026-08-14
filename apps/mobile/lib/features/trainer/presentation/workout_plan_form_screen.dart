@@ -99,6 +99,7 @@ class _WorkoutPlanFormScreenState extends State<WorkoutPlanFormScreen> {
               const SizedBox(height: 16),
               AppLabeledField(
                 label: 'Plan name',
+                hintText: 'e.g. Strength Foundations',
                 controller: _nameController,
                 textInputAction: TextInputAction.next,
               ),

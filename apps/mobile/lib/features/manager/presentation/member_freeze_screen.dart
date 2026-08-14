@@ -76,6 +76,7 @@ class _MemberFreezeScreenState extends State<MemberFreezeScreen> {
               ],
               AppLabeledField(
                 label: 'Reason (optional)',
+                hintText: 'e.g. Traveling, injury',
                 controller: _reasonController,
                 textInputAction: TextInputAction.done,
               ),

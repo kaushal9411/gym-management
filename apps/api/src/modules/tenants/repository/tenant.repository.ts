@@ -3,6 +3,7 @@ import type { Branch, Prisma, Tenant, TenantSettings } from '@prisma/client';
 import { prisma } from '../../../infrastructure/database/prisma';
 import type {
   CreateTenantInput,
+  PublicTenantSummary,
   ResolvedTenantRecord,
   TenantRepositoryPort,
 } from '../interfaces/tenant.interface';
@@ -95,6 +96,31 @@ export class TenantRepository implements TenantRepositoryPort {
   async slugExists(slug: string): Promise<boolean> {
     const count = await prisma.tenant.count({ where: { slug } });
     return count > 0;
+  }
+
+  /**
+   * Backs the pre-login "pick your gym" list (mobile's Find Gym screen).
+   * `ACTIVE`/`TRIAL`/`PAST_DUE` are all states a real login attempt can
+   * still succeed against (`assertTenantAccessible` only hard-blocks
+   * `SUSPENDED`/`CANCELLED` and only blocks `PAST_DUE` once its grace
+   * period has actually lapsed) — `SUSPENDED`/`CANCELLED`/maintenance-mode
+   * tenants are left out since picking them would just dead-end at login.
+   * Capped at 500 and name/slug/logo only — this is a real public,
+   * unauthenticated directory of every eligible tenant on the platform,
+   * so it deliberately carries nothing beyond what a picker row needs.
+   */
+  async listActive(): Promise<PublicTenantSummary[]> {
+    const tenants = await prisma.tenant.findMany({
+      where: {
+        deletedAt: null,
+        maintenanceMode: false,
+        status: { in: ['ACTIVE', 'TRIAL', 'PAST_DUE'] },
+      },
+      select: { slug: true, name: true, branding: { select: { logoUrl: true } } },
+      orderBy: { name: 'asc' },
+      take: 500,
+    });
+    return tenants.map((t) => ({ slug: t.slug, name: t.name, logoUrl: t.branding?.logoUrl ?? null }));
   }
 
   /**

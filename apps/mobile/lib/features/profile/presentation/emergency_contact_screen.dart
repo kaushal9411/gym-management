@@ -110,12 +110,14 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
                   ],
                   AppLabeledField(
                     label: 'Name',
+                    hintText: 'e.g. Priya Sharma',
                     controller: _nameController,
                     textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 14),
                   AppLabeledField(
                     label: 'Phone',
+                    hintText: 'e.g. 9876543210',
                     controller: _phoneController,
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.next,
@@ -123,6 +125,7 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
                   const SizedBox(height: 14),
                   AppLabeledField(
                     label: 'Relation',
+                    hintText: 'e.g. Spouse, Parent, Sibling',
                     controller: _relationController,
                     textInputAction: TextInputAction.done,
                   ),

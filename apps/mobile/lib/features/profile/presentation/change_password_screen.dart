@@ -90,6 +90,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             ],
             AppLabeledField(
               label: 'Current password',
+              hintText: 'Enter your current password',
               controller: _currentController,
               obscureText: true,
               textInputAction: TextInputAction.next,
@@ -97,6 +98,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             const SizedBox(height: 14),
             AppLabeledField(
               label: 'New password',
+              hintText: 'At least 8 characters',
               controller: _newController,
               obscureText: true,
               textInputAction: TextInputAction.next,
@@ -104,6 +106,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             const SizedBox(height: 14),
             AppLabeledField(
               label: 'Confirm new password',
+              hintText: 'Re-enter new password',
               controller: _confirmController,
               obscureText: true,
               textInputAction: TextInputAction.done,

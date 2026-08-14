@@ -105,6 +105,7 @@ class _MemberEditPersonalScreenState extends State<MemberEditPersonalScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Gender',
+                      hintText: 'e.g. Male, Female',
                       controller: _genderController,
                     ),
                   ),
@@ -112,6 +113,7 @@ class _MemberEditPersonalScreenState extends State<MemberEditPersonalScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Date of birth',
+                      hintText: 'YYYY-MM-DD',
                       controller: _dobController,
                       keyboardType: TextInputType.datetime,
                     ),
@@ -124,6 +126,7 @@ class _MemberEditPersonalScreenState extends State<MemberEditPersonalScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Blood group',
+                      hintText: 'e.g. O+',
                       controller: _bloodGroupController,
                     ),
                   ),
@@ -131,6 +134,7 @@ class _MemberEditPersonalScreenState extends State<MemberEditPersonalScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Occupation',
+                      hintText: 'e.g. Software Engineer',
                       controller: _occupationController,
                     ),
                   ),
@@ -142,6 +146,7 @@ class _MemberEditPersonalScreenState extends State<MemberEditPersonalScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Height (cm)',
+                      hintText: 'e.g. 175',
                       controller: _heightController,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
@@ -157,6 +162,7 @@ class _MemberEditPersonalScreenState extends State<MemberEditPersonalScreen> {
                   Expanded(
                     child: AppLabeledField(
                       label: 'Weight (kg)',
+                      hintText: 'e.g. 70',
                       controller: _weightController,
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,

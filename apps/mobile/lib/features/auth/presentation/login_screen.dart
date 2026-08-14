@@ -130,7 +130,14 @@ class _LoginScreenState extends State<LoginScreen> {
         .memberSignedIn(result.member, widget.args.tenant);
   }
 
-  void _changeGym() => context.pop();
+  /// Explicit gym switch — clears the in-memory remembered gym/role (not
+  /// storage; see `SessionCubit.startGymChange`) and navigates rather than
+  /// popping, since this screen may have been reached directly via the
+  /// remembered-gym redirect with nothing underneath it on the stack.
+  void _changeGym() {
+    context.read<SessionCubit>().startGymChange();
+    context.go(AppRoutes.findGym);
+  }
 
   void _forgotPassword() => context.push(
         AppRoutes.forgotPassword,
@@ -192,6 +199,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                     AppLabeledField(
                       label: _isStaff ? 'Work email' : 'Member ID',
+                      hintText: _isStaff ? 'you@gym.com' : 'MEM-0001',
                       controller: _identifierController,
                       keyboardType: _isStaff
                           ? TextInputType.emailAddress
@@ -207,6 +215,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 14),
                     AppLabeledField(
                       label: 'Password',
+                      hintText: 'Enter your password',
                       controller: _passwordController,
                       obscureText: true,
                       autofillHints: const [AutofillHints.password],

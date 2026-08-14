@@ -113,6 +113,7 @@ class _ClassAddAttendeeScreenState extends State<ClassAddAttendeeScreen> {
             children: [
               AppLabeledField(
                 label: 'Search members',
+                hintText: 'Name or Member ID',
                 controller: _searchController,
                 onSubmitted: (_) => _search(),
                 autofocus: true,
