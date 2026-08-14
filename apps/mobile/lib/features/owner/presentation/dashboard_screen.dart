@@ -13,6 +13,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import 'widgets/kpi_card.dart';
 import 'widgets/recent_activity_tile.dart';
 import 'widgets/revenue_sparkline.dart';
@@ -40,8 +41,9 @@ class _DashboardView extends StatelessWidget {
     final session = context.watch<SessionCubit>().state;
     final tenantName =
         session is SessionAuthenticatedStaff ? session.tenant.name : '';
-    final initials =
-        session is SessionAuthenticatedStaff ? session.user.initials : '';
+    final name = session is SessionAuthenticatedStaff ? session.user.name : '';
+    final avatarUrl =
+        session is SessionAuthenticatedStaff ? session.user.avatarUrl : null;
 
     return RefreshIndicator(
       color: AppColors.staffB,
@@ -63,23 +65,7 @@ class _DashboardView extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: () => context.push(AppRoutes.myProfile),
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: const BoxDecoration(
-                    gradient: AppColors.staffGrad,
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    initials,
-                    style: AppText.body(
-                      size: 12,
-                      weight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
+                child: UserAvatar(avatarUrl: avatarUrl, name: name),
               ),
             ],
           ),

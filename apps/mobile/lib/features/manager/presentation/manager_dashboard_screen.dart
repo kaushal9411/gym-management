@@ -16,6 +16,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../repositories/reports_repository.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import '../../owner/presentation/widgets/kpi_card.dart';
 import '../../owner/presentation/widgets/recent_activity_tile.dart';
 
@@ -74,8 +75,9 @@ class _ManagerDashboardViewState extends State<_ManagerDashboardView> {
     final session = context.watch<SessionCubit>().state;
     final tenantName =
         session is SessionAuthenticatedStaff ? session.tenant.name : '';
-    final initials =
-        session is SessionAuthenticatedStaff ? session.user.initials : '';
+    final name = session is SessionAuthenticatedStaff ? session.user.name : '';
+    final avatarUrl =
+        session is SessionAuthenticatedStaff ? session.user.avatarUrl : null;
 
     return RefreshIndicator(
       color: AppColors.staffB,
@@ -100,23 +102,7 @@ class _ManagerDashboardViewState extends State<_ManagerDashboardView> {
               ),
               GestureDetector(
                 onTap: () => context.push(AppRoutes.myProfile),
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: const BoxDecoration(
-                    gradient: AppColors.staffGrad,
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    initials,
-                    style: AppText.body(
-                      size: 12,
-                      weight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
+                child: UserAvatar(avatarUrl: avatarUrl, name: name),
               ),
             ],
           ),

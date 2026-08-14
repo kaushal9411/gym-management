@@ -6,6 +6,7 @@ class UserProfile {
     required this.name,
     required this.email,
     required this.phone,
+    this.avatarUrl,
     required this.status,
     required this.roles,
     required this.permissions,
@@ -16,6 +17,7 @@ class UserProfile {
   final String name;
   final String email;
   final String? phone;
+  final String? avatarUrl;
   final String status;
   final List<String> roles;
   final List<String> permissions;
@@ -45,6 +47,7 @@ class UserProfile {
         name: json['name'] as String? ?? '',
         email: json['email'] as String? ?? '',
         phone: json['phone'] as String?,
+        avatarUrl: json['avatarUrl'] as String?,
         status: json['status'] as String? ?? '',
         roles: (json['roles'] as List?)?.cast<String>() ?? const [],
         permissions: (json['permissions'] as List?)?.cast<String>() ?? const [],

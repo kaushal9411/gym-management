@@ -53,7 +53,12 @@ import '../../features/manager/presentation/staff_form_screen.dart';
 import '../../features/notifications/presentation/notification_template_form_screen.dart';
 import '../../features/notifications/presentation/notification_templates_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
+import '../../features/profile/presentation/change_password_screen.dart';
+import '../../features/profile/presentation/emergency_contact_screen.dart';
+import '../../features/profile/presentation/my_permissions_screen.dart';
 import '../../features/profile/presentation/my_profile_screen.dart';
+import '../../features/profile/presentation/notification_preferences_screen.dart';
+import '../../features/profile/presentation/profile_data_screen.dart';
 import '../../features/receptionist/presentation/checked_in_screen.dart';
 import '../../features/receptionist/presentation/class_add_attendee_screen.dart';
 import '../../features/receptionist/presentation/class_form_screen.dart';
@@ -180,6 +185,26 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       GoRoute(
         path: AppRoutes.myProfile,
         builder: (context, state) => const MyProfileScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.profileData,
+        builder: (context, state) => const ProfileDataScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.profileEmergencyContact,
+        builder: (context, state) => const EmergencyContactScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.profileNotifications,
+        builder: (context, state) => const NotificationPreferencesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.profileChangePassword,
+        builder: (context, state) => const ChangePasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.profilePermissions,
+        builder: (context, state) => const MyPermissionsScreen(),
       ),
       GoRoute(
         path: AppRoutes.branches,

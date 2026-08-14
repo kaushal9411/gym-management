@@ -2,36 +2,81 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../bloc/session/session_cubit.dart';
-import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/staff_profile.dart';
-import '../../../repositories/auth_repository.dart';
 import '../../../repositories/profile_repository.dart';
-import '../../../shared/widgets/app_button.dart';
-import '../../../shared/widgets/app_labeled_field.dart';
-import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/user_avatar.dart';
 
-const _preferenceLabels = <String, String>{
-  'email_billing': 'Billing & subscription emails',
-  'email_announcements': 'Platform announcements',
-  'inapp_system': 'In-app system alerts',
-};
+class _MenuEntry {
+  const _MenuEntry({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.route,
+    this.danger = false,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? route;
+  final bool danger;
+}
+
+const _entries = [
+  _MenuEntry(
+    icon: Icons.person_outline_rounded,
+    title: 'Profile data',
+    subtitle: 'Name, phone',
+    route: AppRoutes.profileData,
+  ),
+  _MenuEntry(
+    icon: Icons.emergency_outlined,
+    title: 'Emergency contact',
+    subtitle: 'Who to call, and how',
+    route: AppRoutes.profileEmergencyContact,
+  ),
+  _MenuEntry(
+    icon: Icons.notifications_outlined,
+    title: 'Notification preferences',
+    subtitle: 'What you get notified about',
+    route: AppRoutes.profileNotifications,
+  ),
+  _MenuEntry(
+    icon: Icons.lock_outline_rounded,
+    title: 'Change password',
+    subtitle: 'Signs out other devices',
+    route: AppRoutes.profileChangePassword,
+  ),
+  _MenuEntry(
+    icon: Icons.shield_outlined,
+    title: 'Check permissions',
+    subtitle: 'Your role and what it can do',
+    route: AppRoutes.profilePermissions,
+  ),
+  _MenuEntry(
+    icon: Icons.logout_rounded,
+    title: 'Log out',
+    subtitle: 'End this session',
+    danger: true,
+  ),
+];
 
 /// The header avatar circle (Owner/Manager/Trainer/Receptionist — every
-/// staff menu/dashboard screen) now opens here. Mirrors `apps/tenant-web`'s
-/// `/profile` page (`GET/PATCH /profile`): photo, editable fields (every
-/// field except email — the backend requires `users:manage` to change
-/// that), notification prefs, a change-password section
-/// (`PATCH /auth/change-password`), and a read-only roles/permissions view
-/// sourced from the session's own `/auth/me` data.
+/// staff menu/dashboard screen) opens here. A hub, mirroring
+/// `GymSettingsScreen`'s pattern: this screen shows the photo + identity
+/// header and holds no editable fields itself — each menu row owns one
+/// slice of `ProfileDto` and does its own `GET/PATCH /profile` round trip.
 class MyProfileScreen extends StatefulWidget {
   const MyProfileScreen({super.key});
 
@@ -42,75 +87,42 @@ class MyProfileScreen extends StatefulWidget {
 class _MyProfileScreenState extends State<MyProfileScreen> {
   StaffProfile? _profile;
   bool _loading = true;
-  String? _loadError;
-
-  late final TextEditingController _nameController;
-  late final TextEditingController _phoneController;
-  late final TextEditingController _ecNameController;
-  late final TextEditingController _ecPhoneController;
-  late final TextEditingController _ecRelationController;
-  String? _avatarUrl;
-  Map<String, bool> _prefs = {};
-
-  bool _savingProfile = false;
-  String? _profileError;
-
-  final _currentPasswordController = TextEditingController();
-  final _newPasswordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  bool _changingPassword = false;
-  String? _passwordError;
+  String? _error;
+  bool _uploadingPhoto = false;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController();
-    _phoneController = TextEditingController();
-    _ecNameController = TextEditingController();
-    _ecPhoneController = TextEditingController();
-    _ecRelationController = TextEditingController();
     _load();
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _ecNameController.dispose();
-    _ecPhoneController.dispose();
-    _ecRelationController.dispose();
-    _currentPasswordController.dispose();
-    _newPasswordController.dispose();
-    _confirmPasswordController.dispose();
-    super.dispose();
   }
 
   Future<void> _load() async {
     setState(() {
       _loading = true;
-      _loadError = null;
+      _error = null;
     });
     try {
       final profile = await getIt<ProfileRepository>().getProfile();
       if (!mounted) return;
       setState(() {
         _profile = profile;
-        _nameController.text = profile.name;
-        _phoneController.text = profile.phone ?? '';
-        _ecNameController.text = profile.emergencyContact.name ?? '';
-        _ecPhoneController.text = profile.emergencyContact.phone ?? '';
-        _ecRelationController.text = profile.emergencyContact.relation ?? '';
-        _avatarUrl = profile.avatarUrl;
-        _prefs = {...profile.notificationPreferences};
         _loading = false;
       });
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
-        _loadError = e.message;
+        _error = e.message;
         _loading = false;
       });
     }
+  }
+
+  /// Pushes [route] and refreshes on return, since the sub-screen may have
+  /// changed a field this hub displays (name, phone) or that another row
+  /// depends on.
+  Future<void> _openSection(String route) async {
+    await context.push(route);
+    if (mounted) _load();
   }
 
   Future<void> _pickPhoto(ImageSource source) async {
@@ -123,7 +135,36 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     if (!mounted) return;
-    setState(() => _avatarUrl = 'data:image/jpeg;base64,${base64Encode(bytes)}');
+    setState(() => _uploadingPhoto = true);
+    try {
+      final updated = await getIt<ProfileRepository>()
+          .updateAvatar('data:image/jpeg;base64,${base64Encode(bytes)}');
+      if (!mounted) return;
+      setState(() => _profile = updated);
+      await context.read<SessionCubit>().refreshStaffUser();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
+  Future<void> _removePhoto() async {
+    setState(() => _uploadingPhoto = true);
+    try {
+      final updated = await getIt<ProfileRepository>().updateAvatar(null);
+      if (!mounted) return;
+      setState(() => _profile = updated);
+      await context.read<SessionCubit>().refreshStaffUser();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
   }
 
   void _showPhotoOptions() {
@@ -154,14 +195,14 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
                 _pickPhoto(ImageSource.gallery);
               },
             ),
-            if (_avatarUrl != null && _avatarUrl!.isNotEmpty)
+            if (_profile?.avatarUrl != null && _profile!.avatarUrl!.isNotEmpty)
               _PhotoOptionTile(
                 icon: Icons.delete_outline_rounded,
                 label: 'Remove photo',
                 color: AppColors.danger,
                 onTap: () {
                   Navigator.pop(sheetContext);
-                  setState(() => _avatarUrl = null);
+                  _removePhoto();
                 },
               ),
             const SizedBox(height: 8),
@@ -171,123 +212,48 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
     );
   }
 
-  Future<void> _saveProfile() async {
-    final name = _nameController.text.trim();
-    if (name.length < 2) {
-      setState(() => _profileError = 'Full name is required');
-      return;
-    }
-    setState(() {
-      _savingProfile = true;
-      _profileError = null;
-    });
-    try {
-      final updated = await getIt<ProfileRepository>().updateProfile(
-        name: name,
-        phone: _phoneController.text.trim().isEmpty
-            ? null
-            : _phoneController.text.trim(),
-        avatarUrl: _avatarUrl,
-        emergencyContactName: _ecNameController.text.trim().isEmpty
-            ? null
-            : _ecNameController.text.trim(),
-        emergencyContactPhone: _ecPhoneController.text.trim().isEmpty
-            ? null
-            : _ecPhoneController.text.trim(),
-        emergencyContactRelation: _ecRelationController.text.trim().isEmpty
-            ? null
-            : _ecRelationController.text.trim(),
-      );
-      if (!mounted) return;
-      setState(() => _profile = updated);
-      if (!mounted) return;
-      await context.read<SessionCubit>().refreshStaffUser();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Profile saved')));
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _profileError = e.message);
-    } finally {
-      if (mounted) setState(() => _savingProfile = false);
-    }
-  }
-
-  Future<void> _togglePreference(String key, bool value) async {
-    final previous = {..._prefs};
-    setState(() => _prefs[key] = value);
-    try {
-      final updated = await getIt<ProfileRepository>().updateProfile(
-        name: _nameController.text.trim(),
-        phone: _phoneController.text.trim().isEmpty
-            ? null
-            : _phoneController.text.trim(),
-        avatarUrl: _avatarUrl,
-        emergencyContactName: _ecNameController.text.trim().isEmpty
-            ? null
-            : _ecNameController.text.trim(),
-        emergencyContactPhone: _ecPhoneController.text.trim().isEmpty
-            ? null
-            : _ecPhoneController.text.trim(),
-        emergencyContactRelation: _ecRelationController.text.trim().isEmpty
-            ? null
-            : _ecRelationController.text.trim(),
-        notificationPreferences: _prefs,
-      );
-      if (!mounted) return;
-      setState(() => _profile = updated);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _prefs = previous);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
-    }
-  }
-
-  Future<void> _changePassword() async {
-    final current = _currentPasswordController.text;
-    final next = _newPasswordController.text;
-    final confirm = _confirmPasswordController.text;
-    if (current.isEmpty || next.isEmpty) {
-      setState(() => _passwordError = 'Both password fields are required');
-      return;
-    }
-    if (next != confirm) {
-      setState(() => _passwordError = 'New passwords don\'t match');
-      return;
-    }
-    setState(() {
-      _changingPassword = true;
-      _passwordError = null;
-    });
-    try {
-      await getIt<AuthRepository>().changePassword(
-        currentPassword: current,
-        newPassword: next,
-      );
-      if (!mounted) return;
-      _currentPasswordController.clear();
-      _newPasswordController.clear();
-      _confirmPasswordController.clear();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password changed. Other devices were signed out.'),
+  Future<void> _confirmLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surface2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.card),
         ),
-      );
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _passwordError = e.message);
-    } finally {
-      if (mounted) setState(() => _changingPassword = false);
+        title: Text('Log out of FitCloud?', style: AppText.display(size: 18)),
+        content: Text(
+          "You'll need your email and password to sign back in.",
+          style: AppText.body(size: 13, color: AppColors.inkFaint),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => dialogContext.pop(false),
+            child: Text(
+              'Cancel',
+              style: AppText.body(size: 13, weight: FontWeight.w700),
+            ),
+          ),
+          TextButton(
+            onPressed: () => dialogContext.pop(true),
+            child: Text(
+              'Log out',
+              style: AppText.body(
+                size: 13,
+                weight: FontWeight.w700,
+                color: AppColors.danger,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await context.read<SessionCubit>().signOut();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final session = context.watch<SessionCubit>().state;
-    final sessionUser =
-        session is SessionAuthenticatedStaff ? session.user : null;
-
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
@@ -300,143 +266,58 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
         child: _loading
             ? const AppLoadingView()
             : _profile == null
-                ? AppErrorView(message: _loadError!, onRetry: _load)
+                ? AppErrorView(message: _error!, onRetry: _load)
                 : ListView(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
+                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
                     children: [
                       Center(
                         child: _AvatarPicker(
-                          avatarUrl: _avatarUrl,
-                          initials: sessionUser?.initials ?? '?',
+                          avatarUrl: _profile!.avatarUrl,
+                          initials: _profile!.name,
+                          loading: _uploadingPhoto,
                           onTap: _showPhotoOptions,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
+                      Center(
+                        child: Text(
+                          _profile!.name,
+                          style: AppText.display(size: 18),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       Center(
                         child: Text(
                           _profile!.email,
                           style: AppText.body(
-                            size: 12,
+                            size: 12.5,
                             color: AppColors.inkFaint,
                             weight: FontWeight.w600,
                           ),
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      Text('Profile', style: AppText.eyebrow()),
-                      const SizedBox(height: 10),
-                      if (_profileError != null) ...[
-                        FormAlert(message: _profileError!),
-                        const SizedBox(height: 12),
-                      ],
-                      AppLabeledField(
-                        label: 'Full name',
-                        controller: _nameController,
-                        textInputAction: TextInputAction.next,
-                      ),
-                      const SizedBox(height: 14),
-                      AppLabeledField(
-                        label: 'Phone',
-                        controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        textInputAction: TextInputAction.next,
-                      ),
-                      const SizedBox(height: 18),
-                      Text('Emergency contact', style: AppText.eyebrow()),
-                      const SizedBox(height: 10),
-                      AppLabeledField(
-                        label: 'Name',
-                        controller: _ecNameController,
-                        textInputAction: TextInputAction.next,
-                      ),
-                      const SizedBox(height: 14),
-                      AppLabeledField(
-                        label: 'Phone',
-                        controller: _ecPhoneController,
-                        keyboardType: TextInputType.phone,
-                        textInputAction: TextInputAction.next,
-                      ),
-                      const SizedBox(height: 14),
-                      AppLabeledField(
-                        label: 'Relation',
-                        controller: _ecRelationController,
-                        textInputAction: TextInputAction.done,
-                      ),
-                      const SizedBox(height: 20),
-                      AppButton(
-                        label: 'Save changes',
-                        loading: _savingProfile,
-                        onPressed: _saveProfile,
-                      ),
-                      const SizedBox(height: 28),
-                      Text('Notifications', style: AppText.eyebrow()),
-                      const SizedBox(height: 10),
-                      for (final entry in _prefs.entries) ...[
-                        _PreferenceRow(
-                          title: _preferenceLabels[entry.key] ?? entry.key,
-                          value: entry.value,
-                          onChanged: (v) => _togglePreference(entry.key, v),
-                        ),
-                        const SizedBox(height: 4),
-                      ],
-                      const SizedBox(height: 24),
-                      Text('Security', style: AppText.eyebrow()),
-                      const SizedBox(height: 10),
-                      if (_passwordError != null) ...[
-                        FormAlert(message: _passwordError!),
-                        const SizedBox(height: 12),
-                      ],
-                      AppLabeledField(
-                        label: 'Current password',
-                        controller: _currentPasswordController,
-                        obscureText: true,
-                        textInputAction: TextInputAction.next,
-                      ),
-                      const SizedBox(height: 14),
-                      AppLabeledField(
-                        label: 'New password',
-                        controller: _newPasswordController,
-                        obscureText: true,
-                        textInputAction: TextInputAction.next,
-                      ),
-                      const SizedBox(height: 14),
-                      AppLabeledField(
-                        label: 'Confirm new password',
-                        controller: _confirmPasswordController,
-                        obscureText: true,
-                        textInputAction: TextInputAction.done,
-                      ),
-                      const SizedBox(height: 20),
-                      AppButton(
-                        label: 'Change password',
-                        variant: AppButtonVariant.ghost,
-                        loading: _changingPassword,
-                        onPressed: _changePassword,
-                      ),
-                      const SizedBox(height: 28),
-                      Text('Role & permissions', style: AppText.eyebrow()),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: (sessionUser?.roles ?? const [])
-                            .map(
-                              (r) => AppPill(
-                                label: r,
-                                tone: AppPillTone.roleTint,
-                              ),
-                            )
-                            .toList(),
-                      ),
-                      const SizedBox(height: 12),
-                      for (final group
-                          in _groupPermissions(sessionUser?.permissions ?? const []))
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _PermissionGroupView(
-                            resource: group.key,
-                            permissions: group.value,
+                      if (_profile!.phone != null &&
+                          _profile!.phone!.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Center(
+                          child: Text(
+                            _profile!.phone!,
+                            style: AppText.body(
+                              size: 12.5,
+                              color: AppColors.inkFaint,
+                              weight: FontWeight.w600,
+                            ),
                           ),
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                      for (final entry in _entries)
+                        _MenuTile(
+                          entry: entry,
+                          onTap: entry.danger
+                              ? _confirmLogout
+                              : () => _openSection(entry.route!),
                         ),
                     ],
                   ),
@@ -445,40 +326,45 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
   }
 }
 
-/// "members:read" → "members" — same grouping the role-permission picker
-/// uses, applied here read-only to the current user's own granted keys.
-List<MapEntry<String, List<String>>> _groupPermissions(
-  List<String> permissions,
-) {
-  final groups = <String, List<String>>{};
-  for (final key in permissions) {
-    final resource = key.split(':').first;
-    groups.putIfAbsent(resource, () => []).add(key);
-  }
-  final entries = groups.entries.toList()
-    ..sort((a, b) => a.key.compareTo(b.key));
-  return entries;
-}
-
 class _AvatarPicker extends StatelessWidget {
   const _AvatarPicker({
     required this.avatarUrl,
     required this.initials,
+    required this.loading,
     required this.onTap,
   });
 
   final String? avatarUrl;
   final String initials;
+  final bool loading;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: loading ? null : onTap,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          _AvatarImage(avatarUrl: avatarUrl, initials: initials, size: 88),
+          UserAvatar(avatarUrl: avatarUrl, name: initials, size: 88),
+          if (loading)
+            Container(
+              width: 88,
+              height: 88,
+              decoration: const BoxDecoration(
+                color: Colors.black45,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           Positioned(
             right: -2,
             bottom: -2,
@@ -502,69 +388,6 @@ class _AvatarPicker extends StatelessWidget {
       ),
     );
   }
-}
-
-class _AvatarImage extends StatelessWidget {
-  const _AvatarImage({
-    required this.avatarUrl,
-    required this.initials,
-    required this.size,
-  });
-
-  final String? avatarUrl;
-  final String initials;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final url = avatarUrl;
-    if (url == null || url.isEmpty) return _fallback();
-
-    if (url.startsWith('data:')) {
-      final base64Part = url.split(',').last;
-      try {
-        return ClipOval(
-          child: Image.memory(
-            base64Decode(base64Part),
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _fallback(),
-          ),
-        );
-      } catch (_) {
-        return _fallback();
-      }
-    }
-
-    return ClipOval(
-      child: Image.network(
-        url,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallback(),
-      ),
-    );
-  }
-
-  Widget _fallback() => Container(
-        width: size,
-        height: size,
-        decoration: const BoxDecoration(
-          gradient: AppColors.staffGrad,
-          shape: BoxShape.circle,
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          initials,
-          style: AppText.body(
-            size: size * 0.32,
-            weight: FontWeight.w800,
-            color: Colors.white,
-          ),
-        ),
-      );
 }
 
 class _PhotoOptionTile extends StatelessWidget {
@@ -597,113 +420,89 @@ class _PhotoOptionTile extends StatelessWidget {
   }
 }
 
-/// Same visual as `SecurityPolicyScreen`'s `_RoleToggleRow` / `RoleFormScreen`'s
-/// `_ToggleRow` — gradient track, 26px height, white knob.
-class _PreferenceRow extends StatelessWidget {
-  const _PreferenceRow({
-    required this.title,
-    required this.value,
-    required this.onChanged,
-  });
+/// Same tile chrome as `GymSettingsScreen`'s `_SettingsTile` — "Log out"
+/// swaps the icon tile and label to the danger tone instead of a chevron
+/// row, since it's an action, not a drill-down.
+class _MenuTile extends StatelessWidget {
+  const _MenuTile({required this.entry, required this.onTap});
 
-  final String title;
-  final bool value;
-  final ValueChanged<bool> onChanged;
+  final _MenuEntry entry;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: AppText.body(size: 13, weight: FontWeight.w600),
-          ),
-        ),
-        GestureDetector(
-          onTap: () => onChanged(!value),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            width: 44,
-            height: 26,
-            padding: const EdgeInsets.all(3),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              gradient: value ? AppColors.staffGrad : null,
-              color: value ? null : AppColors.surface3,
-              borderRadius: BorderRadius.circular(99),
-            ),
-            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-            child: Container(
-              width: 20,
-              height: 20,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
+              color: AppColors.surface2,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(
+                color: entry.danger
+                    ? AppColors.danger.withValues(alpha: 0.3)
+                    : AppColors.line,
               ),
             ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: entry.danger
+                        ? AppColors.dangerSoft
+                        : AppColors.staffSoft,
+                    borderRadius: BorderRadius.circular(AppRadii.tile),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(
+                    entry.icon,
+                    size: 18,
+                    color: entry.danger
+                        ? AppColors.danger
+                        : AppColors.staffPillFg,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.title,
+                        style: AppText.body(
+                          size: 13,
+                          weight: FontWeight.w700,
+                          color: entry.danger ? AppColors.danger : AppColors.ink,
+                        ),
+                      ),
+                      Text(
+                        entry.subtitle,
+                        style: AppText.body(
+                          size: 11,
+                          color: AppColors.inkFaint,
+                          weight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!entry.danger)
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: AppColors.inkFaint,
+                  ),
+              ],
+            ),
           ),
         ),
-      ],
-    );
-  }
-}
-
-/// Read-only twin of `RoleFormScreen`'s `_PermissionGroupCard` — same card
-/// chrome, no "Select all" pill or tap handlers since this just shows what
-/// the signed-in user can already do.
-class _PermissionGroupView extends StatelessWidget {
-  const _PermissionGroupView({
-    required this.resource,
-    required this.permissions,
-  });
-
-  final String resource;
-  final List<String> permissions;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            resource,
-            style: AppText.body(size: 13, weight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: permissions
-                .map(
-                  (permission) => Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      gradient: AppColors.staffGrad,
-                      borderRadius: BorderRadius.circular(AppRadii.pill),
-                    ),
-                    child: Text(
-                      permission,
-                      style: AppText.body(
-                        size: 11,
-                        weight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-        ],
       ),
     );
   }

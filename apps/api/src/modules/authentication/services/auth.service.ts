@@ -649,6 +649,7 @@ export class AuthService {
       name: user.name,
       email: user.email,
       phone: user.phone,
+      avatarUrl: user.avatarUrl,
       status: user.status,
       roles,
       permissions,

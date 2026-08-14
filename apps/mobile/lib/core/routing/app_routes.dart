@@ -10,6 +10,11 @@ class AppRoutes {
   static const forgotPassword = '/forgot-password';
   static const home = '/home';
   static const myProfile = '/profile/me';
+  static const profileData = '/profile/me/data';
+  static const profileEmergencyContact = '/profile/me/emergency-contact';
+  static const profileNotifications = '/profile/me/notifications';
+  static const profileChangePassword = '/profile/me/change-password';
+  static const profilePermissions = '/profile/me/permissions';
 
   static const branches = '/branches';
   static const branchDetail = '/branches/detail';

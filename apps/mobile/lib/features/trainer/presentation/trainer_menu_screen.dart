@@ -8,6 +8,7 @@ import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../shared/widgets/user_avatar.dart';
 
 class _MenuEntry {
   const _MenuEntry({
@@ -62,8 +63,8 @@ class TrainerMenuScreen extends StatelessWidget {
     final tenantName =
         session is SessionAuthenticatedStaff ? session.tenant.name : '';
     final name = session is SessionAuthenticatedStaff ? session.user.name : '';
-    final initials =
-        session is SessionAuthenticatedStaff ? session.user.initials : '';
+    final avatarUrl =
+        session is SessionAuthenticatedStaff ? session.user.avatarUrl : null;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 90),
@@ -81,23 +82,7 @@ class TrainerMenuScreen extends StatelessWidget {
             ),
             GestureDetector(
               onTap: () => context.push(AppRoutes.myProfile),
-              child: Container(
-                width: 38,
-                height: 38,
-                decoration: const BoxDecoration(
-                  gradient: AppColors.staffGrad,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  initials,
-                  style: AppText.body(
-                    size: 12,
-                    weight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+              child: UserAvatar(avatarUrl: avatarUrl, name: name),
             ),
           ],
         ),

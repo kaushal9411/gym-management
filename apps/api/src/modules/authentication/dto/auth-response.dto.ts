@@ -6,6 +6,7 @@ export interface UserProfileDto {
   name: string;
   email: string;
   phone: string | null;
+  avatarUrl: string | null;
   status: string;
   roles: string[];
   /** Union of permission keys across every role the user holds (see RoleRepository). */

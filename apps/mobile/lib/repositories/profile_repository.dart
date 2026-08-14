@@ -9,6 +9,12 @@ import '../models/staff_profile.dart';
 /// branch access, emergency contact, notification prefs). Email is
 /// deliberately never sent here — the backend requires `users:manage` to
 /// change it, so it isn't part of self-service profile editing.
+///
+/// One `PATCH /profile` call backs every method below, but each sends only
+/// the keys its own screen owns — the backend's Prisma `update` treats an
+/// **absent** key as "leave untouched" but an explicit `null` as "clear it"
+/// (`profile.service.ts`), so a screen that only edits e.g. emergency
+/// contact must never also send `phone`/`avatarUrl`, or it would wipe them.
 class ProfileRepository {
   ProfileRepository(this._dio);
 
@@ -25,31 +31,37 @@ class ProfileRepository {
     }
   }
 
-  /// Whole-form save, like `GymSettingsRepository.saveProfile` — the caller
-  /// always sends every field's current edited value. `avatarUrl` is a
-  /// data: URL (base64) or `null` to clear the photo.
-  Future<StaffProfile> updateProfile({
+  Future<StaffProfile> updateBasicInfo({
     required String name,
     String? phone,
-    String? avatarUrl,
-    String? emergencyContactName,
-    String? emergencyContactPhone,
-    String? emergencyContactRelation,
-    Map<String, bool>? notificationPreferences,
-  }) async {
+  }) =>
+      _patch({'name': name, 'phone': phone});
+
+  /// `avatarUrl` is a data: URL (base64) or `null` to clear the photo.
+  Future<StaffProfile> updateAvatar(String? avatarUrl) =>
+      _patch({'avatarUrl': avatarUrl});
+
+  Future<StaffProfile> updateEmergencyContact({
+    String? name,
+    String? phone,
+    String? relation,
+  }) =>
+      _patch({
+        'emergencyContactName': name,
+        'emergencyContactPhone': phone,
+        'emergencyContactRelation': relation,
+      });
+
+  Future<StaffProfile> updateNotificationPreferences(
+    Map<String, bool> preferences,
+  ) =>
+      _patch({'notificationPreferences': preferences});
+
+  Future<StaffProfile> _patch(Map<String, dynamic> data) async {
     try {
       final response = await _dio.patch<Map<String, dynamic>>(
         '/profile',
-        data: {
-          'name': name,
-          'phone': phone,
-          'avatarUrl': avatarUrl,
-          'emergencyContactName': emergencyContactName,
-          'emergencyContactPhone': emergencyContactPhone,
-          'emergencyContactRelation': emergencyContactRelation,
-          if (notificationPreferences != null)
-            'notificationPreferences': notificationPreferences,
-        },
+        data: data,
       );
       return StaffProfile.fromJson(
         response.data!['data'] as Map<String, dynamic>,
