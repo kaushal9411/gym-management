@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../bloc/dashboard/dashboard_cubit.dart';
 import '../../../bloc/dashboard/dashboard_state.dart';
 import '../../../bloc/session/session_cubit.dart';
 import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
@@ -59,20 +61,23 @@ class _DashboardView extends StatelessWidget {
                   ],
                 ),
               ),
-              Container(
-                width: 38,
-                height: 38,
-                decoration: const BoxDecoration(
-                  gradient: AppColors.staffGrad,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  initials,
-                  style: AppText.body(
-                    size: 12,
-                    weight: FontWeight.w800,
-                    color: Colors.white,
+              GestureDetector(
+                onTap: () => context.push(AppRoutes.myProfile),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.staffGrad,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    initials,
+                    style: AppText.body(
+                      size: 12,
+                      weight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),

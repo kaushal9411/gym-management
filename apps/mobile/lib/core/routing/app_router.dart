@@ -53,6 +53,7 @@ import '../../features/manager/presentation/staff_form_screen.dart';
 import '../../features/notifications/presentation/notification_template_form_screen.dart';
 import '../../features/notifications/presentation/notification_templates_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
+import '../../features/profile/presentation/my_profile_screen.dart';
 import '../../features/receptionist/presentation/checked_in_screen.dart';
 import '../../features/receptionist/presentation/class_add_attendee_screen.dart';
 import '../../features/receptionist/presentation/class_form_screen.dart';
@@ -175,6 +176,10 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       GoRoute(
         path: AppRoutes.home,
         builder: (context, state) => const HomeRouterScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.myProfile,
+        builder: (context, state) => const MyProfileScreen(),
       ),
       GoRoute(
         path: AppRoutes.branches,

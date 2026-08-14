@@ -74,6 +74,16 @@ class SessionCubit extends Cubit<SessionState> {
   void staffSignedIn(UserProfile user, TenantBranding tenant) =>
       emit(SessionAuthenticatedStaff(user, tenant));
 
+  /// Re-fetches `/auth/me` and re-emits — used after a self-profile edit
+  /// (e.g. name change) so the header avatar/greeting shown app-wide stays
+  /// in sync without requiring a full re-login.
+  Future<void> refreshStaffUser() async {
+    final current = state;
+    if (current is! SessionAuthenticatedStaff) return;
+    final user = await _authRepository.me();
+    emit(SessionAuthenticatedStaff(user, current.tenant));
+  }
+
   void memberSignedIn(MemberProfile member, TenantBranding tenant) =>
       emit(SessionAuthenticatedMember(member, tenant));
 

@@ -9,6 +9,7 @@ class AppRoutes {
   static const mfaSetup = '/mfa-setup';
   static const forgotPassword = '/forgot-password';
   static const home = '/home';
+  static const myProfile = '/profile/me';
 
   static const branches = '/branches';
   static const branchDetail = '/branches/detail';

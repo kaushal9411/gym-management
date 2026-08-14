@@ -31,6 +31,9 @@ dependencies:
   # Typography — Bricolage Grotesque + Hanken Grotesk (exact families used by the approved design)
   google_fonts: ^6.2.1
 
+  # Profile photo picker (gallery/camera)
+  image_picker: ^1.1.2
+
   # QR check-in scanner (Receptionist front-desk flow)
   mobile_scanner: ^5.2.3
 

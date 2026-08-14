@@ -117,6 +117,26 @@ class AuthRepository {
     }
   }
 
+  /// `PATCH /auth/change-password` — distinct from [forgotPassword]:
+  /// requires proving the current password, and on success the backend
+  /// revokes every other active session (this device stays signed in).
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _dio.patch<void>(
+        '/auth/change-password',
+        data: {
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+        },
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   Future<void> forgotPassword({required String email}) async {
     try {
       await _dio.post<void>('/auth/forgot-password', data: {'email': email});

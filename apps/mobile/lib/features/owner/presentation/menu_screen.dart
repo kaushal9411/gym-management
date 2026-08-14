@@ -153,20 +153,23 @@ class MenuScreen extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              width: 38,
-              height: 38,
-              decoration: const BoxDecoration(
-                gradient: AppColors.staffGrad,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                initials,
-                style: AppText.body(
-                  size: 12,
-                  weight: FontWeight.w800,
-                  color: Colors.white,
+            GestureDetector(
+              onTap: () => context.push(AppRoutes.myProfile),
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: const BoxDecoration(
+                  gradient: AppColors.staffGrad,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  initials,
+                  style: AppText.body(
+                    size: 12,
+                    weight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),

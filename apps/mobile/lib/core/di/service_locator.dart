@@ -27,6 +27,7 @@ import '../../repositories/member_auth_repository.dart';
 import '../../repositories/member_portal_repository.dart';
 import '../../repositories/member_repository.dart';
 import '../../repositories/membership_plan_repository.dart';
+import '../../repositories/profile_repository.dart';
 import '../../repositories/public_tenant_repository.dart';
 import '../../repositories/reports_repository.dart';
 import '../../repositories/scheduled_report_repository.dart';
@@ -140,6 +141,9 @@ void setupServiceLocator() {
   );
   getIt.registerLazySingleton<MemberPortalRepository>(
     () => MemberPortalRepository(getIt()),
+  );
+  getIt.registerLazySingleton<ProfileRepository>(
+    () => ProfileRepository(getIt()),
   );
 
   // Screen-scoped cubits — a fresh instance per screen, not app-wide state.
