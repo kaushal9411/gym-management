@@ -26,6 +26,7 @@ import '../../repositories/member_auth_repository.dart';
 import '../../repositories/member_portal_repository.dart';
 import '../../repositories/member_repository.dart';
 import '../../repositories/membership_plan_repository.dart';
+import '../../repositories/payment_repository.dart';
 import '../../repositories/public_tenant_repository.dart';
 import '../../repositories/reports_repository.dart';
 import '../../repositories/scheduled_report_repository.dart';
@@ -133,6 +134,9 @@ void setupServiceLocator() {
   );
   getIt.registerLazySingleton<FoodRepository>(
     () => FoodRepository(getIt()),
+  );
+  getIt.registerLazySingleton<PaymentRepository>(
+    () => PaymentRepository(getIt()),
   );
   getIt.registerLazySingleton<MemberPortalRepository>(
     () => MemberPortalRepository(getIt()),

@@ -26,6 +26,8 @@ import '../../features/finance/presentation/income_form_screen.dart';
 import '../../features/finance/presentation/income_list_screen.dart';
 import '../../features/finance/presentation/invoice_detail_screen.dart';
 import '../../features/finance/presentation/invoices_screen.dart';
+import '../../features/finance/presentation/payment_detail_screen.dart';
+import '../../features/finance/presentation/payments_screen.dart';
 import '../../features/finance/presentation/record_payment_screen.dart';
 import '../../features/home/presentation/home_router_screen.dart';
 import '../../features/manager/presentation/member_detail_screen.dart';
@@ -270,6 +272,15 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         path: AppRoutes.roleDetail,
         builder: (context, state) =>
             RoleDetailScreen(roleId: state.extra as String),
+      ),
+      GoRoute(
+        path: AppRoutes.payments,
+        builder: (context, state) => const PaymentsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.paymentDetail,
+        builder: (context, state) =>
+            PaymentDetailScreen(paymentId: state.extra as String),
       ),
       GoRoute(
         path: AppRoutes.billing,

@@ -3,14 +3,16 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/glass_bottom_nav.dart';
 import '../../finance/presentation/finance_tab.dart';
+import '../../manager/presentation/members_screen.dart';
 import '../../reports/presentation/reports_center_screen.dart';
 import 'dashboard_screen.dart';
 import 'menu_screen.dart';
-import 'widgets/coming_soon_tab.dart';
 
 /// Tenant/Owner shell — the 5-tab bottom nav from design frame "4.
-/// Dashboard" (Home/Members/Finance/Reports/Menu). Members is still a
-/// [ComingSoonTab] placeholder until its sub-chunk lands.
+/// Dashboard" (Home/Members/Finance/Reports/Menu). Members reuses
+/// [MembersScreen] from the Manager module unmodified — it's
+/// permission-gated, not role-locked, and an Owner's `members:*` grants are
+/// a superset of a Manager's (same reuse as [ReceptionistShell]).
 class OwnerShell extends StatefulWidget {
   const OwnerShell({super.key});
 
@@ -23,7 +25,7 @@ class _OwnerShellState extends State<OwnerShell> {
 
   static const _tabs = [
     DashboardScreen(),
-    ComingSoonTab(title: 'Members'),
+    MembersScreen(),
     FinanceTab(),
     ReportsCenterScreen(),
     MenuScreen(),

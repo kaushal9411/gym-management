@@ -19,6 +19,8 @@ class AppRoutes {
   static const expenses = '/finance/expenses';
   static const expenseForm = '/finance/expenses/form';
   static const recordPayment = '/finance/record-payment';
+  static const payments = '/finance/payments';
+  static const paymentDetail = '/finance/payments/detail';
 
   static const membershipPlans = '/catalog/membership-plans';
   static const membershipPlanForm = '/catalog/membership-plans/form';
