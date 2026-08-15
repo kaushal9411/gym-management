@@ -93,7 +93,7 @@ async function convertExpiredTrials(): Promise<void> {
 
   for (const subscription of subscriptions) {
     // eslint-disable-next-line no-await-in-loop -- sequential across a small, infrequent (daily) batch
-    await tryRenewOrEnterGrace(subscription.tenantId, subscription.id, subscription.tenant.name, subscription.tenant.users[0]?.email);
+    await tryRenewOrEnterGrace(subscription.tenantId, subscription.id, subscription.tenant.slug, subscription.tenant.name, subscription.tenant.users[0]?.email);
   }
 }
 
@@ -113,17 +113,17 @@ async function processOverdueRenewals(): Promise<void> {
       continue;
     }
     // eslint-disable-next-line no-await-in-loop
-    await tryRenewOrEnterGrace(subscription.tenantId, subscription.id, subscription.tenant.name, subscription.tenant.users[0]?.email);
+    await tryRenewOrEnterGrace(subscription.tenantId, subscription.id, subscription.tenant.slug, subscription.tenant.name, subscription.tenant.users[0]?.email);
   }
 }
 
-async function tryRenewOrEnterGrace(tenantId: string, subscriptionId: string, tenantName: string, ownerEmail: string | undefined): Promise<void> {
+async function tryRenewOrEnterGrace(tenantId: string, subscriptionId: string, tenantSlug: string, tenantName: string, ownerEmail: string | undefined): Promise<void> {
   const defaultMethod = await prisma.paymentMethod.findFirst({ where: { tenantId, isDefault: true } });
 
   if (defaultMethod && ownerEmail) {
     try {
       const service = new SubscriptionService(getTenantScopedClient(tenantId));
-      await service.renew(tenantId, tenantName, ownerEmail, `auto-renew:${subscriptionId}:${new Date().toISOString().slice(0, 10)}`);
+      await service.renew(tenantId, tenantSlug, tenantName, ownerEmail, `auto-renew:${subscriptionId}:${new Date().toISOString().slice(0, 10)}`);
       return;
     } catch (error) {
       logger.error('Automatic renewal charge failed — entering grace period', { tenantId, error: (error as Error).message });

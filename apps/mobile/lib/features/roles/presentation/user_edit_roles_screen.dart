@@ -26,8 +26,7 @@ class UserEditRolesScreen extends StatefulWidget {
 
 class _UserEditRolesScreenState extends State<UserEditRolesScreen> {
   List<TenantRole>? _roles;
-  late final Set<String> _selected =
-      widget.user.roles.map((r) => r.id).toSet();
+  late final Set<String> _selected = widget.user.roles.map((r) => r.id).toSet();
   bool _saving = false;
   String? _error;
 
@@ -140,7 +139,8 @@ class _UserEditRolesScreenState extends State<UserEditRolesScreen> {
                                     Icon(
                                       selected
                                           ? Icons.check_box_rounded
-                                          : Icons.check_box_outline_blank_rounded,
+                                          : Icons
+                                              .check_box_outline_blank_rounded,
                                       size: 20,
                                       color: selected
                                           ? AppColors.staffPillFg

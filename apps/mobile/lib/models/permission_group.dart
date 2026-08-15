@@ -7,8 +7,7 @@ class PermissionItem {
   final String key;
   final String? description;
 
-  factory PermissionItem.fromJson(Map<String, dynamic> json) =>
-      PermissionItem(
+  factory PermissionItem.fromJson(Map<String, dynamic> json) => PermissionItem(
         id: json['id'] as String,
         key: json['key'] as String,
         description: json['description'] as String?,

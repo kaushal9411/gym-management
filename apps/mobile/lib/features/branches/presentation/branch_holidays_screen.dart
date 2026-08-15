@@ -161,7 +161,8 @@ class _BranchHolidaysScreenState extends State<BranchHolidaysScreen> {
                       children: [
                         Text(
                           h.label?.isNotEmpty == true ? h.label! : h.date,
-                          style: AppText.body(size: 13, weight: FontWeight.w700),
+                          style:
+                              AppText.body(size: 13, weight: FontWeight.w700),
                         ),
                         Row(
                           children: [

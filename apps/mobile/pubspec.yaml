@@ -37,6 +37,12 @@ dependencies:
   # QR check-in scanner (Receptionist front-desk flow)
   mobile_scanner: ^5.2.3
 
+  # Razorpay's native Checkout modal (platform Billing self-service upgrade/downgrade)
+  razorpay_flutter: ^1.4.5
+
+  # Opens external links (invoice download, class-booking meet links, ...)
+  url_launcher: ^6.3.1
+
 dev_dependencies:
   bloc_test: ^9.1.7
   flutter_lints: ^5.0.0

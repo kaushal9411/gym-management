@@ -255,15 +255,13 @@ class _MemberDietScreenState extends State<MemberDietScreen> {
                             vertical: 13,
                           ),
                           border: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppRadii.field),
+                            borderRadius: BorderRadius.circular(AppRadii.field),
                             borderSide: const BorderSide(
                               color: AppColors.line,
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppRadii.field),
+                            borderRadius: BorderRadius.circular(AppRadii.field),
                             borderSide: const BorderSide(
                               color: AppColors.line,
                             ),
@@ -289,8 +287,8 @@ class _MemberDietScreenState extends State<MemberDietScreen> {
           for (final mealType in assignment.mealTypes) ...[
             _MealRow(
               mealType: mealType,
-              status: log?.mealsStatus[mealType] ??
-                  ExerciseProgressStatus.pending,
+              status:
+                  log?.mealsStatus[mealType] ?? ExerciseProgressStatus.pending,
               onTap: () {
                 final current = log?.mealsStatus[mealType] ??
                     ExerciseProgressStatus.pending;

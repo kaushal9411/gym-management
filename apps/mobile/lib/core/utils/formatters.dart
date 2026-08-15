@@ -17,6 +17,24 @@ class Formatters {
     return '${isNegative ? '-' : ''}₹$body';
   }
 
+  /// `₹13k`/`₹5.2k`/`₹4.1L` — compact form for space-constrained tiles
+  /// (KPI cards), where the full grouped-digit form (`currency` above)
+  /// wraps to a second line once the value is more than ~4 digits.
+  static String currencyCompact(double amount) {
+    final isNegative = amount < 0;
+    final abs = amount.abs();
+    String body;
+    if (abs >= 100000) {
+      body = '${(abs / 100000).toStringAsFixed(abs >= 1000000 ? 1 : 2)}L';
+    } else if (abs >= 1000) {
+      final k = abs / 1000;
+      body = '${k.toStringAsFixed(k >= 10 ? 0 : 1)}k';
+    } else {
+      body = abs.round().toString();
+    }
+    return '${isNegative ? '-' : ''}₹$body';
+  }
+
   static String _groupIndian(int value) {
     final s = value.toString();
     if (s.length <= 3) return s;

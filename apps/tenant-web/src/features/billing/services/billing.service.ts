@@ -12,6 +12,8 @@ import type {
   Subscription,
   SubscriptionHistoryEntry,
   SubscriptionPlan,
+  VerifyCheckoutPayload,
+  VerifyCheckoutResult,
 } from '../types';
 
 interface ApiEnvelope<T> {
@@ -75,6 +77,16 @@ class BillingService {
       const res = await apiClient.post<ApiEnvelope<CheckoutResult>>(path, payload, {
         headers: { 'Idempotency-Key': crypto.randomUUID() },
       });
+      return res.data.data;
+    } catch (error) {
+      throw toBillingServiceError(error);
+    }
+  }
+
+  /** Called once Razorpay's Checkout modal fires its success handler, with the signed order/payment pair it returned — the backend verifies the signature before activating anything. */
+  async verifyCheckout(paymentId: string, payload: VerifyCheckoutPayload): Promise<VerifyCheckoutResult> {
+    try {
+      const res = await apiClient.post<ApiEnvelope<VerifyCheckoutResult>>(`/subscription/checkout/${paymentId}/verify`, payload);
       return res.data.data;
     } catch (error) {
       throw toBillingServiceError(error);

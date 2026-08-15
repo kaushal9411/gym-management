@@ -113,8 +113,7 @@ class _ClientProgressScreenState extends State<ClientProgressScreen> {
                     ? const AppEmptyState(
                         icon: Icons.fitness_center_outlined,
                         title: 'No active workout plan',
-                        message:
-                            'Assign a plan to start tracking this client.',
+                        message: 'Assign a plan to start tracking this client.',
                       )
                     : RefreshIndicator(
                         color: AppColors.staffB,

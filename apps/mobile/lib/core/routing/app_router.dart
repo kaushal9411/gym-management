@@ -48,6 +48,8 @@ import '../../features/manager/presentation/member_renew_screen.dart';
 import '../../features/manager/presentation/member_edit_address_screen.dart';
 import '../../features/manager/presentation/member_edit_health_screen.dart';
 import '../../features/manager/presentation/member_edit_personal_screen.dart';
+import '../../features/manager/presentation/member_downgrade_screen.dart';
+import '../../features/manager/presentation/member_gdpr_export_screen.dart';
 import '../../features/manager/presentation/member_upgrade_screen.dart';
 import '../../features/manager/presentation/staff_detail_screen.dart';
 import '../../features/manager/presentation/staff_edit_employment_screen.dart';
@@ -71,12 +73,18 @@ import '../../features/receptionist/presentation/receptionist_reports_screen.dar
 import '../../features/receptionist/presentation/search_members_screen.dart';
 import '../../features/reports/presentation/analytics_screen.dart';
 import '../../features/reports/presentation/attendance_report_screen.dart';
+import '../../features/reports/presentation/branch_performance_screen.dart';
 import '../../features/reports/presentation/churn_report_screen.dart';
+import '../../features/reports/presentation/expense_report_screen.dart';
+import '../../features/reports/presentation/expiring_memberships_screen.dart';
+import '../../features/reports/presentation/member_progress_report_screen.dart';
 import '../../features/reports/presentation/membership_report_screen.dart';
+import '../../features/reports/presentation/payment_report_screen.dart';
 import '../../features/reports/presentation/revenue_report_screen.dart';
 import '../../features/reports/presentation/scheduled_report_form_screen.dart';
 import '../../features/reports/presentation/scheduled_reports_screen.dart';
 import '../../features/reports/presentation/staff_performance_screen.dart';
+import '../../features/reports/presentation/staff_report_screen.dart';
 import '../../features/roles/presentation/invite_user_screen.dart';
 import '../../features/roles/presentation/role_detail_screen.dart';
 import '../../features/roles/presentation/role_form_screen.dart';
@@ -159,8 +167,8 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         // No page-specific destination (fresh launch, or a stale `/home`
         // hit while signed out) — a remembered gym+role sends the user
         // straight to Login; otherwise Find Gym, same as before.
-        final hasRememberedGym = session.rememberedRole != null &&
-            session.rememberedTenant != null;
+        final hasRememberedGym =
+            session.rememberedRole != null && session.rememberedTenant != null;
         return hasRememberedGym ? AppRoutes.login : AppRoutes.findGym;
       }
       // Authenticated (staff or member) — keep out of the signed-out flow.
@@ -310,6 +318,30 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       GoRoute(
         path: AppRoutes.attendanceReport,
         builder: (context, state) => const AttendanceReportScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.expenseReport,
+        builder: (context, state) => const ExpenseReportScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.paymentReport,
+        builder: (context, state) => const PaymentReportScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.staffReport,
+        builder: (context, state) => const StaffReportScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.memberProgressReport,
+        builder: (context, state) => const MemberProgressReportScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.branchPerformanceReport,
+        builder: (context, state) => const BranchPerformanceScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.expiringMembershipsReport,
+        builder: (context, state) => const ExpiringMembershipsScreen(),
       ),
       GoRoute(
         path: AppRoutes.analytics,
@@ -516,6 +548,21 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         path: AppRoutes.memberUpgrade,
         builder: (context, state) =>
             MemberUpgradeScreen(member: state.extra as GymMember),
+      ),
+      GoRoute(
+        path: AppRoutes.memberDowngrade,
+        builder: (context, state) =>
+            MemberDowngradeScreen(member: state.extra as GymMember),
+      ),
+      GoRoute(
+        path: AppRoutes.memberGdprExport,
+        builder: (context, state) {
+          final member = state.extra as GymMember;
+          return MemberGdprExportScreen(
+            memberId: member.id,
+            memberName: member.name,
+          );
+        },
       ),
       GoRoute(
         path: AppRoutes.memberEditPersonal,

@@ -188,8 +188,7 @@ class _RoleToggleRow extends StatelessWidget {
                 color: value ? null : AppColors.surface3,
                 borderRadius: BorderRadius.circular(99),
               ),
-              alignment:
-                  value ? Alignment.centerRight : Alignment.centerLeft,
+              alignment: value ? Alignment.centerRight : Alignment.centerLeft,
               child: Container(
                 width: 20,
                 height: 20,

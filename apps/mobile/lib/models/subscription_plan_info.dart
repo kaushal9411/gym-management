@@ -1,6 +1,8 @@
 class SubscriptionPlanInfo {
   const SubscriptionPlanInfo({
+    required this.slug,
     required this.name,
+    required this.sortOrder,
     required this.priceMonthly,
     required this.priceYearly,
     required this.currency,
@@ -9,7 +11,12 @@ class SubscriptionPlanInfo {
     required this.maxMembers,
   });
 
+  final String slug;
   final String name;
+
+  /// Plan tier ordering (1 = cheapest) — used to tell an upgrade from a
+  /// downgrade when switching plans (`PlanComparisonList`).
+  final int sortOrder;
   final double priceMonthly;
   final double priceYearly;
   final String currency;
@@ -19,7 +26,9 @@ class SubscriptionPlanInfo {
 
   factory SubscriptionPlanInfo.fromJson(Map<String, dynamic> json) =>
       SubscriptionPlanInfo(
+        slug: json['slug'] as String,
         name: json['name'] as String,
+        sortOrder: json['sortOrder'] as int,
         priceMonthly: double.parse(json['priceMonthly'] as String),
         priceYearly: double.parse(json['priceYearly'] as String),
         currency: json['currency'] as String,

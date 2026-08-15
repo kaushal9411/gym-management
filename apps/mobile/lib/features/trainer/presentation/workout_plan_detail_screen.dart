@@ -214,7 +214,8 @@ class _DayGrid extends StatelessWidget {
     return Row(
       children: WeekDay.values.map((day) {
         final exercises = byDay[day] ?? const [];
-        final label = exercises.isEmpty ? 'Rest' : exercises.first.exercise.name;
+        final label =
+            exercises.isEmpty ? 'Rest' : exercises.first.exercise.name;
         return Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 3),

@@ -28,8 +28,7 @@ class UserEditPermissionsScreen extends StatefulWidget {
       _UserEditPermissionsScreenState();
 }
 
-class _UserEditPermissionsScreenState
-    extends State<UserEditPermissionsScreen> {
+class _UserEditPermissionsScreenState extends State<UserEditPermissionsScreen> {
   List<registry.PermissionGroup>? _groups;
   late final Map<String, _Mode> _modes = {
     for (final o in widget.user.permissionOverrides)
@@ -85,8 +84,7 @@ class _UserEditPermissionsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final overrideCount =
-        _modes.values.where((m) => m != _Mode.inherit).length;
+    final overrideCount = _modes.values.where((m) => m != _Mode.inherit).length;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -288,7 +286,8 @@ class _ModeToggle extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 1),
             child: Material(
-              color: selected ? color.withValues(alpha: 0.22) : Colors.transparent,
+              color:
+                  selected ? color.withValues(alpha: 0.22) : Colors.transparent,
               borderRadius: BorderRadius.circular(AppRadii.pill),
               child: InkWell(
                 onTap: () => onChanged(m),

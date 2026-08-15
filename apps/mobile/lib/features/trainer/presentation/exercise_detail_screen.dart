@@ -117,9 +117,8 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
                     child: _Stepper(
                       label: 'Sets',
                       value: _sets,
-                      onDecrement: _sets > 1
-                          ? () => setState(() => _sets--)
-                          : null,
+                      onDecrement:
+                          _sets > 1 ? () => setState(() => _sets--) : null,
                       onIncrement: () => setState(() => _sets++),
                     ),
                   ),
@@ -128,9 +127,8 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
                     child: _Stepper(
                       label: 'Reps',
                       value: _reps,
-                      onDecrement: _reps > 1
-                          ? () => setState(() => _reps--)
-                          : null,
+                      onDecrement:
+                          _reps > 1 ? () => setState(() => _reps--) : null,
                       onIncrement: () => setState(() => _reps++),
                     ),
                   ),

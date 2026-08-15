@@ -33,7 +33,6 @@ import {
   useAssignMembership,
   useAssignTrainer,
   useCancelMembership,
-  useDowngradeMembership,
   useEraseGdprData,
   useExtendMembership,
   useFreezeMember,
@@ -45,7 +44,6 @@ import {
   useSendPortalInvite,
   useTransferBranch,
   useUpdateMember,
-  useUpgradeMembership,
 } from '@/features/members/hooks/use-members';
 import type { BloodGroup, Gender, MemberDetail } from '@/features/members/types';
 
@@ -127,8 +125,6 @@ export default function MemberDetailPage() {
   const freeze = useFreezeMember();
   const assignMembership = useAssignMembership();
   const renewMembership = useRenewMembership();
-  const upgradeMembership = useUpgradeMembership();
-  const downgradeMembership = useDowngradeMembership();
   const extendMembership = useExtendMembership();
   const cancelMembership = useCancelMembership();
   const resumeMembership = useResumeMembership();
@@ -163,8 +159,6 @@ export default function MemberDetailPage() {
   const [assignPlanId, setAssignPlanId] = React.useState('');
   const [assignAutoRenew, setAssignAutoRenew] = React.useState(false);
   const [renewPlanId, setRenewPlanId] = React.useState('');
-  const [upgradePlanId, setUpgradePlanId] = React.useState('');
-  const [downgradePlanId, setDowngradePlanId] = React.useState('');
   const [extendDays, setExtendDays] = React.useState('');
 
   React.useEffect(() => {
@@ -305,40 +299,6 @@ export default function MemberDetailPage() {
         onSuccess: () => {
           toast.success('Membership renewed.');
           setRenewPlanId('');
-        },
-        onError: (err) => toast.error(toMemberError(err).message),
-      },
-    );
-  };
-
-  const handleUpgrade = () => {
-    if (!upgradePlanId) {
-      toast.error('Select a plan to upgrade to.');
-      return;
-    }
-    upgradeMembership.mutate(
-      { id: memberId, payload: { planId: upgradePlanId } },
-      {
-        onSuccess: () => {
-          toast.success('Membership upgraded.');
-          setUpgradePlanId('');
-        },
-        onError: (err) => toast.error(toMemberError(err).message),
-      },
-    );
-  };
-
-  const handleDowngrade = () => {
-    if (!downgradePlanId) {
-      toast.error('Select a plan to downgrade to.');
-      return;
-    }
-    downgradeMembership.mutate(
-      { id: memberId, payload: { planId: downgradePlanId } },
-      {
-        onSuccess: () => {
-          toast.success('Membership downgraded.');
-          setDowngradePlanId('');
         },
         onError: (err) => toast.error(toMemberError(err).message),
       },
@@ -715,20 +675,6 @@ export default function MemberDetailPage() {
               ) : null}
               {canUpgrade ? (
                 <div className="flex flex-wrap items-end gap-2">
-                  <div className="min-w-56 space-y-2">
-                    <Label htmlFor="upgradePlan">Upgrade to</Label>
-                    <MembershipPlanSelect id="upgradePlan" value={upgradePlanId} onChange={setUpgradePlanId} />
-                  </div>
-                  <Button size="sm" disabled={upgradeMembership.isPending} onClick={handleUpgrade}>
-                    {upgradeMembership.isPending ? 'Upgrading…' : 'Upgrade'}
-                  </Button>
-                  <div className="min-w-56 space-y-2">
-                    <Label htmlFor="downgradePlan">Downgrade to</Label>
-                    <MembershipPlanSelect id="downgradePlan" value={downgradePlanId} onChange={setDowngradePlanId} />
-                  </div>
-                  <Button size="sm" variant="outline" disabled={downgradeMembership.isPending} onClick={handleDowngrade}>
-                    {downgradeMembership.isPending ? 'Downgrading…' : 'Downgrade'}
-                  </Button>
                   <Button size="sm" variant="destructive" onClick={() => setConfirmCancel(true)}>
                     Cancel membership
                   </Button>

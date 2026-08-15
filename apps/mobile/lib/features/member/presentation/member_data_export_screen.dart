@@ -145,8 +145,7 @@ class _MemberDataExportScreenState extends State<MemberDataExportScreen> {
                                       borderRadius: BorderRadius.circular(
                                         AppRadii.card,
                                       ),
-                                      border:
-                                          Border.all(color: AppColors.line),
+                                      border: Border.all(color: AppColors.line),
                                     ),
                                     child: Column(
                                       children: [

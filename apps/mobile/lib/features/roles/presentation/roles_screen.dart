@@ -160,12 +160,10 @@ class _RolesScreenState extends State<RolesScreen> {
                                       vertical: 7,
                                     ),
                                     decoration: BoxDecoration(
-                                      gradient: selected
-                                          ? AppColors.staffGrad
-                                          : null,
-                                      color: selected
-                                          ? null
-                                          : AppColors.surface3,
+                                      gradient:
+                                          selected ? AppColors.staffGrad : null,
+                                      color:
+                                          selected ? null : AppColors.surface3,
                                       borderRadius: BorderRadius.circular(
                                         AppRadii.pill,
                                       ),
@@ -197,14 +195,12 @@ class _RolesScreenState extends State<RolesScreen> {
                         child: switch (_tab) {
                           _IamTab.matrix => _PermissionMatrix(roles: _roles!),
                           _IamTab.roles => ListView.builder(
-                              padding:
-                                  const EdgeInsets.fromLTRB(18, 0, 18, 24),
+                              padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
                               itemCount: _roles!.length,
                               itemBuilder: (context, i) =>
                                   _RoleCard(role: _roles![i]),
                             ),
-                          _IamTab.permissions =>
-                            const PermissionsRegistryTab(),
+                          _IamTab.permissions => const PermissionsRegistryTab(),
                           _IamTab.users => const _UsersTab(),
                           _IamTab.invitations => const _InvitationsTab(),
                         },
@@ -231,8 +227,7 @@ class _PermissionMatrix extends StatelessWidget {
         .where((p) => resources.contains(p.split(':').first))
         .toList();
     if (keys.isEmpty) return '—';
-    final hasWrite =
-        keys.any((k) => !_readActions.contains(k.split(':').last));
+    final hasWrite = keys.any((k) => !_readActions.contains(k.split(':').last));
     return hasWrite ? '✓' : 'view';
   }
 
@@ -290,8 +285,7 @@ class _PermissionMatrix extends StatelessWidget {
                         Expanded(
                           child: Builder(
                             builder: (context) {
-                              final value =
-                                  _cell(byName[roleName], row.value);
+                              final value = _cell(byName[roleName], row.value);
                               return Text(
                                 value,
                                 textAlign: TextAlign.center,
@@ -760,8 +754,7 @@ class _InvitationCard extends StatelessWidget {
                     ),
                     child: Text(
                       'Resend',
-                      style:
-                          AppText.body(size: 12, weight: FontWeight.w700),
+                      style: AppText.body(size: 12, weight: FontWeight.w700),
                     ),
                   ),
                 ),

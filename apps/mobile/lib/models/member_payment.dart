@@ -103,8 +103,8 @@ class MemberPayment {
                 '',
         branchName:
             (json['branch'] as Map<String, dynamic>?)?['name'] as String? ?? '',
-        planName:
-            (json['membership'] as Map<String, dynamic>?)?['planName'] as String?,
+        planName: (json['membership'] as Map<String, dynamic>?)?['planName']
+            as String?,
         invoiceId: json['invoiceId'] as String?,
         finalAmount: double.parse(json['finalAmount'] as String),
         method: json['method'] as String,

@@ -11,9 +11,12 @@ class FinanceRepository {
 
   final Dio _dio;
 
-  Future<FinanceSummary> summary() async {
+  Future<FinanceSummary> summary({String? branchId}) async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>('/finance/summary');
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/finance/summary',
+        queryParameters: {if (branchId != null) 'branchId': branchId},
+      );
       return FinanceSummary.fromJson(
         response.data!['data'] as Map<String, dynamic>,
       );

@@ -24,6 +24,8 @@ class UserProfile {
 
   bool hasPermission(String key) => permissions.contains(key);
 
+  bool hasAnyPermission(List<String> keys) => keys.any(permissions.contains);
+
   bool get isOwner => roles.contains('OWNER');
   bool get isManager => roles.contains('MANAGER');
   bool get isTrainer => roles.contains('TRAINER');

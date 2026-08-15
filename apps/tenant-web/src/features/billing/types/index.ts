@@ -126,12 +126,20 @@ export interface CheckoutPayload {
   planSlug: string;
   billingCycle: BillingCycle;
   couponCode?: string;
-  provider?: PaymentProvider;
-  paymentToken?: string;
 }
 
-export interface CheckoutResult {
-  subscription: Subscription;
-  invoice: Invoice;
-  plan: SubscriptionPlan;
+/** A free/fully-discounted change activates immediately; anything with a balance due returns a real Razorpay Order for the client-side Checkout modal instead. */
+export type CheckoutResult =
+  | { requiresPayment: false; subscription: Subscription; invoice: Invoice; plan: SubscriptionPlan }
+  | { requiresPayment: true; paymentId: string; orderId: string; amount: number; currency: string; keyId: string; invoice: Invoice; plan: SubscriptionPlan };
+
+export interface VerifyCheckoutPayload {
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+}
+
+export interface VerifyCheckoutResult {
+  status: 'SUCCEEDED' | 'FAILED';
+  subscription?: Subscription;
 }

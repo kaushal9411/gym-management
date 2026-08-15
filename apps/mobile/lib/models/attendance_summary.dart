@@ -33,20 +33,25 @@ class AttendanceSummary {
       );
 }
 
-/// Mirrors `AttendanceRecordDto` — only the fields the "Currently inside"
-/// list renders.
+/// Mirrors `AttendanceRecordDto` — the "Currently inside" list only needs
+/// the first four fields; `method`/`status` are additionally used by the
+/// member-detail "Recent visits" list (`GET /attendance/member/:memberId`).
 class AttendanceRecord {
   const AttendanceRecord({
     required this.id,
     required this.memberName,
     required this.checkInTime,
     required this.checkOutTime,
+    this.method,
+    this.status,
   });
 
   final String id;
   final String memberName;
   final DateTime checkInTime;
   final DateTime? checkOutTime;
+  final String? method;
+  final String? status;
 
   factory AttendanceRecord.fromJson(Map<String, dynamic> json) =>
       AttendanceRecord(
@@ -56,5 +61,7 @@ class AttendanceRecord {
         checkOutTime: json['checkOutTime'] == null
             ? null
             : DateTime.parse(json['checkOutTime'] as String),
+        method: json['method'] as String?,
+        status: json['status'] as String?,
       );
 }

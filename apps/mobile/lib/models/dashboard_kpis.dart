@@ -3,6 +3,7 @@ class DashboardKpis {
   const DashboardKpis({
     required this.totalMembers,
     required this.activeMembers,
+    required this.newMembersThisMonth,
     required this.expiringMemberships,
     required this.todaysAttendance,
     required this.monthlyRevenue,
@@ -15,6 +16,7 @@ class DashboardKpis {
 
   final int totalMembers;
   final int activeMembers;
+  final int newMembersThisMonth;
   final int expiringMemberships;
   final int todaysAttendance;
   final double monthlyRevenue;
@@ -27,6 +29,7 @@ class DashboardKpis {
   factory DashboardKpis.fromJson(Map<String, dynamic> json) => DashboardKpis(
         totalMembers: json['totalMembers'] as int,
         activeMembers: json['activeMembers'] as int,
+        newMembersThisMonth: json['newMembersThisMonth'] as int,
         expiringMemberships: json['expiringMemberships'] as int,
         todaysAttendance: json['todaysAttendance'] as int,
         monthlyRevenue: double.parse(json['monthlyRevenue'] as String),

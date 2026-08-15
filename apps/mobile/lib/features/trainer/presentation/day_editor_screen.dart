@@ -34,17 +34,16 @@ class DayEditorScreen extends StatefulWidget {
 }
 
 class _DayEditorScreenState extends State<DayEditorScreen> {
-  late final List<_DayExerciseItem> _items = (widget
-              .args.plan.exercisesByDay[widget.args.day] ??
-          const [])
-      .map(
-        (e) => _DayExerciseItem(
-          exercise: e.exercise,
-          sets: e.sets,
-          reps: e.repetitions,
-        ),
-      )
-      .toList();
+  late final List<_DayExerciseItem> _items =
+      (widget.args.plan.exercisesByDay[widget.args.day] ?? const [])
+          .map(
+            (e) => _DayExerciseItem(
+              exercise: e.exercise,
+              sets: e.sets,
+              reps: e.repetitions,
+            ),
+          )
+          .toList();
   bool _saving = false;
   String? _error;
 
@@ -279,8 +278,7 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
                 style: AppText.body(size: 14, weight: FontWeight.w600),
                 decoration: InputDecoration(
                   hintText: 'Search exercises…',
-                  hintStyle:
-                      AppText.body(size: 14, color: AppColors.inkFaint),
+                  hintStyle: AppText.body(size: 14, color: AppColors.inkFaint),
                   filled: true,
                   fillColor: AppColors.surface2,
                   contentPadding: const EdgeInsets.symmetric(
@@ -323,7 +321,8 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
                                     color: AppColors.inkFaint,
                                   ),
                                 ),
-                                onTap: () => Navigator.of(context).pop(exercise),
+                                onTap: () =>
+                                    Navigator.of(context).pop(exercise),
                               );
                             },
                           ),

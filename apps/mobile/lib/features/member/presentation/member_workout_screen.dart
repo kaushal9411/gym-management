@@ -283,8 +283,7 @@ class _ExerciseCard extends StatelessWidget {
                           ? Icons.remove_rounded
                           : Icons.fitness_center_rounded,
                   size: 15,
-                  color:
-                      isDone ? AppColors.success : AppColors.memberPillFg,
+                  color: isDone ? AppColors.success : AppColors.memberPillFg,
                 ),
               ),
               const SizedBox(width: 10),

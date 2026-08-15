@@ -38,9 +38,15 @@ class AppRoutes {
   static const revenueReport = '/reports/revenue';
   static const membershipReport = '/reports/membership';
   static const attendanceReport = '/reports/attendance';
+  static const expenseReport = '/reports/expenses';
+  static const paymentReport = '/reports/payments';
+  static const staffReport = '/reports/staff';
+  static const memberProgressReport = '/reports/member-progress';
+  static const branchPerformanceReport = '/reports/branch-performance';
+  static const expiringMembershipsReport = '/reports/expiring-memberships';
   static const analytics = '/reports/analytics';
-  static const staffPerformanceReport = '/reports/staff-performance';
-  static const churnReport = '/reports/churn';
+  static const staffPerformanceReport = '/reports/trainer-performance';
+  static const churnReport = '/reports/active-vs-inactive';
   static const scheduledReports = '/reports/scheduled';
   static const scheduledReportForm = '/reports/scheduled/form';
 
@@ -86,6 +92,8 @@ class AppRoutes {
   static const memberRenew = '/members/manage/renew';
   static const memberFreeze = '/members/manage/freeze';
   static const memberUpgrade = '/members/manage/upgrade';
+  static const memberDowngrade = '/members/manage/downgrade';
+  static const memberGdprExport = '/members/manage/gdpr-export';
   static const memberEditPersonal = '/members/manage/edit-personal';
   static const memberEditAddress = '/members/manage/edit-address';
   static const memberEditHealth = '/members/manage/edit-health';

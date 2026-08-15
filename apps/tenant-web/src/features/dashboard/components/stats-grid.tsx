@@ -19,8 +19,8 @@ export function StatsGrid() {
     { key: 'active-members', label: 'Active Members', icon: Users, value: data?.activeMembers, tone: 'primary' },
     { key: 'expiring-memberships', label: 'Expiring Memberships', icon: CalendarClock, value: data?.expiringMemberships, tone: 'warning' },
     { key: 'new-registrations', label: 'New Members (this month)', icon: UserPlus, value: data?.newMembersThisMonth, tone: 'aqua' },
-    { key: 'revenue-summary', label: 'Monthly Revenue', icon: Wallet, value: data ? `$${data.monthlyRevenue}` : undefined, tone: 'success' },
-    { key: 'pending-payments', label: 'Outstanding Payments', icon: Clock3, value: data ? `$${data.outstandingPayments}` : undefined, tone: 'violet' },
+    { key: 'revenue-summary', label: 'Monthly Revenue', icon: Wallet, value: data ? `₹${data.monthlyRevenue}` : undefined, tone: 'success' },
+    { key: 'pending-payments', label: 'Outstanding Payments', icon: Clock3, value: data ? `₹${data.outstandingPayments}` : undefined, tone: 'violet' },
   ] as const;
 
   if (!hasPermission('reports:view')) return null;

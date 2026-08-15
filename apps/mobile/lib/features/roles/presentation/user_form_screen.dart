@@ -202,9 +202,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
                               style: AppText.body(
                                 size: 12,
                                 weight: FontWeight.w700,
-                                color: selected
-                                    ? Colors.white
-                                    : AppColors.inkSoft,
+                                color:
+                                    selected ? Colors.white : AppColors.inkSoft,
                               ),
                             ),
                           ),
@@ -233,8 +232,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           Switch(
                             value: _allBranches,
                             activeThumbColor: AppColors.staffPillFg,
-                            onChanged: (v) =>
-                                setState(() => _allBranches = v),
+                            onChanged: (v) => setState(() => _allBranches = v),
                           ),
                         ],
                       ),
@@ -259,8 +257,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
                                 vertical: 8,
                               ),
                               decoration: BoxDecoration(
-                                gradient:
-                                    selected ? AppColors.staffGrad : null,
+                                gradient: selected ? AppColors.staffGrad : null,
                                 color: selected ? null : AppColors.surface3,
                                 borderRadius:
                                     BorderRadius.circular(AppRadii.pill),

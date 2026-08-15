@@ -17,8 +17,12 @@ interface CheckoutBody {
   planSlug: string;
   billingCycle: 'MONTHLY' | 'YEARLY';
   couponCode?: string;
-  provider?: 'stripe' | 'razorpay' | 'paypal';
-  paymentToken?: string;
+}
+
+interface VerifyCheckoutBody {
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
 }
 
 async function currentUserEmail(req: Request, db: ReturnType<typeof getTenantScopedClient>): Promise<string> {
@@ -73,7 +77,7 @@ export class SubscriptionController {
     const db = getTenantScopedClient(tenantId);
     const email = await currentUserEmail(req, db);
     const service = new SubscriptionService(db);
-    const result = await service.renew(tenantId, req.tenant!.name, email, idempotencyKey(req));
+    const result = await service.renew(tenantId, req.tenant!.slug, req.tenant!.name, email, idempotencyKey(req));
     sendSuccess(res, result, 'Subscription renewed.');
   }
 
@@ -91,18 +95,36 @@ export class SubscriptionController {
     const email = await currentUserEmail(req, db);
     const service = new SubscriptionService(db);
 
-    const result = await service.checkout({
+    const result = await service.startCheckout({
       tenantId,
+      tenantSlug: req.tenant!.slug,
       tenantName: req.tenant!.name,
       customerEmail: email,
       planSlug: req.body.planSlug,
       billingCycle: req.body.billingCycle,
       couponCode: req.body.couponCode,
-      provider: req.body.provider,
-      paymentToken: req.body.paymentToken,
-      idempotencyKey: idempotencyKey(req),
     });
-    sendSuccess(res, result, 'Subscription updated.', 201);
+    sendSuccess(res, result, result.requiresPayment ? 'Razorpay order created.' : 'Subscription updated.', 201);
+  }
+
+  /** POST /subscription/checkout/:paymentId/verify — called once Razorpay's Checkout modal fires its success handler, with the signed order/payment pair it returned. */
+  async verifyCheckout(req: Request<{ paymentId: string }, unknown, VerifyCheckoutBody>, res: Response): Promise<void> {
+    const tenantId = req.tenant!.id;
+    const db = getTenantScopedClient(tenantId);
+    const email = await currentUserEmail(req, db);
+    const service = new SubscriptionService(db);
+
+    const result = await service.verifyCheckoutPayment({
+      tenantId,
+      tenantSlug: req.tenant!.slug,
+      tenantName: req.tenant!.name,
+      customerEmail: email,
+      paymentId: req.params.paymentId,
+      razorpayOrderId: req.body.razorpayOrderId,
+      razorpayPaymentId: req.body.razorpayPaymentId,
+      razorpaySignature: req.body.razorpaySignature,
+    });
+    sendSuccess(res, result);
   }
 
   private async assertDirection(req: TypedBodyRequest<CheckoutBody>, direction: 'upgrade' | 'downgrade'): Promise<void> {

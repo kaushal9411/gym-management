@@ -208,8 +208,8 @@ class _UserDetailScreenState extends State<UserDetailScreen> {
                         ),
                         AppPill(
                           label: user.status.replaceAll('_', ' '),
-                          tone: _statusTones[user.status] ??
-                              AppPillTone.neutral,
+                          tone:
+                              _statusTones[user.status] ?? AppPillTone.neutral,
                         ),
                       ],
                     ),

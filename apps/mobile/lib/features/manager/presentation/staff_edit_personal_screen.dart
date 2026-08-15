@@ -71,8 +71,7 @@ class _StaffEditPersonalScreenState extends State<StaffEditPersonalScreen> {
         'city': _orNull(_cityController.text),
         'emergencyContactName': _orNull(_emergencyNameController.text),
         'emergencyContactPhone': _orNull(_emergencyPhoneController.text),
-        'emergencyContactRelation':
-            _orNull(_emergencyRelationController.text),
+        'emergencyContactRelation': _orNull(_emergencyRelationController.text),
         'notes': _orNull(_notesController.text),
       });
       if (!mounted) return;

@@ -84,12 +84,11 @@ class _FindGymScreenState extends State<FindGymScreen> {
       _error = null;
     });
     try {
-      final TenantBranding tenant = await getIt<PublicTenantRepository>()
-          .resolve(
-            gym.slug,
-            rememberAs:
-                _role == AppRole.staff ? ActorType.staff : ActorType.member,
-          );
+      final TenantBranding tenant =
+          await getIt<PublicTenantRepository>().resolve(
+        gym.slug,
+        rememberAs: _role == AppRole.staff ? ActorType.staff : ActorType.member,
+      );
       if (!mounted) return;
       context.push(
         AppRoutes.login,
@@ -265,8 +264,7 @@ class _GymTile extends StatelessWidget {
                     children: [
                       Text(
                         gym.name,
-                        style:
-                            AppText.body(size: 13, weight: FontWeight.w700),
+                        style: AppText.body(size: 13, weight: FontWeight.w700),
                       ),
                       Text(
                         gym.slug,

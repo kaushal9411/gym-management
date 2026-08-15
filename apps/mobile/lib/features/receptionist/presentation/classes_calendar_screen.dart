@@ -89,9 +89,8 @@ class _ClassesCalendarScreenState extends State<ClassesCalendarScreen> {
                 color: Colors.transparent,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
-                  onTap: () => context
-                      .push(AppRoutes.classForm)
-                      .then((_) => _load()),
+                  onTap: () =>
+                      context.push(AppRoutes.classForm).then((_) => _load()),
                   child: Container(
                     width: 36,
                     height: 36,

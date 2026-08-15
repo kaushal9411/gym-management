@@ -147,9 +147,8 @@ class _MemberClassesScreenState extends State<MemberClassesScreen> {
                       decoration: BoxDecoration(
                         gradient: selected ? AppColors.memberGrad : null,
                         borderRadius: BorderRadius.circular(12),
-                        border: selected
-                            ? null
-                            : Border.all(color: AppColors.line),
+                        border:
+                            selected ? null : Border.all(color: AppColors.line),
                       ),
                       child: Column(
                         children: [

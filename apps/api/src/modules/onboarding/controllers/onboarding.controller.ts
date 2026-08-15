@@ -30,9 +30,11 @@ export class OnboardingController {
     sendSuccess(
       res,
       plans.map((plan) => ({
+        id: plan.id,
         slug: plan.slug,
         name: plan.name,
         description: plan.description,
+        sortOrder: plan.sortOrder,
         priceMonthly: Number(plan.priceMonthly),
         priceYearly: Number(plan.priceYearly),
         currency: plan.currency,

@@ -4,7 +4,7 @@ import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
 import { subscriptionController } from '../controllers/subscription.controller';
-import { cancelSubscriptionSchema, checkoutSchema } from '../validators/subscription.validators';
+import { cancelSubscriptionSchema, checkoutSchema, verifyCheckoutSchema } from '../validators/subscription.validators';
 
 export const subscriptionRouter: Router = Router();
 
@@ -45,11 +45,8 @@ const requireBillingRead = [authenticateMiddleware, requirePermission('billing:r
  *               planSlug: { type: string, example: professional }
  *               billingCycle: { type: string, enum: [MONTHLY, YEARLY] }
  *               couponCode: { type: string }
- *               provider: { type: string, enum: [stripe, razorpay, paypal] }
- *               paymentToken: { type: string }
  *     responses:
- *       201: { description: "{ subscription, invoice, plan }" }
- *       402: { description: Payment required or failed }
+ *       201: { description: "Free/fully-discounted: { requiresPayment: false, subscription, invoice, plan }. Otherwise: { requiresPayment: true, paymentId, orderId, amount, currency, keyId, invoice, plan } — a real Razorpay Order for the client-side Checkout modal; call POST /subscription/checkout/{paymentId}/verify with the modal's signed success callback once the tenant has paid." }
  */
 subscriptionRouter.get('/', ...requireBillingRead, asyncHandler(subscriptionController.getCurrent.bind(subscriptionController)));
 subscriptionRouter.post(
@@ -67,7 +64,7 @@ subscriptionRouter.post(
  *     summary: Upgrade Subscription — same checkout flow, rejected if the target plan isn't a higher tier
  *     security: [{ bearerAuth: [] }]
  *     responses:
- *       201: { description: "{ subscription, invoice, plan }" }
+ *       201: { description: "Same shape as POST /subscription — requiresPayment true/false." }
  *       422: { description: Target plan is not an upgrade }
  */
 subscriptionRouter.post(
@@ -93,6 +90,38 @@ subscriptionRouter.post(
   ...requireBilling,
   validate({ body: checkoutSchema }),
   asyncHandler(subscriptionController.downgrade.bind(subscriptionController)),
+);
+
+/**
+ * @openapi
+ * /subscription/checkout/{paymentId}/verify:
+ *   post:
+ *     tags: [Subscription]
+ *     summary: Verify the Razorpay Checkout modal's success callback (order/payment/signature) created by Create/Upgrade/Downgrade — activates the plan once the signature checks out
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: paymentId
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [razorpayOrderId, razorpayPaymentId, razorpaySignature]
+ *             properties:
+ *               razorpayOrderId: { type: string }
+ *               razorpayPaymentId: { type: string }
+ *               razorpaySignature: { type: string }
+ *     responses:
+ *       200: { description: "{ status: SUCCEEDED | FAILED, subscription? }" }
+ */
+subscriptionRouter.post(
+  '/checkout/:paymentId/verify',
+  ...requireBilling,
+  validate({ body: verifyCheckoutSchema }),
+  asyncHandler(subscriptionController.verifyCheckout.bind(subscriptionController)),
 );
 
 /**

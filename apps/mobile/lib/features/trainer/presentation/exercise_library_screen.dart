@@ -195,9 +195,10 @@ class _ExerciseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final setsReps = exercise.defaultSets != null && exercise.defaultReps != null
-        ? '${exercise.defaultSets}×${exercise.defaultReps}'
-        : null;
+    final setsReps =
+        exercise.defaultSets != null && exercise.defaultReps != null
+            ? '${exercise.defaultSets}×${exercise.defaultReps}'
+            : null;
     return Material(
       color: Colors.transparent,
       child: InkWell(

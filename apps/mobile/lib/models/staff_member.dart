@@ -124,8 +124,7 @@ class StaffMember {
         notes: json['notes'] as String?,
         emergencyContactName: json['emergencyContactName'] as String?,
         emergencyContactPhone: json['emergencyContactPhone'] as String?,
-        emergencyContactRelation:
-            json['emergencyContactRelation'] as String?,
+        emergencyContactRelation: json['emergencyContactRelation'] as String?,
         employmentType: json['employmentType'] as String?,
         salaryType: json['salaryType'] as String?,
         salaryAmount: (json['salaryAmount'] as num?)?.toDouble(),

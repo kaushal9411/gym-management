@@ -81,8 +81,7 @@ class _AddToMealScreenState extends State<AddToMealScreen> {
                 style: AppText.body(size: 14, weight: FontWeight.w600),
                 decoration: InputDecoration(
                   hintText: 'Search foods…',
-                  hintStyle:
-                      AppText.body(size: 14, color: AppColors.inkFaint),
+                  hintStyle: AppText.body(size: 14, color: AppColors.inkFaint),
                   filled: true,
                   fillColor: AppColors.surface2,
                   contentPadding: const EdgeInsets.symmetric(
@@ -114,8 +113,7 @@ class _AddToMealScreenState extends State<AddToMealScreen> {
                           final food = filtered[i];
                           final picked = _selected.contains(food);
                           final macro = [
-                            if (food.calories != null)
-                              '${food.calories} kcal',
+                            if (food.calories != null) '${food.calories} kcal',
                             if (food.protein != null)
                               '${food.protein!.toStringAsFixed(0)}g protein',
                           ].join(' · ');
@@ -168,8 +166,7 @@ class _AddToMealScreenState extends State<AddToMealScreen> {
                                       height: 28,
                                       decoration: BoxDecoration(
                                         gradient: AppColors.staffGrad,
-                                        borderRadius:
-                                            BorderRadius.circular(9),
+                                        borderRadius: BorderRadius.circular(9),
                                       ),
                                       alignment: Alignment.center,
                                       child: Icon(
@@ -191,9 +188,8 @@ class _AddToMealScreenState extends State<AddToMealScreen> {
               const SizedBox(height: 10),
               AppButton(
                 label: 'Save meal',
-                onPressed: _selected.isEmpty
-                    ? null
-                    : () => context.pop(_selected),
+                onPressed:
+                    _selected.isEmpty ? null : () => context.pop(_selected),
               ),
             ],
           ),

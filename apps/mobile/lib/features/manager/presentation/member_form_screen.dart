@@ -7,15 +7,20 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/branch_option.dart';
 import '../../../models/membership_plan.dart';
+import '../../../models/staff_member.dart';
 import '../../../repositories/branch_repository.dart';
 import '../../../repositories/member_repository.dart';
 import '../../../repositories/membership_plan_repository.dart';
+import '../../../repositories/staff_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/category_chip_selector.dart';
 
-/// Design frame "6a. + Add member". `POST /members` (profile only) has no
+/// Design frame "6a. + Add member" — field set and order now match web's
+/// `/members/new` exactly (First/Last name, Email, Phone, Member ID,
+/// Branch, Trainer, Fitness goals; Prompt 62), plus one mobile-only
+/// addition: a Plan chip picker. `POST /members` (profile only) has no
 /// `planId` field — assigning a plan is the separate `PUT /:id/membership`
 /// call, chained here after create so the design's single-form UX still
 /// results in two real requests rather than one fabricated combined one.
@@ -29,12 +34,16 @@ class MemberFormScreen extends StatefulWidget {
 class _MemberFormScreenState extends State<MemberFormScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
-  final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _memberIdController = TextEditingController();
+  final _fitnessGoalsController = TextEditingController();
   List<BranchOption> _branchOptions = [];
   List<MembershipPlan> _plans = [];
+  List<StaffMember> _trainers = [];
   String? _branchId;
   String? _planId;
+  String? _trainerId;
   bool _loading = false;
   bool _loadingOptions = true;
   String? _error;
@@ -49,13 +58,20 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
     try {
       final branchesFuture = getIt<BranchRepository>().assignable();
       final plansFuture = getIt<MembershipPlanRepository>().list(limit: 50);
+      final trainersFuture = getIt<StaffRepository>().list(
+        limit: 100,
+        role: StaffRole.trainer,
+        status: 'ACTIVE',
+      );
       final branches = await branchesFuture;
       final plans = await plansFuture;
+      final trainers = await trainersFuture;
       if (!mounted) return;
       setState(() {
         _branchOptions = branches;
         _branchId = branches.isNotEmpty ? branches.first.id : null;
         _plans = plans.items.where((p) => p.isActive).toList();
+        _trainers = trainers.items;
         _loadingOptions = false;
       });
     } on ApiException catch (e) {
@@ -71,8 +87,10 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
-    _phoneController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
+    _memberIdController.dispose();
+    _fitnessGoalsController.dispose();
     super.dispose();
   }
 
@@ -95,9 +113,12 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
       final member = await getIt<MemberRepository>().create(
         firstName: firstName,
         lastName: lastName,
-        phone: _phoneController.text.trim(),
         email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        memberId: _memberIdController.text.trim(),
         branchId: _branchId!,
+        trainerId: _trainerId,
+        fitnessGoals: _fitnessGoalsController.text.trim(),
       );
       if (_planId != null) {
         await getIt<MemberRepository>().assignMembership(member.id, _planId!);
@@ -150,6 +171,14 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
                     ),
                     const SizedBox(height: 14),
                     AppLabeledField(
+                      label: 'Email',
+                      hintText: 'member@example.com',
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                    ),
+                    const SizedBox(height: 14),
+                    AppLabeledField(
                       label: 'Phone',
                       hintText: 'e.g. 9876543210',
                       controller: _phoneController,
@@ -158,10 +187,51 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
                     ),
                     const SizedBox(height: 14),
                     AppLabeledField(
-                      label: 'Email',
-                      hintText: 'member@example.com',
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
+                      label: 'Member ID (optional)',
+                      hintText: 'Auto-generated if left blank',
+                      controller: _memberIdController,
+                      textCapitalization: TextCapitalization.characters,
+                      textInputAction: TextInputAction.next,
+                    ),
+                    if (_branchOptions.length > 1) ...[
+                      const SizedBox(height: 14),
+                      Text('Branch', style: AppText.eyebrow()),
+                      const SizedBox(height: 8),
+                      CategoryChipSelector<String>(
+                        options: _branchOptions.map((b) => b.id).toList(),
+                        labelOf: (id) =>
+                            _branchOptions.firstWhere((b) => b.id == id).name,
+                        value: _branchId!,
+                        onChanged: (id) => setState(() => _branchId = id),
+                      ),
+                    ],
+                    if (_trainers.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Text('Trainer (optional)', style: AppText.eyebrow()),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _PlanChip(
+                            label: 'No trainer assigned',
+                            selected: _trainerId == null,
+                            onTap: () => setState(() => _trainerId = null),
+                          ),
+                          for (final t in _trainers)
+                            _PlanChip(
+                              label: t.name,
+                              selected: _trainerId == t.id,
+                              onTap: () => setState(() => _trainerId = t.id),
+                            ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 14),
+                    AppLabeledField(
+                      label: 'Fitness goals (optional)',
+                      hintText: 'e.g. Weight loss, strength training',
+                      controller: _fitnessGoalsController,
                       textInputAction: TextInputAction.next,
                     ),
                     if (_plans.isNotEmpty) ...[
@@ -184,18 +254,6 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
                               onTap: () => setState(() => _planId = p.id),
                             ),
                         ],
-                      ),
-                    ],
-                    if (_branchOptions.length > 1) ...[
-                      const SizedBox(height: 14),
-                      Text('Branch', style: AppText.eyebrow()),
-                      const SizedBox(height: 8),
-                      CategoryChipSelector<String>(
-                        options: _branchOptions.map((b) => b.id).toList(),
-                        labelOf: (id) =>
-                            _branchOptions.firstWhere((b) => b.id == id).name,
-                        value: _branchId!,
-                        onChanged: (id) => setState(() => _branchId = id),
                       ),
                     ],
                     const SizedBox(height: 24),

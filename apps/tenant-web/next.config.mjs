@@ -34,7 +34,11 @@ const { httpOrigin: apiOrigin, wsOrigin: apiWsOrigin } = (() => {
  */
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
+  // checkout.razorpay.com — the self-service plan upgrade/downgrade
+  // Checkout modal (Prompt 62) loads Razorpay's own `checkout.js` and opens
+  // its hosted payment UI in an iframe; both need explicit allow-listing
+  // or the browser silently CSP-blocks the script tag / iframe.
+  `script-src 'self' 'unsafe-inline' https://checkout.razorpay.com${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline'",
   // Images can legitimately come from any real S3/CDN bucket in prod (no
   // per-tenant allow-list is practical) — a mislabeled image can't execute
@@ -42,7 +46,8 @@ const csp = [
   // (see core/storage/file-signature.util.ts), so this is a low-risk relaxation.
   `img-src 'self' data: blob: https: http://localhost:9000`,
   "font-src 'self' data:",
-  `connect-src 'self' ${apiOrigin} ${apiWsOrigin}`,
+  `connect-src 'self' ${apiOrigin} ${apiWsOrigin} https://api.razorpay.com https://lumberjack.razorpay.com`,
+  "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
   "object-src 'none'",
   "base-uri 'self'",
   "frame-ancestors 'none'",

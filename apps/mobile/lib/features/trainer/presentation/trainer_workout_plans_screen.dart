@@ -45,8 +45,7 @@ class TrainerWorkoutPlansScreen extends StatefulWidget {
       _TrainerWorkoutPlansScreenState();
 }
 
-class _TrainerWorkoutPlansScreenState
-    extends State<TrainerWorkoutPlansScreen> {
+class _TrainerWorkoutPlansScreenState extends State<TrainerWorkoutPlansScreen> {
   late final _cubit = PaginatedListCubit<WorkoutPlanSummary>(
     (page) => getIt<WorkoutPlanRepository>().list(page: page),
   )..load();

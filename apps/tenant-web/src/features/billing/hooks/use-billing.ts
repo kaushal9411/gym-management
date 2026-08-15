@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { billingService } from '../services/billing.service';
 import { BillingServiceError } from '../types';
-import type { BillingAddress, CheckoutPayload } from '../types';
+import type { BillingAddress, CheckoutPayload, VerifyCheckoutPayload } from '../types';
 
 export function toBillingError(error: unknown): BillingServiceError {
   if (error instanceof BillingServiceError) return error;
@@ -30,6 +30,17 @@ export function useCheckout() {
       billingService.checkout(kind, payload),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['billing'] });
+    },
+  });
+}
+
+export function useVerifyCheckout() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ paymentId, payload }: { paymentId: string; payload: VerifyCheckoutPayload }) =>
+      billingService.verifyCheckout(paymentId, payload),
+    onSuccess: (result) => {
+      if (result.status === 'SUCCEEDED') void queryClient.invalidateQueries({ queryKey: ['billing'] });
     },
   });
 }

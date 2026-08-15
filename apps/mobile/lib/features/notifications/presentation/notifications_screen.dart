@@ -160,8 +160,7 @@ class _NotificationsViewState extends State<_NotificationsView> {
                         style: AppText.body(
                           size: 12,
                           weight: FontWeight.w700,
-                          color:
-                              selected ? Colors.white : AppColors.inkSoft,
+                          color: selected ? Colors.white : AppColors.inkSoft,
                         ),
                       ),
                     ),
@@ -187,9 +186,8 @@ class _NotificationsViewState extends State<_NotificationsView> {
           PaginatedListLoading() => const AppLoadingView(),
           PaginatedListError(:final message) => AppErrorView(
               message: message,
-              onRetry: () => context
-                  .read<PaginatedListCubit<TenantNotification>>()
-                  .load(),
+              onRetry: () =>
+                  context.read<PaginatedListCubit<TenantNotification>>().load(),
             ),
           PaginatedListLoaded() when filtered.isEmpty => AppEmptyState(
               icon: Icons.notifications_none_rounded,
@@ -201,9 +199,8 @@ class _NotificationsViewState extends State<_NotificationsView> {
           PaginatedListLoaded() => RefreshIndicator(
               color: AppColors.staffB,
               backgroundColor: AppColors.surface2,
-              onRefresh: () => context
-                  .read<PaginatedListCubit<TenantNotification>>()
-                  .load(),
+              onRefresh: () =>
+                  context.read<PaginatedListCubit<TenantNotification>>().load(),
               child: ListView.builder(
                 padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
                 itemCount: filtered.length,

@@ -39,6 +39,28 @@ class AnalyticsRepository {
     }
   }
 
+  /// `income` = collected (SUCCESS) payment totals, `expenses` field is
+  /// reused server-side to carry invoiced totals for the same range — not
+  /// real expenses, matches web's own `usePaymentCollection` shape.
+  Future<List<RevenueTrendPoint>> paymentCollection({
+    required DateTime from,
+    required DateTime to,
+    String? branchId,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/analytics/payment-collection',
+        queryParameters: _params(from, to, branchId),
+      );
+      final list = response.data!['data'] as List;
+      return list
+          .map((e) => RevenueTrendPoint.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   Future<List<TrendPoint>> attendanceTrends({
     required DateTime from,
     required DateTime to,

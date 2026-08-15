@@ -147,8 +147,7 @@ class IamUser {
             ? const []
             : (json['permissionOverrides'] as List)
                 .map(
-                  (o) =>
-                      PermissionOverride.fromJson(o as Map<String, dynamic>),
+                  (o) => PermissionOverride.fromJson(o as Map<String, dynamic>),
                 )
                 .toList(),
         effectivePermissions: json['effectivePermissions'] == null

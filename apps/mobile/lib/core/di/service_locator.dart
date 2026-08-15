@@ -163,10 +163,13 @@ void setupServiceLocator() {
   );
 
   // Screen-scoped cubits — a fresh instance per screen, not app-wide state.
-  getIt.registerFactory<DashboardCubit>(() => DashboardCubit(getIt()));
+  getIt.registerFactory<DashboardCubit>(
+    () => DashboardCubit(getIt(), getIt(), getIt(), getIt(), getIt()),
+  );
   getIt.registerFactory<BranchListCubit>(() => BranchListCubit(getIt()));
-  getIt
-      .registerFactory<FinanceSummaryCubit>(() => FinanceSummaryCubit(getIt()));
+  getIt.registerFactory<FinanceSummaryCubit>(
+    () => FinanceSummaryCubit(getIt(), getIt(), getIt(), getIt()),
+  );
 
   getIt.registerLazySingleton<SessionCubit>(
     () => SessionCubit(

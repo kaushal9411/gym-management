@@ -121,13 +121,14 @@ class _BranchHoursScreenState extends State<BranchHoursScreen> {
               FormAlert(message: _error!),
               const SizedBox(height: 12),
             ],
-            for (final day in branchWeekdays) _DayRow(
-              label: _dayLabels[day]!,
-              hours: _hours[day]!,
-              onTapOpen: () => _pickTime(day, isOpen: true),
-              onTapClose: () => _pickTime(day, isOpen: false),
-              onToggleClosed: () => _toggleClosed(day),
-            ),
+            for (final day in branchWeekdays)
+              _DayRow(
+                label: _dayLabels[day]!,
+                hours: _hours[day]!,
+                onTapOpen: () => _pickTime(day, isOpen: true),
+                onTapClose: () => _pickTime(day, isOpen: false),
+                onToggleClosed: () => _toggleClosed(day),
+              ),
             const SizedBox(height: 20),
             AppButton(label: 'Save hours', loading: _saving, onPressed: _save),
           ],
@@ -187,7 +188,8 @@ class _DayRow extends StatelessWidget {
                   _TimeChip(label: hours.open ?? '—', onTap: onTapOpen),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Text('–', style: AppText.body(color: AppColors.inkFaint)),
+                    child: Text('–',
+                        style: AppText.body(color: AppColors.inkFaint)),
                   ),
                   _TimeChip(label: hours.close ?? '—', onTap: onTapClose),
                 ],

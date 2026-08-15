@@ -297,9 +297,8 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
           ],
           const SizedBox(height: 24),
           AppButton(
-            label: _channel == _Channel.offline
-                ? 'Record payment'
-                : 'Send link',
+            label:
+                _channel == _Channel.offline ? 'Record payment' : 'Send link',
             loading: _submitting,
             onPressed: _submit,
           ),

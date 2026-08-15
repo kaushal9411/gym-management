@@ -16,6 +16,7 @@ import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import 'plan_comparison.dart';
 
 const _subscriptionStatusTones = {
   'ACTIVE': AppPillTone.success,
@@ -26,11 +27,11 @@ const _subscriptionStatusTones = {
   'SUSPENDED': AppPillTone.danger,
 };
 
-
 /// Design frame "16. Billing" — the plan card, a "Usage this cycle" card
-/// and a button through to the history frame (16a). The frame's "Manage
-/// plan" button is not built: upgrade/downgrade/cancel run through a
-/// payment-gateway checkout that has no mobile flow in this pass.
+/// and a button through to the history frame (16a), extended with web's
+/// "Choose/Change plan" comparison + sandboxed checkout (`PlanComparisonList`
+/// / `CheckoutSheet`) — the frame's "Manage plan" button, previously
+/// unbuilt since this had no mobile flow.
 ///
 /// The usage numerators aren't part of `GET /subscription` (which carries
 /// only the plan's limits), so they're the real `total`s from the
@@ -173,6 +174,17 @@ class _BillingScreenState extends State<BillingScreen> {
           label: 'Billing address',
           variant: AppButtonVariant.ghost,
           onPressed: () => context.push(AppRoutes.billingAddress),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          subscription == null ? 'Choose a plan' : 'Change plan',
+          style: AppText.body(size: 15, weight: FontWeight.w800),
+        ),
+        const SizedBox(height: 10),
+        PlanComparisonList(
+          currentPlanSlug: subscription?.plan.slug,
+          currentSortOrder: subscription?.plan.sortOrder,
+          onChanged: _load,
         ),
       ],
     );

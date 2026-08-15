@@ -12,10 +12,10 @@ import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import 'widgets/report_filter_bar.dart';
 
-/// Not a literal design frame — the "Staff perf." tile on the Reports
-/// Center grid has no detail mockup, built with the same component
-/// vocabulary. Backs `GET /reports/trainer-performance`. Branch-filterable
-/// only — this is a live snapshot, not a date-ranged report.
+/// Reports Center's "Trainer Performance" card — "Assigned members and
+/// active plans," matching web's report of the same name. Backs
+/// `GET /reports/trainer-performance`. Branch-filterable only — this is a
+/// live snapshot, not a date-ranged report.
 class StaffPerformanceScreen extends StatefulWidget {
   const StaffPerformanceScreen({super.key});
 
@@ -76,7 +76,7 @@ class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text('By trainer', style: AppText.eyebrow()),
-            Text('Staff Performance', style: AppText.display(size: 18)),
+            Text('Trainer Performance', style: AppText.display(size: 18)),
           ],
         ),
       ),

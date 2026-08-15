@@ -6,41 +6,28 @@ import '../../../bloc/session/session_cubit.dart';
 import '../../../bloc/session/session_state.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../shared/widgets/menu_entry.dart';
 import '../../../shared/widgets/user_avatar.dart';
 
-class _MenuEntry {
-  const _MenuEntry({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.route,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String route;
-}
-
-const _sections = <String, List<_MenuEntry>>{
+const _sections = <String, List<MenuEntry>>{
   'My work': [
-    _MenuEntry(
+    MenuEntry(
       icon: Icons.bar_chart_outlined,
       title: 'Reports',
       subtitle: 'View only',
       route: AppRoutes.receptionistReports,
+      permissions: ['reports:view', 'attendance:view'],
     ),
   ],
   'Support': [
-    _MenuEntry(
+    MenuEntry(
       icon: Icons.support_agent_outlined,
       title: 'Support',
       subtitle: 'My tickets',
       route: AppRoutes.support,
     ),
-    _MenuEntry(
+    MenuEntry(
       icon: Icons.notifications_outlined,
       title: 'Notifications',
       subtitle: 'Unread alerts',
@@ -54,17 +41,21 @@ const _sections = <String, List<_MenuEntry>>{
 /// Reports reuses [ReceptionistReportsScreen] (behind `AppRoutes.
 /// receptionistReports`) — it's permission-gated (`reports:view`,
 /// `attendance:view`), not role-locked, so the same two tiles apply here.
+/// No `featureFlag` on the Reports tile since either permission's own
+/// underlying flag (`reports` or `attendance`) can satisfy it — mirrors
+/// web's own `permission: string[]` "any of" pattern.
 class TrainerMenuScreen extends StatelessWidget {
   const TrainerMenuScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final session = context.watch<SessionCubit>().state;
-    final tenantName =
-        session is SessionAuthenticatedStaff ? session.tenant.name : '';
-    final name = session is SessionAuthenticatedStaff ? session.user.name : '';
-    final avatarUrl =
-        session is SessionAuthenticatedStaff ? session.user.avatarUrl : null;
+    if (session is! SessionAuthenticatedStaff) return const SizedBox.shrink();
+    final tenantName = session.tenant.name;
+    final name = session.user.name;
+    final avatarUrl = session.user.avatarUrl;
+    final sections =
+        visibleMenuSections(_sections, session.user, session.tenant);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 90),
@@ -96,82 +87,14 @@ class TrainerMenuScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        for (final section in _sections.entries) ...[
+        for (final section in sections.entries) ...[
           Padding(
             padding: const EdgeInsets.only(bottom: 8, top: 6),
             child: Text(section.key, style: AppText.eyebrow()),
           ),
-          ...section.value.map((entry) => _MenuTile(entry: entry)),
+          ...section.value.map((entry) => MenuTile(entry: entry)),
         ],
       ],
-    );
-  }
-}
-
-class _MenuTile extends StatelessWidget {
-  const _MenuTile({required this.entry});
-
-  final _MenuEntry entry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadii.card),
-          onTap: () => context.push(entry.route),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.surface2,
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              border: Border.all(color: AppColors.line),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.staffSoft,
-                    borderRadius: BorderRadius.circular(AppRadii.tile),
-                  ),
-                  alignment: Alignment.center,
-                  child:
-                      Icon(entry.icon, size: 18, color: AppColors.staffPillFg),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        entry.title,
-                        style: AppText.body(size: 13, weight: FontWeight.w700),
-                      ),
-                      Text(
-                        entry.subtitle,
-                        style: AppText.body(
-                          size: 11,
-                          color: AppColors.inkFaint,
-                          weight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 18,
-                  color: AppColors.inkFaint,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

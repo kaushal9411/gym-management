@@ -24,8 +24,7 @@ class UserEditBranchesScreen extends StatefulWidget {
   final IamUser user;
 
   @override
-  State<UserEditBranchesScreen> createState() =>
-      _UserEditBranchesScreenState();
+  State<UserEditBranchesScreen> createState() => _UserEditBranchesScreenState();
 }
 
 String? _findPrimaryId(List<UserBranchAccess> branches) {
@@ -143,8 +142,7 @@ class _UserEditBranchesScreenState extends State<UserEditBranchesScreen> {
                           Switch(
                             value: _allBranches,
                             activeThumbColor: AppColors.staffPillFg,
-                            onChanged: (v) =>
-                                setState(() => _allBranches = v),
+                            onChanged: (v) => setState(() => _allBranches = v),
                           ),
                         ],
                       ),

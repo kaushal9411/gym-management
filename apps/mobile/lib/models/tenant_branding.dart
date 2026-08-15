@@ -9,6 +9,7 @@ class TenantBranding {
     required this.maintenanceMode,
     required this.primaryColor,
     this.logoUrl,
+    this.featureFlags = const [],
   });
 
   final String slug;
@@ -17,6 +18,13 @@ class TenantBranding {
   final bool maintenanceMode;
   final String primaryColor;
   final String? logoUrl;
+
+  /// Enabled module keys for this tenant's plan (`ResolvedTenant.
+  /// featureFlags` — mirrors `tenant.featureFlags` on the web app, which
+  /// `useFilteredNav` gates the sidebar on). Menu screens gate their tiles
+  /// the same way, so a tile a plan doesn't include doesn't dead-end at a
+  /// 403 when tapped.
+  final List<String> featureFlags;
 
   /// First two letters of each of the first two words — "Kaushal Fitness
   /// Studio" -> "KF" — used by [BrandMark.initials] when there's no logo.
@@ -41,6 +49,7 @@ class TenantBranding {
       maintenanceMode: json['maintenanceMode'] as bool? ?? false,
       primaryColor: branding['primaryColor'] as String? ?? '',
       logoUrl: branding['logoUrl'] as String?,
+      featureFlags: (json['featureFlags'] as List?)?.cast<String>() ?? const [],
     );
   }
 }

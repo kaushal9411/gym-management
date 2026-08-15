@@ -175,10 +175,11 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
                 style: AppText.eyebrow(),
               ),
             ),
-            for (final item in section) _ResultTile(
-                  item: item,
-                  onTap: () => _openResult(item),
-                ),
+            for (final item in section)
+              _ResultTile(
+                item: item,
+                onTap: () => _openResult(item),
+              ),
           ],
       ],
     );

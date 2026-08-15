@@ -23,8 +23,7 @@ class MemberEditHealthScreen extends StatefulWidget {
   final GymMember member;
 
   @override
-  State<MemberEditHealthScreen> createState() =>
-      _MemberEditHealthScreenState();
+  State<MemberEditHealthScreen> createState() => _MemberEditHealthScreenState();
 }
 
 class _MemberEditHealthScreenState extends State<MemberEditHealthScreen> {

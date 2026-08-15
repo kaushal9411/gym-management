@@ -21,8 +21,7 @@ class PermissionsRegistryTab extends StatefulWidget {
   const PermissionsRegistryTab({super.key});
 
   @override
-  State<PermissionsRegistryTab> createState() =>
-      _PermissionsRegistryTabState();
+  State<PermissionsRegistryTab> createState() => _PermissionsRegistryTabState();
 }
 
 class _PermissionsRegistryTabState extends State<PermissionsRegistryTab> {

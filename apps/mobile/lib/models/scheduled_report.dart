@@ -22,22 +22,48 @@ extension ReportFrequencyX on ReportFrequency {
 
 /// The subset of `REPORT_TYPES` offered on the mobile create form — the
 /// backend allows 18 (including per-analytics-chart types); these are the
-/// ones with an actual report screen elsewhere in the app.
-enum ScheduledReportType { revenue, membership, attendance, staff }
+/// 11 tabular ones, each with an actual report screen elsewhere in the app.
+enum ScheduledReportType {
+  membership,
+  attendance,
+  revenue,
+  expenses,
+  payments,
+  staff,
+  trainerPerformance,
+  memberProgress,
+  branchPerformance,
+  expiringMemberships,
+  activeVsInactive,
+}
 
 extension ScheduledReportTypeX on ScheduledReportType {
   String get apiValue => switch (this) {
-        ScheduledReportType.revenue => 'revenue',
         ScheduledReportType.membership => 'membership',
         ScheduledReportType.attendance => 'attendance',
-        ScheduledReportType.staff => 'trainer-performance',
+        ScheduledReportType.revenue => 'revenue',
+        ScheduledReportType.expenses => 'expenses',
+        ScheduledReportType.payments => 'payments',
+        ScheduledReportType.staff => 'staff',
+        ScheduledReportType.trainerPerformance => 'trainer-performance',
+        ScheduledReportType.memberProgress => 'member-progress',
+        ScheduledReportType.branchPerformance => 'branch-performance',
+        ScheduledReportType.expiringMemberships => 'expiring-memberships',
+        ScheduledReportType.activeVsInactive => 'active-vs-inactive',
       };
 
   String get label => switch (this) {
-        ScheduledReportType.revenue => 'Revenue',
         ScheduledReportType.membership => 'Membership',
         ScheduledReportType.attendance => 'Attendance',
-        ScheduledReportType.staff => 'Staff performance',
+        ScheduledReportType.revenue => 'Revenue',
+        ScheduledReportType.expenses => 'Expense',
+        ScheduledReportType.payments => 'Payment',
+        ScheduledReportType.staff => 'Staff',
+        ScheduledReportType.trainerPerformance => 'Trainer performance',
+        ScheduledReportType.memberProgress => 'Member progress',
+        ScheduledReportType.branchPerformance => 'Branch performance',
+        ScheduledReportType.expiringMemberships => 'Expiring memberships',
+        ScheduledReportType.activeVsInactive => 'Active vs Inactive',
       };
 }
 

@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto';
+
 import Razorpay from 'razorpay';
 
 import { env } from '../../../config/env';
@@ -83,4 +85,46 @@ export async function fetchPaymentLink(paymentLinkId: string): Promise<RazorpayP
     status: link.status,
     razorpayPaymentId: link.payments?.payment_id ?? null,
   };
+}
+
+export interface RazorpayOrder {
+  id: string;
+  amount: number;
+  currency: string;
+}
+
+/**
+ * Creates a Razorpay Order for the client-side Checkout modal
+ * (`checkout.js`, opened in-page as a popup — not a hosted redirect page
+ * like the Payment Link flow above). Used by the tenant self-service plan
+ * upgrade/downgrade flow. Amount must be in the currency's smallest unit.
+ */
+export async function createOrder(params: {
+  amountInSmallestUnit: number;
+  currency: string;
+  receipt: string;
+  notes?: Record<string, string>;
+}): Promise<RazorpayOrder> {
+  const order = await getClient().orders.create({
+    amount: params.amountInSmallestUnit,
+    currency: params.currency,
+    receipt: params.receipt,
+    notes: params.notes,
+  });
+  return { id: order.id, amount: Number(order.amount), currency: order.currency };
+}
+
+/**
+ * Verifies the Checkout modal's success callback genuinely came from
+ * Razorpay — HMAC-SHA256 of `orderId|paymentId` keyed with the account
+ * secret, per Razorpay's documented Checkout verification scheme. Pure
+ * local computation, no API call — unlike polling a Payment Link's status,
+ * this can't be affected by upstream API flakiness.
+ */
+export function verifyOrderPaymentSignature(params: { orderId: string; paymentId: string; signature: string }): boolean {
+  if (!env.razorpay.isConfigured) return false;
+  const expected = createHmac('sha256', env.razorpay.keySecret!)
+    .update(`${params.orderId}|${params.paymentId}`)
+    .digest('hex');
+  return expected === params.signature;
 }

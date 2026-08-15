@@ -68,8 +68,7 @@ class _BillingHistoryScreenState extends State<BillingHistoryScreen> {
                     ? const AppEmptyState(
                         icon: Icons.receipt_long_outlined,
                         title: 'No invoices yet',
-                        message:
-                            'FitCloud subscription invoices appear here.',
+                        message: 'FitCloud subscription invoices appear here.',
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),

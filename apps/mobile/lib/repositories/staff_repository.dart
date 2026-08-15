@@ -11,15 +11,20 @@ class StaffRepository {
 
   Future<PaginatedResult<StaffMember>> list({
     int page = 1,
+    int limit = 20,
     String? search,
+    StaffRole? role,
+    String? status,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/staff',
         queryParameters: {
           'page': page,
-          'limit': 20,
+          'limit': limit,
           if (search != null && search.isNotEmpty) 'search': search,
+          if (role != null) 'role': role.apiValue,
+          if (status != null) 'status': status,
         },
       );
       return PaginatedResult.fromJson(

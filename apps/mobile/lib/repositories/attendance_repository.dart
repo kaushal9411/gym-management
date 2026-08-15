@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
 import '../models/attendance_summary.dart';
+import '../models/paginated_result.dart';
 import '../models/qr_validation_result.dart';
 
 class AttendanceRepository {
@@ -86,6 +87,46 @@ class AttendanceRepository {
           'memberId': memberId,
           if (branchId != null) 'branchId': branchId,
         },
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Closes out the member's open visit — `attendanceId` omitted lets the
+  /// server resolve their currently-open record for today.
+  Future<void> manualCheckOut({
+    required String memberId,
+    String? attendanceId,
+  }) async {
+    try {
+      await _dio.post<void>(
+        '/attendance/manual-check-out',
+        data: {
+          'memberId': memberId,
+          if (attendanceId != null) 'attendanceId': attendanceId,
+        },
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Staff-facing visit history for one member — the Member Detail
+  /// screen's "Recent visits" list.
+  Future<PaginatedResult<AttendanceRecord>> getMemberAttendance(
+    String memberId, {
+    int page = 1,
+    int limit = 5,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/attendance/member/$memberId',
+        queryParameters: {'page': page, 'limit': limit},
+      );
+      return PaginatedResult.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+        AttendanceRecord.fromJson,
       );
     } on DioException catch (e) {
       throw _mapError(e);

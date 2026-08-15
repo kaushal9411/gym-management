@@ -74,7 +74,8 @@ class MemberVisitDetailScreen extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  _Row(label: 'Check-in', value: formatClock(visit.checkInTime)),
+                  _Row(
+                      label: 'Check-in', value: formatClock(visit.checkInTime)),
                   _Row(
                     label: 'Check-out',
                     value: visit.checkOutTime == null

@@ -71,8 +71,7 @@ class _MemberEditAddressScreenState extends State<MemberEditAddressScreen> {
         'postalCode': _orNull(_postalCodeController.text),
         'emergencyContactName': _orNull(_emergencyNameController.text),
         'emergencyContactPhone': _orNull(_emergencyPhoneController.text),
-        'emergencyContactRelation':
-            _orNull(_emergencyRelationController.text),
+        'emergencyContactRelation': _orNull(_emergencyRelationController.text),
       });
       if (!mounted) return;
       context.pop();

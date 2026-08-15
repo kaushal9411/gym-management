@@ -172,7 +172,8 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
       context: context,
       backgroundColor: AppColors.surface2,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.card)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(AppRadii.card)),
       ),
       builder: (sheetContext) => SafeArea(
         child: Column(
@@ -464,9 +465,8 @@ class _MenuTile extends StatelessWidget {
                   child: Icon(
                     entry.icon,
                     size: 18,
-                    color: entry.danger
-                        ? AppColors.danger
-                        : AppColors.staffPillFg,
+                    color:
+                        entry.danger ? AppColors.danger : AppColors.staffPillFg,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -479,7 +479,8 @@ class _MenuTile extends StatelessWidget {
                         style: AppText.body(
                           size: 13,
                           weight: FontWeight.w700,
-                          color: entry.danger ? AppColors.danger : AppColors.ink,
+                          color:
+                              entry.danger ? AppColors.danger : AppColors.ink,
                         ),
                       ),
                       Text(

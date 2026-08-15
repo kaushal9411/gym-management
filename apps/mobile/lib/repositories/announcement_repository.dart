@@ -3,11 +3,31 @@ import 'package:dio/dio.dart';
 import '../core/network/api_exception.dart';
 import '../models/announcement.dart';
 import '../models/paginated_result.dart';
+import '../models/platform_announcement.dart';
 
 class AnnouncementRepository {
   AnnouncementRepository(this._dio);
 
   final Dio _dio;
+
+  /// `GET /announcements/active` — Super Admin platform notices currently
+  /// targeting this tenant (audience + expiry already filtered server-side).
+  /// Backs the Owner dashboard's "Announcements" card; unrelated to
+  /// [list]/[create]/etc. below, which manage the tenant's own announcements.
+  Future<List<PlatformAnnouncement>> listActivePlatform() async {
+    try {
+      final response =
+          await _dio.get<Map<String, dynamic>>('/announcements/active');
+      final list = response.data!['data'] as List;
+      return list
+          .map(
+            (e) => PlatformAnnouncement.fromJson(e as Map<String, dynamic>),
+          )
+          .toList();
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
 
   Future<PaginatedResult<Announcement>> list({int page = 1}) async {
     try {

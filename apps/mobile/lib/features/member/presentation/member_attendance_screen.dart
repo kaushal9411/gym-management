@@ -111,8 +111,7 @@ class _MemberAttendanceScreenState extends State<MemberAttendanceScreen> {
                                   decoration: BoxDecoration(
                                     gradient:
                                         visited ? AppColors.memberGrad : null,
-                                    color:
-                                        visited ? null : AppColors.surface3,
+                                    color: visited ? null : AppColors.surface3,
                                     borderRadius: BorderRadius.circular(7),
                                     border: visited
                                         ? null

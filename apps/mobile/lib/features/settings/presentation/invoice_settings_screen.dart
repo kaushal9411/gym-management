@@ -49,7 +49,8 @@ class _InvoiceSettingsScreenState extends State<InvoiceSettingsScreen> {
   Future<void> _load() async {
     setState(() => _error = null);
     try {
-      final settings = await getIt<GymSettingsRepository>().getInvoiceSettings();
+      final settings =
+          await getIt<GymSettingsRepository>().getInvoiceSettings();
       if (!mounted) return;
       setState(() {
         _settings = settings;

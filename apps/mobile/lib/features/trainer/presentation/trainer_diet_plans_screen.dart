@@ -38,8 +38,7 @@ class TrainerDietPlansScreen extends StatefulWidget {
   final GymMember member;
 
   @override
-  State<TrainerDietPlansScreen> createState() =>
-      _TrainerDietPlansScreenState();
+  State<TrainerDietPlansScreen> createState() => _TrainerDietPlansScreenState();
 }
 
 class _TrainerDietPlansScreenState extends State<TrainerDietPlansScreen> {

@@ -48,8 +48,7 @@ class StaffEditEmploymentScreen extends StatefulWidget {
       _StaffEditEmploymentScreenState();
 }
 
-class _StaffEditEmploymentScreenState
-    extends State<StaffEditEmploymentScreen> {
+class _StaffEditEmploymentScreenState extends State<StaffEditEmploymentScreen> {
   late final _salaryAmountController = TextEditingController(
     text: widget.staff.salaryAmount?.toString() ?? '',
   );

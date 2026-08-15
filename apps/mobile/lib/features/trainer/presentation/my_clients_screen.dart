@@ -185,8 +185,7 @@ class _ClientCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadii.card),
-        onTap: () =>
-            context.push(AppRoutes.clientProgress, extra: member),
+        onTap: () => context.push(AppRoutes.clientProgress, extra: member),
         child: Container(
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),

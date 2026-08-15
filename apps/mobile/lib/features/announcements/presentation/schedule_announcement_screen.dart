@@ -29,8 +29,7 @@ class _ScheduleAnnouncementScreenState
     extends State<ScheduleAnnouncementScreen> {
   DateTime _date = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _time = const TimeOfDay(hour: 9, minute: 0);
-  late final _dateController =
-      TextEditingController(text: _formatDate(_date));
+  late final _dateController = TextEditingController(text: _formatDate(_date));
   late final _timeController =
       TextEditingController(text: _time.format(context));
   bool _saving = false;

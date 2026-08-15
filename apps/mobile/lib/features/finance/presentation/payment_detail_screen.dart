@@ -229,7 +229,8 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                       children: [
                         _Row(
                           label: 'Member',
-                          value: '${payment.memberName} · ${payment.memberCode}',
+                          value:
+                              '${payment.memberName} · ${payment.memberCode}',
                         ),
                         _Row(label: 'Method', value: payment.method),
                         if (payment.planName != null)

@@ -4,6 +4,7 @@ import '../core/network/api_exception.dart';
 import '../models/diet_plan.dart';
 import '../models/diet_plan_summary.dart';
 import '../models/member_diet_progress.dart';
+import '../models/member_workout_progress.dart';
 import '../models/paginated_result.dart';
 
 class PlanMealDraft {
@@ -112,6 +113,45 @@ class DietPlanRepository {
       return current == null
           ? null
           : MemberDietProgress.fromJson(current as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Unassigns a plan from a member — the "Remove" action on Member Detail.
+  Future<void> removeAssignment(String assignmentId) async {
+    try {
+      await _dio.post<void>('/diet-plans/assignments/$assignmentId/remove');
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Merges into the given day's log — water/weight and per-meal status all
+  /// go through this one endpoint, same as web's "Save tracking" and meal
+  /// Done/Skip actions.
+  Future<MemberDietProgress> updateProgress({
+    required String assignmentId,
+    required DateTime date,
+    int? waterIntakeMl,
+    double? weightKg,
+    Map<MealType, ExerciseProgressStatus>? mealsStatus,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/diet-plans/assignments/$assignmentId/progress',
+        data: {
+          'date': date.toIso8601String().substring(0, 10),
+          if (waterIntakeMl != null) 'waterIntakeMl': waterIntakeMl,
+          if (weightKg != null) 'weightKg': weightKg,
+          if (mealsStatus != null)
+            'mealsStatus':
+                mealsStatus.map((k, v) => MapEntry(k.apiValue, v.apiValue)),
+        },
+      );
+      return MemberDietProgress.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
     } on DioException catch (e) {
       throw _mapError(e);
     }

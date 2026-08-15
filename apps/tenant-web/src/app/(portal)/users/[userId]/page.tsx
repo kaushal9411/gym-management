@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useCurrentUser } from '@/features/auth/hooks/use-current-user';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { BranchAccessEditor, type BranchAssignment } from '@/features/iam/components/branch-access-editor';
-import { PermissionTree } from '@/features/iam/components/permission-tree';
+import { type OverrideMode, PermissionOverridesTree } from '@/features/iam/components/permission-overrides-tree';
 import { RoleMultiSelect } from '@/features/iam/components/role-select';
 import { UserStatusBadge } from '@/features/iam/components/status-badge';
 import {
@@ -109,8 +109,8 @@ export default function UserDetailPage() {
       {canManage ? (
         <OverridesEditor
           userId={u.id}
-          initialGrants={u.permissionOverrides.filter((o) => o.mode === 'GRANT').map((o) => o.key)}
-          initialDenies={u.permissionOverrides.filter((o) => o.mode === 'DENY').map((o) => o.key)}
+          initialOverrides={u.permissionOverrides}
+          effective={u.effectivePermissions}
         />
       ) : null}
 
@@ -305,26 +305,33 @@ function BranchesEditor({
 
 function OverridesEditor({
   userId,
-  initialGrants,
-  initialDenies,
+  initialOverrides,
+  effective,
 }: {
   userId: string;
-  initialGrants: string[];
-  initialDenies: string[];
+  initialOverrides: Array<{ key: string; mode: 'GRANT' | 'DENY' }>;
+  effective: string[];
 }) {
   const setOverrides = useSetUserPermissionOverrides();
-  const [grants, setGrants] = React.useState(new Set(initialGrants));
-  const [denies, setDenies] = React.useState(new Set(initialDenies));
-  const [tab, setTab] = React.useState<'GRANT' | 'DENY'>('GRANT');
+  const [overrides, setOverrides_] = React.useState(
+    () => new Map(initialOverrides.map((o) => [o.key, o.mode])),
+  );
+  const effectiveSet = React.useMemo(() => new Set(effective), [effective]);
+  const overrideCount = overrides.size;
+
+  const onChange = (key: string, mode: OverrideMode) =>
+    setOverrides_((prev) => {
+      const next = new Map(prev);
+      if (mode === null) next.delete(key);
+      else next.set(key, mode);
+      return next;
+    });
 
   const save = () =>
     setOverrides.mutate(
       {
         userId,
-        overrides: [
-          ...[...grants].map((key) => ({ key, mode: 'GRANT' as const })),
-          ...[...denies].map((key) => ({ key, mode: 'DENY' as const })),
-        ],
+        overrides: [...overrides.entries()].map(([key, mode]) => ({ key, mode })),
       },
       {
         onSuccess: () => toast.success('Overrides updated'),
@@ -337,32 +344,18 @@ function OverridesEditor({
       <CardHeader>
         <CardTitle className="text-base">Permission overrides</CardTitle>
         <CardDescription>
-          Fine-tune this ONE user beyond their roles. Grants add extra permissions; denies remove them — a deny always
-          wins.
+          {overrideCount} override{overrideCount === 1 ? '' : 's'} · everything else inherits from their roles. The
+          green tick shows what this user currently, actually has — click it for a one-tap grant/deny, or use the
+          segmented control to reset a permission back to Inherit.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="inline-flex rounded-md border p-0.5">
-          {(['GRANT', 'DENY'] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setTab(mode)}
-              className={
-                tab === mode
-                  ? 'rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground'
-                  : 'rounded px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-accent'
-              }
-            >
-              {mode === 'GRANT' ? `Grants (${grants.size})` : `Denies (${denies.size})`}
-            </button>
-          ))}
-        </div>
-        {tab === 'GRANT' ? (
-          <PermissionTree selected={grants} onChange={setGrants} disabled={setOverrides.isPending} />
-        ) : (
-          <PermissionTree selected={denies} onChange={setDenies} disabled={setOverrides.isPending} />
-        )}
+        <PermissionOverridesTree
+          overrides={overrides}
+          onChange={onChange}
+          effective={effectiveSet}
+          disabled={setOverrides.isPending}
+        />
         <Button size="sm" onClick={save} disabled={setOverrides.isPending}>
           {setOverrides.isPending ? 'Saving…' : 'Save overrides'}
         </Button>

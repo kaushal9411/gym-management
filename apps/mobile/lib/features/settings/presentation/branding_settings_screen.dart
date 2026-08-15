@@ -165,8 +165,7 @@ class _BrandingSettingsScreenState extends State<BrandingSettingsScreen> {
                       const SizedBox(height: 8),
                       CategoryChipSelector<String>(
                         options: _themes,
-                        labelOf: (t) =>
-                            t[0] + t.substring(1).toLowerCase(),
+                        labelOf: (t) => t[0] + t.substring(1).toLowerCase(),
                         value: _theme,
                         onChanged: (t) => setState(() => _theme = t),
                       ),

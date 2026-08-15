@@ -55,7 +55,9 @@ class WorkoutPlanRepository {
     try {
       final response =
           await _dio.get<Map<String, dynamic>>('/workout-plans/$planId');
-      return WorkoutPlan.fromJson(response.data!['data'] as Map<String, dynamic>);
+      return WorkoutPlan.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -75,7 +77,9 @@ class WorkoutPlanRepository {
           'durationWeeks': durationWeeks,
         },
       );
-      return WorkoutPlan.fromJson(response.data!['data'] as Map<String, dynamic>);
+      return WorkoutPlan.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -91,7 +95,9 @@ class WorkoutPlanRepository {
         '/workout-plans/$planId/exercises',
         data: {'exercises': exercises.map((e) => e.toJson()).toList()},
       );
-      return WorkoutPlan.fromJson(response.data!['data'] as Map<String, dynamic>);
+      return WorkoutPlan.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -140,6 +146,15 @@ class WorkoutPlanRepository {
         '/workout-plans/assignments/$assignmentId',
         data: {'trainerRemarks': trainerRemarks},
       );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Unassigns a plan from a member — the "Remove" action on Member Detail.
+  Future<void> removeAssignment(String assignmentId) async {
+    try {
+      await _dio.post<void>('/workout-plans/assignments/$assignmentId/remove');
     } on DioException catch (e) {
       throw _mapError(e);
     }

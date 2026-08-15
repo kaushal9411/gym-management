@@ -23,8 +23,7 @@ class BillingAddress {
   final String country;
   final String? taxId;
 
-  factory BillingAddress.fromJson(Map<String, dynamic> json) =>
-      BillingAddress(
+  factory BillingAddress.fromJson(Map<String, dynamic> json) => BillingAddress(
         legalName: json['legalName'] as String?,
         line1: json['line1'] as String,
         line2: json['line2'] as String?,

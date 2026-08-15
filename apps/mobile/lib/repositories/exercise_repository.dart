@@ -35,9 +35,12 @@ class ExerciseRepository {
   /// exercise").
   Future<List<Exercise>> active() async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>('/exercises/active');
+      final response =
+          await _dio.get<Map<String, dynamic>>('/exercises/active');
       final list = response.data!['data'] as List;
-      return list.map((e) => Exercise.fromJson(e as Map<String, dynamic>)).toList();
+      return list
+          .map((e) => Exercise.fromJson(e as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw _mapError(e);
     }

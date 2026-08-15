@@ -14,7 +14,6 @@ import '../../../repositories/support_ticket_repository.dart';
 import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
 
-
 /// The design pills tickets by **priority** (High is emphasised, Medium is
 /// muted), not by status — status lives in the "N open" count up top and,
 /// for anything no longer open, in the row's subtext.
@@ -173,8 +172,8 @@ class _TicketCard extends StatelessWidget {
                   ),
                   AppPill(
                     label: ticket.priority.label,
-                    tone: _priorityTones[ticket.priority] ??
-                        AppPillTone.neutral,
+                    tone:
+                        _priorityTones[ticket.priority] ?? AppPillTone.neutral,
                   ),
                 ],
               ),

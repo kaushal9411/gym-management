@@ -97,7 +97,7 @@ class _BillingAddressScreenState extends State<BillingAddressScreen> {
       setState(
         () => _error =
             'Address line, city, state, postal code and a 2-letter country '
-            'code are required',
+                'code are required',
       );
       return;
     }

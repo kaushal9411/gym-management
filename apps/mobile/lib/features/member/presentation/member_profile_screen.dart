@@ -87,8 +87,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                               ),
                               borderRadius:
                                   BorderRadius.circular(AppRadii.card),
-                              border:
-                                  Border.all(color: AppColors.glassBorder),
+                              border: Border.all(color: AppColors.glassBorder),
                             ),
                             child: Row(
                               children: [
@@ -157,8 +156,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                                 if (profile.currentMembership != null)
                                   _Row(
                                     label: 'Plan',
-                                    value:
-                                        profile.currentMembership!.planName,
+                                    value: profile.currentMembership!.planName,
                                   ),
                               ],
                             ),
@@ -191,8 +189,8 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                                   role: AppRole.member,
                                   variant: AppButtonVariant.ghost,
                                   size: AppButtonSize.small,
-                                  onPressed: () => context
-                                      .push(AppRoutes.memberDataExport),
+                                  onPressed: () =>
+                                      context.push(AppRoutes.memberDataExport),
                                 ),
                               ],
                             ),
