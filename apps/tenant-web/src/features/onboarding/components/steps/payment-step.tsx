@@ -4,14 +4,11 @@ import * as React from 'react';
 import { ShieldCheck, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { loadRazorpayScript } from '@/lib/razorpay-checkout';
 import { FormAlert } from '@/features/auth/components/form-alert';
 import { LoadingButton } from '@/components/ui/loading-button';
-import { PAYMENT_PROVIDERS } from '../../constants';
-import { toOnboardingError, usePayForPlan } from '../../hooks/use-onboarding';
-import type { PaymentProvider } from '../../types';
+import { toOnboardingError, useStartOnboardingCheckout, useVerifyOnboardingCheckout } from '../../hooks/use-onboarding';
 import { useOnboardingWizard } from '../../store/onboarding-wizard-context';
 
 function formatMoney(amount: number, currency: string): string {
@@ -26,16 +23,21 @@ function formatMoney(amount: number, currency: string): string {
  * Step 5 — payment. Trial-eligible plans (all seeded plans currently have a
  * 14-day trial) can skip this entirely — the backend only requires a
  * completed payment when `plan.trialDays <= 0` (see
- * tenant-provisioning.service.ts's `requiresPayment` check). Card fields
- * here are structural only: the gateway is a sandboxed stub
- * (payment-gateway.service.ts), so nothing real is ever charged.
+ * tenant-provisioning.service.ts's `requiresPayment` check). Paying now
+ * instead opens a real Razorpay Order in Razorpay's own Checkout modal
+ * (`checkout.js`, in-page popup) — this app never renders or sees a
+ * card/UPI field, same pattern as the tenant self-service plan-upgrade
+ * flow's `CheckoutDialog`. The modal's signed success callback is verified
+ * server-side (HMAC of order+payment ids) before the session is marked
+ * paid; a dismissed/failed modal leaves the session untouched, so retrying
+ * or starting the trial instead both still work.
  */
 export function PaymentStep() {
   const { state, dispatch } = useOnboardingWizard();
-  const pay = usePayForPlan();
-  const [provider, setProvider] = React.useState<PaymentProvider>('razorpay');
-  const [cardNumber, setCardNumber] = React.useState('');
+  const startCheckout = useStartOnboardingCheckout();
+  const verifyCheckout = useVerifyOnboardingCheckout();
   const [error, setError] = React.useState<string | null>(null);
+  const [openingModal, setOpeningModal] = React.useState(false);
 
   const plan = state.selectedPlan;
   const sessionId = state.sessionId;
@@ -51,23 +53,62 @@ export function PaymentStep() {
     dispatch({ type: 'PAYMENT_DONE' });
   };
 
-  const submitPayment = () => {
-    if (cardNumber.replace(/\s/g, '').length < 8) {
-      setError('Enter a valid card number.');
-      return;
-    }
+  const payNow = () => {
     setError(null);
-    pay.mutate(
-      { sessionId, provider, paymentToken: `tok_${provider}_${Date.now()}` },
-      {
-        onSuccess: () => {
-          toast.success('Payment successful');
-          dispatch({ type: 'PAYMENT_DONE' });
-        },
-        onError: (err) => setError(toOnboardingError(err).message),
+    startCheckout.mutate(sessionId, {
+      onSuccess: async (result) => {
+        setOpeningModal(true);
+        const loaded = await loadRazorpayScript();
+        setOpeningModal(false);
+        if (!loaded || !window.Razorpay) {
+          setError('Could not load the Razorpay checkout. Please try again.');
+          return;
+        }
+
+        const razorpay = new window.Razorpay({
+          key: result.keyId,
+          amount: result.amount,
+          currency: result.currency,
+          order_id: result.orderId,
+          name: 'FitCloud',
+          description: `${plan.name} plan (${(state.billingCycle ?? 'MONTHLY').toLowerCase()})`,
+          theme: { color: '#ff5a1f' },
+          handler: (response) => {
+            verifyCheckout.mutate(
+              {
+                sessionId,
+                payload: {
+                  razorpayOrderId: response.razorpay_order_id,
+                  razorpayPaymentId: response.razorpay_payment_id,
+                  razorpaySignature: response.razorpay_signature,
+                },
+              },
+              {
+                onSuccess: (verifyResult) => {
+                  if (verifyResult.status === 'SUCCEEDED') {
+                    toast.success('Payment successful');
+                    dispatch({ type: 'PAYMENT_DONE' });
+                  } else {
+                    setError('Payment verification failed. If you were charged, contact support — your account has not been activated.');
+                  }
+                },
+                onError: (err) => setError(toOnboardingError(err).message),
+              },
+            );
+          },
+          modal: {
+            ondismiss: () => {
+              setError('Checkout closed before payment completed. You can try again or start the free trial instead.');
+            },
+          },
+        });
+        razorpay.open();
       },
-    );
+      onError: (err) => setError(toOnboardingError(err).message),
+    });
   };
+
+  const paying = startCheckout.isPending || openingModal || verifyCheckout.isPending;
 
   return (
     <div className="space-y-5">
@@ -97,46 +138,22 @@ export function PaymentStep() {
         </div>
       ) : null}
 
-      <div className={cn('space-y-4', trialEligible && 'border-t border-border pt-5')}>
+      <div className={cn('space-y-3', trialEligible && 'border-t border-border pt-5')}>
         {trialEligible ? (
           <p className="text-center text-xs text-muted-foreground">Prefer to pay now instead?</p>
         ) : null}
 
-        <div className="flex gap-2">
-          {PAYMENT_PROVIDERS.map((p) => (
-            <button
-              key={p.value}
-              type="button"
-              onClick={() => setProvider(p.value)}
-              className={cn(
-                'flex-1 rounded-lg border px-3 py-2 text-xs font-medium shadow-xs transition-colors duration-150',
-                provider === p.value ? 'border-primary bg-primary/5 text-foreground' : 'border-input text-muted-foreground hover:bg-accent',
-              )}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="cardNumber">Card / account number</Label>
-          <Input
-            id="cardNumber"
-            placeholder="4242 4242 4242 4242"
-            value={cardNumber}
-            onChange={(e) => setCardNumber(e.target.value)}
-            disabled={pay.isPending}
-          />
-          <p className="text-xs text-muted-foreground">Sandbox mode — no real payment is processed.</p>
-        </div>
+        <p className="text-center text-xs text-muted-foreground">
+          You&apos;ll pay in Razorpay&apos;s own secure checkout popup — this app never sees your card or UPI details.
+        </p>
 
         <LoadingButton
           type="button"
           variant={trialEligible ? 'outline' : 'default'}
           className={cn('w-full', !trialEligible && 'onboarding-cta')}
-          onClick={submitPayment}
-          loading={pay.isPending}
-          loadingText="Processing payment…"
+          onClick={payNow}
+          loading={paying}
+          loadingText={openingModal ? 'Opening checkout…' : verifyCheckout.isPending ? 'Confirming…' : 'Starting checkout…'}
         >
           <ShieldCheck aria-hidden />
           Pay {formatMoney(price, plan.currency)}

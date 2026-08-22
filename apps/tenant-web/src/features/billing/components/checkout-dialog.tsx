@@ -16,47 +16,9 @@ import { Button } from '@/components/ui/button';
 import { FormAlert } from '@/features/auth/components/form-alert';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { cn } from '@/lib/utils';
+import { loadRazorpayScript } from '@/lib/razorpay-checkout';
 import { toBillingError, useCheckout, useValidateCoupon, useVerifyCheckout } from '../hooks/use-billing';
 import type { BillingCycle, SubscriptionPlan } from '../types';
-
-interface RazorpayCheckoutOptions {
-  key: string;
-  amount: number;
-  currency: string;
-  order_id: string;
-  name: string;
-  description?: string;
-  theme?: { color?: string };
-  handler: (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => void;
-  modal?: { ondismiss?: () => void };
-}
-
-interface RazorpayCheckoutInstance {
-  open: () => void;
-}
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: RazorpayCheckoutOptions) => RazorpayCheckoutInstance;
-  }
-}
-
-let razorpayScriptPromise: Promise<boolean> | null = null;
-
-/** Lazily injects Razorpay's Checkout modal script — only needed once a real payment is actually due, not on every page load. */
-function loadRazorpayScript(): Promise<boolean> {
-  if (typeof window === 'undefined') return Promise.resolve(false);
-  if (window.Razorpay) return Promise.resolve(true);
-  if (razorpayScriptPromise) return razorpayScriptPromise;
-  razorpayScriptPromise = new Promise((resolve) => {
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-  return razorpayScriptPromise;
-}
 
 function formatMoney(amount: number, currency: string): string {
   try {

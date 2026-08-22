@@ -8,10 +8,11 @@ import type {
   checkSubdomainSchema,
   createTenantSchema,
   onboardingStatusSchema,
-  paymentSchema,
   registerOnboardingSchema,
   selectPlanSchema,
   sendOtpSchema,
+  startCheckoutSchema,
+  verifyCheckoutSchema,
   verifyOtpSchema,
 } from '../validators/onboarding.validators';
 
@@ -78,9 +79,15 @@ export class OnboardingController {
     sendSuccess(res, { step: session.step }, 'Plan selected.');
   }
 
-  async pay(req: TypedBodyRequest<z.infer<typeof paymentSchema>>, res: Response): Promise<void> {
-    const result = await onboardingService.pay(req.body.sessionId, req.body.provider, req.body.paymentToken);
-    sendSuccess(res, result, 'Payment successful.');
+  async startCheckout(req: TypedBodyRequest<z.infer<typeof startCheckoutSchema>>, res: Response): Promise<void> {
+    const result = await onboardingService.startCheckout(req.body.sessionId);
+    sendSuccess(res, result, 'Checkout order created.');
+  }
+
+  async verifyCheckout(req: TypedBodyRequest<z.infer<typeof verifyCheckoutSchema>>, res: Response): Promise<void> {
+    const { sessionId, ...params } = req.body;
+    const result = await onboardingService.verifyCheckout(sessionId, params);
+    sendSuccess(res, result, result.status === 'SUCCEEDED' ? 'Payment successful.' : 'Payment verification failed.');
   }
 
   async createTenant(req: TypedBodyRequest<z.infer<typeof createTenantSchema>>, res: Response): Promise<void> {

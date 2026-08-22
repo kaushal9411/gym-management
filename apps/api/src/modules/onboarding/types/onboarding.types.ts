@@ -38,6 +38,8 @@ export interface OnboardingSessionData {
   billingCycle?: BillingCycleValue;
   paymentStatus?: PaymentStatusValue;
   paymentReference?: string;
+  /** Set by `startCheckout`, checked by `verifyCheckout` so a signed callback can't be replayed against a different order. */
+  razorpayOrderId?: string;
   provisionedTenantId?: string;
   provisionedSlug?: string;
   createdAt: string;

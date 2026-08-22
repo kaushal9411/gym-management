@@ -7,10 +7,11 @@ import {
   checkSubdomainSchema,
   createTenantSchema,
   onboardingStatusSchema,
-  paymentSchema,
   registerOnboardingSchema,
   selectPlanSchema,
   sendOtpSchema,
+  startCheckoutSchema,
+  verifyCheckoutSchema,
   verifyOtpSchema,
 } from '../validators/onboarding.validators';
 
@@ -174,28 +175,51 @@ onboardingRouter.post(
 
 /**
  * @openapi
- * /onboarding/payment:
+ * /onboarding/checkout:
  *   post:
  *     tags: [Onboarding]
- *     summary: Step 6 — charge the selected plan (skip this call entirely for trial-eligible plans)
+ *     summary: Step 6 — create a real Razorpay Order for the Checkout modal (skip this call entirely for trial-eligible plans)
  *     requestBody:
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             required: [sessionId, provider, paymentToken]
+ *             required: [sessionId]
  *             properties:
  *               sessionId: { type: string, format: uuid }
- *               provider: { type: string, enum: [stripe, razorpay, paypal] }
- *               paymentToken: { type: string }
  *     responses:
- *       200: { description: "{ paymentReference }" }
- *       402: { description: Payment failed }
+ *       200: { description: "{ requiresPayment, orderId, amount, currency, keyId }" }
  */
 onboardingRouter.post(
-  '/payment',
-  validate({ body: paymentSchema }),
-  asyncHandler(onboardingController.pay.bind(onboardingController)),
+  '/checkout',
+  validate({ body: startCheckoutSchema }),
+  asyncHandler(onboardingController.startCheckout.bind(onboardingController)),
+);
+
+/**
+ * @openapi
+ * /onboarding/checkout/verify:
+ *   post:
+ *     tags: [Onboarding]
+ *     summary: Step 6b — verify the Checkout modal's signed success callback and mark the session paid
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [sessionId, razorpayOrderId, razorpayPaymentId, razorpaySignature]
+ *             properties:
+ *               sessionId: { type: string, format: uuid }
+ *               razorpayOrderId: { type: string }
+ *               razorpayPaymentId: { type: string }
+ *               razorpaySignature: { type: string }
+ *     responses:
+ *       200: { description: "{ status: SUCCEEDED | FAILED }" }
+ */
+onboardingRouter.post(
+  '/checkout/verify',
+  validate({ body: verifyCheckoutSchema }),
+  asyncHandler(onboardingController.verifyCheckout.bind(onboardingController)),
 );
 
 /**

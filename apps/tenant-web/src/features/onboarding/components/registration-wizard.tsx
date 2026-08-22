@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowLeft } from 'lucide-react';
 
 import { AUTH_ROUTES } from '@/features/auth/constants';
 import { AccountDetailsStep } from './steps/account-details-step';
@@ -12,6 +13,7 @@ import { SubdomainStep } from './steps/subdomain-step';
 import { SuccessStep } from './steps/success-step';
 import { ProgressIndicator } from './progress-indicator';
 import { OnboardingWizardProvider, useOnboardingWizard } from '../store/onboarding-wizard-context';
+import { WIZARD_STEPS } from '../types';
 import type { WizardStep } from '../types';
 
 const STEP_COPY: Record<WizardStep, { title: string; subtitle: string }> = {
@@ -19,9 +21,36 @@ const STEP_COPY: Record<WizardStep, { title: string; subtitle: string }> = {
   otp: { title: 'Verify your email', subtitle: 'One quick check before we set up your plan' },
   plan: { title: 'Choose your plan', subtitle: 'Switch or upgrade anytime from your dashboard' },
   subdomain: { title: 'Pick your portal address', subtitle: 'This is where your team will sign in' },
-  payment: { title: 'Payment', subtitle: 'Sandboxed — no real charge is ever made in this environment' },
+  payment: { title: 'Payment', subtitle: 'Start a free trial, or pay now with Razorpay' },
   success: { title: "You're all set!", subtitle: '' },
 };
+
+/**
+ * Steps forward through `WIZARD_STEPS` only — going back is a pure
+ * client-side view change (no destructive/duplicate-submission API call
+ * happens on the click itself); re-submitting a step's own form afterward
+ * behaves the same as it would on a fresh visit (e.g. plan re-selection
+ * just overwrites `planSlug`/`billingCycle`). Hidden on `account` (nothing
+ * before it) and `success` (provisioning already happened — there's
+ * nothing to go back to).
+ */
+function BackButton() {
+  const { state, dispatch } = useOnboardingWizard();
+  const currentIndex = WIZARD_STEPS.indexOf(state.step);
+  const previousStep = currentIndex > 0 ? WIZARD_STEPS[currentIndex - 1] : undefined;
+  if (state.step === 'account' || state.step === 'success' || !previousStep) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => dispatch({ type: 'GO_TO', step: previousStep })}
+      className="inline-flex items-center gap-1 text-xs font-medium text-white/50 transition-colors hover:text-white"
+    >
+      <ArrowLeft className="size-3.5" aria-hidden />
+      Back
+    </button>
+  );
+}
 
 function WizardBody() {
   const { state } = useOnboardingWizard();
@@ -77,6 +106,8 @@ function WizardBody() {
         .onboarding-cta:hover { transform: translateY(-2px); box-shadow: 0 16px 36px -8px rgba(255, 90, 31, 0.7); }
         .onboarding-cta:active { transform: translateY(0) scale(0.98); }
       `}</style>
+
+      <BackButton />
 
       <ProgressIndicator current={state.step} />
 

@@ -55,10 +55,15 @@ export const selectPlanSchema = z.object({
   billingCycle: z.enum(['MONTHLY', 'YEARLY']),
 });
 
-export const paymentSchema = z.object({
+export const startCheckoutSchema = z.object({
   sessionId: z.string().uuid(),
-  provider: z.enum(['stripe', 'razorpay', 'paypal']),
-  paymentToken: z.string().min(1),
+});
+
+export const verifyCheckoutSchema = z.object({
+  sessionId: z.string().uuid(),
+  razorpayOrderId: z.string().min(1),
+  razorpayPaymentId: z.string().min(1),
+  razorpaySignature: z.string().min(1),
 });
 
 export const createTenantSchema = z.object({

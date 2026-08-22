@@ -1,9 +1,10 @@
+import { env } from '../../../config/env';
 import { AppError, ConflictError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { assertPasswordPolicy, passwordService } from '../../../core/security/password.service';
 import { prisma } from '../../../infrastructure/database/prisma';
 import type { DeviceInfo } from '../../authentication/types/auth.types';
-import { getPaymentGateway, type PaymentGatewayProvider } from '../../payment/services/payment-gateway.service';
+import { createOrder, verifyOrderPaymentSignature } from '../../finance/services/razorpay-gateway.service';
 import { planRepository } from '../repositories/plan.repository';
 import type { BillingCycleValue, OnboardingSessionData, ProvisioningResult } from '../types/onboarding.types';
 
@@ -98,11 +99,22 @@ export class OnboardingService {
     return onboardingSessionService.update(sessionId, { planSlug, billingCycle, step: 'plan_selected' });
   }
 
-  async pay(
-    sessionId: string,
-    provider: PaymentGatewayProvider,
-    paymentToken: string,
-  ): Promise<{ paymentReference: string }> {
+  /**
+   * Creates a real Razorpay Order for the client-side Checkout modal —
+   * same `createOrder`/`verifyOrderPaymentSignature` pair the tenant
+   * self-service plan-upgrade flow uses (`subscription.service.ts`'s
+   * `startCheckout`), just with no `Payment`/`Invoice` DB rows to attach
+   * to yet (no tenant exists until `createTenant`) — the order id and,
+   * once verified, the payment id live directly on the Redis onboarding
+   * session instead.
+   */
+  async startCheckout(sessionId: string): Promise<{
+    requiresPayment: true;
+    orderId: string;
+    amount: number;
+    currency: string;
+    keyId: string;
+  }> {
     const session = await onboardingSessionService.get(sessionId);
     onboardingSessionService.assertStepReached(session, 'plan_selected');
     if (!session.planSlug) {
@@ -113,27 +125,55 @@ export class OnboardingService {
     if (!plan) throw new AppError(ErrorCode.VALIDATION_ERROR, 'The selected plan is not available.', 422);
 
     const amount = session.billingCycle === 'YEARLY' ? Number(plan.priceYearly) : Number(plan.priceMonthly);
-    const gateway = getPaymentGateway(provider);
-    const result = await gateway.charge({
-      provider,
-      paymentToken,
-      amount,
+    const order = await createOrder({
+      amountInSmallestUnit: Math.round(amount * 100),
       currency: plan.currency,
-      customerEmail: session.form.email,
-      description: `${plan.name} plan — ${session.billingCycle ?? 'MONTHLY'}`,
+      receipt: sessionId,
+      notes: { onboardingSessionId: sessionId, planSlug: plan.slug },
     });
 
-    if (!result.success) {
-      throw new AppError(ErrorCode.VALIDATION_ERROR, 'Payment could not be completed. Please try another method.', 402);
+    await onboardingSessionService.update(sessionId, { razorpayOrderId: order.id });
+
+    return {
+      requiresPayment: true,
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: env.razorpay.keyId!,
+    };
+  }
+
+  /**
+   * Verifies the Checkout modal's signed success callback (local HMAC
+   * check, no Razorpay API call — see `verifyOrderPaymentSignature`) and
+   * only then marks the session paid. A forged/tampered client callback
+   * can't self-approve — same guarantee `subscription.service.ts`'s
+   * `verifyCheckoutPayment` gives the tenant plan-upgrade flow.
+   */
+  async verifyCheckout(
+    sessionId: string,
+    params: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string },
+  ): Promise<{ status: 'SUCCEEDED' | 'FAILED' }> {
+    const session = await onboardingSessionService.get(sessionId);
+    if (session.paymentStatus === 'completed') return { status: 'SUCCEEDED' };
+    if (session.razorpayOrderId !== params.razorpayOrderId) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, 'This payment does not match the order being verified.', 400);
     }
+
+    const valid = verifyOrderPaymentSignature({
+      orderId: params.razorpayOrderId,
+      paymentId: params.razorpayPaymentId,
+      signature: params.razorpaySignature,
+    });
+    if (!valid) return { status: 'FAILED' };
 
     await onboardingSessionService.update(sessionId, {
       paymentStatus: 'completed',
-      paymentReference: result.gatewayReference,
+      paymentReference: params.razorpayPaymentId,
       step: 'payment_completed',
     });
 
-    return { paymentReference: result.gatewayReference };
+    return { status: 'SUCCEEDED' };
   }
 
   async createTenant(sessionId: string, subdomain: string, device: DeviceInfo): Promise<ProvisioningResult> {

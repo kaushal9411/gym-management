@@ -5,11 +5,13 @@ import { OnboardingServiceError, type OnboardingErrorCode } from '../types';
 import type {
   BillingCycle,
   OnboardingStatus,
-  PaymentProvider,
   ProvisioningResult,
   RegisterOnboardingPayload,
+  StartCheckoutResult,
   SubdomainCheckResult,
   SubscriptionPlan,
+  VerifyCheckoutPayload,
+  VerifyCheckoutResult,
 } from '../types';
 
 interface ApiEnvelope<T> {
@@ -112,12 +114,20 @@ class OnboardingService {
     }
   }
 
-  async pay(sessionId: string, provider: PaymentProvider, paymentToken: string): Promise<{ paymentReference: string }> {
+  async startCheckout(sessionId: string): Promise<StartCheckoutResult> {
     try {
-      const res = await apiClient.post<ApiEnvelope<{ paymentReference: string }>>('/onboarding/payment', {
+      const res = await apiClient.post<ApiEnvelope<StartCheckoutResult>>('/onboarding/checkout', { sessionId });
+      return res.data.data;
+    } catch (error) {
+      throw toOnboardingServiceError(error);
+    }
+  }
+
+  async verifyCheckout(sessionId: string, payload: VerifyCheckoutPayload): Promise<VerifyCheckoutResult> {
+    try {
+      const res = await apiClient.post<ApiEnvelope<VerifyCheckoutResult>>('/onboarding/checkout/verify', {
         sessionId,
-        provider,
-        paymentToken,
+        ...payload,
       });
       return res.data.data;
     } catch (error) {

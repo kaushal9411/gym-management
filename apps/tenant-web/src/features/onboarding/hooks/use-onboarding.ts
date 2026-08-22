@@ -4,7 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { onboardingService } from '../services/onboarding.service';
 import { OnboardingServiceError } from '../types';
-import type { BillingCycle, PaymentProvider, RegisterOnboardingPayload } from '../types';
+import type { BillingCycle, RegisterOnboardingPayload, VerifyCheckoutPayload } from '../types';
 
 /** Narrow unknown errors into the typed catalog for consistent UX mapping. */
 export function toOnboardingError(error: unknown): OnboardingServiceError {
@@ -57,10 +57,16 @@ export function useSelectPlan() {
   });
 }
 
-export function usePayForPlan() {
+export function useStartOnboardingCheckout() {
   return useMutation({
-    mutationFn: ({ sessionId, provider, paymentToken }: { sessionId: string; provider: PaymentProvider; paymentToken: string }) =>
-      onboardingService.pay(sessionId, provider, paymentToken),
+    mutationFn: (sessionId: string) => onboardingService.startCheckout(sessionId),
+  });
+}
+
+export function useVerifyOnboardingCheckout() {
+  return useMutation({
+    mutationFn: ({ sessionId, payload }: { sessionId: string; payload: VerifyCheckoutPayload }) =>
+      onboardingService.verifyCheckout(sessionId, payload),
   });
 }
 

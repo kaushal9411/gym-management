@@ -60,7 +60,25 @@ export interface RegisterOnboardingPayload {
 }
 
 export type BillingCycle = 'MONTHLY' | 'YEARLY';
-export type PaymentProvider = 'stripe' | 'razorpay' | 'paypal';
+
+/** Real Razorpay Order for the Checkout modal — created by `POST /onboarding/checkout`. */
+export interface StartCheckoutResult {
+  requiresPayment: true;
+  orderId: string;
+  amount: number;
+  currency: string;
+  keyId: string;
+}
+
+export interface VerifyCheckoutPayload {
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+}
+
+export interface VerifyCheckoutResult {
+  status: 'SUCCEEDED' | 'FAILED';
+}
 
 // ── Results / read models ───────────────────────────────────────────────
 
