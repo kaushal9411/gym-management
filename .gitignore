@@ -16,6 +16,14 @@ coverage/
 .env.*
 !.env.example
 
+# local-disk storage fallback (apps/api/src/core/storage/local-storage.util.ts)
+apps/api/uploads/
+
+# testing-deploy scripts generate these locally — never commit
+infrastructure/testing-deploy/config.env
+infrastructure/testing-deploy/credentials.txt
+infrastructure/testing-deploy/*.pem
+
 # logs
 *.log
 npm-debug.log*

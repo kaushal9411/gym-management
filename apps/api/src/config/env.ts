@@ -78,27 +78,29 @@ const envSchema = z.object({
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
 
   /**
-   * Object storage (`core/storage/`) — MinIO in dev (docker-compose), real
-   * S3/R2/Spaces in production via the same `@aws-sdk/client-s3` client
-   * (just different endpoint/credentials). Unset means uploads stay as
-   * base64 data-URLs in Postgres (today's behavior) — never a hard
-   * requirement to boot, so a dev machine that hasn't run
-   * `docker compose up minio minio-init` yet keeps working unchanged.
+   * Object storage (`core/storage/`) — real AWS S3 via `@aws-sdk/client-s3`.
+   * Set S3_BUCKET + S3_ACCESS_KEY_ID + S3_SECRET_ACCESS_KEY to upload to S3;
+   * leave any of them unset and uploads fall back to local disk storage
+   * (`core/storage/local-storage.util.ts`, served from `/uploads`) — never a
+   * hard requirement to boot, so a dev machine with no AWS credentials keeps
+   * working unchanged.
    */
   S3_ENDPOINT: z.string().optional(),
   S3_REGION: z.string().default('us-east-1'),
   S3_BUCKET: z.string().optional(),
   S3_ACCESS_KEY_ID: z.string().optional(),
   S3_SECRET_ACCESS_KEY: z.string().optional(),
-  // MinIO (and most non-AWS S3-compatible stores) need path-style URLs
-  // (`endpoint/bucket/key`); real AWS S3 uses virtual-hosted-style by
-  // default and this must be "false" there.
+  // Real AWS S3 uses virtual-hosted-style URLs by default ("false"); only an
+  // S3-compatible store that needs `endpoint/bucket/key` path-style URLs
+  // requires "true".
   S3_FORCE_PATH_STYLE: z
     .enum(['true', 'false'])
-    .default('true')
+    .default('false')
     .transform((v) => v === 'true'),
-  /** Base URL used to build the direct (non-presigned) URL stored for `public/`-prefixed objects — e.g. `http://localhost:9000/fitcloud-uploads` in dev, a CDN/custom domain in production. */
+  /** Base URL for the direct (non-presigned) URL stored for `public/`-prefixed objects. Defaults to the standard AWS S3 virtual-hosted URL for S3_BUCKET/S3_REGION — only set this for a CDN/custom domain in front of the bucket. */
   S3_PUBLIC_URL_BASE: z.string().optional(),
+  /** Base URL this API is reachable at — only used to build local-disk-storage file URLs when AWS S3 isn't configured. */
+  API_PUBLIC_URL: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -125,6 +127,7 @@ export const env = {
   isTest: raw.NODE_ENV === 'test',
   port: raw.PORT,
   apiVersion: raw.API_VERSION,
+  publicUrl: raw.API_PUBLIC_URL ?? `http://localhost:${raw.PORT}`,
 
   databaseUrl: raw.DATABASE_URL,
   redisUrl: raw.REDIS_URL,
@@ -221,9 +224,11 @@ export const env = {
     accessKeyId: raw.S3_ACCESS_KEY_ID,
     secretAccessKey: raw.S3_SECRET_ACCESS_KEY,
     forcePathStyle: raw.S3_FORCE_PATH_STYLE,
-    publicUrlBase: raw.S3_PUBLIC_URL_BASE,
+    // A CDN/custom domain, or the standard AWS virtual-hosted URL for the bucket.
+    publicUrlBase: raw.S3_PUBLIC_URL_BASE ?? (raw.S3_BUCKET ? `https://${raw.S3_BUCKET}.s3.${raw.S3_REGION}.amazonaws.com` : undefined),
+    // AWS credentials present → upload to S3. Missing → storage.service.ts falls back to local disk.
     get isConfigured() {
-      return Boolean(raw.S3_ENDPOINT && raw.S3_BUCKET && raw.S3_ACCESS_KEY_ID && raw.S3_SECRET_ACCESS_KEY && raw.S3_PUBLIC_URL_BASE);
+      return Boolean(raw.S3_BUCKET && raw.S3_ACCESS_KEY_ID && raw.S3_SECRET_ACCESS_KEY);
     },
   },
 } as const;

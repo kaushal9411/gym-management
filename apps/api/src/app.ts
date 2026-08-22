@@ -15,6 +15,7 @@ import { apiRateLimiter } from './core/middleware/rate-limiter';
 import { requestContextMiddleware } from './core/middleware/request-context.middleware';
 import { requestLoggerMiddleware } from './core/middleware/request-logger.middleware';
 import { requestTimeoutMiddleware } from './core/middleware/request-timeout.middleware';
+import { LOCAL_UPLOADS_DIR } from './core/storage/local-storage.util';
 import { swaggerSpec } from './core/swagger/swagger';
 import { tenantMiddleware } from './modules/tenants/middleware/tenant.middleware';
 
@@ -118,6 +119,10 @@ export function createApp(): Express {
     }
     sendSuccess(res, result, result.status === 'degraded' ? 'Degraded' : 'OK');
   });
+
+  // Local-disk storage fallback (`core/storage/local-storage.util.ts`) —
+  // only ever reached when AWS S3 isn't configured (no S3_* credentials).
+  app.use('/uploads', express.static(LOCAL_UPLOADS_DIR));
 
   // Swagger UI ships an inline bootstrap script/style — it genuinely needs
   // `'unsafe-inline'`, which the app-wide CSP above deliberately doesn't
