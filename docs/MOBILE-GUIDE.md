@@ -26,13 +26,13 @@ lib/
     common/                  PaginatedListCubit<T> + PaginatedListState<T>  ← use this for new lists
     session/                 SessionCubit + SessionState (app-wide)
     branches|dashboard|finance/   three older feature cubits (pre-date the generic one)
-  models/                    51 files, one per DTO shape, hand-written fromJson (no codegen)
-  repositories/              28 files, one per backend module
-  features/<area>/presentation/   100 screens, flat inside each feature
-  shared/widgets/            10 design-system widgets
+  models/                    70+ files, one per DTO shape, hand-written fromJson (no codegen)
+  repositories/              34 files, one per backend module
+  features/<area>/presentation/   165+ screens, flat inside each feature
+  shared/widgets/            14 design-system widgets, incl. status_action_menu.dart + trainer_picker_field.dart (Prompt 63)
 ```
 
-There is **no codegen** (no freezed/json_serializable/build_runner) and no `l10n`. Models are plain classes with a `factory X.fromJson`. Keep it that way — adding a build step now would touch all 51 models.
+There is **no codegen** (no freezed/json_serializable/build_runner) and no `l10n`. Models are plain classes with a `factory X.fromJson`. Keep it that way — adding a build step now would touch every model.
 
 ## State rules (strict)
 
@@ -80,7 +80,9 @@ Each role gets its own `*Shell` — a `StatefulWidget` with an `IndexedStack` an
 
 **Screens are permission-gated, not role-locked**, so they're reused aggressively across shells: Manager's `MembersScreen`/`MemberDetailScreen`/Renew/Freeze/Upgrade are the Receptionist's Members tab verbatim; `RecordPaymentScreen` is the Receptionist's Payments tab; Support/Notifications/Reports-hub screens are shared by Owner, Manager, Receptionist and Trainer. Before building a screen for a new role, check whether one exists — usually it does, and reusing it unmodified is the established pattern.
 
-Trainer's nav is worth internalising: **"Workouts" is the Exercise *library* and "Diet" is the Food *library*.** Workout/diet **plans** are not a top-level destination anywhere — they're reached only through My Clients → Assign → Workout/Diet plan.
+Trainer's nav is worth internalising: **"Workouts" is the Exercise *library* and "Diet" is the Food *library*.** Workout/diet **plans** are not a top-level destination in the Trainer's own tabs — they're reached only through My Clients → Assign → Workout/Diet plan, a reduced-field create-only flow.
+
+**Owner/Manager have a separate, full-CRUD entry point into the same plans** (Prompt 63): Menu → Programs → Workout Plans / Diet Plans / Classes, each a proper catalog (search, status filters, ⋯ menu for Duplicate/Activate-Deactivate/Delete/Restore) backed by `features/catalog/presentation/`. Both entry points call the **same repository** (`WorkoutPlanRepository`/`DietPlanRepository`/`GroupClassRepository`) — there is one create/update implementation, just two UI paths, matching how web itself lets you assign a plan either from the plan's own page or the member's page. Don't merge them; the user explicitly chose "coexist, share the repository layer" over unifying the flows.
 
 ## Design system (`core/theme/` + `shared/widgets/`)
 
@@ -96,7 +98,11 @@ Trainer's nav is worth internalising: **"Workouts" is the Exercise *library* and
 ## Backend traps that cost real debugging time
 
 - **`/attendance/*` is NOT branch-scoped server-side.** Unlike `/reports/*` and `/dashboard/*` (which auto-scope via `resolveBranchScope`), an attendance call that omits `branchId` returns the whole tenant. Manager's Attendance tab looks up its own `primaryBranch` with a `GET /staff/:id` self-lookup and passes it explicitly. Any new attendance screen must do the same.
-- **`PATCH /workout-plans/:id/exercises` and `PATCH /diet-plans/:id/meals` replace the entire array.** The Day Editor re-sends every *other* day's exercises alongside the edited day. Send a delta and you'll silently wipe the rest of the plan.
+- **`PATCH /workout-plans/:id/exercises` and `PATCH /diet-plans/:id/meals` replace the entire array.** The Day Editor re-sends every *other* day's exercises alongside the edited day; `WeeklyExerciseEditor`/`MealTypeEditor` (Prompt 63, the Owner/Manager catalog forms) follow the same rule. Send a delta and you'll silently wipe the rest of the plan. `PATCH /classes/:id/schedule` is the same convention a third time.
+- **A diet plan meal's `quantity` comes back from the API as a string** (`"quantity": "2.5"`), not a number, same convention as every other Prisma `Decimal` field in this API (`Food.protein`/`carbohydrates`/`fat` etc.). Parse with `double.tryParse`, never cast.
+- **Classes has no `activate`/`deactivate`/`duplicate` endpoints** — `GroupClass.isActive` is a plain field toggled via `PATCH /classes/:id`, and there is no `/classes/:id/duplicate` at all (`StatusActionMenu`'s `showActivateDeactivate`/`canDuplicate` flags both go `false` for Classes' ⋯ menu — same treatment as Exercises/Foods, which also lack activate/deactivate). Don't fabricate a client-side duplicate; confirmed absent via the route file, not assumed.
+- **`PATCH /classes/:id` treats `trainerId` as tri-state**: omit it to leave unchanged, send a real id to set it, send `null` to explicitly clear it (`z.string().uuid().nullable().optional()`). The Owner/Manager catalog form always sends the full current state (including `trainerId: null` when no trainer is picked) rather than omitting the key, matching this codebase's "forms submit complete state" convention — verified live that an explicit `null` genuinely clears an already-set trainer rather than being ignored.
+- **`GroupClassSession`s are never hand-created.** `GroupClass` (recurring template) → `GroupClassSchedule` slots (day+time, via `setSchedule`) → a nightly BullMQ job auto-generates dated, bookable `ClassSession` rows. `ClassSessionRepository.generate()` exists for a manual on-demand regeneration but has no UI trigger anywhere in the app — the nightly job is the real mechanism.
 - **`POST /portal/diet/:id/log` merges** into the day's existing row (logging water can't wipe a logged meal) — the opposite convention to the two above. Verified live.
 - **Member plane is `/portal/*` only** — confirmed by grep: no other module mounts `memberAuthenticateMiddleware`. There is no member-facing renew, payment, or profile-update route.
 - **`/support/tickets` is list/get/create only.** Replies come from FitCloud admins via the admin console, so a tenant has nothing to POST a reply to.
@@ -167,3 +173,5 @@ Each item is dropped because **no API backs it**, and each is documented in the 
 **AI Assistant is explicitly out of scope** for mobile (user direction — "no need AI assistant on mobile"), not a missing-backend drop; the `ai:use` permission still appears in the Permissions registry tab (it mirrors web's registry verbatim) but no chat UI exists or is planned.
 
 Six screens intentionally have **no** design frame of their own and exist as minimal glue: the Trainer's workout/diet **plan picker** lists (the design jumps straight from "Assign plan" to an already-open plan), the plan **create** forms, the **Payments list** (`PaymentsScreen`) — frame 14 "Payment detail" is drawn with no navigation source, so the list was added beside Income/Expenses in the Menu's Finance section to reach it — and, from the mobile-vs-web feature audit (Chunk 8, no Kinetic frame exists for either): **Global Search** (`GlobalSearchScreen`, reached via a "Global Search" Menu tile on Owner/Manager) and **Billing Address** (`BillingAddressScreen`, reached via a button on the Billing screen beside "View billing history").
+
+Same reasoning applies to the whole Owner/Manager plan-library catalog added in Prompt 63 (`features/catalog/presentation/`) — no Kinetic frame covers "the plan library as its own admin screen" (web has this surface, the mockup never did): `workout_plan_form_screen.dart`'s `WorkoutPlanCatalogFormScreen`, `diet_plan_form_screen.dart`'s `DietPlanCatalogFormScreen`, and `classes_screen.dart` were all built senior-UX-judgement-first from web's equivalent pages, following this app's own established CRUD template (`membership_plan_form_screen.dart`) rather than any HTML mockup.

@@ -9,7 +9,11 @@ class FoodRepository {
 
   final Dio _dio;
 
-  Future<PaginatedResult<Food>> list({int page = 1, String? search}) async {
+  Future<PaginatedResult<Food>> list({
+    int page = 1,
+    String? search,
+    bool includeDeleted = false,
+  }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/foods',
@@ -17,6 +21,7 @@ class FoodRepository {
           'page': page,
           'limit': 20,
           if (search != null && search.isNotEmpty) 'search': search,
+          if (includeDeleted) 'includeDeleted': includeDeleted,
         },
       );
       return PaginatedResult.fromJson(
@@ -50,23 +55,35 @@ class FoodRepository {
 
   Future<Food> create({
     required String name,
+    String? category,
     String? servingSize,
     int? calories,
     double? protein,
     double? carbohydrates,
     double? fat,
+    double? fiber,
+    double? sugar,
+    double? sodium,
+    String? notes,
+    bool? isActive,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/foods',
         data: {
           'name': name,
+          if (category != null && category.isNotEmpty) 'category': category,
           if (servingSize != null && servingSize.isNotEmpty)
             'servingSize': servingSize,
           if (calories != null) 'calories': calories,
           if (protein != null) 'protein': protein,
           if (carbohydrates != null) 'carbohydrates': carbohydrates,
           if (fat != null) 'fat': fat,
+          if (fiber != null) 'fiber': fiber,
+          if (sugar != null) 'sugar': sugar,
+          if (sodium != null) 'sodium': sodium,
+          if (notes != null && notes.isNotEmpty) 'notes': notes,
+          if (isActive != null) 'isActive': isActive,
         },
       );
       return Food.fromJson(response.data!['data'] as Map<String, dynamic>);
@@ -77,24 +94,56 @@ class FoodRepository {
 
   Future<Food> update(
     String foodId, {
+    String? name,
+    String? category,
     String? servingSize,
     int? calories,
     double? protein,
     double? carbohydrates,
     double? fat,
+    double? fiber,
+    double? sugar,
+    double? sodium,
+    String? notes,
+    bool? isActive,
   }) async {
     try {
       final response = await _dio.patch<Map<String, dynamic>>(
         '/foods/$foodId',
         data: {
+          if (name != null) 'name': name,
+          if (category != null) 'category': category,
           if (servingSize != null) 'servingSize': servingSize,
           if (calories != null) 'calories': calories,
           if (protein != null) 'protein': protein,
           if (carbohydrates != null) 'carbohydrates': carbohydrates,
           if (fat != null) 'fat': fat,
+          if (fiber != null) 'fiber': fiber,
+          if (sugar != null) 'sugar': sugar,
+          if (sodium != null) 'sodium': sodium,
+          if (notes != null) 'notes': notes,
+          if (isActive != null) 'isActive': isActive,
         },
       );
       return Food.fromJson(response.data!['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Soft-delete — plans that already use it are unaffected, but it can no
+  /// longer be added to new meals until restored.
+  Future<void> delete(String foodId) async {
+    try {
+      await _dio.delete<void>('/foods/$foodId');
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<void> restore(String foodId) async {
+    try {
+      await _dio.post<void>('/foods/$foodId/restore');
     } on DioException catch (e) {
       throw _mapError(e);
     }

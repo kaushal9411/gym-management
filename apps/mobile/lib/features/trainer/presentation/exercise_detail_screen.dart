@@ -10,7 +10,9 @@ import '../../../models/exercise.dart';
 import '../../../repositories/exercise_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
+import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/status_action_menu.dart';
 
 /// Design frame "5a. Exercise detail" — Sets/Reps steppers + Notes, "Save
 /// to plan" relabeled "Save" here since this screen (reached from the
@@ -31,6 +33,7 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
   late final _notesController =
       TextEditingController(text: widget.exercise.instructions ?? '');
   bool _loading = false;
+  bool _busy = false;
   String? _error;
 
   @override
@@ -61,6 +64,40 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
     }
   }
 
+  Future<void> _delete() async {
+    setState(() => _busy = true);
+    try {
+      await getIt<ExerciseRepository>().delete(widget.exercise.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Exercise deleted.')));
+      context.pop(true);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _restore() async {
+    setState(() => _busy = true);
+    try {
+      await getIt<ExerciseRepository>().restore(widget.exercise.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Exercise restored.')));
+      context.pop(true);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -84,6 +121,33 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
             ),
           ],
         ),
+        actions: [
+          if (_busy)
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else
+            StatusActionMenu(
+              subjectName: widget.exercise.name,
+              isDeleted: widget.exercise.deletedAt != null,
+              isActive: widget.exercise.isActive,
+              canDuplicate: false,
+              showActivateDeactivate: false,
+              onDelete: _delete,
+              onRestore: _restore,
+              deleteDescription: 'This soft-deletes the exercise — plans '
+                  'that already use it are unaffected, but it can no '
+                  'longer be added to new plans until restored.',
+              iconColor: AppColors.ink,
+            ),
+        ],
       ),
       body: SafeArea(
         top: false,
@@ -96,6 +160,20 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
                 FormAlert(message: _error!),
                 const SizedBox(height: 14),
               ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: AppPill(
+                  label: widget.exercise.deletedAt != null
+                      ? 'Deleted'
+                      : (widget.exercise.isActive ? 'Active' : 'Inactive'),
+                  tone: widget.exercise.deletedAt != null
+                      ? AppPillTone.neutral
+                      : (widget.exercise.isActive
+                          ? AppPillTone.success
+                          : AppPillTone.danger),
+                ),
+              ),
+              const SizedBox(height: 10),
               Container(
                 height: 120,
                 decoration: BoxDecoration(

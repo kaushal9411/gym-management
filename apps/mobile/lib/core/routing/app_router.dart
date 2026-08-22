@@ -19,9 +19,12 @@ import '../../features/branches/presentation/branch_form_screen.dart';
 import '../../features/branches/presentation/branch_holidays_screen.dart';
 import '../../features/branches/presentation/branch_hours_screen.dart';
 import '../../features/branches/presentation/branches_list_screen.dart';
+import '../../features/catalog/presentation/classes_screen.dart';
+import '../../features/catalog/presentation/diet_plan_form_screen.dart';
 import '../../features/catalog/presentation/diet_plans_screen.dart';
 import '../../features/catalog/presentation/membership_plan_form_screen.dart';
 import '../../features/catalog/presentation/membership_plans_screen.dart';
+import '../../features/catalog/presentation/workout_plan_form_screen.dart';
 import '../../features/catalog/presentation/workout_plans_screen.dart';
 import '../../features/finance/presentation/expense_form_screen.dart';
 import '../../features/finance/presentation/expense_list_screen.dart';
@@ -72,6 +75,8 @@ import '../../features/receptionist/presentation/class_session_detail_screen.dar
 import '../../features/receptionist/presentation/receptionist_reports_screen.dart';
 import '../../features/receptionist/presentation/search_members_screen.dart';
 import '../../features/reports/presentation/analytics_screen.dart';
+import '../../features/reports/presentation/attendance_dashboard_screen.dart';
+import '../../features/reports/presentation/attendance_history_screen.dart';
 import '../../features/reports/presentation/attendance_report_screen.dart';
 import '../../features/reports/presentation/branch_performance_screen.dart';
 import '../../features/reports/presentation/churn_report_screen.dart';
@@ -132,6 +137,7 @@ import '../../models/gym_profile.dart';
 import '../../models/iam_user.dart';
 import '../../models/member_invoice.dart';
 import '../../models/member_visit.dart';
+import '../../models/membership_plan.dart';
 import '../../models/notification_template.dart';
 import '../../models/staff_member.dart';
 import '../../models/tenant_role.dart';
@@ -297,15 +303,33 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       ),
       GoRoute(
         path: AppRoutes.membershipPlanForm,
-        builder: (context, state) => const MembershipPlanFormScreen(),
+        builder: (context, state) => MembershipPlanFormScreen(
+          plan: state.extra as MembershipPlan?,
+        ),
       ),
       GoRoute(
         path: AppRoutes.workoutPlans,
         builder: (context, state) => const WorkoutPlansScreen(),
       ),
       GoRoute(
+        path: AppRoutes.workoutPlanForm,
+        builder: (context, state) => WorkoutPlanCatalogFormScreen(
+          planId: state.extra as String?,
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.dietPlans,
         builder: (context, state) => const DietPlansScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.dietPlanForm,
+        builder: (context, state) => DietPlanCatalogFormScreen(
+          planId: state.extra as String?,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.classes,
+        builder: (context, state) => const ClassesScreen(),
       ),
       GoRoute(
         path: AppRoutes.revenueReport,
@@ -589,6 +613,14 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         builder: (context, state) => const SearchMembersScreen(),
       ),
       GoRoute(
+        path: AppRoutes.attendance,
+        builder: (context, state) => const AttendanceDashboardScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.attendanceHistory,
+        builder: (context, state) => const AttendanceHistoryScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.invoices,
         builder: (context, state) => const InvoicesScreen(),
       ),
@@ -609,7 +641,8 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       ),
       GoRoute(
         path: AppRoutes.classForm,
-        builder: (context, state) => const ClassFormScreen(),
+        builder: (context, state) =>
+            ClassFormScreen(classId: state.extra as String?),
       ),
       GoRoute(
         path: AppRoutes.classSchedule,

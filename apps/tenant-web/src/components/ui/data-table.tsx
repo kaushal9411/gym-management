@@ -23,6 +23,8 @@ interface DataTableProps<T> {
   error?: unknown;
   /** Shown as the Retry button's handler in the error state — pass `query.refetch`. Omitted → no Retry button. */
   onRetry?: () => void;
+  /** Extra classes merged onto a row's `<tr>` — used to highlight soft-deleted rows across every list. */
+  rowClassName?: (row: T) => string | undefined;
 }
 
 function errorMessage(error: unknown): string {
@@ -31,7 +33,7 @@ function errorMessage(error: unknown): string {
 }
 
 /** Generic table shell reused across every tenant-portal list view (members, staff, payments, etc.). Extended in Prompt 23 (Global Loading & Performance Optimization) with a distinct error/retry state — previously a failed query had no dedicated rendering path and silently fell through to the empty state. */
-export function DataTable<T>({ columns, rows, rowKey, loading, emptyMessage = 'Nothing to show yet.', error, onRetry }: DataTableProps<T>) {
+export function DataTable<T>({ columns, rows, rowKey, loading, emptyMessage = 'Nothing to show yet.', error, onRetry, rowClassName }: DataTableProps<T>) {
   if (error) {
     return (
       <EmptyState
@@ -66,7 +68,7 @@ export function DataTable<T>({ columns, rows, rowKey, loading, emptyMessage = 'N
         </thead>
         <tbody className="divide-y divide-border">
           {rows.map((row) => (
-            <tr key={rowKey(row)} className="transition-colors duration-100 hover:bg-accent/50">
+            <tr key={rowKey(row)} className={cn('transition-colors duration-100 hover:bg-accent/50', rowClassName?.(row))}>
               {columns.map((col) => (
                 <td key={col.key} className={cn('whitespace-nowrap px-4 py-3', col.className)}>
                   {col.render(row)}

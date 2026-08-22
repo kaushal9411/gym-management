@@ -7,6 +7,7 @@ import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
+import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -149,7 +150,7 @@ export default function ClassDetailPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {data.deletedAt ? (
-            <Badge variant="outline" className="border-dashed text-muted-foreground">Deleted</Badge>
+            <DeletedBadge />
           ) : (
             <Badge variant={data.isActive ? 'secondary' : 'outline'}>{data.isActive ? 'Active' : 'Inactive'}</Badge>
           )}

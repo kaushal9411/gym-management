@@ -11,7 +11,9 @@ import '../../../models/food.dart';
 import '../../../repositories/food_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
+import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/status_action_menu.dart';
 
 /// Design frame "7a. Food detail".
 class FoodDetailScreen extends StatefulWidget {
@@ -36,6 +38,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
     text: widget.food.fat?.toStringAsFixed(1) ?? '',
   );
   bool _loading = false;
+  bool _busy = false;
   String? _error;
 
   @override
@@ -70,6 +73,40 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
     }
   }
 
+  Future<void> _delete() async {
+    setState(() => _busy = true);
+    try {
+      await getIt<FoodRepository>().delete(widget.food.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Food deleted.')));
+      context.pop(true);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _restore() async {
+    setState(() => _busy = true);
+    try {
+      await getIt<FoodRepository>().restore(widget.food.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Food restored.')));
+      context.pop(true);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -85,6 +122,33 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
             Text(widget.food.servingSize ?? '—', style: AppText.eyebrow()),
           ],
         ),
+        actions: [
+          if (_busy)
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else
+            StatusActionMenu(
+              subjectName: widget.food.name,
+              isDeleted: widget.food.deletedAt != null,
+              isActive: widget.food.isActive,
+              canDuplicate: false,
+              showActivateDeactivate: false,
+              onDelete: _delete,
+              onRestore: _restore,
+              deleteDescription: 'This soft-deletes the food — meals that '
+                  'already use it are unaffected, but it can no longer be '
+                  'added to new meals until restored.',
+              iconColor: AppColors.ink,
+            ),
+        ],
       ),
       body: SafeArea(
         top: false,
@@ -97,6 +161,20 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
                 FormAlert(message: _error!),
                 const SizedBox(height: 14),
               ],
+              Align(
+                alignment: Alignment.centerLeft,
+                child: AppPill(
+                  label: widget.food.deletedAt != null
+                      ? 'Deleted'
+                      : (widget.food.isActive ? 'Active' : 'Inactive'),
+                  tone: widget.food.deletedAt != null
+                      ? AppPillTone.neutral
+                      : (widget.food.isActive
+                          ? AppPillTone.success
+                          : AppPillTone.danger),
+                ),
+              ),
+              const SizedBox(height: 10),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),

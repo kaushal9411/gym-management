@@ -130,6 +130,9 @@ class TrendChart extends StatelessWidget {
                         ? Text(
                             dateLabels[i],
                             textAlign: TextAlign.center,
+                            maxLines: 1,
+                            softWrap: false,
+                            overflow: TextOverflow.visible,
                             style: AppText.body(
                               size: 8,
                               color: AppColors.inkFaint,

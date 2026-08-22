@@ -8,14 +8,60 @@ import '../models/member_workout_progress.dart';
 import '../models/paginated_result.dart';
 
 class PlanMealDraft {
-  const PlanMealDraft({required this.foodId, required this.mealType});
+  const PlanMealDraft({
+    required this.foodId,
+    required this.mealType,
+    this.quantity,
+    this.notes,
+  });
 
   final String foodId;
   final MealType mealType;
+  final double? quantity;
+  final String? notes;
 
   Map<String, dynamic> toJson() => {
         'foodId': foodId,
         'mealType': mealType.apiValue,
+        if (quantity != null) 'quantity': quantity,
+        if (notes != null) 'notes': notes,
+      };
+}
+
+/// Full create/update field set — mirrors web's plan form
+/// (`createDietPlanSchema`/`updateDietPlanSchema`). One input class for both
+/// create (`POST`) and update (`PATCH`), same convention as
+/// `WorkoutPlanFormInput`.
+class DietPlanFormInput {
+  const DietPlanFormInput({
+    required this.name,
+    required this.durationDays,
+    this.goal,
+    this.description,
+    this.dailyCalories,
+    this.trainerId,
+    this.notes,
+    this.isActive,
+  });
+
+  final String name;
+  final int durationDays;
+  final String? goal;
+  final String? description;
+  final int? dailyCalories;
+  final String? trainerId;
+  final String? notes;
+  final bool? isActive;
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'durationDays': durationDays,
+        if (goal != null) 'goal': goal,
+        if (description != null) 'description': description,
+        if (dailyCalories != null) 'dailyCalories': dailyCalories,
+        if (trainerId != null) 'trainerId': trainerId,
+        if (notes != null) 'notes': notes,
+        if (isActive != null) 'isActive': isActive,
       };
 }
 
@@ -24,20 +70,42 @@ class DietPlanRepository {
 
   final Dio _dio;
 
-  /// Read-only catalog view (Owner/Manager Menu) — unchanged from Chunk 2c.
   Future<PaginatedResult<DietPlanSummary>> list({
     int page = 1,
     int limit = 20,
+    String? search,
+    bool? isActive,
+    bool includeDeleted = false,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/diet-plans',
-        queryParameters: {'page': page, 'limit': limit},
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+          if (search != null && search.isNotEmpty) 'search': search,
+          if (isActive != null) 'isActive': isActive,
+          if (includeDeleted) 'includeDeleted': includeDeleted,
+        },
       );
       return PaginatedResult.fromJson(
         response.data!['data'] as Map<String, dynamic>,
         DietPlanSummary.fromJson,
       );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Active-only, unfiltered — for assign-plan pickers.
+  Future<List<DietPlanSummary>> listAssignable() async {
+    try {
+      final response =
+          await _dio.get<Map<String, dynamic>>('/diet-plans/assignable');
+      final list = response.data!['data'] as List;
+      return list
+          .map((e) => DietPlanSummary.fromJson(e as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -53,20 +121,69 @@ class DietPlanRepository {
     }
   }
 
-  Future<DietPlan> create({
-    required String name,
-    required int durationDays,
-    int? dailyCalories,
-  }) async {
+  Future<DietPlan> create(DietPlanFormInput input) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/diet-plans',
-        data: {
-          'name': name,
-          'durationDays': durationDays,
-          if (dailyCalories != null) 'dailyCalories': dailyCalories,
-        },
+        data: input.toJson(),
       );
+      return DietPlan.fromJson(response.data!['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<DietPlan> update(String planId, DietPlanFormInput input) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/diet-plans/$planId',
+        data: input.toJson(),
+      );
+      return DietPlan.fromJson(response.data!['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<void> activate(String planId) async {
+    try {
+      await _dio.post<void>('/diet-plans/$planId/activate');
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<void> deactivate(String planId) async {
+    try {
+      await _dio.post<void>('/diet-plans/$planId/deactivate');
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Soft-delete — restorable, blocks future assignment while deleted.
+  Future<void> delete(String planId) async {
+    try {
+      await _dio.delete<void>('/diet-plans/$planId');
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<void> restore(String planId) async {
+    try {
+      await _dio.post<void>('/diet-plans/$planId/restore');
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Creates a copy named "{name} (Copy)" including its meals — always
+  /// inactive.
+  Future<DietPlan> duplicate(String planId) async {
+    try {
+      final response = await _dio
+          .post<Map<String, dynamic>>('/diet-plans/$planId/duplicate');
       return DietPlan.fromJson(response.data!['data'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _mapError(e);

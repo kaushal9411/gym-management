@@ -10,8 +10,12 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/menu_entry.dart';
 import '../../../shared/widgets/user_avatar.dart';
 
+/// Section order mirrors web's `NAV_ITEMS` macro order (Finance before
+/// Insights-equivalent "My work" before Communication before
+/// Administration) — same `Support`/`Notifications` split into
+/// Communication/Administration as Owner's and Manager's menus.
 const _sections = <String, List<MenuEntry>>{
-  'Money': [
+  'Finance': [
     MenuEntry(
       icon: Icons.receipt_long_outlined,
       title: 'Invoices',
@@ -31,18 +35,20 @@ const _sections = <String, List<MenuEntry>>{
       featureFlag: 'reports',
     ),
   ],
-  'Support': [
-    MenuEntry(
-      icon: Icons.support_agent_outlined,
-      title: 'Support',
-      subtitle: 'My tickets',
-      route: AppRoutes.support,
-    ),
+  'Communication': [
     MenuEntry(
       icon: Icons.notifications_outlined,
       title: 'Notifications',
       subtitle: 'Unread alerts',
       route: AppRoutes.notifications,
+    ),
+  ],
+  'Administration': [
+    MenuEntry(
+      icon: Icons.support_agent_outlined,
+      title: 'Support',
+      subtitle: 'My tickets',
+      route: AppRoutes.support,
     ),
   ],
 };

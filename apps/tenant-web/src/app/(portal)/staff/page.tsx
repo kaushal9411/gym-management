@@ -474,6 +474,7 @@ export default function StaffListPage() {
         columns={columns}
         rows={items}
         rowKey={(s) => s.id}
+        rowClassName={(s) => (s.deletedAt ? 'bg-destructive/5' : undefined)}
         loading={staff.isPending}
         error={staff.error}
         onRetry={() => staff.refetch()}

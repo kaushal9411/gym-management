@@ -33,7 +33,10 @@ class AppRoutes {
   static const membershipPlans = '/catalog/membership-plans';
   static const membershipPlanForm = '/catalog/membership-plans/form';
   static const workoutPlans = '/catalog/workout-plans';
+  static const workoutPlanForm = '/catalog/workout-plans/form';
   static const dietPlans = '/catalog/diet-plans';
+  static const dietPlanForm = '/catalog/diet-plans/form';
+  static const classes = '/catalog/classes';
 
   static const revenueReport = '/reports/revenue';
   static const membershipReport = '/reports/membership';
@@ -100,6 +103,8 @@ class AppRoutes {
 
   static const checkedIn = '/attendance/checked-in';
   static const searchMembers = '/attendance/search';
+  static const attendance = '/attendance/dashboard';
+  static const attendanceHistory = '/attendance/history';
   static const invoices = '/invoices';
   static const invoiceDetail = '/invoices/detail';
   static const classSessionDetail = '/classes/detail';

@@ -20,6 +20,7 @@ class FoodFormScreen extends StatefulWidget {
 
 class _FoodFormScreenState extends State<FoodFormScreen> {
   final _nameController = TextEditingController();
+  final _categoryController = TextEditingController();
   final _servingController = TextEditingController();
   final _kcalController = TextEditingController();
   final _proteinController = TextEditingController();
@@ -31,6 +32,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _categoryController.dispose();
     _servingController.dispose();
     _kcalController.dispose();
     _proteinController.dispose();
@@ -52,6 +54,7 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
     try {
       await getIt<FoodRepository>().create(
         name: name,
+        category: _categoryController.text.trim(),
         servingSize: _servingController.text.trim(),
         calories: int.tryParse(_kcalController.text.trim()),
         protein: double.tryParse(_proteinController.text.trim()),
@@ -93,6 +96,13 @@ class _FoodFormScreenState extends State<FoodFormScreen> {
                 label: 'Food name',
                 hintText: 'e.g. Grilled Chicken Breast',
                 controller: _nameController,
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 14),
+              AppLabeledField(
+                label: 'Category',
+                hintText: 'e.g. Protein, Dairy',
+                controller: _categoryController,
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 14),

@@ -7,6 +7,7 @@ import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Dumbbell, MoreHorizontal, P
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
+import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
@@ -190,7 +191,7 @@ export default function ExerciseLibraryPage() {
       header: 'Status',
       render: (ex) =>
         ex.deletedAt ? (
-          <Badge variant="outline" className="border-dashed text-muted-foreground">Deleted</Badge>
+          <DeletedBadge />
         ) : (
           <Badge variant={ex.isActive ? 'secondary' : 'outline'}>{ex.isActive ? 'Active' : 'Inactive'}</Badge>
         ),
@@ -265,7 +266,7 @@ export default function ExerciseLibraryPage() {
         }}
       />
 
-      <DataTable columns={columns} rows={items} rowKey={(ex) => ex.id} loading={exercises.isPending} error={exercises.error} onRetry={() => exercises.refetch()} emptyMessage="No exercises match these filters." />
+      <DataTable columns={columns} rows={items} rowKey={(ex) => ex.id} rowClassName={(ex) => (ex.deletedAt ? 'bg-destructive/5' : undefined)} loading={exercises.isPending} error={exercises.error} onRetry={() => exercises.refetch()} emptyMessage="No exercises match these filters." />
 
       {data ? (
         <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />

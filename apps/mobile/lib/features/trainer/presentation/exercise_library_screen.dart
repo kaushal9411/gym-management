@@ -30,10 +30,12 @@ class ExerciseLibraryScreen extends StatefulWidget {
 class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   final _searchController = TextEditingController();
   Timer? _debounce;
+  bool _includeDeleted = false;
   late final _cubit = PaginatedListCubit<Exercise>(
     (page) => getIt<ExerciseRepository>().list(
       page: page,
       search: _searchController.text.trim(),
+      includeDeleted: _includeDeleted,
     ),
   )..load();
 
@@ -48,6 +50,11 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
   void _onSearchChanged(String _) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), _cubit.load);
+  }
+
+  void _toggleIncludeDeleted() {
+    setState(() => _includeDeleted = !_includeDeleted);
+    _cubit.load();
   }
 
   Future<void> _addExercise() async {
@@ -130,6 +137,27 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: _toggleIncludeDeleted,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: _includeDeleted ? AppColors.staffGrad : null,
+                  color: _includeDeleted ? null : AppColors.surface3,
+                  borderRadius: BorderRadius.circular(AppRadii.pill),
+                ),
+                child: Text(
+                  'Show deleted',
+                  style: AppText.body(
+                    size: 12,
+                    weight: FontWeight.w700,
+                    color: _includeDeleted ? Colors.white : AppColors.inkSoft,
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 12),
             Expanded(
               child: BlocBuilder<PaginatedListCubit<Exercise>,
@@ -195,6 +223,7 @@ class _ExerciseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final deleted = exercise.deletedAt != null;
     final setsReps =
         exercise.defaultSets != null && exercise.defaultReps != null
             ? '${exercise.defaultSets}×${exercise.defaultReps}'
@@ -207,9 +236,13 @@ class _ExerciseCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.surface2,
+            color: deleted ? AppColors.dangerSoft : AppColors.surface2,
             borderRadius: BorderRadius.circular(AppRadii.card),
-            border: Border.all(color: AppColors.line),
+            border: Border.all(
+              color: deleted
+                  ? AppColors.danger.withValues(alpha: 0.3)
+                  : AppColors.line,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -226,7 +259,10 @@ class _ExerciseCard extends StatelessWidget {
                 exercise.muscleGroup ?? exercise.category ?? '—',
                 style: AppText.body(size: 11, color: AppColors.inkFaint),
               ),
-              if (setsReps != null) ...[
+              if (deleted) ...[
+                const SizedBox(height: 6),
+                const AppPill(label: 'Deleted', tone: AppPillTone.danger),
+              ] else if (setsReps != null) ...[
                 const SizedBox(height: 6),
                 AppPill(label: setsReps, tone: AppPillTone.roleTint),
               ],

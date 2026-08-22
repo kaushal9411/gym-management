@@ -310,6 +310,7 @@ export default function UsersPage() {
         columns={columns}
         rows={data?.items ?? []}
         rowKey={(u) => u.id}
+        rowClassName={(u) => (u.deletedAt ? 'bg-destructive/5' : undefined)}
         loading={users.isPending}
         error={users.error}
         onRetry={() => users.refetch()}

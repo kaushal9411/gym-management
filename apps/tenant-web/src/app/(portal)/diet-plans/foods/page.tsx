@@ -7,6 +7,7 @@ import { Apple, ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, MoreHorizontal, Plus
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
+import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
@@ -176,7 +177,7 @@ export default function FoodLibraryPage() {
       header: 'Status',
       render: (f) =>
         f.deletedAt ? (
-          <Badge variant="outline" className="border-dashed text-muted-foreground">Deleted</Badge>
+          <DeletedBadge />
         ) : (
           <Badge variant={f.isActive ? 'secondary' : 'outline'}>{f.isActive ? 'Active' : 'Inactive'}</Badge>
         ),
@@ -251,7 +252,7 @@ export default function FoodLibraryPage() {
         }}
       />
 
-      <DataTable columns={columns} rows={items} rowKey={(f) => f.id} loading={foods.isPending} error={foods.error} onRetry={() => foods.refetch()} emptyMessage="No foods match these filters." />
+      <DataTable columns={columns} rows={items} rowKey={(f) => f.id} rowClassName={(f) => (f.deletedAt ? 'bg-destructive/5' : undefined)} loading={foods.isPending} error={foods.error} onRetry={() => foods.refetch()} emptyMessage="No foods match these filters." />
 
       {data ? (
         <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />

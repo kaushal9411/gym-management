@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Pagination } from '@/components/ui/pagination';
 import { SearchBar } from '@/components/ui/search-bar';
@@ -125,7 +126,7 @@ export default function BranchesPage() {
     {
       key: 'status',
       header: 'Status',
-      render: (b) => (b.deletedAt ? <span className="text-xs text-muted-foreground">Deleted</span> : <BranchStatusBadge isActive={b.isActive} />),
+      render: (b) => (b.deletedAt ? <DeletedBadge /> : <BranchStatusBadge isActive={b.isActive} />),
     },
     {
       key: 'actions',
@@ -224,7 +225,7 @@ export default function BranchesPage() {
         </select>
       </div>
 
-      <DataTable columns={columns} rows={items} rowKey={(b) => b.id} loading={branches.isPending} error={branches.error} onRetry={() => branches.refetch()} emptyMessage="No branches match these filters." />
+      <DataTable columns={columns} rows={items} rowKey={(b) => b.id} rowClassName={(b) => (b.deletedAt ? 'bg-destructive/5' : undefined)} loading={branches.isPending} error={branches.error} onRetry={() => branches.refetch()} emptyMessage="No branches match these filters." />
 
       {data ? (
         <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />

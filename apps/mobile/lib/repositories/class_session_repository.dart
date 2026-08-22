@@ -61,6 +61,21 @@ class ClassSessionRepository {
     }
   }
 
+  /// Manually rolls the session-generation window forward — the nightly
+  /// BullMQ job already covers this; no UI trigger wires to it this pass,
+  /// it exists so a class create/edit flow could call it later without a
+  /// repository change.
+  Future<void> generate({int? daysAhead}) async {
+    try {
+      await _dio.post<void>(
+        '/class-sessions/generate',
+        data: {if (daysAhead != null) 'daysAhead': daysAhead},
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   ApiException _mapError(DioException e) {
     if (e.type == DioExceptionType.connectionError ||
         e.type == DioExceptionType.connectionTimeout) {

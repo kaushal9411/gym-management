@@ -6,6 +6,7 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../models/exercise.dart';
 import '../../../repositories/exercise_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
@@ -27,7 +28,9 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
   final _equipmentController = TextEditingController();
   final _setsController = TextEditingController();
   final _repsController = TextEditingController();
+  final _instructionsController = TextEditingController();
   String _muscleGroup = _muscleGroups.first;
+  ExerciseDifficulty _difficulty = ExerciseDifficulty.beginner;
   bool _loading = false;
   String? _error;
 
@@ -37,6 +40,7 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
     _equipmentController.dispose();
     _setsController.dispose();
     _repsController.dispose();
+    _instructionsController.dispose();
     super.dispose();
   }
 
@@ -55,6 +59,10 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
         name: name,
         muscleGroup: _muscleGroup,
         equipment: _equipmentController.text.trim(),
+        difficultyLevel: _difficulty,
+        instructions: _instructionsController.text.trim().isEmpty
+            ? null
+            : _instructionsController.text.trim(),
         defaultSets: int.tryParse(_setsController.text.trim()),
         defaultReps: int.tryParse(_repsController.text.trim()),
       );
@@ -110,6 +118,24 @@ class _ExerciseFormScreenState extends State<ExerciseFormScreen> {
                 hintText: 'e.g. Barbell (optional)',
                 controller: _equipmentController,
                 textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: 14),
+              Text('Difficulty', style: AppText.eyebrow()),
+              const SizedBox(height: 8),
+              CategoryChipSelector<ExerciseDifficulty>(
+                options: ExerciseDifficulty.values,
+                labelOf: (d) => d.label,
+                value: _difficulty,
+                onChanged: (d) => setState(() => _difficulty = d),
+              ),
+              const SizedBox(height: 14),
+              AppLabeledField(
+                label: 'Instructions',
+                hintText: 'How to perform this exercise (optional)',
+                controller: _instructionsController,
+                minLines: 2,
+                maxLines: 4,
+                textInputAction: TextInputAction.newline,
               ),
               const SizedBox(height: 14),
               Text('Default sets × reps', style: AppText.eyebrow()),

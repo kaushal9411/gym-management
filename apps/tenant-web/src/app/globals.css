@@ -151,6 +151,7 @@
     var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono',
     monospace;
   --animate-shimmer: shimmer 1.8s ease-in-out infinite;
+  --animate-blink: blink-deleted 1.4s ease-in-out infinite;
 
   /* Soft layered elevation — see :root/.dark for the tuned raw values. */
   --shadow-xs: var(--elevation-xs);
@@ -218,5 +219,18 @@
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
+  }
+}
+
+/* A deliberately more noticeable blink than stock `animate-pulse` (which fades only to 50% opacity on a slow
+   2s cycle) — dips further and cycles faster so the "Deleted" tag actually reads as blinking, not just softly
+   breathing, at badge size. Still covered by the `prefers-reduced-motion` override above. */
+@keyframes blink-deleted {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
   }
 }

@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { BranchDefaultBadge, BranchStatusBadge } from '@/features/branch/components/branch-badges';
 import { BranchFormFields, DEFAULT_BRANCH_FORM_STATE, type BranchFormState } from '@/features/branch/components/branch-form-fields';
 import {
@@ -165,7 +166,7 @@ export default function BranchDetailPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {data.deletedAt ? <span className="text-xs text-muted-foreground">Deleted</span> : <BranchStatusBadge isActive={data.isActive} />}
+          {data.deletedAt ? <DeletedBadge /> : <BranchStatusBadge isActive={data.isActive} />}
           {canUpdate && !data.isDefault && data.isActive && !data.deletedAt ? (
             <Button variant="outline" size="sm" onClick={() => setConfirmSetDefault(true)}>
               <Star className="size-4" /> Set as default

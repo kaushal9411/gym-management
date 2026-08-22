@@ -10,6 +10,17 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/menu_entry.dart';
 import '../../../shared/widgets/user_avatar.dart';
 
+/// Section names/order and each tile's placement mirror web's
+/// `NAV_ITEMS` (`nav-config.ts`) exactly — same section headers
+/// (People/Programs/Finance/Insights/Communication/Administration) in the
+/// same order, and tiles within each section in the same order web lists
+/// them. `Members`, `Reports`, and `Dashboard` have no menu tile here
+/// because they're already a bottom-nav tab one level up (Home/Members/
+/// Reports) — same reasoning web doesn't need since it has no separate
+/// tab bar. Web's `Staff` (`/staff`) nav item has no mobile screen yet, so
+/// isn't listed (never wire a tile to a screen that doesn't exist).
+/// `Search` is a mobile-only addition (no web sidebar equivalent) and
+/// stays first since it's the most-used shortcut.
 const _sections = <String, List<MenuEntry>>{
   'Search': [
     MenuEntry(
@@ -19,7 +30,15 @@ const _sections = <String, List<MenuEntry>>{
       route: AppRoutes.globalSearch,
     ),
   ],
-  'Business': [
+  'People': [
+    MenuEntry(
+      icon: Icons.groups_outlined,
+      title: 'Team & Access',
+      subtitle: 'Staff, roles, permissions',
+      route: AppRoutes.roles,
+      permissions: ['users:read'],
+      featureFlag: 'staff',
+    ),
     MenuEntry(
       icon: Icons.storefront_outlined,
       title: 'Branches',
@@ -28,6 +47,8 @@ const _sections = <String, List<MenuEntry>>{
       permissions: ['branches:view'],
       featureFlag: 'branches',
     ),
+  ],
+  'Programs': [
     MenuEntry(
       icon: Icons.card_membership_outlined,
       title: 'Membership Plans',
@@ -35,6 +56,22 @@ const _sections = <String, List<MenuEntry>>{
       route: AppRoutes.membershipPlans,
       permissions: ['memberships:manage'],
       featureFlag: 'membership_plans',
+    ),
+    MenuEntry(
+      icon: Icons.fact_check_outlined,
+      title: 'Attendance',
+      subtitle: "Who's checked in today",
+      route: AppRoutes.attendance,
+      permissions: ['attendance:view'],
+      featureFlag: 'attendance',
+    ),
+    MenuEntry(
+      icon: Icons.history_rounded,
+      title: 'Attendance History',
+      subtitle: 'Every visit, filterable',
+      route: AppRoutes.attendanceHistory,
+      permissions: ['attendance:view'],
+      featureFlag: 'attendance',
     ),
     MenuEntry(
       icon: Icons.fitness_center_outlined,
@@ -45,6 +82,14 @@ const _sections = <String, List<MenuEntry>>{
       featureFlag: 'workout_plans',
     ),
     MenuEntry(
+      icon: Icons.calendar_month_outlined,
+      title: 'Classes',
+      subtitle: 'Group class catalog & schedule',
+      route: AppRoutes.classes,
+      permissions: ['classes:view'],
+      featureFlag: 'live_classes',
+    ),
+    MenuEntry(
       icon: Icons.restaurant_outlined,
       title: 'Diet Plans',
       subtitle: 'Trainer catalog',
@@ -52,26 +97,16 @@ const _sections = <String, List<MenuEntry>>{
       permissions: ['diets:view'],
       featureFlag: 'diet_plans',
     ),
-    MenuEntry(
-      icon: Icons.insights_outlined,
-      title: 'Analytics',
-      subtitle: 'Trends & breakdowns',
-      route: AppRoutes.analytics,
-      permissions: ['analytics:view'],
-      featureFlag: 'reports',
-    ),
-  ],
-  'Team': [
-    MenuEntry(
-      icon: Icons.groups_outlined,
-      title: 'Team & Access',
-      subtitle: 'Staff, roles, permissions',
-      route: AppRoutes.roles,
-      permissions: ['users:read'],
-      featureFlag: 'staff',
-    ),
   ],
   'Finance': [
+    MenuEntry(
+      icon: Icons.account_balance_wallet_outlined,
+      title: 'Payments',
+      subtitle: 'Member payment ledger',
+      route: AppRoutes.payments,
+      permissions: ['finance:view'],
+      featureFlag: 'payments',
+    ),
     MenuEntry(
       icon: Icons.payments_outlined,
       title: 'Income',
@@ -89,14 +124,6 @@ const _sections = <String, List<MenuEntry>>{
       featureFlag: 'expenses',
     ),
     MenuEntry(
-      icon: Icons.account_balance_wallet_outlined,
-      title: 'Payments',
-      subtitle: 'Member payment ledger',
-      route: AppRoutes.payments,
-      permissions: ['finance:view'],
-      featureFlag: 'payments',
-    ),
-    MenuEntry(
       icon: Icons.credit_card_outlined,
       title: 'Billing',
       subtitle: 'FitCloud subscription',
@@ -104,7 +131,23 @@ const _sections = <String, List<MenuEntry>>{
       permissions: ['billing:read'],
     ),
   ],
+  'Insights': [
+    MenuEntry(
+      icon: Icons.insights_outlined,
+      title: 'Analytics',
+      subtitle: 'Trends & breakdowns',
+      route: AppRoutes.analytics,
+      permissions: ['analytics:view'],
+      featureFlag: 'reports',
+    ),
+  ],
   'Communication': [
+    MenuEntry(
+      icon: Icons.notifications_outlined,
+      title: 'Notifications',
+      subtitle: 'Unread alerts',
+      route: AppRoutes.notifications,
+    ),
     MenuEntry(
       icon: Icons.campaign_outlined,
       title: 'Announcements',
@@ -112,12 +155,6 @@ const _sections = <String, List<MenuEntry>>{
       route: AppRoutes.announcements,
       permissions: ['announcements:view'],
       featureFlag: 'notifications',
-    ),
-    MenuEntry(
-      icon: Icons.support_agent_outlined,
-      title: 'Support',
-      subtitle: 'Open tickets',
-      route: AppRoutes.support,
     ),
   ],
   'Administration': [
@@ -129,10 +166,10 @@ const _sections = <String, List<MenuEntry>>{
       permissions: ['settings:read'],
     ),
     MenuEntry(
-      icon: Icons.notifications_outlined,
-      title: 'Notifications',
-      subtitle: 'Unread alerts',
-      route: AppRoutes.notifications,
+      icon: Icons.support_agent_outlined,
+      title: 'Support',
+      subtitle: 'Open tickets',
+      route: AppRoutes.support,
     ),
     MenuEntry(
       icon: Icons.mark_email_unread_outlined,

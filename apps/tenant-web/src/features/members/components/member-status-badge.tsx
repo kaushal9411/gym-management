@@ -1,4 +1,5 @@
 import { Badge, type BadgeProps } from '@/components/ui/badge';
+import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { cn } from '@/lib/utils';
 import type { MemberStatus, MembershipStatus } from '../types';
 
@@ -19,7 +20,7 @@ const MEMBERSHIP_STATUS_VARIANT: Record<MembershipStatus, NonNullable<BadgeProps
 
 export function MemberStatusBadge({ status, deleted }: { status: MemberStatus; deleted?: boolean }) {
   if (deleted) {
-    return <Badge variant="outline" className="border-dashed text-muted-foreground">Deleted</Badge>;
+    return <DeletedBadge />;
   }
   return (
     <Badge

@@ -9,6 +9,12 @@ class Food {
     required this.carbohydrates,
     required this.fat,
     required this.isActive,
+    this.category,
+    this.fiber,
+    this.sugar,
+    this.sodium,
+    this.notes,
+    this.deletedAt,
   });
 
   final String id;
@@ -19,6 +25,14 @@ class Food {
   final double? carbohydrates;
   final double? fat;
   final bool isActive;
+  final String? category;
+  final double? fiber;
+  final double? sugar;
+  final double? sodium;
+  final String? notes;
+
+  /// Non-null means soft-deleted.
+  final DateTime? deletedAt;
 
   factory Food.fromJson(Map<String, dynamic> json) => Food(
         id: json['id'] as String,
@@ -33,5 +47,19 @@ class Food {
             : double.parse(json['carbohydrates'] as String),
         fat: json['fat'] == null ? null : double.parse(json['fat'] as String),
         isActive: json['isActive'] as bool? ?? true,
+        category: json['category'] as String?,
+        fiber: json['fiber'] == null
+            ? null
+            : double.parse(json['fiber'] as String),
+        sugar: json['sugar'] == null
+            ? null
+            : double.parse(json['sugar'] as String),
+        sodium: json['sodium'] == null
+            ? null
+            : double.parse(json['sodium'] as String),
+        notes: json['notes'] as String?,
+        deletedAt: json['deletedAt'] == null
+            ? null
+            : DateTime.parse(json['deletedAt'] as String),
       );
 }

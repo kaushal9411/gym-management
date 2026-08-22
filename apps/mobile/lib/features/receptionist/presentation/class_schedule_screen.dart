@@ -15,7 +15,9 @@ import '../../../shared/widgets/app_state_views.dart';
 /// Design frame "18a. Class schedule" — recurring weekly day + time slots,
 /// `PATCH /classes/:id/schedule`. Each save replaces the whole slot list
 /// (the endpoint isn't additive), so the local list is the source of truth
-/// until "Save schedule" is pressed.
+/// until "Save schedule" is pressed. Re-entrant for an existing class (not
+/// just chained once after create) — [groupClass.schedule] seeds the local
+/// list so editing an existing class shows its current slots.
 class ClassScheduleScreen extends StatefulWidget {
   const ClassScheduleScreen({super.key, required this.groupClass});
 
@@ -28,7 +30,7 @@ class ClassScheduleScreen extends StatefulWidget {
 class _ClassScheduleScreenState extends State<ClassScheduleScreen> {
   final _timeController = TextEditingController(text: '07:00');
   WeekDay _day = WeekDay.monday;
-  final List<ScheduleSlot> _slots = [];
+  late final List<ScheduleSlot> _slots = List.of(widget.groupClass.schedule);
   bool _saving = false;
   String? _error;
 

@@ -7,6 +7,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, CalendarRange, MoreHoriz
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
+import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
@@ -103,7 +104,7 @@ export default function ClassesPage() {
       header: 'Status',
       render: (c) =>
         c.deletedAt ? (
-          <Badge variant="outline" className="border-dashed text-muted-foreground">Deleted</Badge>
+          <DeletedBadge />
         ) : (
           <Badge variant={c.isActive ? 'secondary' : 'outline'}>{c.isActive ? 'Active' : 'Inactive'}</Badge>
         ),
@@ -198,7 +199,7 @@ export default function ClassesPage() {
         </select>
       </div>
 
-      <DataTable columns={columns} rows={items} rowKey={(c) => c.id} loading={classes.isPending} error={classes.error} onRetry={() => classes.refetch()} emptyMessage="No classes match these filters." />
+      <DataTable columns={columns} rows={items} rowKey={(c) => c.id} rowClassName={(c) => (c.deletedAt ? 'bg-destructive/5' : undefined)} loading={classes.isPending} error={classes.error} onRetry={() => classes.refetch()} emptyMessage="No classes match these filters." />
 
       {data ? (
         <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />

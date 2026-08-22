@@ -13,6 +13,7 @@ import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/food.dart';
 import '../../../repositories/food_repository.dart';
+import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
 
 /// Design frame "7. Food library" — the Trainer shell's "Diet" tab root.
@@ -29,10 +30,12 @@ class FoodLibraryScreen extends StatefulWidget {
 class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
   final _searchController = TextEditingController();
   Timer? _debounce;
+  bool _includeDeleted = false;
   late final _cubit = PaginatedListCubit<Food>(
     (page) => getIt<FoodRepository>().list(
       page: page,
       search: _searchController.text.trim(),
+      includeDeleted: _includeDeleted,
     ),
   )..load();
 
@@ -47,6 +50,11 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
   void _onSearchChanged(String _) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), _cubit.load);
+  }
+
+  void _toggleIncludeDeleted() {
+    setState(() => _includeDeleted = !_includeDeleted);
+    _cubit.load();
   }
 
   Future<void> _addFood() async {
@@ -129,6 +137,27 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: _toggleIncludeDeleted,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: _includeDeleted ? AppColors.staffGrad : null,
+                  color: _includeDeleted ? null : AppColors.surface3,
+                  borderRadius: BorderRadius.circular(AppRadii.pill),
+                ),
+                child: Text(
+                  'Show deleted',
+                  style: AppText.body(
+                    size: 12,
+                    weight: FontWeight.w700,
+                    color: _includeDeleted ? Colors.white : AppColors.inkSoft,
+                  ),
+                ),
+              ),
+            ),
             const SizedBox(height: 12),
             Expanded(
               child: BlocBuilder<PaginatedListCubit<Food>,
@@ -187,6 +216,7 @@ class _FoodCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final deleted = food.deletedAt != null;
     final macro = [
       if (food.calories != null) '${food.calories} kcal',
       if (food.protein != null) '${food.protein!.toStringAsFixed(0)}g protein',
@@ -200,9 +230,13 @@ class _FoodCard extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.surface2,
+            color: deleted ? AppColors.dangerSoft : AppColors.surface2,
             borderRadius: BorderRadius.circular(AppRadii.card),
-            border: Border.all(color: AppColors.line),
+            border: Border.all(
+              color: deleted
+                  ? AppColors.danger.withValues(alpha: 0.3)
+                  : AppColors.line,
+            ),
           ),
           child: Row(
             children: [
@@ -218,6 +252,10 @@ class _FoodCard extends StatelessWidget {
                       food.servingSize ?? '—',
                       style: AppText.body(size: 11, color: AppColors.inkFaint),
                     ),
+                    if (deleted) ...[
+                      const SizedBox(height: 6),
+                      const AppPill(label: 'Deleted', tone: AppPillTone.danger),
+                    ],
                   ],
                 ),
               ),

@@ -59,9 +59,11 @@ class _WorkoutPlanFormScreenState extends State<WorkoutPlanFormScreen> {
     });
     try {
       final plan = await getIt<WorkoutPlanRepository>().create(
-        name: name,
-        level: _level,
-        durationWeeks: duration,
+        WorkoutPlanFormInput(
+          name: name,
+          level: _level,
+          durationWeeks: duration,
+        ),
       );
       if (!mounted) return;
       context.pushReplacement(

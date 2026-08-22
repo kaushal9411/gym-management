@@ -133,6 +133,43 @@ class AttendanceRepository {
     }
   }
 
+  /// Tenant-wide visit history (not member-scoped) — the Attendance
+  /// History screen. Mirrors web's `/attendance/history` list exactly.
+  Future<PaginatedResult<AttendanceRecord>> list({
+    int page = 1,
+    int limit = 20,
+    String? search,
+    String? branchId,
+    String? status,
+    String? method,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/attendance',
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+          if (search != null && search.isNotEmpty) 'search': search,
+          if (branchId != null) 'branchId': branchId,
+          if (status != null) 'status': status,
+          if (method != null) 'method': method,
+          if (dateFrom != null)
+            'dateFrom': dateFrom.toIso8601String().substring(0, 10),
+          if (dateTo != null)
+            'dateTo': dateTo.toIso8601String().substring(0, 10),
+        },
+      );
+      return PaginatedResult.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+        AttendanceRecord.fromJson,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   ApiException _mapError(DioException e) {
     if (e.type == DioExceptionType.connectionError ||
         e.type == DioExceptionType.connectionTimeout) {

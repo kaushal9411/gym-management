@@ -10,6 +10,10 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/menu_entry.dart';
 import '../../../shared/widgets/user_avatar.dart';
 
+/// Section order mirrors web's `NAV_ITEMS` macro order (Insights-equivalent
+/// "My work" before Communication before Administration) — same
+/// `Support`/`Notifications` split into Communication/Administration as
+/// Owner's, Manager's, and Receptionist's menus.
 const _sections = <String, List<MenuEntry>>{
   'My work': [
     MenuEntry(
@@ -20,18 +24,20 @@ const _sections = <String, List<MenuEntry>>{
       permissions: ['reports:view', 'attendance:view'],
     ),
   ],
-  'Support': [
-    MenuEntry(
-      icon: Icons.support_agent_outlined,
-      title: 'Support',
-      subtitle: 'My tickets',
-      route: AppRoutes.support,
-    ),
+  'Communication': [
     MenuEntry(
       icon: Icons.notifications_outlined,
       title: 'Notifications',
       subtitle: 'Unread alerts',
       route: AppRoutes.notifications,
+    ),
+  ],
+  'Administration': [
+    MenuEntry(
+      icon: Icons.support_agent_outlined,
+      title: 'Support',
+      subtitle: 'My tickets',
+      route: AppRoutes.support,
     ),
   ],
 };

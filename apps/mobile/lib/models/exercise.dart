@@ -33,6 +33,12 @@ class Exercise {
     required this.defaultSets,
     required this.defaultReps,
     required this.isActive,
+    this.imageUrl,
+    this.videoUrl,
+    this.durationSeconds,
+    this.restSeconds,
+    this.caloriesBurnEstimate,
+    this.deletedAt,
   });
 
   final String id;
@@ -45,6 +51,14 @@ class Exercise {
   final int? defaultSets;
   final int? defaultReps;
   final bool isActive;
+  final String? imageUrl;
+  final String? videoUrl;
+  final int? durationSeconds;
+  final int? restSeconds;
+  final int? caloriesBurnEstimate;
+
+  /// Non-null means soft-deleted — same convention as `GymMember`/`StaffMember`.
+  final DateTime? deletedAt;
 
   factory Exercise.fromJson(Map<String, dynamic> json) => Exercise(
         id: json['id'] as String,
@@ -58,5 +72,13 @@ class Exercise {
         defaultSets: json['defaultSets'] as int?,
         defaultReps: json['defaultReps'] as int?,
         isActive: json['isActive'] as bool? ?? true,
+        imageUrl: json['imageUrl'] as String?,
+        videoUrl: json['videoUrl'] as String?,
+        durationSeconds: json['durationSeconds'] as int?,
+        restSeconds: json['restSeconds'] as int?,
+        caloriesBurnEstimate: json['caloriesBurnEstimate'] as int?,
+        deletedAt: json['deletedAt'] == null
+            ? null
+            : DateTime.parse(json['deletedAt'] as String),
       );
 }

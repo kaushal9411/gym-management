@@ -57,9 +57,11 @@ class _DietPlanFormScreenState extends State<DietPlanFormScreen> {
     });
     try {
       final plan = await getIt<DietPlanRepository>().create(
-        name: name,
-        durationDays: duration,
-        dailyCalories: int.tryParse(_caloriesController.text.trim()),
+        DietPlanFormInput(
+          name: name,
+          durationDays: duration,
+          dailyCalories: int.tryParse(_caloriesController.text.trim()),
+        ),
       );
       if (!mounted) return;
       context.pushReplacement(

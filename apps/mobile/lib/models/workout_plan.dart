@@ -68,6 +68,9 @@ class PlanExercise {
     required this.dayOfWeek,
     required this.sets,
     required this.repetitions,
+    this.sortOrder = 0,
+    this.restSeconds,
+    this.notes,
   });
 
   final String id;
@@ -75,6 +78,9 @@ class PlanExercise {
   final WeekDay dayOfWeek;
   final int? sets;
   final int? repetitions;
+  final int sortOrder;
+  final int? restSeconds;
+  final String? notes;
 
   factory PlanExercise.fromJson(Map<String, dynamic> json) => PlanExercise(
         id: json['id'] as String,
@@ -82,6 +88,23 @@ class PlanExercise {
         dayOfWeek: WeekDayX.fromApi(json['dayOfWeek'] as String),
         sets: json['sets'] as int?,
         repetitions: json['repetitions'] as int?,
+        sortOrder: json['sortOrder'] as int? ?? 0,
+        restSeconds: json['restSeconds'] as int?,
+        notes: json['notes'] as String?,
+      );
+}
+
+/// A plan's assigned trainer — nested `{id, name}` on both the list and
+/// detail DTOs.
+class PlanTrainer {
+  const PlanTrainer({required this.id, required this.name});
+
+  final String id;
+  final String name;
+
+  factory PlanTrainer.fromJson(Map<String, dynamic> json) => PlanTrainer(
+        id: json['id'] as String,
+        name: json['name'] as String,
       );
 }
 
@@ -96,6 +119,13 @@ class WorkoutPlan {
     required this.durationWeeks,
     required this.isActive,
     required this.activeMemberCount,
+    this.goal,
+    this.description,
+    this.trainer,
+    this.notes,
+    this.createdAt,
+    this.updatedAt,
+    this.deletedAt,
     this.exercises = const [],
   });
 
@@ -105,6 +135,15 @@ class WorkoutPlan {
   final int durationWeeks;
   final bool isActive;
   final int activeMemberCount;
+  final String? goal;
+  final String? description;
+  final PlanTrainer? trainer;
+  final String? notes;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  /// Non-null means soft-deleted.
+  final DateTime? deletedAt;
   final List<PlanExercise> exercises;
 
   Map<WeekDay, List<PlanExercise>> get exercisesByDay {
@@ -122,6 +161,21 @@ class WorkoutPlan {
         durationWeeks: json['durationWeeks'] as int,
         isActive: json['isActive'] as bool? ?? true,
         activeMemberCount: json['activeMemberCount'] as int? ?? 0,
+        goal: json['goal'] as String?,
+        description: json['description'] as String?,
+        trainer: json['trainer'] == null
+            ? null
+            : PlanTrainer.fromJson(json['trainer'] as Map<String, dynamic>),
+        notes: json['notes'] as String?,
+        createdAt: json['createdAt'] == null
+            ? null
+            : DateTime.parse(json['createdAt'] as String),
+        updatedAt: json['updatedAt'] == null
+            ? null
+            : DateTime.parse(json['updatedAt'] as String),
+        deletedAt: json['deletedAt'] == null
+            ? null
+            : DateTime.parse(json['deletedAt'] as String),
         exercises: json['exercises'] == null
             ? const []
             : (json['exercises'] as List)

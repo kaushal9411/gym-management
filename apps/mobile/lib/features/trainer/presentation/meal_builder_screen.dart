@@ -18,10 +18,9 @@ const _mealSections = [MealType.breakfast, MealType.lunch, MealType.dinner];
 
 /// Design frame "8. Meal builder" — Breakfast/Lunch/Dinner sections only
 /// (the backend's `MealType` has 7 values; the design shows exactly these
-/// 3). Unlike the workout builder, this frame has no "Assign to client"
-/// card — "Save plan" is the only CTA — so here it both persists the meals
-/// and (since this screen is only ever reached via the client-assignment
-/// flow) assigns the plan to [member] in one action.
+/// 3). "Save plan" persists the meal list only (`PATCH .../meals`);
+/// "Assign to {member}" is a separate step so the trainer can save changes
+/// without re-assigning (or re-assign later without editing meals).
 class MealBuilderScreen extends StatefulWidget {
   const MealBuilderScreen({
     required this.planId,
@@ -41,6 +40,7 @@ class _MealBuilderScreenState extends State<MealBuilderScreen> {
   final Map<MealType, List<Food>> _mealFoods = {};
   bool _loading = true;
   bool _saving = false;
+  bool _assigning = false;
   String? _error;
 
   @override
@@ -96,6 +96,23 @@ class _MealBuilderScreenState extends State<MealBuilderScreen> {
         }
       }
       await getIt<DietPlanRepository>().setMeals(widget.planId, drafts);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Plan saved.')));
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _assign() async {
+    setState(() {
+      _assigning = true;
+      _error = null;
+    });
+    try {
       await getIt<DietPlanRepository>().assign(
         planId: widget.planId,
         memberId: widget.member.id,
@@ -110,7 +127,7 @@ class _MealBuilderScreenState extends State<MealBuilderScreen> {
       if (!mounted) return;
       setState(() => _error = e.message);
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) setState(() => _assigning = false);
     }
   }
 
@@ -171,6 +188,13 @@ class _MealBuilderScreenState extends State<MealBuilderScreen> {
                               label: 'Save plan',
                               loading: _saving,
                               onPressed: _save,
+                            ),
+                            const SizedBox(height: 10),
+                            AppButton(
+                              label: 'Assign to ${widget.member.name}',
+                              variant: AppButtonVariant.ghost,
+                              loading: _assigning,
+                              onPressed: _assign,
                             ),
                           ],
                         ),

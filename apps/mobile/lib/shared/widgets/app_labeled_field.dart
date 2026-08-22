@@ -25,6 +25,8 @@ class AppLabeledField extends StatefulWidget {
     this.onTap,
     this.suffixIcon,
     this.hintText,
+    this.minLines,
+    this.maxLines = 1,
   });
 
   final String label;
@@ -49,6 +51,11 @@ class AppLabeledField extends StatefulWidget {
   final bool readOnly;
   final VoidCallback? onTap;
   final Widget? suffixIcon;
+
+  /// Multi-line growth — pass e.g. `minLines: 3, maxLines: 6` for a
+  /// description/notes textarea. Defaults preserve the single-line field.
+  final int? minLines;
+  final int? maxLines;
 
   @override
   State<AppLabeledField> createState() => _AppLabeledFieldState();
@@ -89,6 +96,8 @@ class _AppLabeledFieldState extends State<AppLabeledField> {
             onSubmitted: widget.onSubmitted,
             textInputAction: widget.textInputAction,
             autofocus: widget.autofocus,
+            minLines: widget.minLines,
+            maxLines: widget.maxLines,
             inputFormatters: widget.inputFormatters,
             readOnly: widget.readOnly,
             onTap: widget.onTap,

@@ -35,7 +35,9 @@ class AttendanceSummary {
 
 /// Mirrors `AttendanceRecordDto` — the "Currently inside" list only needs
 /// the first four fields; `method`/`status` are additionally used by the
-/// member-detail "Recent visits" list (`GET /attendance/member/:memberId`).
+/// member-detail "Recent visits" list (`GET /attendance/member/:memberId`);
+/// `memberCode`/`branchName` are additionally used by the tenant-wide
+/// Attendance History list (`GET /attendance`).
 class AttendanceRecord {
   const AttendanceRecord({
     required this.id,
@@ -44,6 +46,8 @@ class AttendanceRecord {
     required this.checkOutTime,
     this.method,
     this.status,
+    this.memberCode,
+    this.branchName,
   });
 
   final String id;
@@ -52,16 +56,23 @@ class AttendanceRecord {
   final DateTime? checkOutTime;
   final String? method;
   final String? status;
+  final String? memberCode;
+  final String? branchName;
 
-  factory AttendanceRecord.fromJson(Map<String, dynamic> json) =>
-      AttendanceRecord(
-        id: json['id'] as String,
-        memberName: (json['member'] as Map<String, dynamic>)['name'] as String,
-        checkInTime: DateTime.parse(json['checkInTime'] as String),
-        checkOutTime: json['checkOutTime'] == null
-            ? null
-            : DateTime.parse(json['checkOutTime'] as String),
-        method: json['method'] as String?,
-        status: json['status'] as String?,
-      );
+  factory AttendanceRecord.fromJson(Map<String, dynamic> json) {
+    final member = json['member'] as Map<String, dynamic>;
+    final branch = json['branch'] as Map<String, dynamic>?;
+    return AttendanceRecord(
+      id: json['id'] as String,
+      memberName: member['name'] as String,
+      checkInTime: DateTime.parse(json['checkInTime'] as String),
+      checkOutTime: json['checkOutTime'] == null
+          ? null
+          : DateTime.parse(json['checkOutTime'] as String),
+      method: json['method'] as String?,
+      status: json['status'] as String?,
+      memberCode: member['memberId'] as String?,
+      branchName: branch?['name'] as String?,
+    );
+  }
 }

@@ -10,6 +10,13 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/menu_entry.dart';
 import '../../../shared/widgets/user_avatar.dart';
 
+/// Section order mirrors web's `NAV_ITEMS` macro order (People/Programs/
+/// Finance/Insights/Communication/Administration) — Manager has no People/
+/// Insights/Administration-caliber tiles of its own (Team&Access/Branches/
+/// Analytics/Gym Settings stay Owner-only per design frame "11. Gym
+/// settings"), so only Programs/Finance/Communication/Administration show
+/// up here, in that relative order. `Search` is a mobile-only addition
+/// (no web sidebar equivalent) and stays first.
 const _sections = <String, List<MenuEntry>>{
   'Search': [
     MenuEntry(
@@ -17,15 +24,6 @@ const _sections = <String, List<MenuEntry>>{
       title: 'Global Search',
       subtitle: 'Members, staff & branches',
       route: AppRoutes.globalSearch,
-    ),
-  ],
-  'Money': [
-    MenuEntry(
-      icon: Icons.account_balance_wallet_outlined,
-      title: 'Finance',
-      subtitle: 'Revenue vs expenses',
-      route: AppRoutes.finance,
-      permissions: ['finance:view'],
     ),
   ],
   'Programs': [
@@ -38,6 +36,14 @@ const _sections = <String, List<MenuEntry>>{
       featureFlag: 'workout_plans',
     ),
     MenuEntry(
+      icon: Icons.calendar_month_outlined,
+      title: 'Classes',
+      subtitle: 'Group class catalog & schedule',
+      route: AppRoutes.classes,
+      permissions: ['classes:view'],
+      featureFlag: 'live_classes',
+    ),
+    MenuEntry(
       icon: Icons.restaurant_outlined,
       title: 'Diet Plans',
       subtitle: 'Trainer catalog',
@@ -46,18 +52,29 @@ const _sections = <String, List<MenuEntry>>{
       featureFlag: 'diet_plans',
     ),
   ],
-  'Support': [
+  'Finance': [
     MenuEntry(
-      icon: Icons.support_agent_outlined,
-      title: 'Support',
-      subtitle: 'Open tickets',
-      route: AppRoutes.support,
+      icon: Icons.account_balance_wallet_outlined,
+      title: 'Finance',
+      subtitle: 'Revenue vs expenses',
+      route: AppRoutes.finance,
+      permissions: ['finance:view'],
     ),
+  ],
+  'Communication': [
     MenuEntry(
       icon: Icons.notifications_outlined,
       title: 'Notifications',
       subtitle: 'Unread alerts',
       route: AppRoutes.notifications,
+    ),
+  ],
+  'Administration': [
+    MenuEntry(
+      icon: Icons.support_agent_outlined,
+      title: 'Support',
+      subtitle: 'Open tickets',
+      route: AppRoutes.support,
     ),
   ],
 };

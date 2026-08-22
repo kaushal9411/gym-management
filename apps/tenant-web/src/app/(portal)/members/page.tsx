@@ -396,7 +396,7 @@ export default function MembersListPage() {
         </div>
       ) : null}
 
-      <DataTable columns={columns} rows={items} rowKey={(m) => m.id} loading={members.isPending} error={members.error} onRetry={() => members.refetch()} emptyMessage="No members match these filters." />
+      <DataTable columns={columns} rows={items} rowKey={(m) => m.id} rowClassName={(m) => (m.deletedAt ? 'bg-destructive/5' : undefined)} loading={members.isPending} error={members.error} onRetry={() => members.refetch()} emptyMessage="No members match these filters." />
 
       {data ? (
         <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
