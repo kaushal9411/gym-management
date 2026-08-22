@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CalendarCheck, CalendarRange, Dumbbell, LayoutDashboard, LogOut, Receipt, Salad } from 'lucide-react';
+import { CalendarCheck, CalendarRange, Dumbbell, LayoutDashboard, LogOut, Receipt, Salad, UserRound } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,7 @@ const TABS = [
   { href: MEMBER_PORTAL_ROUTES.diet, label: 'Diet', icon: Salad },
   { href: MEMBER_PORTAL_ROUTES.classes, label: 'Classes', icon: CalendarRange },
   { href: MEMBER_PORTAL_ROUTES.invoices, label: 'Invoices', icon: Receipt },
+  { href: MEMBER_PORTAL_ROUTES.profile, label: 'Profile', icon: UserRound },
 ];
 
 /**

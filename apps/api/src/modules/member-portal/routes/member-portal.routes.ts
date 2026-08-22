@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { validate } from '../../../core/middleware/validate.middleware';
 import { memberAuthenticateMiddleware } from '../../member-auth/middlewares/member-authenticate.middleware';
+import { memberChangePasswordSchema } from '../../member-auth/validators/member-auth.validators';
 import { memberPortalController } from '../controllers/member-portal.controller';
 import {
   memberDietLogSchema,
@@ -27,6 +28,11 @@ memberPortalRouter.use(memberAuthenticateMiddleware);
 
 memberPortalRouter.get('/me', asyncHandler(memberPortalController.me.bind(memberPortalController)));
 memberPortalRouter.get('/gdpr-export', asyncHandler(memberPortalController.gdprExport.bind(memberPortalController)));
+memberPortalRouter.post(
+  '/change-password',
+  validate({ body: memberChangePasswordSchema }),
+  asyncHandler(memberPortalController.changePassword.bind(memberPortalController)),
+);
 
 memberPortalRouter.get('/attendance', validate({ query: memberPortalPaginationSchema }), asyncHandler(memberPortalController.attendance.bind(memberPortalController)));
 

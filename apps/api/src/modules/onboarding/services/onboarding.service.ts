@@ -96,7 +96,19 @@ export class OnboardingService {
     const session = await onboardingSessionService.get(sessionId);
     onboardingSessionService.assertStepReached(session, 'email_verified');
 
-    return onboardingSessionService.update(sessionId, { planSlug, billingCycle, step: 'plan_selected' });
+    // Clear any prior payment progress on every (re-)selection, not just when
+    // the slug/cycle actually differs — a visitor can reach this after going
+    // back from Payment, and a stale `paymentStatus: 'completed'` from a
+    // previously-paid, now-abandoned plan/order must never carry over onto a
+    // different plan (or price) it was never actually paid for.
+    return onboardingSessionService.update(sessionId, {
+      planSlug,
+      billingCycle,
+      step: 'plan_selected',
+      paymentStatus: undefined,
+      paymentReference: undefined,
+      razorpayOrderId: undefined,
+    });
   }
 
   /**

@@ -193,6 +193,15 @@ export const memberPortalService = {
     }
   },
 
+  /** In-app password change — distinct from the logged-out forgot-password/reset-token flow. Revokes every other active session on success; this device stays signed in. */
+  async changePassword(input: { currentPassword: string; newPassword: string }): Promise<void> {
+    try {
+      await memberApiClient.post('/portal/change-password', input);
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
   async downloadInvoice(invoiceId: string, invoiceNumber: string): Promise<void> {
     const res = await memberApiClient.get(`/portal/invoices/${invoiceId}/download`, { responseType: 'blob' });
     const url = window.URL.createObjectURL(new Blob([res.data]));

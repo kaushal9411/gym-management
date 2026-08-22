@@ -10,4 +10,5 @@ export const MEMBER_PORTAL_ROUTES = {
   diet: '/portal/diet',
   invoices: '/portal/invoices',
   classes: '/portal/classes',
+  profile: '/portal/profile',
 } as const;

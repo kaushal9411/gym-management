@@ -30,3 +30,14 @@ export const memberResetPasswordSchema = z.object({
   token: z.string().min(1, 'Token is required'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
+
+/** In-app password change (authenticated) — distinct from the forgot-password/reset-token flow above. */
+export const memberChangePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1, 'Current password is required'),
+    newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+  })
+  .refine((data) => data.currentPassword !== data.newPassword, {
+    message: 'New password must be different from the current password',
+    path: ['newPassword'],
+  });

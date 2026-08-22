@@ -190,6 +190,23 @@ class MemberPortalRepository {
     }
   }
 
+  /// In-app password change — revokes every other active session on
+  /// success (this device stays signed in), same guarantee as the staff
+  /// plane's `PATCH /auth/change-password`.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await _dio.post<void>(
+        '/portal/change-password',
+        data: {'currentPassword': currentPassword, 'newPassword': newPassword},
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   /// Returns the export payload itself (this backend builds it inline — it
   /// does not email a link), so the UI can only report what it contains.
   Future<Map<String, dynamic>> gdprExport() async {

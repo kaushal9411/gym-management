@@ -6,6 +6,10 @@ export function useMemberProfile() {
   return useQuery({ queryKey: ['member-portal', 'me'], queryFn: memberPortalService.getProfile });
 }
 
+export function useChangeMemberPassword() {
+  return useMutation({ mutationFn: memberPortalService.changePassword });
+}
+
 export function useMemberAttendance(page = 1, limit = 20) {
   return useQuery({ queryKey: ['member-portal', 'attendance', page, limit], queryFn: () => memberPortalService.getAttendance(page, limit) });
 }

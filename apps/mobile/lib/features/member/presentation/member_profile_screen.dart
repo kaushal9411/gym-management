@@ -13,9 +13,11 @@ import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import 'member_menu_screen.dart';
 
-/// Design frame "8e. Profile" — read-only. `/portal/*` has no profile
-/// update route (the member plane is read-mostly: progress logging and
-/// class booking are its only writes), so nothing here is editable.
+/// Design frame "8e. Profile" — account fields (name/email/phone/plan) stay
+/// read-only, since `/portal/*` has no profile-update route (the member
+/// plane is read-mostly: progress logging, class booking, and now password
+/// changes are its only writes). "Change password" is the one editable
+/// action here, backed by `POST /portal/change-password`.
 class MemberProfileScreen extends StatefulWidget {
   const MemberProfileScreen({super.key});
 
@@ -191,6 +193,40 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                                   size: AppButtonSize.small,
                                   onPressed: () =>
                                       context.push(AppRoutes.memberDataExport),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.surface2,
+                              borderRadius:
+                                  BorderRadius.circular(AppRadii.card),
+                              border: Border.all(color: AppColors.line),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Security', style: AppText.eyebrow()),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Change the password you use to sign in.',
+                                  style: AppText.body(
+                                    size: 13,
+                                    weight: FontWeight.w600,
+                                    color: AppColors.inkSoft,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                AppButton(
+                                  label: 'Change password',
+                                  role: AppRole.member,
+                                  variant: AppButtonVariant.ghost,
+                                  size: AppButtonSize.small,
+                                  onPressed: () => context
+                                      .push(AppRoutes.memberChangePassword),
                                 ),
                               ],
                             ),

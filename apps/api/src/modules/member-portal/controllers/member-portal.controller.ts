@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
+import { buildMemberAuthService } from '../../member-auth/services/member-auth.service';
 import { MemberGdprService } from '../../members/services/member-gdpr.service';
 import { MemberPortalService } from '../services/member-portal.service';
 
@@ -72,6 +73,12 @@ export class MemberPortalController {
   /** Self-service GDPR data-portability export — same underlying bundle the staff-side `GET /members/:id/gdpr-export` returns, just scoped to the caller's own id. */
   async gdprExport(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await new MemberGdprService(req.tenant!.id).exportData(memberId(req)));
+  }
+
+  async changePassword(req: Request, res: Response): Promise<void> {
+    const { currentPassword, newPassword } = req.body as { currentPassword: string; newPassword: string };
+    await buildMemberAuthService(req.tenant!.id).changePassword(memberId(req), currentPassword, newPassword);
+    sendSuccess(res, null, 'Password changed. Please sign in again on your other devices.');
   }
 }
 

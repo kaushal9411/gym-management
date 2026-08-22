@@ -136,6 +136,7 @@ class AppRoutes {
   static const memberInvoices = '/member/invoices';
   static const memberInvoiceDetail = '/member/invoices/detail';
   static const memberProfile = '/member/profile';
+  static const memberChangePassword = '/member/profile/change-password';
   static const memberDataExport = '/member/data-export';
   static const memberClassBooked = '/member/classes/booked';
 }

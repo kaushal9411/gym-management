@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { env } from '../../../config/env';
-import { AppError, UnauthenticatedError } from '../../../core/errors/app-error';
+import { AppError, UnauthenticatedError, ValidationError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { eventBus } from '../../../core/events/event-bus';
 import { authLogger, securityLogger } from '../../../core/logging/logger';
@@ -179,6 +179,32 @@ export class MemberAuthService {
     // A password reset should invalidate every existing session — resetting
     // the password is exactly the moment a compromised session needs to die.
     await this.sessions.revokeAllForMember(this.tenantId, verification.memberId);
+  }
+
+  /**
+   * In-app password change (authenticated) — distinct from the
+   * `forgotPassword`/`resetPassword` email-token flow above, and the only
+   * way a member could change their password until now (the portal had no
+   * such route at all; a forgotten-vs-just-want-to-change password both
+   * had to go through logging out and requesting a reset email). Same
+   * "revoke every other session" guarantee as `resetPassword` — a changed
+   * password is exactly the moment a stale/compromised session should die.
+   */
+  async changePassword(memberId: string, currentPassword: string, newPassword: string): Promise<void> {
+    assertPasswordPolicy(newPassword);
+    const credential = await this.credentials.findByMemberId(this.tenantId, memberId);
+    if (!credential) throw new AppError(ErrorCode.NOT_FOUND, 'Portal access is not set up for this member.', 404);
+
+    const matches = await passwordService.verify(currentPassword, credential.passwordHash);
+    if (!matches) {
+      throw new ValidationError('Current password is incorrect', {
+        fields: [{ field: 'currentPassword', message: 'Current password is incorrect' }],
+      });
+    }
+
+    await this.credentials.setPassword(credential.id, await passwordService.hash(newPassword));
+    await this.sessions.revokeAllForMember(this.tenantId, memberId);
+    await this.auditLog.record({ tenantId: this.tenantId, actorUserId: null, actorRole: 'MEMBER', action: 'member_auth.password_changed', entityType: 'member', entityId: memberId });
   }
 
   // ── internals ───────────────────────────────────────────────────────────
