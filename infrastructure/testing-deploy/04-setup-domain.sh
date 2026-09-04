@@ -57,6 +57,10 @@ sudo tee /etc/nginx/sites-available/fitcloud-test.conf > /dev/null <<NGINX
 server {
     listen 80;
     server_name ${API_HOSTNAME};
+    # Matches the API's own multer limit (300MB) for large uploads (mobile
+    # .apk releases via /admin/app-releases) — nginx's 1MB default silently
+    # 413s anything bigger before it ever reaches the app.
+    client_max_body_size 300M;
     location / {
         proxy_pass http://127.0.0.1:4000;
         proxy_set_header Host \$host;
