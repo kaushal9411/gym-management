@@ -37,6 +37,9 @@ class AppRoutes {
   static const dietPlans = '/catalog/diet-plans';
   static const dietPlanForm = '/catalog/diet-plans/form';
   static const classes = '/catalog/classes';
+  static const measuredMembers = '/catalog/measurements';
+  static const newMeasurement = '/catalog/measurements/new';
+  static const memberMeasurementsDetail = '/catalog/measurements/detail';
 
   static const revenueReport = '/reports/revenue';
   static const membershipReport = '/reports/membership';
@@ -139,4 +142,5 @@ class AppRoutes {
   static const memberChangePassword = '/member/profile/change-password';
   static const memberDataExport = '/member/data-export';
   static const memberClassBooked = '/member/classes/booked';
+  static const memberMeasurements = '/member/measurements';
 }

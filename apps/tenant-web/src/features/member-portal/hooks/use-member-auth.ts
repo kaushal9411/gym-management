@@ -39,3 +39,8 @@ export function useMemberLogout() {
     onSettled: () => dispatch(memberSignedOut()),
   });
 }
+
+/** No session to establish (or dispatch) here — just the request-reset call, same as `useForgotPassword` on the staff side. Used by the unified `ForgotPasswordForm`. */
+export function useMemberForgotPassword() {
+  return useMutation({ mutationFn: memberAuthService.forgotPassword.bind(memberAuthService) });
+}

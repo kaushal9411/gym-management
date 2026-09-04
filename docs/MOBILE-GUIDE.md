@@ -27,9 +27,9 @@ lib/
     session/                 SessionCubit + SessionState (app-wide)
     branches|dashboard|finance/   three older feature cubits (pre-date the generic one)
   models/                    70+ files, one per DTO shape, hand-written fromJson (no codegen)
-  repositories/              34 files, one per backend module
-  features/<area>/presentation/   165+ screens, flat inside each feature
-  shared/widgets/            14 design-system widgets, incl. status_action_menu.dart + trainer_picker_field.dart (Prompt 63)
+  repositories/              35 files, one per backend module, incl. body_measurement_repository.dart (Prompt 66, gained listMembers() in Prompt 67)
+  features/<area>/presentation/   169+ screens, flat inside each feature, incl. catalog/{measured_members,new_measurement,member_measurements_detail}_screen.dart (Prompt 67)
+  shared/widgets/            15 design-system widgets, incl. status_action_menu.dart + trainer_picker_field.dart (Prompt 63, made session-aware in Prompt 66 — see below) + measurement_form_fields.dart (Prompt 67, MeasurementFormController)
 ```
 
 There is **no codegen** (no freezed/json_serializable/build_runner) and no `l10n`. Models are plain classes with a `factory X.fromJson`. Keep it that way — adding a build step now would touch every model.
@@ -104,7 +104,7 @@ Trainer's nav is worth internalising: **"Workouts" is the Exercise *library* and
 - **`PATCH /classes/:id` treats `trainerId` as tri-state**: omit it to leave unchanged, send a real id to set it, send `null` to explicitly clear it (`z.string().uuid().nullable().optional()`). The Owner/Manager catalog form always sends the full current state (including `trainerId: null` when no trainer is picked) rather than omitting the key, matching this codebase's "forms submit complete state" convention — verified live that an explicit `null` genuinely clears an already-set trainer rather than being ignored.
 - **`GroupClassSession`s are never hand-created.** `GroupClass` (recurring template) → `GroupClassSchedule` slots (day+time, via `setSchedule`) → a nightly BullMQ job auto-generates dated, bookable `ClassSession` rows. `ClassSessionRepository.generate()` exists for a manual on-demand regeneration but has no UI trigger anywhere in the app — the nightly job is the real mechanism.
 - **`POST /portal/diet/:id/log` merges** into the day's existing row (logging water can't wipe a logged meal) — the opposite convention to the two above. Verified live.
-- **Member plane is `/portal/*` only** — confirmed by grep: no other module mounts `memberAuthenticateMiddleware`. There is no member-facing renew, payment, or profile-update route.
+- **Member plane is `/portal/*` only** — confirmed by grep: no other module mounts `memberAuthenticateMiddleware`. There is no member-facing renew or payment route. `POST /portal/change-password` (Prompt 65) is the one write to the member's own account — every other profile field (name/email/phone/etc.) is still staff-managed only, no member-facing edit route for those.
 - **`/support/tickets` is list/get/create only.** Replies come from FitCloud admins via the admin console, so a tenant has nothing to POST a reply to.
 - **`GET /notifications` takes no category param** (only `unreadOnly`/paging), so the design's filter pills filter the fetched page client-side on each item's real `category`.
 - **`GET /subscription` carries plan *limits* only**, no current usage — Billing's "Usage this cycle" numerators are the real `total`s from the branches/staff/members list endpoints.

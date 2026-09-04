@@ -18,6 +18,7 @@ import {
   Users,
   LogOut,
   Clock,
+  Smartphone,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ const NAV_ITEMS = [
   { href: ADMIN_ROUTES.cms, label: 'CMS', icon: FileText, tone: 'var(--chart-5)' },
   { href: ADMIN_ROUTES.notifications, label: 'Notifications', icon: Bell, tone: 'var(--chart-2)' },
   { href: ADMIN_ROUTES.scheduler, label: 'Scheduler', icon: Clock, tone: 'var(--chart-4)' },
+  { href: ADMIN_ROUTES.appReleases, label: 'App Releases', icon: Smartphone, tone: 'var(--chart-2)' },
   { href: ADMIN_ROUTES.roles, label: 'Roles & Admins', icon: Users, tone: undefined },
   { href: ADMIN_ROUTES.auditLogs, label: 'Audit Logs', icon: ScrollText, tone: undefined },
   { href: ADMIN_ROUTES.settings, label: 'Settings', icon: Settings, tone: undefined },

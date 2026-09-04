@@ -97,6 +97,13 @@ const _sections = <String, List<MenuEntry>>{
       permissions: ['diets:view'],
       featureFlag: 'diet_plans',
     ),
+    MenuEntry(
+      icon: Icons.straighten_outlined,
+      title: 'Body Measurements',
+      subtitle: 'Member history log',
+      route: AppRoutes.measuredMembers,
+      permissions: ['measurements:view'],
+    ),
   ],
   'Finance': [
     MenuEntry(

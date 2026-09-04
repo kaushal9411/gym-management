@@ -13,6 +13,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/attendance_summary.dart';
+import '../../../models/body_measurement.dart';
 import '../../../models/branch_option.dart';
 import '../../../models/diet_plan.dart';
 import '../../../models/gym_member.dart';
@@ -21,6 +22,7 @@ import '../../../models/member_workout_progress.dart';
 import '../../../models/staff_member.dart';
 import '../../../models/workout_plan.dart';
 import '../../../repositories/attendance_repository.dart';
+import '../../../repositories/body_measurement_repository.dart';
 import '../../../repositories/branch_repository.dart';
 import '../../../repositories/diet_plan_repository.dart';
 import '../../../repositories/member_repository.dart';
@@ -38,10 +40,11 @@ import '../../../shared/widgets/user_avatar.dart';
 /// membership actions (renew/extend/upgrade/downgrade/cancel), renewal +
 /// freeze history, branch & trainer (independent saves), attendance
 /// (manual check-in/out + recent visits), workout plan + progress, diet
-/// plan + daily tracking, profile photo, QR code, member portal access,
-/// GDPR export/erase. Everything below calls the exact same endpoints web
-/// calls — see `MemberRepository`/`AttendanceRepository`/
-/// `WorkoutPlanRepository`/`DietPlanRepository`.
+/// plan + daily tracking, body measurement history, profile photo, QR
+/// code, member portal access, GDPR export/erase. Everything below calls
+/// the exact same endpoints web calls — see `MemberRepository`/
+/// `AttendanceRepository`/`WorkoutPlanRepository`/`DietPlanRepository`/
+/// `BodyMeasurementRepository`.
 ///
 /// Deliberately NOT built here (a real gap, not an oversight): **Documents**
 /// upload needs a general file picker (`image_picker` only handles
@@ -92,6 +95,20 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   final _waterController = TextEditingController();
   final _weightController = TextEditingController();
 
+  List<BodyMeasurement> _measurements = [];
+  bool _measurementFormOpen = false;
+  bool _savingMeasurement = false;
+  String? _deletingMeasurementId;
+  final _measurementWeightController = TextEditingController();
+  final _measurementHeightController = TextEditingController();
+  final _measurementBodyFatController = TextEditingController();
+  final _measurementChestController = TextEditingController();
+  final _measurementWaistController = TextEditingController();
+  final _measurementHipsController = TextEditingController();
+  final _measurementBicepsController = TextEditingController();
+  final _measurementThighsController = TextEditingController();
+  final _measurementNotesController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -104,11 +121,103 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   void dispose() {
     _waterController.dispose();
     _weightController.dispose();
+    _measurementWeightController.dispose();
+    _measurementHeightController.dispose();
+    _measurementBodyFatController.dispose();
+    _measurementChestController.dispose();
+    _measurementWaistController.dispose();
+    _measurementHipsController.dispose();
+    _measurementBicepsController.dispose();
+    _measurementThighsController.dispose();
+    _measurementNotesController.dispose();
     super.dispose();
   }
 
   Future<void> _loadTracking() async {
-    await Future.wait([_loadAttendance(), _loadWorkout(), _loadDiet()]);
+    await Future.wait([
+      _loadAttendance(),
+      _loadWorkout(),
+      _loadDiet(),
+      _loadMeasurements(),
+    ]);
+  }
+
+  Future<void> _loadMeasurements() async {
+    try {
+      final measurements = await getIt<BodyMeasurementRepository>()
+          .listForMember(widget.memberId);
+      if (!mounted) return;
+      setState(() => _measurements = measurements);
+    } on ApiException {
+      // Non-fatal — the Body measurements card just shows an empty state
+      // (also how a role without `measurements:view` degrades — the same
+      // "silently empty" pattern as Attendance above, not a crash).
+    }
+  }
+
+  Future<void> _saveMeasurement() async {
+    double? num(TextEditingController c) => double.tryParse(c.text.trim());
+    setState(() => _savingMeasurement = true);
+    try {
+      await getIt<BodyMeasurementRepository>().create(
+        widget.memberId,
+        BodyMeasurementFormInput(
+          weightKg: num(_measurementWeightController),
+          heightCm: num(_measurementHeightController),
+          bodyFatPercent: num(_measurementBodyFatController),
+          chestCm: num(_measurementChestController),
+          waistCm: num(_measurementWaistController),
+          hipsCm: num(_measurementHipsController),
+          bicepsCm: num(_measurementBicepsController),
+          thighsCm: num(_measurementThighsController),
+          notes: _measurementNotesController.text.trim().isEmpty
+              ? null
+              : _measurementNotesController.text.trim(),
+        ),
+      );
+      for (final c in [
+        _measurementWeightController,
+        _measurementHeightController,
+        _measurementBodyFatController,
+        _measurementChestController,
+        _measurementWaistController,
+        _measurementHipsController,
+        _measurementBicepsController,
+        _measurementThighsController,
+        _measurementNotesController,
+      ]) {
+        c.clear();
+      }
+      await _loadMeasurements();
+      if (mounted) setState(() => _measurementFormOpen = false);
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _savingMeasurement = false);
+    }
+  }
+
+  Future<void> _deleteMeasurement(BodyMeasurement entry) async {
+    final ok = await _confirm(
+      title: 'Delete this measurement?',
+      content: 'Recorded ${_formatDate(entry.recordedAt)} — this cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    );
+    if (!ok) return;
+    setState(() => _deletingMeasurementId = entry.id);
+    try {
+      await getIt<BodyMeasurementRepository>().delete(entry.id);
+      await _loadMeasurements();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _deletingMeasurementId = null);
+    }
   }
 
   Future<void> _loadAttendance() async {
@@ -796,6 +905,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         const SizedBox(height: 16),
         _buildDietCard(),
         const SizedBox(height: 16),
+        _buildMeasurementsCard(),
+        const SizedBox(height: 16),
         _buildQrCard(member),
         const SizedBox(height: 16),
         _buildPortalCard(member),
@@ -1296,6 +1407,111 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                     _markMeal(mealType, ExerciseProgressStatus.completed),
                 onSkip: () =>
                     _markMeal(mealType, ExerciseProgressStatus.skipped),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Trainer/Owner/Manager-logged historical body-measurement trend log —
+  /// separate from the profile's single current height/weight fields at the
+  /// top of this screen. A role without `measurements:create`/`:delete`
+  /// still sees this card (backend 403s the action, surfaced via the
+  /// snackbar) — same unconditional-render convention as every other card
+  /// here (see this file's doc comment: no permission checks anywhere in
+  /// this screen, unlike web's `hasPermission` gating).
+  Widget _buildMeasurementsCard() {
+    final latest = _measurements.isEmpty ? null : _measurements.first;
+    final history = _measurements.length > 1 ? _measurements.sublist(1) : const <BodyMeasurement>[];
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _CardHeading(icon: Icons.straighten_rounded, title: 'Body measurements'),
+          const SizedBox(height: 12),
+          if (latest == null)
+            Text(
+              'No measurements recorded yet.',
+              style: AppText.body(size: 12, color: AppColors.inkFaint),
+            )
+          else
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _formatDate(latest.recordedAt),
+                        style: AppText.body(size: 13, weight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        latest.summary,
+                        style: AppText.body(size: 11, color: AppColors.inkFaint),
+                      ),
+                      if (latest.recordedBy != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Recorded by ${latest.recordedBy!.name}',
+                          style: AppText.body(size: 10, color: AppColors.inkFaint),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                AppButton(
+                  label: 'Delete',
+                  variant: AppButtonVariant.ghost,
+                  size: AppButtonSize.small,
+                  fullWidth: false,
+                  foregroundColor: AppColors.danger,
+                  loading: _deletingMeasurementId == latest.id,
+                  onPressed: _deletingMeasurementId != null
+                      ? null
+                      : () => _deleteMeasurement(latest),
+                ),
+              ],
+            ),
+          const SizedBox(height: 12),
+          if (_measurementFormOpen)
+            _MeasurementForm(
+              weightController: _measurementWeightController,
+              heightController: _measurementHeightController,
+              bodyFatController: _measurementBodyFatController,
+              chestController: _measurementChestController,
+              waistController: _measurementWaistController,
+              hipsController: _measurementHipsController,
+              bicepsController: _measurementBicepsController,
+              thighsController: _measurementThighsController,
+              notesController: _measurementNotesController,
+              saving: _savingMeasurement,
+              onSave: _saveMeasurement,
+              onCancel: () => setState(() => _measurementFormOpen = false),
+            )
+          else
+            AppButton(
+              label: 'Record measurement',
+              size: AppButtonSize.small,
+              fullWidth: false,
+              onPressed: () => setState(() => _measurementFormOpen = true),
+            ),
+          if (history.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text('History (${history.length})', style: AppText.eyebrow()),
+            const SizedBox(height: 8),
+            for (final entry in history) ...[
+              _MeasurementHistoryRow(
+                entry: entry,
+                deleting: _deletingMeasurementId == entry.id,
+                onDelete: _deletingMeasurementId != null
+                    ? null
+                    : () => _deleteMeasurement(entry),
               ),
               const SizedBox(height: 8),
             ],
@@ -2169,6 +2385,244 @@ class _DietMealRow extends StatelessWidget {
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The "Record measurement" inline form — same 2-column `_TrackingField`
+/// grid pattern as the Diet card's tracking box above, just more fields
+/// (every field optional, mirrors web's `MeasurementFormFields`).
+class _MeasurementForm extends StatelessWidget {
+  const _MeasurementForm({
+    required this.weightController,
+    required this.heightController,
+    required this.bodyFatController,
+    required this.chestController,
+    required this.waistController,
+    required this.hipsController,
+    required this.bicepsController,
+    required this.thighsController,
+    required this.notesController,
+    required this.saving,
+    required this.onSave,
+    required this.onCancel,
+  });
+
+  final TextEditingController weightController;
+  final TextEditingController heightController;
+  final TextEditingController bodyFatController;
+  final TextEditingController chestController;
+  final TextEditingController waistController;
+  final TextEditingController hipsController;
+  final TextEditingController bicepsController;
+  final TextEditingController thighsController;
+  final TextEditingController notesController;
+  final bool saving;
+  final VoidCallback onSave;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(AppRadii.tile),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _TrackingField(
+                  label: 'Weight (kg)',
+                  controller: weightController,
+                  integerOnly: false,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _TrackingField(
+                  label: 'Height (cm)',
+                  controller: heightController,
+                  integerOnly: false,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _TrackingField(
+                  label: 'Body fat (%)',
+                  controller: bodyFatController,
+                  integerOnly: false,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _TrackingField(
+                  label: 'Chest (cm)',
+                  controller: chestController,
+                  integerOnly: false,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _TrackingField(
+                  label: 'Waist (cm)',
+                  controller: waistController,
+                  integerOnly: false,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _TrackingField(
+                  label: 'Hips (cm)',
+                  controller: hipsController,
+                  integerOnly: false,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _TrackingField(
+                  label: 'Biceps (cm)',
+                  controller: bicepsController,
+                  integerOnly: false,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _TrackingField(
+                  label: 'Thighs (cm)',
+                  controller: thighsController,
+                  integerOnly: false,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Notes',
+            style: AppText.body(
+              size: 11,
+              color: AppColors.inkFaint,
+              weight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: notesController,
+            style: AppText.body(size: 14, weight: FontWeight.w600),
+            decoration: InputDecoration(
+              isDense: true,
+              filled: true,
+              fillColor: AppColors.surface3,
+              hintText: 'Optional',
+              hintStyle: AppText.body(color: AppColors.inkFaint),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppRadii.field),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: 'Save measurement',
+                  size: AppButtonSize.small,
+                  loading: saving,
+                  onPressed: saving ? null : onSave,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: AppButton(
+                  label: 'Cancel',
+                  variant: AppButtonVariant.ghost,
+                  size: AppButtonSize.small,
+                  onPressed: saving ? null : onCancel,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One past entry in the Body measurements card's collapsed history list —
+/// same row shape as `_VisitRow` above (date + summary + a trailing action).
+class _MeasurementHistoryRow extends StatelessWidget {
+  const _MeasurementHistoryRow({
+    required this.entry,
+    required this.deleting,
+    required this.onDelete,
+  });
+
+  final BodyMeasurement entry;
+  final bool deleting;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(AppRadii.tile),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${entry.recordedAt.day}/${entry.recordedAt.month}/${entry.recordedAt.year}',
+                  style: AppText.body(size: 12, weight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  entry.summary,
+                  style: AppText.body(size: 11, color: AppColors.inkFaint),
+                ),
+              ],
+            ),
+          ),
+          deleting
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : IconButton(
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    size: 18,
+                    color: AppColors.danger,
+                  ),
+                  onPressed: onDelete,
+                  visualDensity: VisualDensity.compact,
+                ),
         ],
       ),
     );

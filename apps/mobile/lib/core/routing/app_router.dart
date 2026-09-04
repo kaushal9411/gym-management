@@ -24,6 +24,9 @@ import '../../features/catalog/presentation/diet_plan_form_screen.dart';
 import '../../features/catalog/presentation/diet_plans_screen.dart';
 import '../../features/catalog/presentation/membership_plan_form_screen.dart';
 import '../../features/catalog/presentation/membership_plans_screen.dart';
+import '../../features/catalog/presentation/measured_members_screen.dart';
+import '../../features/catalog/presentation/member_measurements_detail_screen.dart';
+import '../../features/catalog/presentation/new_measurement_screen.dart';
 import '../../features/catalog/presentation/workout_plan_form_screen.dart';
 import '../../features/catalog/presentation/workout_plans_screen.dart';
 import '../../features/finance/presentation/expense_form_screen.dart';
@@ -43,6 +46,7 @@ import '../../features/member/presentation/member_class_booked_screen.dart';
 import '../../features/member/presentation/member_data_export_screen.dart';
 import '../../features/member/presentation/member_invoice_detail_screen.dart';
 import '../../features/member/presentation/member_invoices_screen.dart';
+import '../../features/member/presentation/member_measurements_screen.dart';
 import '../../features/member/presentation/member_change_password_screen.dart';
 import '../../features/member/presentation/member_profile_screen.dart';
 import '../../features/member/presentation/member_visit_detail_screen.dart';
@@ -326,6 +330,20 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         path: AppRoutes.dietPlanForm,
         builder: (context, state) => DietPlanCatalogFormScreen(
           planId: state.extra as String?,
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.measuredMembers,
+        builder: (context, state) => const MeasuredMembersScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.newMeasurement,
+        builder: (context, state) => const NewMeasurementScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.memberMeasurementsDetail,
+        builder: (context, state) => MemberMeasurementsDetailScreen(
+          memberId: state.extra as String,
         ),
       ),
       GoRoute(
@@ -765,6 +783,10 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       GoRoute(
         path: AppRoutes.memberDataExport,
         builder: (context, state) => const MemberDataExportScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.memberMeasurements,
+        builder: (context, state) => const MemberMeasurementsScreen(),
       ),
       GoRoute(
         path: AppRoutes.memberClassBooked,

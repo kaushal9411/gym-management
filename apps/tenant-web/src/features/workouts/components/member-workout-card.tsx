@@ -101,9 +101,12 @@ export function MemberWorkoutCard({ memberId }: MemberWorkoutCardProps) {
             </p>
             {current.progress.length > 0 ? (
               <div className="space-y-1.5">
-                {current.progress.map((p) => (
+                {current.progress.map((p, index) => (
                   <div
-                    key={p.exerciseId}
+                    // Same exercise can appear on more than one day — `exerciseId` alone isn't
+                    // a unique row key here, same bug class fixed in the member portal's own
+                    // workout page (`app/portal/(authenticated)/workout/page.tsx`).
+                    key={`${p.exerciseId}-${p.dayOfWeek}-${index}`}
                     className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-muted/40 px-2.5 py-2 text-sm"
                   >
                     <span>

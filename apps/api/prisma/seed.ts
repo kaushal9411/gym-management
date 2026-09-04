@@ -193,6 +193,13 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'classes:delete', description: 'Soft-delete a class' },
   { key: 'classes:restore', description: 'Restore a soft-deleted class' },
   { key: 'bookings:manage', description: 'Book or cancel any member into a class session (front desk)' },
+
+  // Body Measurements — trainer/owner-logged historical trend log, distinct
+  // from the member profile's single current height/weight snapshot.
+  { key: 'measurements:view', description: "View a member's body measurement history" },
+  { key: 'measurements:create', description: "Log a new body measurement entry for a member" },
+  { key: 'measurements:update', description: 'Edit an existing body measurement entry' },
+  { key: 'measurements:delete', description: 'Delete a body measurement entry' },
 ];
 
 const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
@@ -227,6 +234,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'branches:view', 'branches:create', 'branches:update', 'branches:delete', 'branches:restore', 'branches:activate',
     'support:view', 'support:create', 'ai:use',
     'classes:view', 'classes:create', 'classes:update', 'classes:delete', 'classes:restore', 'bookings:manage',
+    'measurements:view', 'measurements:create', 'measurements:update', 'measurements:delete',
   ],
   TRAINER: [
     'members:read', 'attendance:create', 'attendance:read',
@@ -257,6 +265,10 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     // creating/editing classes or booking members in stays a Manager/
     // front-desk decision.
     'classes:view',
+    // Trainers log/update a member's body measurements day-to-day as part
+    // of coaching; deleting a mistaken entry stays a Manager decision, same
+    // tightening pattern as workouts/diets delete.
+    'measurements:view', 'measurements:create', 'measurements:update',
   ],
   RECEPTIONIST: [
     'members:manage', 'members:read',
@@ -479,6 +491,7 @@ const ADMIN_PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'scheduler:trigger', description: 'Manually trigger a background job' },
   { key: 'scheduler:retry', description: 'Retry a failed job or re-enqueue an entire failed queue' },
   { key: 'scheduler:pause', description: 'Pause a job or a queue' },
+  { key: 'app-releases:manage', description: 'Upload, activate, and delete mobile app (.apk) releases distributed to all users' },
 ];
 
 const ADMIN_ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
@@ -497,6 +510,7 @@ const ADMIN_ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'scheduler:trigger',
     'scheduler:retry',
     'scheduler:pause',
+    'app-releases:manage',
   ],
 };
 

@@ -36,6 +36,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body
+        // Browser extensions (ColorZilla's `cz-shortcut-listen`, Grammarly's
+        // `data-gr-*`, etc.) inject attributes onto <body> before React
+        // hydrates, which React then reports as a hydration mismatch even
+        // though nothing in this app produced it — false positive, not a
+        // real SSR/client divergence. `suppressHydrationWarning` on <html>
+        // above doesn't cover <body>'s own attributes, hence this too.
+        suppressHydrationWarning
         style={
           {
             '--primary': tenant.branding.primaryColor,

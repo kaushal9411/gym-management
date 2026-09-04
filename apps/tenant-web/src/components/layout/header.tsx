@@ -3,6 +3,7 @@
 import { Menu } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { DownloadAppButton } from '@/features/app-download/download-app-button';
 import { BranchSelector } from './branch-selector';
 import { GlobalSearch } from './global-search';
 import { NotificationPanel } from './notification-panel';
@@ -34,6 +35,7 @@ export function Header() {
       <div className="ml-auto flex items-center gap-2">
         <GlobalSearch />
         <QuickActionsMenu />
+        <DownloadAppButton />
         <BranchSelector />
         <ThemeToggle />
         <NotificationPanel />

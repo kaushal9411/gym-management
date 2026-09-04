@@ -9,6 +9,7 @@ import { ClassBookingService } from '../../classes/services/class-booking.servic
 import { ClassSessionService } from '../../classes/services/class-session.service';
 import { MemberDietPlanRepository } from '../../diet/repositories/member-diet-plan.repository';
 import { MemberInvoiceService } from '../../finance/services/member-invoice.service';
+import { MeasurementService } from '../../measurements/services/measurement.service';
 import { MemberService } from '../../members/services/member.service';
 import { tenantService } from '../../tenants/service/tenant.service';
 import { MemberWorkoutPlanRepository } from '../../workouts/repositories/member-workout-plan.repository';
@@ -86,6 +87,11 @@ export class MemberPortalService {
   async getDiet(memberId: string) {
     const assignment = await this.dietAssignments.findActiveByMember(this.tenantId, memberId);
     return assignment ? toDietAssignmentDto(assignment) : null;
+  }
+
+  /** Reuses the staff-side service's DTO shape — it's the member's own history, newest first, nothing needs hiding. */
+  async getMeasurements(memberId: string) {
+    return new MeasurementService(this.tenantId).listForSelf(memberId);
   }
 
   /** Same merge-not-overwrite semantics as the staff-side `DietPlanService#updateProgress` — a partial update (e.g. just water) must not wipe an already-logged meal for the same day. */

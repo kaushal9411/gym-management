@@ -75,8 +75,9 @@ export const registerGymSchema = z
     path: ['confirmPassword'],
   });
 
-export const forgotPasswordSchema = z.object({
-  email: emailSchema,
+/** One field, same "@" detection precedent as `unifiedLoginSchema` — see `looksLikeEmail` in `utils/identifier.ts`. */
+export const unifiedForgotPasswordSchema = z.object({
+  identifier: z.string().trim().min(1, 'Email or Member ID is required'),
 });
 
 export const resetPasswordSchema = z
@@ -128,7 +129,7 @@ export const acceptInvitationSchema = z
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type UnifiedLoginFormValues = z.infer<typeof unifiedLoginSchema>;
 export type RegisterGymFormValues = z.infer<typeof registerGymSchema>;
-export type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+export type UnifiedForgotPasswordFormValues = z.infer<typeof unifiedForgotPasswordSchema>;
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 export type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 export type OtpFormValues = z.infer<typeof otpFormSchema>;

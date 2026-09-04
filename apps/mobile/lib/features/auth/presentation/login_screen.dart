@@ -6,31 +6,43 @@ import '../../../bloc/session/session_cubit.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/staff_login_result.dart';
 import '../../../models/tenant_branding.dart';
 import '../../../repositories/auth_repository.dart';
 import '../../../repositories/member_auth_repository.dart';
+import '../../../repositories/public_tenant_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/brand_mark.dart';
+import '../../../shared/widgets/role_toggle.dart';
 import 'forgot_password_screen.dart';
 import 'staff_mfa_setup_screen.dart';
 import 'staff_otp_screen.dart';
 
 class LoginScreenArgs {
-  const LoginScreenArgs({required this.role, required this.tenant});
+  const LoginScreenArgs({this.role, required this.tenant});
 
-  final AppRole role;
+  /// Initial tab selection only — the [RoleToggle] on this screen lets the
+  /// user change it freely either way. `null` (a fresh Find Gym pick, which
+  /// no longer has its own toggle — see that screen's doc comment) defaults
+  /// to Staff. Non-null for the "send a returning user straight to Login"
+  /// remembered-gym path (`SessionCubit`/`AppRouter`), so a returning user
+  /// lands on the tab they actually used last time.
+  final AppRole? role;
   final TenantBranding tenant;
 }
 
 /// Design frame "3. Login" — staff (work email + password) and member
 /// (Member ID + password) variants, both against `kaushalgym`'s resolved
-/// branding from the previous screen.
+/// branding from the previous screen. The [RoleToggle] picking between them
+/// lives here (moved from Find Gym, which now just resolves a gym — see
+/// that screen's doc comment) so switching roles doesn't need a round trip
+/// back through Find Gym.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.args});
 
@@ -43,18 +55,34 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
+  late AppRole _role = widget.args.role ?? AppRole.staff;
   bool _loading = false;
   String? _formError;
   String? _identifierError;
   String? _passwordError;
 
-  bool get _isStaff => widget.args.role == AppRole.staff;
+  bool get _isStaff => _role == AppRole.staff;
 
   @override
   void dispose() {
     _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  /// Switching roles mid-screen is new (the toggle used to live one screen
+  /// earlier, before either field existed) — clears both fields/errors so
+  /// e.g. a half-typed email doesn't linger under the Member tab.
+  void _changeRole(AppRole role) {
+    if (role == _role) return;
+    setState(() {
+      _role = role;
+      _identifierController.clear();
+      _passwordController.clear();
+      _formError = null;
+      _identifierError = null;
+      _passwordError = null;
+    });
   }
 
   Future<void> _submit() async {
@@ -66,8 +94,9 @@ class _LoginScreenState extends State<LoginScreen> {
       _identifierError = null;
       _passwordError = null;
     });
+    final isStaff = _isStaff;
     try {
-      if (_isStaff) {
+      if (isStaff) {
         await _submitStaff(identifier, password);
       } else {
         await _submitMember(identifier, password);
@@ -80,7 +109,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // isn't specifically an "email" or "password" problem, it's a
         // general one). Only suppress the banner when we actually found a
         // field-specific message to show inline instead of it.
-        _identifierError = e.errorFor(_isStaff ? 'email' : 'memberId');
+        _identifierError = e.errorFor(isStaff ? 'email' : 'memberId');
         _passwordError = e.errorFor('password');
         _formError = (_identifierError == null && _passwordError == null)
             ? e.message
@@ -91,12 +120,31 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  /// Records the gym+role for the "send a returning user straight to
+  /// Login" memory — Find Gym no longer has a toggle to do this at
+  /// resolve-time (see that screen's doc comment), so it's recorded here
+  /// instead, once a real login actually succeeds. Always called (even on
+  /// the already-remembered path) since it's idempotent — just re-records
+  /// the same gym+role — and simpler than tracking whether this was fresh.
+  /// Best-effort; a storage failure here shouldn't block a login that
+  /// already succeeded.
+  Future<void> _rememberRole(ActorType actorType) async {
+    try {
+      await getIt<PublicTenantRepository>()
+          .rememberGymForRole(widget.args.tenant, actorType);
+    } catch (_) {
+      // Best-effort only — see doc comment above.
+    }
+  }
+
   Future<void> _submitStaff(String email, String password) async {
     final result =
         await getIt<AuthRepository>().login(email: email, password: password);
     if (!mounted) return;
     switch (result) {
       case StaffLoginSuccess(:final user):
+        await _rememberRole(ActorType.staff);
+        if (!mounted) return;
         context.read<SessionCubit>().staffSignedIn(user, widget.args.tenant);
       case StaffOtpRequired(:final email, :final purpose):
         context.push(
@@ -104,7 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
           extra: StaffOtpScreenArgs(
             email: email,
             purpose: purpose,
-            role: widget.args.role,
+            role: AppRole.staff,
             tenant: widget.args.tenant,
           ),
         );
@@ -114,7 +162,7 @@ class _LoginScreenState extends State<LoginScreen> {
           extra: StaffMfaSetupScreenArgs(
             setupToken: setupToken,
             email: email,
-            role: widget.args.role,
+            role: AppRole.staff,
             tenant: widget.args.tenant,
           ),
         );
@@ -124,6 +172,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _submitMember(String memberId, String password) async {
     final result = await getIt<MemberAuthRepository>()
         .login(memberId: memberId, password: password);
+    if (!mounted) return;
+    await _rememberRole(ActorType.member);
     if (!mounted) return;
     context
         .read<SessionCubit>()
@@ -142,7 +192,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _forgotPassword() => context.push(
         AppRoutes.forgotPassword,
         extra: ForgotPasswordScreenArgs(
-          role: widget.args.role,
+          role: _role,
           tenant: widget.args.tenant,
           prefill: _identifierController.text.trim(),
         ),
@@ -150,7 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final role = widget.args.role;
+    final role = _role;
     final tenant = widget.args.tenant;
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -159,6 +209,8 @@ class _LoginScreenState extends State<LoginScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Column(
             children: [
+              RoleToggle(value: _role, onChanged: _changeRole),
+              const SizedBox(height: 20),
               BrandMark.initials(
                 initials: tenant.initials,
                 role: role,

@@ -18,6 +18,10 @@ export function useMemberWorkout() {
   return useQuery({ queryKey: ['member-portal', 'workout'], queryFn: memberPortalService.getWorkout });
 }
 
+export function useMemberMeasurements() {
+  return useQuery({ queryKey: ['member-portal', 'measurements'], queryFn: memberPortalService.getMeasurements });
+}
+
 export function useMarkWorkoutProgress() {
   const queryClient = useQueryClient();
   return useMutation({

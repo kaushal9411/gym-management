@@ -32,10 +32,14 @@ export default function MemberWorkoutPage() {
           <CardTitle className="text-base">Exercises</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {workout.workoutPlan.exercises.map((ex) => {
+          {workout.workoutPlan.exercises.map((ex, index) => {
             const progress = progressByExercise.get(ex.exerciseId);
             return (
-              <div key={ex.exerciseId} className="flex items-center justify-between rounded-lg border p-3">
+              // The same exercise can be scheduled on more than one day (progress itself is
+              // tracked per-exercise, not per-day — see `progressByExercise` above, keyed the
+              // same way), so `exerciseId` alone isn't a unique row key here; `dayOfWeek` +
+              // index closes the gap even if the same exercise were ever double-booked on one day.
+              <div key={`${ex.exerciseId}-${ex.dayOfWeek}-${index}`} className="flex items-center justify-between rounded-lg border p-3">
                 <div>
                   <p className="text-sm font-medium">{ex.name}</p>
                   <p className="text-xs text-muted-foreground">{ex.dayOfWeek}</p>

@@ -4,16 +4,18 @@ import * as React from 'react';
 import Link from 'next/link';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Mail, MailCheck } from 'lucide-react';
+import { ArrowLeft, MailCheck, User } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 
 import { Label } from '@/components/ui/label';
 import { LoadingButton } from '@/components/ui/loading-button';
+import { useMemberForgotPassword } from '@/features/member-portal/hooks/use-member-auth';
 import { TenantLogo } from '@/features/tenant/components/tenant-logo';
 import { useTenant } from '@/features/tenant/tenant-provider';
 import { AUTH_ROUTES } from '../../constants';
 import { useForgotPassword } from '../../hooks/use-auth';
-import { forgotPasswordSchema, type ForgotPasswordFormValues } from '../../schemas';
+import { unifiedForgotPasswordSchema, type UnifiedForgotPasswordFormValues } from '../../schemas';
+import { looksLikeEmail } from '../../utils/identifier';
 import { maskEmail } from '../../utils/mask';
 import { IconField } from '../icon-field';
 import { LoginHero } from '../login-hero';
@@ -31,23 +33,34 @@ const itemVariants = {
 const DARK_FIELD_CLASS =
   'h-12 border-white/10 bg-white/4 text-white placeholder:text-white/35 focus-visible:border-orange-400/50 focus-visible:ring-orange-400/20';
 
-/** Same premium neon-glass shell as `/login` — mirrors its background, card and footer so navigating between the two feels like one page. */
+/**
+ * One screen for both auth planes — same "Email or Member ID" field +
+ * `looksLikeEmail` branch as the unified `/login` page (`login-form.tsx`),
+ * rather than the two separate forms (`/forgot-password` for staff,
+ * `/portal/forgot-password` for members) this used to be split across.
+ * Same premium neon-glass shell as `/login` — mirrors its background, card
+ * and footer so navigating between the two feels like one page.
+ */
 export function ForgotPasswordForm() {
   const tenant = useTenant();
   const forgotPassword = useForgotPassword();
-  const [sentTo, setSentTo] = React.useState<string | null>(null);
+  const memberForgotPassword = useMemberForgotPassword();
+  const [sentTo, setSentTo] = React.useState<{ identifier: string; isEmail: boolean } | null>(null);
 
-  const form = useForm<ForgotPasswordFormValues>({
-    resolver: zodResolver(forgotPasswordSchema),
-    defaultValues: { email: '' },
+  const form = useForm<UnifiedForgotPasswordFormValues>({
+    resolver: zodResolver(unifiedForgotPasswordSchema),
+    defaultValues: { identifier: '' },
   });
 
-  const onSubmit = form.handleSubmit((values) => {
-    // Always resolves to success — the API never reveals whether an email exists.
-    forgotPassword.mutate(values.email, { onSuccess: () => setSentTo(values.email) });
+  const onSubmit = form.handleSubmit(({ identifier }) => {
+    const isEmail = looksLikeEmail(identifier);
+    // Always resolves to success either way — neither backend reveals whether the identifier exists.
+    const mutation = isEmail ? forgotPassword : memberForgotPassword;
+    mutation.mutate(identifier, { onSuccess: () => setSentTo({ identifier, isEmail }) });
   });
 
-  const emailValue = form.watch('email');
+  const isPending = forgotPassword.isPending || memberForgotPassword.isPending;
+  const identifierValue = form.watch('identifier');
 
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
@@ -102,8 +115,12 @@ export function ForgotPasswordForm() {
                   <div className="space-y-1.5">
                     <h1 className="text-2xl font-bold tracking-tight text-white">Check your email</h1>
                     <p className="text-sm text-white/50">
-                      If an account exists for {maskEmail(sentTo)}, a password reset link is on its way. The link expires
-                      in 30 minutes.
+                      {sentTo.isEmail ? (
+                        <>If an account exists for {maskEmail(sentTo.identifier)}, a password reset link is on its way.</>
+                      ) : (
+                        <>If a portal account exists for {sentTo.identifier}, a password reset link has been sent to the email on file.</>
+                      )}{' '}
+                      The link expires in 30 minutes.
                     </p>
                   </div>
 
@@ -121,39 +138,41 @@ export function ForgotPasswordForm() {
                 <>
                   <div className="mb-6 space-y-1 text-center">
                     <h1 className="text-2xl font-bold tracking-tight text-white">Forgot your password?</h1>
-                    <p className="text-sm text-white/50">Enter your email and we&apos;ll send you a reset link.</p>
+                    <p className="text-sm text-white/50">
+                      Enter your email (staff) or Member ID (members) and we&apos;ll send a reset link.
+                    </p>
                   </div>
 
                   <form onSubmit={onSubmit} noValidate className="space-y-5">
                     <div className="space-y-2">
-                      <Label htmlFor="email" className="text-xs font-medium uppercase tracking-wide text-white/60">
-                        Email
+                      <Label htmlFor="identifier" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                        Email or Member ID
                       </Label>
                       <IconField
-                        id="email"
-                        icon={Mail}
-                        type="email"
-                        autoComplete="email"
-                        placeholder="you@example.com"
-                        invalid={!!form.formState.errors.email}
-                        showSuccess={form.formState.touchedFields.email && !!emailValue}
-                        aria-describedby={form.formState.errors.email ? 'email-error' : undefined}
-                        disabled={forgotPassword.isPending}
+                        id="identifier"
+                        icon={User}
+                        type="text"
+                        autoComplete="username"
+                        placeholder="you@example.com or MEM-0001"
+                        invalid={!!form.formState.errors.identifier}
+                        showSuccess={form.formState.touchedFields.identifier && !!identifierValue}
+                        aria-describedby={form.formState.errors.identifier ? 'identifier-error' : undefined}
+                        disabled={isPending}
                         iconClassName="text-white/40 group-focus-within:text-orange-400"
                         glowClassName="shadow-[0_0_0_4px_rgba(255,138,61,0.18)]"
                         className={DARK_FIELD_CLASS}
-                        {...form.register('email')}
+                        {...form.register('identifier')}
                       />
-                      {form.formState.errors.email ? (
-                        <p id="email-error" role="alert" className="text-xs text-red-400">
-                          {form.formState.errors.email.message}
+                      {form.formState.errors.identifier ? (
+                        <p id="identifier-error" role="alert" className="text-xs text-red-400">
+                          {form.formState.errors.identifier.message}
                         </p>
                       ) : null}
                     </div>
 
                     <LoadingButton
                       type="submit"
-                      loading={forgotPassword.isPending}
+                      loading={isPending}
                       loadingText="Sending link…"
                       className="login-ripple-btn relative h-12 w-full overflow-hidden border-0 text-[15px] font-bold uppercase tracking-wide text-white"
                     >

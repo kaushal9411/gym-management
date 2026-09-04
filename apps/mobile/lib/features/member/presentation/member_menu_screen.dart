@@ -38,6 +38,12 @@ const _entries = [
     route: AppRoutes.memberInvoices,
   ),
   _MenuEntry(
+    icon: Icons.straighten_outlined,
+    title: 'Body Measurements',
+    subtitle: 'Your progress over time',
+    route: AppRoutes.memberMeasurements,
+  ),
+  _MenuEntry(
     icon: Icons.person_outline_rounded,
     title: 'Profile',
     subtitle: 'Your details',
@@ -51,7 +57,12 @@ const _entries = [
   ),
 ];
 
-/// Design frame "8. Menu".
+/// Design frame "8. Menu", plus a "Body Measurements" tile added alongside
+/// the mobile permission-parity work (not in the original design frame —
+/// it's the natural member-facing counterpart of the trainer/owner-side
+/// "Record measurement" flow on `member_detail_screen.dart`, real backend
+/// data via `GET /portal/measurements`, same "add beyond the frame with a
+/// doc comment" precedent used for the other roles' menu parity).
 class MemberMenuScreen extends StatelessWidget {
   const MemberMenuScreen({super.key});
 

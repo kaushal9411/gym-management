@@ -1,38 +1,27 @@
 'use client';
 
+import * as React from 'react';
 import Link from 'next/link';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { AuthHeader } from '@/features/auth/components/auth-header';
 import { AUTH_ROUTES } from '@/features/auth/constants';
 import { slugSchema } from '@/features/auth/schemas';
+import { listActiveTenants } from '@/features/tenant/list-active';
+import { getRememberedGymSlug, setRememberedGymSlug } from '@/features/tenant/remember-gym';
+import { buildTenantLoginUrl } from '@/features/tenant/subdomain-urls';
 import { cn } from '@/lib/utils';
 
 const findGymSchema = z.object({ slug: slugSchema });
 type FindGymFormValues = z.infer<typeof findGymSchema>;
-
-const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'fitcloud.local';
-
-/**
- * Builds the target subdomain URL from the CURRENT host, so this works
- * identically in every environment without hardcoding a domain: on
- * `{x}.localhost:3001` or plain `localhost:3001` it targets
- * `{slug}.localhost:<port>` (browser-native dev subdomains); anywhere else
- * it targets `{slug}.<platform domain>`.
- */
-function buildTenantLoginUrl(slug: string): string {
-  const { protocol, hostname, port } = window.location;
-  const isLocalDev = hostname === 'localhost' || hostname.endsWith('.localhost');
-  const host = isLocalDev ? `${slug}.localhost${port ? `:${port}` : ''}` : `${slug}.${PLATFORM_DOMAIN}`;
-  return `${protocol}//${host}/login`;
-}
 
 interface FindGymFormProps {
   /**
@@ -59,33 +48,84 @@ export function FindGymForm({ bare = false, dark = false }: FindGymFormProps) {
     defaultValues: { slug: '' },
   });
 
+  // A previous visit already picked a gym — skip straight to its login
+  // instead of asking again. Starts `null` (matches the server-rendered
+  // markup — localStorage doesn't exist there) and is only ever read after
+  // mount, same "client-only prefill" pattern as `remember-me.ts`'s
+  // `getRememberedEmail`; reading it during the initial render instead
+  // would desync from the server output and trip a hydration mismatch.
+  //
+  // `?changeGym=1` is the tenant login screen's "Change gym" link signaling
+  // back here (it can't clear this storage directly — different origin,
+  // see remember-gym.ts) — forget the old pick and show the picker instead
+  // of bouncing straight back to it.
+  const [remembered, setRemembered] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('changeGym')) {
+      setRememberedGymSlug(null);
+      window.history.replaceState(null, '', window.location.pathname);
+      return;
+    }
+    const slug = getRememberedGymSlug();
+    if (slug) {
+      setRemembered(slug);
+      window.location.href = buildTenantLoginUrl(slug);
+    }
+  }, []);
+
+  // Public, unauthenticated — GET /public/tenants was built specifically for
+  // this "pre-login pick your gym" picker (name/slug/logo only, excludes
+  // suspended/cancelled/maintenance-mode tenants a login couldn't succeed
+  // against anyway). `enabled: !remembered` is best-effort, not a guarantee
+  // — on a remembered-slug mount both effects fire around the same time, so
+  // this may still request once before navigation away; harmless either way.
+  const { data: tenants, isLoading } = useQuery({
+    queryKey: ['public-tenants'],
+    queryFn: listActiveTenants,
+    staleTime: 60_000,
+    enabled: !remembered,
+  });
+
   const onSubmit = form.handleSubmit(({ slug }) => {
+    setRememberedGymSlug(slug);
     window.location.href = buildTenantLoginUrl(slug);
   });
+
+  const noGymsFound = !isLoading && (tenants?.length ?? 0) === 0;
+
+  if (remembered) {
+    return <p className={cn('text-center text-sm', dark ? 'text-white/40' : 'text-muted-foreground')}>Redirecting to your gym…</p>;
+  }
 
   const fields = (
     <form onSubmit={onSubmit} noValidate className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="slug" className={dark ? 'text-xs font-medium uppercase tracking-wide text-white/60' : undefined}>
-          Gym subdomain
+          Your gym
         </Label>
-        <div className="flex items-center gap-2">
-          <Input
-            id="slug"
-            placeholder="yourgym"
-            autoComplete="off"
-            // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate: the sole field on a single-purpose "find your gym" form.
-            autoFocus
-            invalid={!!form.formState.errors.slug}
-            aria-describedby={form.formState.errors.slug ? 'slug-error' : undefined}
-            className={cn(
-              bare && 'h-12 text-[15px]',
-              dark && 'border-white/10 bg-white/4 text-white placeholder:text-white/35 focus-visible:border-orange-400/50 focus-visible:ring-orange-400/20',
-            )}
-            {...form.register('slug')}
-          />
-          <span className={cn('shrink-0 text-sm', dark ? 'text-white/40' : 'text-muted-foreground')}>.{PLATFORM_DOMAIN}</span>
-        </div>
+        <Select
+          id="slug"
+          // eslint-disable-next-line jsx-a11y/no-autofocus -- deliberate: the sole field on a single-purpose "find your gym" form.
+          autoFocus
+          invalid={!!form.formState.errors.slug}
+          aria-describedby={form.formState.errors.slug ? 'slug-error' : undefined}
+          disabled={isLoading || noGymsFound}
+          defaultValue=""
+          className={cn(
+            bare && 'h-12 text-[15px]',
+            dark && 'border-white/10 bg-white/4 text-white focus-visible:border-orange-400/50 focus-visible:ring-orange-400/20',
+          )}
+          {...form.register('slug')}
+        >
+          <option value="" disabled className={dark ? 'bg-neutral-900 text-white/50' : undefined}>
+            {isLoading ? 'Loading gyms…' : noGymsFound ? 'No gyms found' : 'Select your gym'}
+          </option>
+          {tenants?.map((tenant) => (
+            <option key={tenant.slug} value={tenant.slug} className={dark ? 'bg-neutral-900 text-white' : undefined}>
+              {tenant.name}
+            </option>
+          ))}
+        </Select>
         {form.formState.errors.slug ? (
           <p id="slug-error" role="alert" className={cn('text-xs', dark ? 'text-red-400' : 'text-destructive')}>
             {form.formState.errors.slug.message}
@@ -95,6 +135,7 @@ export function FindGymForm({ bare = false, dark = false }: FindGymFormProps) {
 
       <Button
         type="submit"
+        disabled={isLoading || noGymsFound}
         className={cn(
           bare && 'h-12 w-full border-0 text-[15px] font-bold uppercase tracking-wide shadow-lg',
           dark
@@ -133,7 +174,7 @@ export function FindGymForm({ bare = false, dark = false }: FindGymFormProps) {
     <div className="space-y-6">
       <AuthHeader
         title="Looking for your gym?"
-        subtitle="Enter your gym's FitCloud subdomain to continue to its sign-in page."
+        subtitle="Select your gym from the list to continue to its sign-in page."
       />
 
       <Card>

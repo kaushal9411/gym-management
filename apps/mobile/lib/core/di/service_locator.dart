@@ -11,6 +11,7 @@ import '../../repositories/announcement_repository.dart';
 import '../../repositories/attendance_repository.dart';
 import '../../repositories/auth_repository.dart';
 import '../../repositories/billing_repository.dart';
+import '../../repositories/body_measurement_repository.dart';
 import '../../repositories/branch_repository.dart';
 import '../../repositories/class_session_repository.dart';
 import '../../repositories/dashboard_repository.dart';
@@ -91,6 +92,9 @@ void setupServiceLocator() {
   );
   getIt.registerLazySingleton<DietPlanRepository>(
     () => DietPlanRepository(getIt()),
+  );
+  getIt.registerLazySingleton<BodyMeasurementRepository>(
+    () => BodyMeasurementRepository(getIt()),
   );
   getIt.registerLazySingleton<AnalyticsRepository>(
     () => AnalyticsRepository(getIt()),

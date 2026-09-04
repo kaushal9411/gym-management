@@ -21,6 +21,7 @@ import {
   LifeBuoy,
   Settings,
   Store,
+  Ruler,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -109,6 +110,16 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Apple,
     permission: 'diets:view',
     featureFlag: 'diet_plans',
+    section: 'Programs',
+  },
+  {
+    // No featureFlag — always-on, same as Dashboard/Notifications/Support
+    // (a per-member log, not a plan-tier add-on like Workout/Diet/Classes).
+    key: 'measurements',
+    label: 'Body Measurements',
+    href: '/measurements',
+    icon: Ruler,
+    permission: 'measurements:view',
     section: 'Programs',
   },
   { key: 'payments', label: 'Payments', href: '/payments', icon: CreditCard, permission: 'finance:view', featureFlag: 'payments', section: 'Finance' },

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
+import '../models/body_measurement.dart';
 import '../models/class_session.dart';
 import '../models/diet_plan.dart';
 import '../models/member_booking.dart';
@@ -202,6 +203,23 @@ class MemberPortalRepository {
         '/portal/change-password',
         data: {'currentPassword': currentPassword, 'newPassword': newPassword},
       );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Own body measurement history, newest first — reuses the staff-side
+  /// `BodyMeasurement` DTO shape (identical, nothing needs hiding for the
+  /// member it belongs to). Read-only: a member never edits their own
+  /// measurements, only a trainer/owner/manager logs them.
+  Future<List<BodyMeasurement>> measurements() async {
+    try {
+      final response =
+          await _dio.get<Map<String, dynamic>>('/portal/measurements');
+      final data = response.data!['data'] as List<dynamic>;
+      return data
+          .map((e) => BodyMeasurement.fromJson(e as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw _mapError(e);
     }

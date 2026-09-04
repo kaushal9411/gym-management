@@ -25,6 +25,7 @@ import { FreezeHistoryTable, MembershipHistoryTable } from '@/features/members/c
 import { MembershipPlanSelect } from '@/features/members/components/membership-plan-select';
 import { MemberWorkoutCard } from '@/features/workouts/components/member-workout-card';
 import { MemberDietCard } from '@/features/diet/components/member-diet-card';
+import { MemberMeasurementsCard } from '@/features/measurements/components/member-measurements-card';
 import { MemberStatusBadge } from '@/features/members/components/member-status-badge';
 import { QrCodeDisplay } from '@/features/members/components/qr-code-display';
 import { TrainerSelect } from '@/features/members/components/trainer-select';
@@ -755,6 +756,8 @@ export default function MemberDetailPage() {
       <MemberWorkoutCard memberId={memberId} />
 
       <MemberDietCard memberId={memberId} />
+
+      <MemberMeasurementsCard memberId={memberId} />
 
       <Card>
         <CardHeader>

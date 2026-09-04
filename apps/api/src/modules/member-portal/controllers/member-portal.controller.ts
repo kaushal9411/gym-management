@@ -36,6 +36,10 @@ export class MemberPortalController {
     sendSuccess(res, await serviceFor(req).getDiet(memberId(req)));
   }
 
+  async measurements(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await serviceFor(req).getMeasurements(memberId(req)));
+  }
+
   async logDiet(req: Request<{ id: string }>, res: Response): Promise<void> {
     const result = await serviceFor(req).logDiet(memberId(req), req.params.id, req.body);
     sendSuccess(res, result, 'Diet log updated.');

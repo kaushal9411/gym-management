@@ -208,6 +208,7 @@ model Tenant {
   memberships           Membership[]
   membershipFreezes     MembershipFreeze[]
   memberDocuments       MemberDocument[]
+  bodyMeasurements      BodyMeasurement[]
   attendances           Attendance[]
   exercises             Exercise[]
   workoutPlans          WorkoutPlan[]
@@ -253,48 +254,48 @@ enum MeasurementUnit {
 }
 
 model TenantSettings {
-  id                        String          @id @default(uuid()) @db.Uuid
-  tenantId                  String          @unique @map("tenant_id") @db.Uuid
+  id                           String          @id @default(uuid()) @db.Uuid
+  tenantId                     String          @unique @map("tenant_id") @db.Uuid
   /// { primaryColor, primaryForeground, logoUrl?, welcomeMessage }
-  branding                  Json            @default("{}")
-  timezone                  String          @default("UTC") @db.VarChar(64)
-  currency                  String          @default("USD") @db.Char(3)
-  locale                    String          @default("en") @db.VarChar(10)
-  emailFromName             String?         @map("email_from_name") @db.VarChar(120)
-  emailFromAddress          String?         @map("email_from_address") @db.VarChar(255)
+  branding                     Json            @default("{}")
+  timezone                     String          @default("UTC") @db.VarChar(64)
+  currency                     String          @default("USD") @db.Char(3)
+  locale                       String          @default("en") @db.VarChar(10)
+  emailFromName                String?         @map("email_from_name") @db.VarChar(120)
+  emailFromAddress             String?         @map("email_from_address") @db.VarChar(255)
   /// Business Settings module (Prompt 12) — regional/display preferences.
   /// Symbol is stored (not derived) so a tenant can override the default for
   /// their currency code (e.g. "Fr" vs "CHF").
-  currencySymbol            String          @default("$") @map("currency_symbol") @db.VarChar(8)
-  dateFormat                String          @default("MM/DD/YYYY") @map("date_format") @db.VarChar(20)
-  timeFormat                String          @default("12h") @map("time_format") @db.VarChar(4)
+  currencySymbol               String          @default("$") @map("currency_symbol") @db.VarChar(8)
+  dateFormat                   String          @default("MM/DD/YYYY") @map("date_format") @db.VarChar(20)
+  timeFormat                   String          @default("12h") @map("time_format") @db.VarChar(4)
   /// 0 = Sunday .. 6 = Saturday.
-  weekStartDay              Int             @default(0) @map("week_start_day")
-  measurementUnit           MeasurementUnit @default(METRIC) @map("measurement_unit")
+  weekStartDay                 Int             @default(0) @map("week_start_day")
+  measurementUnit              MeasurementUnit @default(METRIC) @map("measurement_unit")
   /// Notification Preferences (tenant-wide channel defaults — distinct from
   /// each user's own notificationPreferences on the User model).
-  emailNotificationsEnabled Boolean         @default(true) @map("email_notifications_enabled")
-  pushNotificationsEnabled  Boolean         @default(true) @map("push_notifications_enabled")
+  emailNotificationsEnabled    Boolean         @default(true) @map("email_notifications_enabled")
+  pushNotificationsEnabled     Boolean         @default(true) @map("push_notifications_enabled")
   /// SMS is configuration-only — no provider is wired up (matches the
   /// no-op Pusher / sandboxed-gateway pattern elsewhere): this just
   /// records intent + provider config for when a real SMS provider ships.
-  smsNotificationsEnabled   Boolean         @default(false) @map("sms_notifications_enabled")
-  smsProviderConfig         Json?           @map("sms_provider_config")
+  smsNotificationsEnabled      Boolean         @default(false) @map("sms_notifications_enabled")
+  smsProviderConfig            Json?           @map("sms_provider_config")
   /// Security policy (Prompt 42) — system role NAMES (e.g. `["OWNER","MANAGER"]`)
   /// that must have `User.mfaEnabled` before they can complete login. Checked
   /// against `RoleRepository#getRoleNamesForUser` at login time, not stored
   /// per-role, since system roles (OWNER/MANAGER/TRAINER/RECEPTIONIST) are
   /// immutable — a tenant-wide policy list here sidesteps needing to clone a
   /// system role just to flag it as MFA-required.
-  mfaRequiredRoles          Json            @default("[]") @map("mfa_required_roles")
+  mfaRequiredRoles             Json            @default("[]") @map("mfa_required_roles")
   /// Dashboard "get your gym set up" checklist — Owner/Manager can dismiss
   /// it permanently (also auto-hidden client-side once every item is
   /// complete, but an explicit dismiss should stick even if they never
   /// finish every item). Not part of `ResolvedTenant`/the tenant-resolve
   /// cache, so no `tenantService.invalidateCache` call is needed on write.
-  onboardingChecklistDismissed Boolean      @default(false) @map("onboarding_checklist_dismissed")
-  createdAt                 DateTime        @default(now()) @map("created_at")
-  updatedAt                 DateTime        @updatedAt @map("updated_at")
+  onboardingChecklistDismissed Boolean         @default(false) @map("onboarding_checklist_dismissed")
+  createdAt                    DateTime        @default(now()) @map("created_at")
+  updatedAt                    DateTime        @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -372,6 +373,7 @@ model User {
   groupClassesAsTrainer        GroupClass[]          @relation("GroupClassTrainer")
   classSessionsAsTrainer       ClassSession[]        @relation("ClassSessionTrainer")
   classBookingsMade            ClassBooking[]        @relation("ClassBookingBookedBy")
+  bodyMeasurementsRecorded     BodyMeasurement[]     @relation("BodyMeasurementRecordedBy")
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
@@ -805,21 +807,22 @@ model Member {
   updatedAt                DateTime     @updatedAt @map("updated_at")
   deletedAt                DateTime?    @map("deleted_at")
 
-  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch        Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  trainer       User?                @relation("MemberTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
-  memberships   Membership[]
-  freezes       MembershipFreeze[]
-  documents     MemberDocument[]
-  attendances   Attendance[]
-  workoutPlans  MemberWorkoutPlan[]
-  dietPlans     MemberDietPlan[]
-  invoices      MemberInvoice[]
-  payments      MemberPayment[]
-  credential    MemberCredential?
-  sessions      MemberSession[]
-  verifications MemberVerification[]
-  classBookings ClassBooking[]
+  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch           Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  trainer          User?                @relation("MemberTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+  memberships      Membership[]
+  freezes          MembershipFreeze[]
+  documents        MemberDocument[]
+  bodyMeasurements BodyMeasurement[]
+  attendances      Attendance[]
+  workoutPlans     MemberWorkoutPlan[]
+  dietPlans        MemberDietPlan[]
+  invoices         MemberInvoice[]
+  payments         MemberPayment[]
+  credential       MemberCredential?
+  sessions         MemberSession[]
+  verifications    MemberVerification[]
+  classBookings    ClassBooking[]
 
   @@unique([tenantId, memberId])
   @@index([tenantId, status])
@@ -986,6 +989,46 @@ model MemberDocument {
 
   @@index([tenantId, memberId])
   @@map("member_documents")
+}
+
+/// A trainer/owner-logged snapshot of a member's body measurements at a
+/// point in time — the historical trend log. Distinct from
+/// `Member.height`/`Member.weight` (a single current-value snapshot kept on
+/// the profile itself, unrelated to this table). Always staff-authored
+/// (Owner/Manager/Trainer); members can only ever read their own entries via
+/// the member-portal plane, same "no RBAC, self-scoped only" shape as
+/// `/portal/workout`/`/portal/diet`. Stored in canonical metric units
+/// (cm/kg) regardless of the tenant's display `measurementUnit` setting —
+/// unit conversion for IMPERIAL display, if ever added, is a frontend-only
+/// concern layered on top.
+model BodyMeasurement {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  memberId       String   @map("member_id") @db.Uuid
+  recordedAt     DateTime @default(now()) @map("recorded_at")
+  weightKg       Decimal? @map("weight_kg") @db.Decimal(5, 2)
+  heightCm       Decimal? @map("height_cm") @db.Decimal(5, 2)
+  bodyFatPercent Decimal? @map("body_fat_percent") @db.Decimal(4, 1)
+  chestCm        Decimal? @map("chest_cm") @db.Decimal(5, 2)
+  waistCm        Decimal? @map("waist_cm") @db.Decimal(5, 2)
+  hipsCm         Decimal? @map("hips_cm") @db.Decimal(5, 2)
+  bicepsCm       Decimal? @map("biceps_cm") @db.Decimal(5, 2)
+  thighsCm       Decimal? @map("thighs_cm") @db.Decimal(5, 2)
+  notes          String?
+  /// Staff user (Owner/Manager/Trainer) who recorded this entry; null if
+  /// that user is later removed (same nullable + SetNull shape as
+  /// `Attendance.checkedInBy`).
+  recordedBy     String?  @map("recorded_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member         Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  recordedByUser User?  @relation("BodyMeasurementRecordedBy", fields: [recordedBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, memberId])
+  @@index([tenantId, recordedAt])
+  @@map("body_measurements")
 }
 
 /// QR_CODE and MANUAL are the only methods wired up today; the device-based
@@ -2742,6 +2785,7 @@ model AdminUser {
   assignedTickets SupportTicket[]       @relation("TicketAssignee")
   ticketNotes     SupportTicketNote[]
   aiConversations AdminAiConversation[]
+  appReleases     AppRelease[]
 
   @@map("admin_users")
 }
@@ -2889,6 +2933,41 @@ model FeatureFlag {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("feature_flags")
+}
+
+enum AppReleasePlatform {
+  ANDROID
+
+  @@map("app_release_platform")
+}
+
+/// A super-admin-uploaded mobile app build, downloadable by any signed-in
+/// tenant user (staff or member) regardless of role — platform-level, not
+/// tenant-scoped, same precedent as `FeatureFlag`/`AdminUser` (no `tenantId`,
+/// no RLS). The APK file itself goes through the existing `core/storage/`
+/// funnel (S3 when configured, else local disk) — `fileKey` is whatever
+/// `uploadDataUrl`-adjacent large-file path returns, never a raw public URL
+/// (re-signed to a fresh presigned URL on every public download request,
+/// same "never persist a directly-usable URL" rule as member documents).
+/// Exactly one release per platform is ever `isActive` at a time — the
+/// "latest" a user downloads.
+model AppRelease {
+  id           String             @id @default(uuid()) @db.Uuid
+  platform     AppReleasePlatform @default(ANDROID)
+  version      String             @db.VarChar(40)
+  versionCode  Int                @map("version_code")
+  fileName     String             @map("file_name") @db.VarChar(200)
+  fileKey      String             @map("file_key")
+  fileSize     BigInt             @map("file_size")
+  releaseNotes String?            @map("release_notes")
+  isActive     Boolean            @default(false) @map("is_active")
+  uploadedBy   String?            @map("uploaded_by") @db.Uuid
+  createdAt    DateTime           @default(now()) @map("created_at")
+
+  uploader AdminUser? @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+
+  @@index([platform, isActive])
+  @@map("app_releases")
 }
 
 enum JobCategory {

@@ -6,10 +6,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../bloc/session/session_cubit.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/storage/secure_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/tenant_branding.dart';
 import '../../../repositories/auth_repository.dart';
+import '../../../repositories/public_tenant_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
@@ -81,6 +83,16 @@ class _StaffOtpScreenState extends State<StaffOtpScreen> {
         code: code,
         purpose: widget.args.purpose,
       );
+      if (!mounted) return;
+      // Find Gym no longer has a role toggle to remember this at — see its
+      // doc comment. Idempotent (just re-records the same gym+role) on the
+      // already-known-role path, so unconditional here is fine either way.
+      try {
+        await getIt<PublicTenantRepository>()
+            .rememberGymForRole(widget.args.tenant, ActorType.staff);
+      } catch (_) {
+        // Best-effort — a storage failure shouldn't block a login that already succeeded.
+      }
       if (!mounted) return;
       context
           .read<SessionCubit>()

@@ -46,6 +46,16 @@ class PublicTenantRepository {
 
   Future<List<RecentGym>> recentGyms() => _storage.readRecentGyms();
 
+  /// Called by [LoginScreen] right after a successful sign-in — Find Gym no
+  /// longer has a role toggle to pass `rememberAs` at resolve-time (see
+  /// that screen's doc comment), so the gym+role pair for the "send a
+  /// returning user straight to Login" memory (`SessionCubit`) is recorded
+  /// here instead, once the role is actually confirmed by a real login.
+  Future<void> rememberGymForRole(TenantBranding tenant, ActorType actorType) =>
+      _storage.rememberGym(
+        RecentGym(slug: tenant.slug, name: tenant.name, actorType: actorType),
+      );
+
   Future<void> forgetGym(String slug) => _storage.forgetGym(slug);
 
   /// `GET /public/tenants` — every gym a login attempt could actually

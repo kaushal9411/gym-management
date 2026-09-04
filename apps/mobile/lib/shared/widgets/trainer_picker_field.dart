@@ -1,7 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../bloc/session/session_cubit.dart';
+import '../../bloc/session/session_state.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/network/api_exception.dart';
 import '../../core/theme/app_colors.dart';
@@ -30,6 +33,14 @@ class TrainerOption {
 /// their DTO. No reusable picker existed anywhere in mobile before this;
 /// `StaffRepository.list(role: StaffRole.trainer, status: 'ACTIVE')` was
 /// already there server-side, just never surfaced as a form field.
+///
+/// When the signed-in user is themselves a Trainer, there's nothing to
+/// pick — a trainer creating/editing a plan or class is always the trainer
+/// on it (the parent form is responsible for actually setting
+/// `selectedTrainer` to that trainer; see each form's `_load`/`initState`).
+/// This field just reflects that as a read-only "assigned to you" row
+/// instead of the tappable picker, so Owner/Manager/Receptionist (who
+/// genuinely choose among trainers) are unaffected.
 class TrainerPickerField extends StatelessWidget {
   const TrainerPickerField({
     super.key,
@@ -62,6 +73,11 @@ class TrainerPickerField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final session = context.watch<SessionCubit>().state;
+    final isSelfTrainer = session is SessionAuthenticatedStaff &&
+        session.user.isTrainer &&
+        (selectedTrainer == null || selectedTrainer!.id == session.user.id);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -73,7 +89,7 @@ class TrainerPickerField extends StatelessWidget {
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(AppRadii.field),
-            onTap: () => _openPicker(context),
+            onTap: isSelfTrainer ? null : () => _openPicker(context),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
               decoration: BoxDecoration(
@@ -85,17 +101,25 @@ class TrainerPickerField extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      selectedTrainer?.name ?? 'No trainer assigned',
+                      isSelfTrainer
+                          ? 'Assigned to you'
+                          : selectedTrainer?.name ?? 'No trainer assigned',
                       style: AppText.body(
                         size: 15,
                         weight: FontWeight.w600,
-                        color: selectedTrainer == null
+                        color: selectedTrainer == null && !isSelfTrainer
                             ? AppColors.inkFaint
                             : AppColors.ink,
                       ),
                     ),
                   ),
-                  if (selectedTrainer != null)
+                  if (isSelfTrainer)
+                    const Icon(
+                      Icons.lock_outline_rounded,
+                      size: 16,
+                      color: AppColors.inkFaint,
+                    )
+                  else if (selectedTrainer != null)
                     GestureDetector(
                       onTap: () => onChanged(null),
                       child: const Icon(

@@ -1,3 +1,4 @@
+import type { BodyMeasurement } from '@/features/measurements/types';
 import { memberApiClient, toMemberAuthServiceError } from './member-api-client';
 
 interface Envelope<T> {
@@ -144,6 +145,16 @@ export const memberPortalService = {
   async logDiet(assignmentId: string, input: { date: string; waterIntakeMl?: number; weightKg?: number; mealsStatus?: Record<string, string>; notes?: string }): Promise<MemberPortalDiet> {
     try {
       const res = await memberApiClient.post<Envelope<MemberPortalDiet>>(`/portal/diet/${assignmentId}/log`, input);
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  /** Own body measurement history, newest first — reuses the staff-side `BodyMeasurement` DTO shape (identical, nothing needs hiding for the member it belongs to). */
+  async getMeasurements(): Promise<BodyMeasurement[]> {
+    try {
+      const res = await memberApiClient.get<Envelope<BodyMeasurement[]>>('/portal/measurements');
       return res.data.data;
     } catch (error) {
       throw toMemberAuthServiceError(error);

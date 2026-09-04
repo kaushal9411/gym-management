@@ -21,6 +21,7 @@ import { MemberStatusBadge } from '@/features/members/components/member-status-b
 import { toMemberError, useBulkImportMembers, useBulkMemberAction, useMemberList, useMemberStatusAction } from '@/features/members/hooks/use-members';
 import { memberService } from '@/features/members/services/member.service';
 import type { ListMembersParams, MemberBulkImportRow, MemberListItem, MemberStatus } from '@/features/members/types';
+import { useStaffList } from '@/features/staff/hooks/use-staff';
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
@@ -62,7 +63,9 @@ export default function MembersListPage() {
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
   const [status, setStatus] = React.useState<MemberStatus | ''>('');
+  const [trainerId, setTrainerId] = React.useState('');
   const [page, setPage] = React.useState(1);
+  const trainers = useStaffList({ role: 'TRAINER', status: 'ACTIVE', limit: 100 });
   const [sortBy, setSortBy] = React.useState<SortableColumn>('createdAt');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
@@ -78,6 +81,7 @@ export default function MembersListPage() {
     search: debouncedSearch || undefined,
     status: status || undefined,
     branchId: currentBranchId ?? undefined,
+    trainerId: trainerId || undefined,
     includeDeleted: true,
     sortBy,
     sortDir,
@@ -369,6 +373,22 @@ export default function MembersListPage() {
           <option value="ACTIVE">Active</option>
           <option value="INACTIVE">Inactive</option>
           <option value="FROZEN">Frozen</option>
+        </select>
+        <select
+          className={selectClassName}
+          value={trainerId}
+          onChange={(e) => {
+            setTrainerId(e.target.value);
+            setPage(1);
+          }}
+          aria-label="Filter by trainer"
+        >
+          <option value="">All trainers</option>
+          {(trainers.data?.items ?? []).map((trainer) => (
+            <option key={trainer.id} value={trainer.id}>
+              {trainer.name}
+            </option>
+          ))}
         </select>
       </div>
 

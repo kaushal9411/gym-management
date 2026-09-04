@@ -8,6 +8,7 @@ export const MEMBER_PORTAL_ROUTES = {
   attendance: '/portal/attendance',
   workout: '/portal/workout',
   diet: '/portal/diet',
+  measurements: '/portal/measurements',
   invoices: '/portal/invoices',
   classes: '/portal/classes',
   profile: '/portal/profile',

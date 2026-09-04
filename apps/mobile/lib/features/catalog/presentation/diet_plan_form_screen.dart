@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../bloc/session/session_cubit.dart';
+import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
@@ -63,7 +66,19 @@ class _DietPlanCatalogFormScreenState extends State<DietPlanCatalogFormScreen> {
   @override
   void initState() {
     super.initState();
+    _trainer = _selfTrainerOption();
     if (widget.planId != null) _load();
+  }
+
+  /// A Trainer creating/editing a plan is always the trainer on it — no
+  /// picker needed (see `TrainerPickerField`'s doc comment). Returns null
+  /// for every other role, leaving their picker exactly as before.
+  TrainerOption? _selfTrainerOption() {
+    final session = context.read<SessionCubit>().state;
+    if (session is SessionAuthenticatedStaff && session.user.isTrainer) {
+      return TrainerOption(id: session.user.id, name: session.user.name);
+    }
+    return null;
   }
 
   Future<void> _load() async {
@@ -83,7 +98,7 @@ class _DietPlanCatalogFormScreenState extends State<DietPlanCatalogFormScreen> {
         _isActive = plan.isActive;
         final trainer = plan.trainer;
         _trainer = trainer == null
-            ? null
+            ? _selfTrainerOption()
             : TrainerOption(id: trainer.id, name: trainer.name);
       });
     } on ApiException catch (e) {

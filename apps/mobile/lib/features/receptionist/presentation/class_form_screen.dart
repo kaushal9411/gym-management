@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../bloc/session/session_cubit.dart';
+import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
@@ -66,6 +69,17 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
     _loadBranches();
   }
 
+  /// A Trainer creating/editing a class is always the trainer on it — no
+  /// picker needed (see `TrainerPickerField`'s doc comment). Returns null
+  /// for every other role, leaving their picker exactly as before.
+  TrainerOption? _selfTrainerOption() {
+    final session = context.read<SessionCubit>().state;
+    if (session is SessionAuthenticatedStaff && session.user.isTrainer) {
+      return TrainerOption(id: session.user.id, name: session.user.name);
+    }
+    return null;
+  }
+
   Future<void> _loadBranches() async {
     try {
       final options = await getIt<BranchRepository>().assignable();
@@ -88,11 +102,12 @@ class _ClassFormScreenState extends State<ClassFormScreen> {
               (options.isEmpty ? null : options.first.id);
           final trainer = existing.trainer;
           _trainer = trainer == null
-              ? null
+              ? _selfTrainerOption()
               : TrainerOption(id: trainer.id, name: trainer.name);
           _isActive = existing.isActive;
         } else {
           _branchId = options.isNotEmpty ? options.first.id : null;
+          _trainer = _selfTrainerOption();
         }
         _loadingBranches = false;
       });

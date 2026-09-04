@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
-import '../../../core/storage/secure_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -13,18 +12,23 @@ import '../../../models/tenant_summary.dart';
 import '../../../repositories/public_tenant_repository.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/brand_mark.dart';
-import '../../../shared/widgets/role_toggle.dart';
 import 'login_screen.dart';
 
-/// Design frame "2. Find your gym" (staff copy) / member section frame "2"
-/// (member copy) — merged into one screen with a [RoleToggle] so the same
-/// entry surface serves both flows.
+/// Design frame "2. Find your gym" — one entry surface for both staff and
+/// members, a real dropdown of every active gym (`GET /public/tenants`);
+/// the user picks, never types a gym name to submit. The search field only
+/// filters the already-loaded list client-side; it never itself resolves
+/// arbitrary text as a slug.
 ///
-/// User-requested change from the original typed-slug form: this now shows
-/// a real dropdown of every active gym (`GET /public/tenants`) — the user
-/// picks, never types a gym name to submit. The search field only filters
-/// the already-loaded list client-side; it never itself resolves arbitrary
-/// text as a slug.
+/// User-requested change: this used to also ask staff-vs-member up front
+/// via a [RoleToggle] before showing the gym list. That's gone — which
+/// plane a login is on isn't decided here anymore; [LoginScreen] detects it
+/// from what's actually typed (an email vs. a Member ID), same "one
+/// credentials field, no separate screens" precedent as the web app's own
+/// unified `/login`. `rememberAs` used to be passed to [resolve] from this
+/// screen's toggle; since the role isn't known yet at gym-pick time now,
+/// that's deferred to [LoginScreen] recording it after a real login
+/// actually succeeds (`PublicTenantRepository.rememberGymForRole`).
 class FindGymScreen extends StatefulWidget {
   const FindGymScreen({super.key});
 
@@ -34,7 +38,6 @@ class FindGymScreen extends StatefulWidget {
 
 class _FindGymScreenState extends State<FindGymScreen> {
   final _searchController = TextEditingController();
-  AppRole _role = AppRole.staff;
   String? _resolvingSlug;
   String? _error;
   List<TenantSummary>? _gyms;
@@ -84,15 +87,14 @@ class _FindGymScreenState extends State<FindGymScreen> {
       _error = null;
     });
     try {
+      // No `rememberAs` — the role isn't known until a real login succeeds
+      // (see this file's doc comment / `LoginScreen`).
       final TenantBranding tenant =
-          await getIt<PublicTenantRepository>().resolve(
-        gym.slug,
-        rememberAs: _role == AppRole.staff ? ActorType.staff : ActorType.member,
-      );
+          await getIt<PublicTenantRepository>().resolve(gym.slug);
       if (!mounted) return;
       context.push(
         AppRoutes.login,
-        extra: LoginScreenArgs(role: _role, tenant: tenant),
+        extra: LoginScreenArgs(role: null, tenant: tenant),
       );
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -104,7 +106,6 @@ class _FindGymScreenState extends State<FindGymScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isStaff = _role == AppRole.staff;
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
@@ -112,22 +113,16 @@ class _FindGymScreenState extends State<FindGymScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
             children: [
-              RoleToggle(
-                value: _role,
-                onChanged: (r) => setState(() {
-                  _role = r;
-                  _error = null;
-                }),
-              ),
-              const SizedBox(height: 20),
-              BrandMark.glyph(role: _role, size: 52),
+              const SizedBox(height: 8),
+              // Neutral — no role is known yet at this point (see this
+              // file's doc comment), same default `BrandMark.initials`
+              // already uses when its own `role` is omitted.
+              const BrandMark.glyph(role: AppRole.staff, size: 52),
               const SizedBox(height: 12),
               Text('Find your gym', style: AppText.display(size: 24)),
               const SizedBox(height: 6),
               Text(
-                isStaff
-                    ? 'Select your gym to continue as staff'
-                    : 'Select your gym to sign in as a member',
+                'Select your gym to continue',
                 style: AppText.body(color: AppColors.inkSoft),
                 textAlign: TextAlign.center,
               ),
@@ -196,7 +191,6 @@ class _FindGymScreenState extends State<FindGymScreen> {
           padding: const EdgeInsets.only(bottom: 8),
           child: _GymTile(
             gym: gym,
-            role: _role,
             busy: _resolvingSlug == gym.slug,
             disabled: _resolvingSlug != null && _resolvingSlug != gym.slug,
             onTap: () => _select(gym),
@@ -210,14 +204,12 @@ class _FindGymScreenState extends State<FindGymScreen> {
 class _GymTile extends StatelessWidget {
   const _GymTile({
     required this.gym,
-    required this.role,
     required this.busy,
     required this.disabled,
     required this.onTap,
   });
 
   final TenantSummary gym;
-  final AppRole role;
   final bool busy;
   final bool disabled;
   final VoidCallback onTap;
@@ -243,8 +235,10 @@ class _GymTile extends StatelessWidget {
                 Container(
                   width: 34,
                   height: 34,
-                  decoration: BoxDecoration(
-                    gradient: role.gradient,
+                  decoration: const BoxDecoration(
+                    // Neutral — role isn't known until a real login
+                    // succeeds, see this file's top doc comment.
+                    gradient: AppColors.staffGrad,
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,

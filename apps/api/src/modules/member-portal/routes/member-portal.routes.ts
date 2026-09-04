@@ -50,6 +50,8 @@ memberPortalRouter.post(
   asyncHandler(memberPortalController.logDiet.bind(memberPortalController)),
 );
 
+memberPortalRouter.get('/measurements', asyncHandler(memberPortalController.measurements.bind(memberPortalController)));
+
 memberPortalRouter.get('/invoices', validate({ query: memberPortalPaginationSchema }), asyncHandler(memberPortalController.invoices.bind(memberPortalController)));
 memberPortalRouter.get(
   '/invoices/:id/download',

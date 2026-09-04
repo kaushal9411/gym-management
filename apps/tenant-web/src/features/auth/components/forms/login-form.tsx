@@ -17,11 +17,13 @@ import { MEMBER_PORTAL_ROUTES } from '@/features/member-portal/constants';
 import { useMemberAuth, useMemberLogin } from '@/features/member-portal/hooks/use-member-auth';
 import { FindGymForm } from '@/features/tenant/components/find-gym-form';
 import { TenantLogo } from '@/features/tenant/components/tenant-logo';
+import { buildPlatformLoginUrl } from '@/features/tenant/subdomain-urls';
 import { useTenant } from '@/features/tenant/tenant-provider';
 import { useAppSelector } from '@/store/hooks';
 import { AUTH_ROUTES, POST_LOGIN_REDIRECT } from '../../constants';
 import { useLogin, toAuthError } from '../../hooks/use-auth';
 import { unifiedLoginSchema, type UnifiedLoginFormValues } from '../../schemas';
+import { looksLikeEmail } from '../../utils/identifier';
 import { getRememberedEmail, setRememberedEmail } from '../../utils/remember-me';
 import { FormAlert } from '../form-alert';
 import { IconField } from '../icon-field';
@@ -49,11 +51,6 @@ const itemVariants = {
 /** Dark-glass field chrome shared by every input on this page — overrides the theme-reactive base tokens with fixed dark values, since this page commits to one dramatic neon-dark look regardless of the app's light/dark toggle. */
 const DARK_FIELD_CLASS =
   'h-12 border-white/10 bg-white/4 text-white placeholder:text-white/35 focus-visible:border-orange-400/50 focus-visible:ring-orange-400/20';
-
-/** A staff email always contains "@"; a Member ID (e.g. "MEM-0007") never does — the one signal needed to route a shared identifier field to the right of two cryptographically distinct auth planes. */
-function looksLikeEmail(identifier: string): boolean {
-  return identifier.includes('@');
-}
 
 export function LoginForm() {
   const router = useRouter();
@@ -144,6 +141,15 @@ export function LoginForm() {
   const identifierValue = form.watch('identifier');
   const passwordValue = form.watch('password');
 
+  // Can't clear the remembered pick directly — it lives in the bare host's
+  // localStorage, a different origin from this tenant subdomain page, and
+  // localStorage has no cross-origin equivalent of a cookie's `Domain`
+  // attribute. `?changeGym=1` signals the bare host's FindGymForm to forget
+  // it and show the picker instead of auto-redirecting straight back here.
+  function handleChangeGym() {
+    window.location.href = `${buildPlatformLoginUrl()}?changeGym=1`;
+  }
+
   function spawnRipple(e: React.MouseEvent<HTMLButtonElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
     const id = rippleId.current++;
@@ -209,6 +215,15 @@ export function LoginForm() {
                   </p>
                   {!isPlatform ? <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">Gym Portal</p> : null}
                 </div>
+                {!isPlatform ? (
+                  <button
+                    type="button"
+                    onClick={handleChangeGym}
+                    className="text-xs font-medium text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 rounded-sm"
+                  >
+                    Change gym
+                  </button>
+                ) : null}
               </div>
 
               <div className="mb-6 space-y-1 text-center">
@@ -217,7 +232,7 @@ export function LoginForm() {
                 </h1>
                 <p className="text-sm text-white/50">
                   {isPlatform
-                    ? "Enter your gym's FitCloud subdomain to continue."
+                    ? 'Select your gym to continue.'
                     : 'Sign in to keep your gym running at full pace.'}
                 </p>
               </div>
@@ -265,7 +280,7 @@ export function LoginForm() {
                           Password
                         </Label>
                         <Link
-                          href={identifierValue && !looksLikeEmail(identifierValue) ? MEMBER_PORTAL_ROUTES.forgotPassword : AUTH_ROUTES.forgotPassword}
+                          href={AUTH_ROUTES.forgotPassword}
                           className="text-xs font-medium text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 rounded-sm"
                         >
                           Forgot password?

@@ -10,11 +10,81 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/menu_entry.dart';
 import '../../../shared/widgets/user_avatar.dart';
 
-/// Section order mirrors web's `NAV_ITEMS` macro order (Finance before
-/// Insights-equivalent "My work" before Communication before
-/// Administration) — same `Support`/`Notifications` split into
-/// Communication/Administration as Owner's and Manager's menus.
+/// Section order mirrors web's `NAV_ITEMS` macro order (People/Programs/
+/// Finance/"My work" before Communication before Administration) — same
+/// `Support`/`Notifications` split into Communication/Administration as
+/// Owner's and Manager's menus.
+///
+/// Every tile a Receptionist's real permission grants allow on web is now
+/// wired here too (Branches/Memberships/Attendance/Attendance History/
+/// Workout Plans/Diet Plans/Income/Expenses/Announcements) — this used to
+/// be a much shorter list (only Invoices/Reports), which meant mobile
+/// silently hid access the RBAC permission system actually granted, purely
+/// because no tile existed yet. Fixed by reusing the exact same
+/// routes/screens Owner's `MenuScreen` already wires up (permission-gated,
+/// not role-locked, per this codebase's established reuse convention) —
+/// explicit user request to bring mobile to full parity with web's
+/// permission-driven access for every staff role, not a design frame.
 const _sections = <String, List<MenuEntry>>{
+  'People': [
+    MenuEntry(
+      icon: Icons.storefront_outlined,
+      title: 'Branches',
+      subtitle: 'Locations & capacity',
+      route: AppRoutes.branches,
+      permissions: ['branches:view'],
+      featureFlag: 'branches',
+    ),
+  ],
+  'Programs': [
+    MenuEntry(
+      icon: Icons.card_membership_outlined,
+      title: 'Membership Plans',
+      subtitle: "The gym's plan catalog",
+      route: AppRoutes.membershipPlans,
+      permissions: ['memberships:manage'],
+      featureFlag: 'membership_plans',
+    ),
+    MenuEntry(
+      icon: Icons.fact_check_outlined,
+      title: 'Attendance',
+      subtitle: "Who's checked in today",
+      route: AppRoutes.attendance,
+      permissions: ['attendance:view'],
+      featureFlag: 'attendance',
+    ),
+    MenuEntry(
+      icon: Icons.history_rounded,
+      title: 'Attendance History',
+      subtitle: 'Every visit, filterable',
+      route: AppRoutes.attendanceHistory,
+      permissions: ['attendance:view'],
+      featureFlag: 'attendance',
+    ),
+    MenuEntry(
+      icon: Icons.fitness_center_outlined,
+      title: 'Workout Plans',
+      subtitle: 'Trainer catalog',
+      route: AppRoutes.workoutPlans,
+      permissions: ['workouts:view'],
+      featureFlag: 'workout_plans',
+    ),
+    MenuEntry(
+      icon: Icons.restaurant_outlined,
+      title: 'Diet Plans',
+      subtitle: 'Trainer catalog',
+      route: AppRoutes.dietPlans,
+      permissions: ['diets:view'],
+      featureFlag: 'diet_plans',
+    ),
+    MenuEntry(
+      icon: Icons.straighten_outlined,
+      title: 'Body Measurements',
+      subtitle: 'Member history log',
+      route: AppRoutes.measuredMembers,
+      permissions: ['measurements:view'],
+    ),
+  ],
   'Finance': [
     MenuEntry(
       icon: Icons.receipt_long_outlined,
@@ -23,6 +93,22 @@ const _sections = <String, List<MenuEntry>>{
       route: AppRoutes.invoices,
       permissions: ['finance:view'],
       featureFlag: 'payments',
+    ),
+    MenuEntry(
+      icon: Icons.payments_outlined,
+      title: 'Income',
+      subtitle: 'This month',
+      route: AppRoutes.income,
+      permissions: ['finance:view'],
+      featureFlag: 'income',
+    ),
+    MenuEntry(
+      icon: Icons.receipt_long_outlined,
+      title: 'Expenses',
+      subtitle: 'This month',
+      route: AppRoutes.expenses,
+      permissions: ['finance:view'],
+      featureFlag: 'expenses',
     ),
   ],
   'My work': [
@@ -41,6 +127,14 @@ const _sections = <String, List<MenuEntry>>{
       title: 'Notifications',
       subtitle: 'Unread alerts',
       route: AppRoutes.notifications,
+    ),
+    MenuEntry(
+      icon: Icons.campaign_outlined,
+      title: 'Announcements',
+      subtitle: 'Published & drafts',
+      route: AppRoutes.announcements,
+      permissions: ['announcements:view'],
+      featureFlag: 'notifications',
     ),
   ],
   'Administration': [

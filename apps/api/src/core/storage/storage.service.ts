@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { createReadStream } from 'node:fs';
+import { mkdir, rename, stat, unlink } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -8,7 +11,7 @@ import { ValidationError } from '../errors/app-error';
 import { logger } from '../logging/logger';
 
 import { categoryOf, sniffFileType, type FileCategory } from './file-signature.util';
-import { localFileUrl, saveLocalFile } from './local-storage.util';
+import { LOCAL_UPLOADS_DIR, localFileUrl, saveLocalFile } from './local-storage.util';
 import { getS3Client } from './s3-client';
 
 const DATA_URL_RE = /^data:([a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+);base64,(.+)$/s;
@@ -103,6 +106,54 @@ export async function uploadDataUrl(
   );
 
   return opts.visibility === 'public' ? `${env.storage.publicUrlBase}/${key}` : key;
+}
+
+/**
+ * The large-binary counterpart to `uploadDataUrl` — for files too big to
+ * reasonably pass through a base64 JSON body (APK installers, currently the
+ * only caller: `modules/admin-app-releases/`). The caller must have already
+ * written the upload to a temp path on disk (`multer.diskStorage`, never
+ * `memoryStorage` — this function exists specifically so a 100MB+ file is
+ * never fully buffered in process memory at any point) and passes that path
+ * in; this function either streams it to S3 (`fs.createReadStream`, so the
+ * body is never buffered here either) or renames it into place on local
+ * disk (instant — no copy), then always removes the temp file. Always
+ * `public` visibility — an installable app binary has no member-privacy
+ * concern the way documents/receipts do, so a stable direct URL is fine.
+ */
+export async function uploadLargeFile(
+  tempFilePath: string,
+  opts: { keyPrefix: string; fileName: string; contentType: string },
+): Promise<string> {
+  const key = `public/${opts.keyPrefix}/${randomUUID()}-${opts.fileName}`;
+
+  if (!env.storage.isConfigured) {
+    if (!warnedOnce) {
+      logger.warn('AWS S3 is not configured (S3_BUCKET/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY) — uploads are being stored on local disk instead.');
+      warnedOnce = true;
+    }
+    const destPath = join(LOCAL_UPLOADS_DIR, key);
+    await mkdir(dirname(destPath), { recursive: true });
+    await rename(tempFilePath, destPath);
+    return localFileUrl(key);
+  }
+
+  const stats = await stat(tempFilePath);
+  try {
+    await getS3Client().send(
+      new PutObjectCommand({
+        Bucket: env.storage.bucket,
+        Key: key,
+        Body: createReadStream(tempFilePath),
+        ContentType: opts.contentType,
+        ContentLength: stats.size,
+      }),
+    );
+  } finally {
+    await unlink(tempFilePath).catch(() => undefined);
+  }
+
+  return `${env.storage.publicUrlBase}/${key}`;
 }
 
 /** For `private`-visibility objects — turns the stored bare key into a short-lived, authenticated-read-only URL. Call this fresh on every response; never persist the result. */

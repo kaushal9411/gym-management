@@ -3,9 +3,10 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CalendarCheck, CalendarRange, Dumbbell, LayoutDashboard, LogOut, Receipt, Salad, UserRound } from 'lucide-react';
+import { CalendarCheck, CalendarRange, Dumbbell, LayoutDashboard, LogOut, Receipt, Ruler, Salad, UserRound } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { DownloadAppButton } from '@/features/app-download/download-app-button';
 import { cn } from '@/lib/utils';
 import { useMemberAuth, useMemberLogout } from '../hooks/use-member-auth';
 import { MEMBER_PORTAL_ROUTES } from '../constants';
@@ -15,6 +16,7 @@ const TABS = [
   { href: MEMBER_PORTAL_ROUTES.attendance, label: 'Attendance', icon: CalendarCheck },
   { href: MEMBER_PORTAL_ROUTES.workout, label: 'Workout', icon: Dumbbell },
   { href: MEMBER_PORTAL_ROUTES.diet, label: 'Diet', icon: Salad },
+  { href: MEMBER_PORTAL_ROUTES.measurements, label: 'Measurements', icon: Ruler },
   { href: MEMBER_PORTAL_ROUTES.classes, label: 'Classes', icon: CalendarRange },
   { href: MEMBER_PORTAL_ROUTES.invoices, label: 'Invoices', icon: Receipt },
   { href: MEMBER_PORTAL_ROUTES.profile, label: 'Profile', icon: UserRound },
@@ -39,9 +41,12 @@ export function MemberPortalShell({ children }: { children: React.ReactNode }) {
             <p className="text-sm font-semibold">{member?.name}</p>
             <p className="text-xs text-muted-foreground">{member?.memberId}</p>
           </div>
-          <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => logout.mutate()} disabled={logout.isPending}>
-            <LogOut className="size-4" /> Log out
-          </Button>
+          <div className="flex items-center gap-1">
+            <DownloadAppButton />
+            <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => logout.mutate()} disabled={logout.isPending}>
+              <LogOut className="size-4" /> Log out
+            </Button>
+          </div>
         </div>
         <nav className="mx-auto flex max-w-4xl gap-1 overflow-x-auto px-4 pb-2">
           {TABS.map((tab) => {
