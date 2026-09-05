@@ -19,26 +19,38 @@ import {
   type DowngradeMembershipInput,
   type ExtendMembershipInput,
   type FreezeMembershipInput,
+  type GuestVisitDto,
   type ListMembersQuery,
+  type LogGuestVisitInput,
+  type LogPtSessionInput,
   type MemberBulkImportResult,
   type MemberBulkImportRow,
   type MemberDetailDto,
   type MemberDocumentDto,
   type MemberListItemDto,
+  type PlanUsageDto,
+  type PtSessionLogDto,
   type RenewMembershipInput,
   type TransferBranchInput,
   type UpdateMemberInput,
   type UpgradeMembershipInput,
   type UploadDocumentInput,
 } from '../dto/member.dto';
+import { GuestVisitRepository } from '../repositories/guest-visit.repository';
 import { MemberDocumentRepository } from '../repositories/member-document.repository';
 import { MemberRepository, type MemberRow } from '../repositories/member.repository';
 import { MembershipPlanRepository, type MembershipPlanRow } from '../repositories/membership-plan.repository';
 import { MembershipRepository } from '../repositories/membership.repository';
-import { addDuration } from '../utils/duration.util';
+import { PtSessionLogRepository } from '../repositories/pt-session-log.repository';
+import { addDuration, isWithinGracePeriod } from '../utils/duration.util';
 
 function toListItem(member: MemberRow): MemberListItemDto {
-  const activeMembership = member.memberships.find((m) => m.status === 'ACTIVE');
+  // Falls back to a PENDING (future-dated) membership when there's no ACTIVE
+  // one, so staff still see what's coming up rather than a blank "no plan"
+  // — the two are mutually exclusive per member (assignMembership blocks a
+  // second assignment while either is outstanding).
+  const activeMembership =
+    member.memberships.find((m) => m.status === 'ACTIVE') ?? member.memberships.find((m) => m.status === 'PENDING');
   return {
     id: member.id,
     memberId: member.memberId,
@@ -69,13 +81,16 @@ function toListItem(member: MemberRow): MemberListItemDto {
   };
 }
 
-function toDetail(member: MemberRow): MemberDetailDto {
+function toDetail(member: MemberRow, planUsage: PlanUsageDto | null): MemberDetailDto {
   const listItem = toListItem(member);
   const activeMembership = member.memberships.find((m) => m.status === 'ACTIVE');
   const canCheckIn =
-    member.status === 'ACTIVE' && !!activeMembership && new Date(activeMembership.endDate) >= new Date();
+    member.status === 'ACTIVE' &&
+    !!activeMembership &&
+    isWithinGracePeriod(new Date(activeMembership.endDate), activeMembership.plan.gracePeriodDays);
   return {
     ...listItem,
+    planUsage,
     dateOfBirth: member.dateOfBirth?.toISOString() ?? null,
     bloodGroup: member.bloodGroup,
     height: member.height?.toString() ?? null,
@@ -130,6 +145,8 @@ export class MemberService {
   private readonly membershipPlans: MembershipPlanRepository;
   private readonly memberships: MembershipRepository;
   private readonly documents: MemberDocumentRepository;
+  private readonly guestVisits: GuestVisitRepository;
+  private readonly ptSessionLogs: PtSessionLogRepository;
   private readonly auditLog: AuditLogRepository;
 
   constructor(private readonly tenantId: string) {
@@ -138,6 +155,8 @@ export class MemberService {
     this.membershipPlans = new MembershipPlanRepository(this.db);
     this.memberships = new MembershipRepository(this.db);
     this.documents = new MemberDocumentRepository(this.db);
+    this.guestVisits = new GuestVisitRepository(this.db);
+    this.ptSessionLogs = new PtSessionLogRepository(this.db);
     this.auditLog = new AuditLogRepository(this.db);
   }
 
@@ -154,7 +173,8 @@ export class MemberService {
   }
 
   async getById(id: string, actorUserId: string): Promise<MemberDetailDto> {
-    return toDetail(await this.mustFind(id, actorUserId));
+    const member = await this.mustFind(id, actorUserId);
+    return toDetail(member, await this.buildPlanUsage(member));
   }
 
   /**
@@ -168,7 +188,7 @@ export class MemberService {
   async getOwnProfile(id: string): Promise<MemberDetailDto> {
     const member = await this.members.findDetail(this.tenantId, id);
     if (!member) throw new NotFoundError('Member not found.');
-    return toDetail(member);
+    return toDetail(member, await this.buildPlanUsage(member));
   }
 
   async create(input: CreateMemberInput, actor: IamActor): Promise<MemberDetailDto> {
@@ -224,7 +244,7 @@ export class MemberService {
       memberCode: member.memberId,
       memberEmail: member.email,
     });
-    return toDetail(member);
+    return toDetail(member, null); // fresh member — no membership assigned yet, nothing to measure usage against
   }
 
   async update(id: string, input: UpdateMemberInput, actor: IamActor): Promise<MemberDetailDto> {
@@ -285,6 +305,22 @@ export class MemberService {
     const member = await this.mustFind(id, actor.userId);
     if (member.status === 'FROZEN') throw new ConflictError(ErrorCode.CONFLICT, 'This member is already frozen.');
     const activeMembership = member.memberships.find((m) => m.status === 'ACTIVE');
+    if (activeMembership) {
+      const plan = activeMembership.plan;
+      if (!plan.freezeAllowed) {
+        throw new AppError(ErrorCode.VALIDATION_ERROR, `Plan "${plan.name}" does not allow freezing.`, 422);
+      }
+      if (plan.freezeDaysLimit !== null) {
+        const usedDays = await this.memberships.sumFreezeDays(this.tenantId, activeMembership.id);
+        if (usedDays >= plan.freezeDaysLimit) {
+          throw new AppError(
+            ErrorCode.VALIDATION_ERROR,
+            `This membership has already used its full freeze allowance (${plan.freezeDaysLimit} day(s)) for this period.`,
+            422,
+          );
+        }
+      }
+    }
     await this.memberships.createFreeze({
       tenantId: this.tenantId,
       memberId: id,
@@ -322,11 +358,13 @@ export class MemberService {
 
   async assignMembership(id: string, input: AssignMembershipInput, actor: IamActor): Promise<MemberDetailDto> {
     const member = await this.mustFind(id, actor.userId);
-    const existingActive = member.memberships.find((m) => m.status === 'ACTIVE');
+    const existingActive = member.memberships.find((m) => m.status === 'ACTIVE' || m.status === 'PENDING');
     if (existingActive) {
       throw new ConflictError(
         ErrorCode.CONFLICT,
-        'This member already has an active membership — use Renew or Upgrade instead.',
+        existingActive.status === 'PENDING'
+          ? 'This member already has a membership starting soon — cancel it first if you want to assign a different plan.'
+          : 'This member already has an active membership — use Renew or Upgrade instead.',
       );
     }
     const plan = await this.mustFindPlan(input.planId);
@@ -335,8 +373,17 @@ export class MemberService {
       throw new AppError(ErrorCode.VALIDATION_ERROR, `Plan "${plan.name}" does not allow auto-renewal.`, 422);
     }
 
-    const startDate = input.startDate ? new Date(input.startDate) : new Date();
+    // India-common flow: a member signs up and pays today but tells the
+    // owner to start on a specific future date (e.g. after their old gym's
+    // plan runs out). A future startDate is stored as PENDING rather than
+    // ACTIVE — canCheckIn (below) and every other "current membership"
+    // lookup already gate on ACTIVE, so a PENDING membership grants no
+    // check-in access until `pendingMembershipActivation` (scheduler) flips
+    // it once startDate arrives.
+    const now = new Date();
+    const startDate = input.startDate ? new Date(input.startDate) : now;
     const endDate = addDuration(startDate, plan.durationValue, plan.durationType);
+    const status = startDate > now ? 'PENDING' : 'ACTIVE';
     await this.memberships.create({
       tenantId: this.tenantId,
       memberId: id,
@@ -345,7 +392,7 @@ export class MemberService {
       endDate,
       durationDays: daysBetween(startDate, endDate),
       priceAtAssignment: plan.price,
-      status: 'ACTIVE',
+      status,
       autoRenew: input.autoRenew ?? false,
     });
     await this.audit(actor, 'member.membership_assigned', id);
@@ -353,6 +400,7 @@ export class MemberService {
       memberName: `${member.firstName} ${member.lastName}`.trim(),
       planName: plan.name,
       endDate: endDate.toISOString().slice(0, 10),
+      startDate: status === 'PENDING' ? startDate.toISOString().slice(0, 10) : undefined,
     });
     return this.getById(id, actor.userId);
   }
@@ -492,6 +540,86 @@ export class MemberService {
     await this.members.update(id, { qrCodeToken, qrCodeImageUrl });
     await this.audit(actor, 'member.qr_code_regenerated', id);
     return { qrCodeToken, qrCodeImageUrl };
+  }
+
+  /** Backs `MembershipPlan.guestPasses` — rejects once the member's current membership period has used its full allowance. */
+  async logGuestVisit(id: string, input: LogGuestVisitInput, actor: IamActor): Promise<GuestVisitDto> {
+    const member = await this.mustFind(id, actor.userId);
+    const activeMembership = member.memberships.find((m) => m.status === 'ACTIVE');
+    if (!activeMembership) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has no active membership to log a guest visit against.', 422);
+    }
+    const quota = activeMembership.plan.guestPasses;
+    if (quota > 0) {
+      const used = await this.guestVisits.countForMembership(this.tenantId, activeMembership.id);
+      if (used >= quota) {
+        throw new AppError(
+          ErrorCode.VALIDATION_ERROR,
+          `This member has used all ${quota} guest pass(es) included in their plan for this period.`,
+          422,
+        );
+      }
+    }
+    const visit = await this.guestVisits.create({
+      tenantId: this.tenantId,
+      memberId: id,
+      membershipId: activeMembership.id,
+      guestName: input.guestName,
+    });
+    await this.audit(actor, 'member.guest_visit_logged', id);
+    return { id: visit.id, guestName: visit.guestName, visitedAt: visit.visitedAt.toISOString() };
+  }
+
+  async listGuestVisits(id: string, actorUserId: string): Promise<GuestVisitDto[]> {
+    await this.mustFind(id, actorUserId);
+    const rows = await this.guestVisits.listByMember(this.tenantId, id);
+    return rows.map((v) => ({ id: v.id, guestName: v.guestName, visitedAt: v.visitedAt.toISOString() }));
+  }
+
+  /** Backs `MembershipPlan.ptSessionsIncluded` — same quota pattern as `logGuestVisit` above. */
+  async logPtSession(id: string, input: LogPtSessionInput, actor: IamActor): Promise<PtSessionLogDto> {
+    const member = await this.mustFind(id, actor.userId);
+    const activeMembership = member.memberships.find((m) => m.status === 'ACTIVE');
+    if (!activeMembership) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has no active membership to log a PT session against.', 422);
+    }
+    const quota = activeMembership.plan.ptSessionsIncluded;
+    if (quota > 0) {
+      const used = await this.ptSessionLogs.countForMembership(this.tenantId, activeMembership.id);
+      if (used >= quota) {
+        throw new AppError(
+          ErrorCode.VALIDATION_ERROR,
+          `This member has used all ${quota} PT session(s) included in their plan for this period.`,
+          422,
+        );
+      }
+    }
+    if (input.trainerId) await this.assertTrainerValid(input.trainerId);
+    const log = await this.ptSessionLogs.create({
+      tenantId: this.tenantId,
+      memberId: id,
+      membershipId: activeMembership.id,
+      trainerId: input.trainerId,
+      notes: input.notes,
+    });
+    await this.audit(actor, 'member.pt_session_logged', id);
+    return {
+      id: log.id,
+      trainer: log.trainer ? { id: log.trainer.id, name: log.trainer.name } : null,
+      sessionDate: log.sessionDate.toISOString(),
+      notes: log.notes,
+    };
+  }
+
+  async listPtSessions(id: string, actorUserId: string): Promise<PtSessionLogDto[]> {
+    await this.mustFind(id, actorUserId);
+    const rows = await this.ptSessionLogs.listByMember(this.tenantId, id);
+    return rows.map((log) => ({
+      id: log.id,
+      trainer: log.trainer ? { id: log.trainer.id, name: log.trainer.name } : null,
+      sessionDate: log.sessionDate.toISOString(),
+      notes: log.notes,
+    }));
   }
 
   async listDocuments(id: string, actorUserId: string): Promise<MemberDocumentDto[]> {
@@ -682,6 +810,48 @@ export class MemberService {
   private async resolveBranchRestriction(actorUserId: string): Promise<string[] | undefined> {
     const access = await getBranchAccess(this.tenantId, actorUserId);
     return access.allBranches ? undefined : access.branchIds;
+  }
+
+  /**
+   * `null` when there's no active membership — nothing to measure usage
+   * against. `0`/`null` quotas are read as "not configured on this plan,"
+   * same convention as every enforcement check above (see `PlanUsageDto`'s
+   * doc comment) — the frontend decides whether to show/hide each row.
+   */
+  private async buildPlanUsage(member: MemberRow): Promise<PlanUsageDto | null> {
+    const activeMembership = member.memberships.find((m) => m.status === 'ACTIVE');
+    if (!activeMembership) return null;
+    const plan = activeMembership.plan;
+    const [guestPassesUsed, ptSessionsUsed, freezeDaysUsed] = await Promise.all([
+      this.guestVisits.countForMembership(this.tenantId, activeMembership.id),
+      this.ptSessionLogs.countForMembership(this.tenantId, activeMembership.id),
+      plan.freezeDaysLimit !== null ? this.memberships.sumFreezeDays(this.tenantId, activeMembership.id) : Promise.resolve(0),
+    ]);
+    // Inlined rather than importing classes' ClassBookingRepository —
+    // module boundaries stay one-way (classes may reach into members, not
+    // the other way round); this mirrors ClassBookingService#book's own
+    // identical query (see BACKEND-GUIDE.md).
+    const groupClassesUsed =
+      plan.groupClassesIncluded > 0
+        ? await this.db.classBooking.count({
+            where: {
+              tenantId: this.tenantId,
+              memberId: member.id,
+              status: { not: 'CANCELLED' },
+              classSession: { sessionDate: { gte: activeMembership.startDate, lte: activeMembership.endDate } },
+            },
+          })
+        : 0;
+    return {
+      guestPassesUsed,
+      guestPassesIncluded: plan.guestPasses,
+      ptSessionsUsed,
+      ptSessionsIncluded: plan.ptSessionsIncluded,
+      groupClassesUsed,
+      groupClassesIncluded: plan.groupClassesIncluded,
+      freezeDaysUsed,
+      freezeDaysLimit: plan.freezeDaysLimit,
+    };
   }
 
   private async mustFindPlan(planId: string) {

@@ -14,6 +14,8 @@ import {
   extendMembershipSchema,
   freezeMembershipSchema,
   listMembersQuerySchema,
+  logGuestVisitSchema,
+  logPtSessionSchema,
   memberBulkImportSchema,
   memberDocumentParamSchema,
   memberParamSchema,
@@ -266,6 +268,64 @@ memberRouter.post(
   requirePermission('members:update'),
   validate({ params: memberParamSchema }),
   asyncHandler(memberController.sendPortalInvite.bind(memberController)),
+);
+
+/**
+ * @openapi
+ * /members/{id}/guest-visits:
+ *   get:
+ *     tags: [Members]
+ *     summary: List a member's logged guest visits (backs MembershipPlan.guestPasses)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Guest visits }
+ *   post:
+ *     tags: [Members]
+ *     summary: Log a guest visit against the member's current membership period — rejected once their plan's guestPasses quota is used up
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       201: { description: Guest visit logged }
+ */
+memberRouter.get(
+  '/:id/guest-visits',
+  requirePermission('members:view'),
+  validate({ params: memberParamSchema }),
+  asyncHandler(memberController.listGuestVisits.bind(memberController)),
+);
+memberRouter.post(
+  '/:id/guest-visits',
+  requirePermission('members:update'),
+  validate({ params: memberParamSchema, body: logGuestVisitSchema }),
+  asyncHandler(memberController.logGuestVisit.bind(memberController)),
+);
+
+/**
+ * @openapi
+ * /members/{id}/pt-sessions:
+ *   get:
+ *     tags: [Members]
+ *     summary: List a member's logged PT sessions (backs MembershipPlan.ptSessionsIncluded)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: PT sessions }
+ *   post:
+ *     tags: [Members]
+ *     summary: Log a PT session against the member's current membership period — rejected once their plan's ptSessionsIncluded quota is used up
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       201: { description: PT session logged }
+ */
+memberRouter.get(
+  '/:id/pt-sessions',
+  requirePermission('members:view'),
+  validate({ params: memberParamSchema }),
+  asyncHandler(memberController.listPtSessions.bind(memberController)),
+);
+memberRouter.post(
+  '/:id/pt-sessions',
+  requirePermission('members:update'),
+  validate({ params: memberParamSchema, body: logPtSessionSchema }),
+  asyncHandler(memberController.logPtSession.bind(memberController)),
 );
 
 /**

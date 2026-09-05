@@ -18,6 +18,7 @@ import { RevenueTrendChart } from '@/features/finance/components/revenue-trend-c
 import { useFinanceDashboard, usePaymentList } from '@/features/finance/hooks/use-finance';
 import { financeService } from '@/features/finance/services/finance.service';
 import type { ListPaymentsParams, MemberPaymentListItem, MemberPaymentMethod, MemberPaymentStatus } from '@/features/finance/types';
+import { useCurrencySymbol } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
@@ -31,6 +32,7 @@ export default function PaymentsPage() {
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('finance:payment-create');
   const { currentBranchId } = useCurrentBranch();
+  const currencySymbol = useCurrencySymbol();
 
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -94,7 +96,7 @@ export default function PaymentsPage() {
       ),
     },
     { key: 'method', header: 'Method', render: (p) => <PaymentMethodBadge method={p.method} /> },
-    { key: 'finalAmount', header: sortableHeader('Amount', 'finalAmount'), render: (p) => `$${p.finalAmount}` },
+    { key: 'finalAmount', header: sortableHeader('Amount', 'finalAmount'), render: (p) => `${currencySymbol}${p.finalAmount}` },
     { key: 'paymentDate', header: sortableHeader('Date', 'paymentDate'), render: (p) => new Date(p.paymentDate).toLocaleDateString() },
     { key: 'status', header: 'Status', render: (p) => <PaymentStatusBadge status={p.status} /> },
   ];

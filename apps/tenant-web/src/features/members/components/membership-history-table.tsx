@@ -1,13 +1,15 @@
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
+import { useCurrencySymbol } from '@/lib/currency';
 import { MembershipStatusBadge } from './member-status-badge';
 import type { MembershipFreezeEntry, MembershipHistoryEntry } from '../types';
 
 export function MembershipHistoryTable({ entries }: { entries: MembershipHistoryEntry[] }) {
+  const currencySymbol = useCurrencySymbol();
   const columns: DataTableColumn<MembershipHistoryEntry>[] = [
     { key: 'plan', header: 'Plan', render: (entry) => entry.planName },
     { key: 'start', header: 'Start', render: (entry) => new Date(entry.startDate).toLocaleDateString() },
     { key: 'end', header: 'End', render: (entry) => new Date(entry.endDate).toLocaleDateString() },
-    { key: 'price', header: 'Price', render: (entry) => `$${entry.priceAtAssignment}` },
+    { key: 'price', header: 'Price', render: (entry) => `${currencySymbol}${entry.priceAtAssignment}` },
     { key: 'status', header: 'Status', render: (entry) => <MembershipStatusBadge status={entry.status} /> },
     { key: 'autoRenew', header: 'Auto-renew', render: (entry) => (entry.autoRenew ? 'Yes' : 'No') },
   ];

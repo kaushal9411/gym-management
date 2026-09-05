@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/network/auth_event_bus.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/app_currency.dart';
 import '../../models/member_profile.dart';
 import '../../models/tenant_branding.dart';
 import '../../models/user_profile.dart';
@@ -51,6 +52,7 @@ class SessionCubit extends Cubit<SessionState> {
             emit(
               SessionAuthenticatedStaff(await userFuture, await tenantFuture),
             );
+            unawaited(AppCurrency.refresh());
             return;
           case ActorType.member:
             final member = await _memberAuthRepository.restoreCachedProfile();
@@ -107,10 +109,15 @@ class SessionCubit extends Cubit<SessionState> {
   /// is left untouched until the user actually resolves a new gym
   /// (`PublicTenantRepository.resolve` overwrites it then); backing out
   /// without picking one keeps the old gym remembered for next launch.
-  void startGymChange() => emit(const SessionUnauthenticated());
+  void startGymChange() {
+    AppCurrency.reset();
+    emit(const SessionUnauthenticated());
+  }
 
-  void staffSignedIn(UserProfile user, TenantBranding tenant) =>
-      emit(SessionAuthenticatedStaff(user, tenant));
+  void staffSignedIn(UserProfile user, TenantBranding tenant) {
+    emit(SessionAuthenticatedStaff(user, tenant));
+    unawaited(AppCurrency.refresh());
+  }
 
   /// Re-fetches `/auth/me` and re-emits — used after a self-profile edit
   /// (e.g. name change) so the header avatar/greeting shown app-wide stays
@@ -132,6 +139,7 @@ class SessionCubit extends Cubit<SessionState> {
     } else if (current is SessionAuthenticatedMember) {
       await _memberAuthRepository.logout();
     }
+    AppCurrency.reset();
     emit(await _unauthenticatedWithMemory());
   }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useAssignablePlans } from '../hooks/use-members';
+import { useCurrencySymbol } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
@@ -17,12 +18,13 @@ interface MembershipPlanSelectProps {
 
 export function MembershipPlanSelect({ id, value, onChange, disabled }: MembershipPlanSelectProps) {
   const plans = useAssignablePlans();
+  const currencySymbol = useCurrencySymbol();
   return (
     <select id={id} className={selectClassName} value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
       <option value="">Select a plan…</option>
       {(plans.data ?? []).map((plan) => (
         <option key={plan.id} value={plan.id}>
-          {plan.name} ({plan.durationDays}d · ${plan.price})
+          {plan.name} ({plan.durationDays}d · {currencySymbol}{plan.price})
         </option>
       ))}
     </select>

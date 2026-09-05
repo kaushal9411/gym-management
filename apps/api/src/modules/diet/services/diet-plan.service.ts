@@ -272,8 +272,18 @@ export class DietPlanService {
     const plan = await this.mustFind(planId);
     if (!plan.isActive) throw new ConflictError(ErrorCode.CONFLICT, 'This diet plan is inactive and cannot be assigned.');
 
-    const member = await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null } });
+    const member = await this.db.member.findFirst({
+      where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null },
+      include: { memberships: { where: { status: 'ACTIVE' }, include: { plan: { select: { dietConsultationIncluded: true } } } } },
+    });
     if (!member) throw new NotFoundError('Member not found.');
+    // Only gated when the member actually has an active plan that says so —
+    // a member between membership periods (none active right now) is left
+    // alone, same as this endpoint's pre-existing behavior for that case.
+    const activeMembership = member.memberships[0];
+    if (activeMembership && !activeMembership.plan.dietConsultationIncluded) {
+      throw new ConflictError(ErrorCode.CONFLICT, "This member's plan does not include diet consultation.");
+    }
 
     const startDate = new Date(input.startDate);
     if (Number.isNaN(startDate.getTime())) throw new ValidationError('Invalid start date.');

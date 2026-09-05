@@ -15,6 +15,7 @@ import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { InvoiceStatusBadge } from '@/features/finance/components/finance-badges';
 import { useInvoiceList } from '@/features/finance/hooks/use-finance';
 import type { ListInvoicesParams, MemberInvoiceListItem, MemberInvoiceStatus } from '@/features/finance/types';
+import { useCurrencySymbol } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
@@ -28,6 +29,7 @@ export default function InvoicesPage() {
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('finance:payment-create');
   const { currentBranchId } = useCurrentBranch();
+  const currencySymbol = useCurrencySymbol();
 
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -88,7 +90,7 @@ export default function InvoicesPage() {
     },
     { key: 'invoiceDate', header: sortableHeader('Invoice date', 'invoiceDate'), render: (inv) => new Date(inv.invoiceDate).toLocaleDateString() },
     { key: 'dueDate', header: sortableHeader('Due date', 'dueDate'), render: (inv) => new Date(inv.dueDate).toLocaleDateString() },
-    { key: 'totalAmount', header: sortableHeader('Total', 'totalAmount'), render: (inv) => `$${inv.totalAmount}` },
+    { key: 'totalAmount', header: sortableHeader('Total', 'totalAmount'), render: (inv) => `${currencySymbol}${inv.totalAmount}` },
     { key: 'status', header: 'Status', render: (inv) => <InvoiceStatusBadge status={inv.status} /> },
   ];
 

@@ -258,6 +258,8 @@ model Tenant {
   groupClassSchedules   GroupClassSchedule[]
   classSessions         ClassSession[]
   classBookings         ClassBooking[]
+  guestVisits           GuestVisit[]
+  ptSessionLogs         PtSessionLog[]
 
   @@map("tenants")
 }
@@ -392,6 +394,7 @@ model User {
   classSessionsAsTrainer       ClassSession[]        @relation("ClassSessionTrainer")
   classBookingsMade            ClassBooking[]        @relation("ClassBookingBookedBy")
   bodyMeasurementsRecorded     BodyMeasurement[]     @relation("BodyMeasurementRecordedBy")
+  ptSessionsAsTrainer          PtSessionLog[]        @relation("PtSessionTrainer")
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
@@ -670,6 +673,8 @@ enum MemberStatus {
 }
 
 enum MembershipStatus {
+  /// Assigned with a future `startDate` — not yet in effect, doesn't grant check-in.
+  PENDING
   ACTIVE
   EXPIRED
   CANCELLED
@@ -841,6 +846,8 @@ model Member {
   sessions         MemberSession[]
   verifications    MemberVerification[]
   classBookings    ClassBooking[]
+  guestVisits      GuestVisit[]
+  ptSessionLogs    PtSessionLog[]
 
   @@unique([tenantId, memberId])
   @@index([tenantId, status])
@@ -961,15 +968,66 @@ model Membership {
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
 
-  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  member   Member             @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  plan     MembershipPlan     @relation(fields: [planId], references: [id], onDelete: Restrict)
-  freezes  MembershipFreeze[]
-  payments MemberPayment[]
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member        Member             @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  plan          MembershipPlan     @relation(fields: [planId], references: [id], onDelete: Restrict)
+  freezes       MembershipFreeze[]
+  payments      MemberPayment[]
+  guestVisits   GuestVisit[]
+  ptSessionLogs PtSessionLog[]
 
   @@index([tenantId, memberId])
   @@index([tenantId, status])
   @@map("memberships")
+}
+
+/// Guest-pass tracking (`MembershipPlan.guestPasses` quota) — one row per
+/// guest a member brings in, logged against their current membership
+/// period. Quota resets naturally: a new `Membership` row (renewal/upgrade)
+/// means a fresh `membershipId` to count against.
+model GuestVisit {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  memberId     String   @map("member_id") @db.Uuid
+  membershipId String   @map("membership_id") @db.Uuid
+  guestName    String?  @map("guest_name") @db.VarChar(120)
+  visitedAt    DateTime @default(now()) @map("visited_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member     Member     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, memberId])
+  @@index([tenantId, membershipId])
+  @@map("guest_visits")
+}
+
+/// PT-session consumption tracking (`MembershipPlan.ptSessionsIncluded`
+/// quota) — one row per personal-training session logged against a
+/// member's current membership period. Same quota-reset-via-new-
+/// membershipId reasoning as `GuestVisit` above.
+model PtSessionLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  memberId     String   @map("member_id") @db.Uuid
+  membershipId String   @map("membership_id") @db.Uuid
+  /// Which trainer conducted the session — optional (a session can be
+  /// logged before a specific trainer is on file, or by a non-trainer
+  /// front-desk staffer on a trainer's behalf).
+  trainerId    String?  @map("trainer_id") @db.Uuid
+  sessionDate  DateTime @default(now()) @map("session_date")
+  notes        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member     Member     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  trainer    User?      @relation("PtSessionTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, memberId])
+  @@index([tenantId, membershipId])
+  @@map("pt_session_logs")
 }
 
 /// Freeze History — `unfrozenAt = null` means still frozen.

@@ -16,7 +16,27 @@ const MEMBER_INCLUDE = {
   trainer: { select: { id: true, name: true } },
   memberships: {
     orderBy: { createdAt: 'desc' },
-    include: { plan: { select: { id: true, name: true } } },
+    // Selected fields beyond id/name back plan-based enforcement (freeze
+    // gating, grace-period check-in, branch access, guest-pass/PT-session/
+    // class quotas) that reads a member's active membership's plan —
+    // AttendanceService, MemberService#freeze, and the new guest-visit/
+    // pt-session/class-booking quota checks all rely on this same include.
+    include: {
+      plan: {
+        select: {
+          id: true,
+          name: true,
+          gracePeriodDays: true,
+          freezeAllowed: true,
+          freezeDaysLimit: true,
+          gymAccessAllBranches: true,
+          accessBranchIds: true,
+          guestPasses: true,
+          ptSessionsIncluded: true,
+          groupClassesIncluded: true,
+        },
+      },
+    },
   },
   freezes: { orderBy: { frozenAt: 'desc' } },
 } satisfies Prisma.MemberInclude;

@@ -36,7 +36,7 @@ There is **no codegen** (no freezed/json_serializable/build_runner) and no `l10n
 
 ## State rules (strict)
 
-- **`SessionCubit` is the only app-wide state.** Everything else is screen-scoped. There is no Redux-equivalent global store and no cross-screen cache.
+- **`SessionCubit` is the only app-wide *state* (rebuild-triggering).** Everything else is screen-scoped. There is no Redux-equivalent global store and no cross-screen cache — the one exception is `core/utils/app_currency.dart`'s `AppCurrency`, a static (not `ChangeNotifier`/Cubit) `{symbol, code}` read cache refreshed once per staff session and reset on sign-out (Prompt 79), deliberately plain statics rather than a new Cubit since nothing needs to rebuild when it changes — screens just read it fresh next time they format a number.
 - **Server state lives in the screen that shows it.** Two accepted shapes, in order of preference:
   1. **`PaginatedListCubit<T>`** (`bloc/common/`) for anything backed by a `PaginatedResult` — construct it with a `(page) => repo.list(page: page, …)` closure, `..load()` it, and render with a `switch` over `PaginatedListLoading / PaginatedListError / PaginatedListLoaded`. ~15 screens use this; copy the nearest one.
   2. **Plain `StatefulWidget` fields** (`X? _data; bool _loading; String? _error;`) for detail screens, forms, and non-paginated GETs. Also the norm for anything with local edit state (steppers, toggles, pickers).

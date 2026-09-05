@@ -13,10 +13,12 @@ import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { InvoiceStatusBadge, PaymentStatusBadge } from '@/features/finance/components/finance-badges';
 import { toFinanceError, useEmailInvoice, useInvoice } from '@/features/finance/hooks/use-finance';
 import { financeService } from '@/features/finance/services/finance.service';
+import { useCurrencySymbol } from '@/lib/currency';
 
 export default function InvoiceDetailPage() {
   const params = useParams<{ invoiceId: string }>();
   const { hasPermission } = usePermissions();
+  const currencySymbol = useCurrencySymbol();
   const invoiceId = params.invoiceId;
 
   const invoice = useInvoice(invoiceId);
@@ -135,18 +137,18 @@ export default function InvoiceDetailPage() {
                 <tr key={item.id} className="border-b last:border-0">
                   <td className="py-1.5">{item.description}</td>
                   <td className="py-1.5 text-right">{item.quantity}</td>
-                  <td className="py-1.5 text-right">${item.unitPrice}</td>
-                  <td className="py-1.5 text-right">${item.amount}</td>
+                  <td className="py-1.5 text-right">{currencySymbol}{item.unitPrice}</td>
+                  <td className="py-1.5 text-right">{currencySymbol}{item.amount}</td>
                 </tr>
               ))}
             </tbody>
           </table>
 
           <div className="flex flex-col items-end gap-1 text-sm">
-            <p>Subtotal: ${data.subtotal}</p>
-            <p>Tax: ${data.taxAmount}</p>
-            <p>Discount: -${data.discountAmount}</p>
-            <p className="text-base font-semibold">Total: ${data.totalAmount}</p>
+            <p>Subtotal: {currencySymbol}{data.subtotal}</p>
+            <p>Tax: {currencySymbol}{data.taxAmount}</p>
+            <p>Discount: -{currencySymbol}{data.discountAmount}</p>
+            <p className="text-base font-semibold">Total: {currencySymbol}{data.totalAmount}</p>
           </div>
 
           {data.notes ? (
@@ -167,7 +169,7 @@ export default function InvoiceDetailPage() {
             {data.payments.map((p) => (
               <Link key={p.id} href={`/payments/${p.id}`} className="flex items-center justify-between border-b pb-2 text-sm last:border-0 last:pb-0 hover:underline">
                 <span>
-                  {p.paymentNumber} — ${p.finalAmount}
+                  {p.paymentNumber} — {currencySymbol}{p.finalAmount}
                   <span className="block text-xs text-muted-foreground">{new Date(p.paymentDate).toLocaleDateString()}</span>
                 </span>
                 <PaymentStatusBadge status={p.status} />

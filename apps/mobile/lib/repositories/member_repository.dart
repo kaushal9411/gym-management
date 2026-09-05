@@ -97,11 +97,47 @@ class MemberRepository {
     }
   }
 
-  Future<void> assignMembership(String memberId, String planId) async {
+  Future<void> assignMembership(
+    String memberId,
+    String planId, {
+    DateTime? startDate,
+  }) async {
     try {
       await _dio.put<void>(
         '/members/$memberId/membership',
-        data: {'planId': planId},
+        data: {
+          'planId': planId,
+          if (startDate != null)
+            'startDate': startDate.toIso8601String().substring(0, 10),
+        },
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Backs `MembershipPlan.guestPasses` — server rejects once the current
+  /// membership period's allowance is used up.
+  Future<void> logGuestVisit(String memberId, {String? guestName}) async {
+    try {
+      await _dio.post<void>(
+        '/members/$memberId/guest-visits',
+        data: {if (guestName != null && guestName.isNotEmpty) 'guestName': guestName},
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Backs `MembershipPlan.ptSessionsIncluded` — same quota pattern as `logGuestVisit`.
+  Future<void> logPtSession(String memberId, {String? trainerId, String? notes}) async {
+    try {
+      await _dio.post<void>(
+        '/members/$memberId/pt-sessions',
+        data: {
+          if (trainerId != null) 'trainerId': trainerId,
+          if (notes != null && notes.isNotEmpty) 'notes': notes,
+        },
       );
     } on DioException catch (e) {
       throw _mapError(e);

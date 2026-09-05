@@ -1,11 +1,8 @@
 import { CreditCard, Receipt, TrendingDown, TrendingUp } from 'lucide-react';
 
 import { StatisticCard } from '@/components/ui/statistic-card';
+import { useCurrencySymbol } from '@/lib/currency';
 import type { FinanceDashboard } from '../types';
-
-function money(amount: string | number): string {
-  return `$${Number(amount).toFixed(2)}`;
-}
 
 interface FinanceSummaryCardsProps {
   summary: FinanceDashboard | undefined;
@@ -13,6 +10,8 @@ interface FinanceSummaryCardsProps {
 }
 
 export function FinanceSummaryCards({ summary, loading }: FinanceSummaryCardsProps) {
+  const currencySymbol = useCurrencySymbol();
+  const money = (amount: string | number) => `${currencySymbol}${Number(amount).toFixed(2)}`;
   const cards = [
     { label: "Today's income", value: summary ? money(summary.todayIncome) : undefined, icon: CreditCard, tone: 'primary', sub: undefined },
     { label: 'Monthly income', value: summary ? money(summary.monthlyIncome) : undefined, icon: TrendingUp, tone: 'success', sub: undefined },

@@ -1,38 +1,49 @@
+import 'app_currency.dart';
+
 /// Small, dependency-free formatters — kept here instead of pulling in
 /// `intl` for a handful of one-line cases.
 class Formatters {
   Formatters._();
 
-  /// `₹4.1L`/`₹85,000`/`₹1,20,000` — Indian lakh grouping, matching the
-  /// design's currency displays (`kaushalgym` seed data uses INR).
+  /// `₹4.1L`/`₹85,000`/`₹1,20,000` (Indian lakh grouping) when the signed-in
+  /// gym's currency is actually INR (`AppCurrency.code`, the common case —
+  /// see its own doc comment); otherwise the real symbol with standard
+  /// thousands-grouping (`$120,000`), since lakh-grouping is meaningless
+  /// outside INR.
   static String currency(double amount) {
     final isNegative = amount < 0;
     final abs = amount.abs();
-    String body;
-    if (abs >= 100000) {
-      body = '${(abs / 100000).toStringAsFixed(abs >= 1000000 ? 1 : 2)}L';
-    } else {
-      body = _groupIndian(abs.round());
-    }
-    return '${isNegative ? '-' : ''}₹$body';
+    final symbol = AppCurrency.symbol;
+    final body = AppCurrency.code == 'INR'
+        ? (abs >= 100000
+            ? '${(abs / 100000).toStringAsFixed(abs >= 1000000 ? 1 : 2)}L'
+            : _groupIndian(abs.round()))
+        : _groupWestern(abs.round());
+    return '${isNegative ? '-' : ''}$symbol$body';
   }
 
-  /// `₹13k`/`₹5.2k`/`₹4.1L` — compact form for space-constrained tiles
-  /// (KPI cards), where the full grouped-digit form (`currency` above)
-  /// wraps to a second line once the value is more than ~4 digits.
+  /// `₹13k`/`₹5.2k`/`₹4.1L` (INR) or `$13k`/`$5.2k`/`$4.1M` (other
+  /// currencies) — compact form for space-constrained tiles (KPI cards),
+  /// where the full grouped-digit form (`currency` above) wraps to a
+  /// second line once the value is more than ~4 digits.
   static String currencyCompact(double amount) {
     final isNegative = amount < 0;
     final abs = amount.abs();
+    final symbol = AppCurrency.symbol;
+    final isInr = AppCurrency.code == 'INR';
     String body;
-    if (abs >= 100000) {
+    if (isInr && abs >= 100000) {
       body = '${(abs / 100000).toStringAsFixed(abs >= 1000000 ? 1 : 2)}L';
+    } else if (!isInr && abs >= 1000000) {
+      final m = abs / 1000000;
+      body = '${m.toStringAsFixed(m >= 10 ? 0 : 1)}M';
     } else if (abs >= 1000) {
       final k = abs / 1000;
       body = '${k.toStringAsFixed(k >= 10 ? 0 : 1)}k';
     } else {
       body = abs.round().toString();
     }
-    return '${isNegative ? '-' : ''}₹$body';
+    return '${isNegative ? '-' : ''}$symbol$body';
   }
 
   static String _groupIndian(int value) {
@@ -45,6 +56,16 @@ class Formatters {
       (m) => '${m[1]},',
     );
     return '$grouped,$last3';
+  }
+
+  /// Standard thousands-grouping (`120,000`), used for every non-INR
+  /// currency — Indian lakh-grouping (`_groupIndian`) doesn't apply.
+  static String _groupWestern(int value) {
+    final s = value.toString();
+    return s.replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (m) => '${m[1]},',
+    );
   }
 
   /// "14 min ago" / "2 hr ago" / "3d ago" — relative time, coarse enough for

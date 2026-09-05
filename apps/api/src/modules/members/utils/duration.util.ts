@@ -17,3 +17,15 @@ export function approximateDurationDays(value: number, type: DurationType): numb
   if (type === 'MONTHS') return value * 30;
   return value * 365;
 }
+
+/**
+ * `MembershipPlan.gracePeriodDays` — a membership past its `endDate` still
+ * counts as usable (check-in eligible, not yet flipped to EXPIRED) until
+ * `endDate + gracePeriodDays` passes. Shared by `AttendanceService`'s
+ * check-in eligibility, `MemberService#toDetail`'s `canCheckIn`, and the
+ * `auto-membership-status-update` scheduler job, so all three agree on
+ * exactly when a membership is "really" expired.
+ */
+export function isWithinGracePeriod(endDate: Date, gracePeriodDays: number, now = new Date()): boolean {
+  return addDuration(endDate, gracePeriodDays, 'DAYS') >= now;
+}

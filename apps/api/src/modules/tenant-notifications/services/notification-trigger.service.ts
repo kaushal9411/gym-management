@@ -82,13 +82,14 @@ export async function notifyNewMemberRegistration(
 }
 
 /** No matching named template (only "Membership Renewal"/"Membership Expiry" are in the 10-template list) — a plain in-app notice. */
-export async function notifyMembershipAssigned(tenantId: string, params: { memberName: string; planName: string; endDate: string }): Promise<void> {
-  await tenantNotificationService.notifyTenant(
-    tenantId,
-    'MEMBERSHIP',
-    'Membership assigned',
-    `${params.memberName} was assigned the ${params.planName} plan, valid through ${params.endDate}.`,
-  );
+export async function notifyMembershipAssigned(
+  tenantId: string,
+  params: { memberName: string; planName: string; endDate: string; startDate?: string },
+): Promise<void> {
+  const message = params.startDate
+    ? `${params.memberName} was assigned the ${params.planName} plan, starting ${params.startDate} and valid through ${params.endDate}.`
+    : `${params.memberName} was assigned the ${params.planName} plan, valid through ${params.endDate}.`;
+  await tenantNotificationService.notifyTenant(tenantId, 'MEMBERSHIP', 'Membership assigned', message);
 }
 
 export async function notifyMembershipRenewed(

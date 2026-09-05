@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/branch_option.dart';
 import '../../../models/membership_plan.dart';
@@ -43,6 +44,7 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
   List<StaffMember> _trainers = [];
   String? _branchId;
   String? _planId;
+  DateTime _planStartDate = DateTime.now();
   String? _trainerId;
   bool _loading = false;
   bool _loadingOptions = true;
@@ -83,6 +85,21 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
     }
   }
 
+  /// India-common flow: the member pays/joins today but tells the owner to
+  /// start on a later date (e.g. once their old gym's plan runs out). A
+  /// future date here makes the backend store the membership `PENDING`
+  /// instead of `ACTIVE` — no check-in access until that date arrives.
+  Future<void> _pickPlanStartDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      firstDate: DateTime.now().subtract(const Duration(days: 30)),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: _planStartDate,
+    );
+    if (picked == null) return;
+    setState(() => _planStartDate = picked);
+  }
+
   @override
   void dispose() {
     _firstNameController.dispose();
@@ -121,7 +138,11 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
         fitnessGoals: _fitnessGoalsController.text.trim(),
       );
       if (_planId != null) {
-        await getIt<MemberRepository>().assignMembership(member.id, _planId!);
+        await getIt<MemberRepository>().assignMembership(
+          member.id,
+          _planId!,
+          startDate: _planStartDate,
+        );
       }
       if (!mounted) return;
       context.pop();
@@ -255,6 +276,42 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
                             ),
                         ],
                       ),
+                      if (_planId != null) ...[
+                        const SizedBox(height: 10),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(AppRadii.field),
+                            onTap: _pickPlanStartDate,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface3,
+                                borderRadius: BorderRadius.circular(AppRadii.field),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.calendar_today_rounded,
+                                    size: 15,
+                                    color: AppColors.inkFaint,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Starts ${_planStartDate.day.toString().padLeft(2, '0')}/'
+                                    '${_planStartDate.month.toString().padLeft(2, '0')}/'
+                                    '${_planStartDate.year}',
+                                    style: AppText.body(size: 13, weight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                     const SizedBox(height: 24),
                     AppButton(

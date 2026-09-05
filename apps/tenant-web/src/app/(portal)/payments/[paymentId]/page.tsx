@@ -16,10 +16,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { PaymentMethodBadge, PaymentStatusBadge } from '@/features/finance/components/finance-badges';
 import { toFinanceError, useCancelPayment, usePayment, useRefundPayment, useVerifyPaymentStatus } from '@/features/finance/hooks/use-finance';
+import { useCurrencySymbol } from '@/lib/currency';
 
 export default function PaymentDetailPage() {
   const params = useParams<{ paymentId: string }>();
   const { hasPermission } = usePermissions();
+  const currencySymbol = useCurrencySymbol();
   const paymentId = params.paymentId;
 
   const payment = usePayment(paymentId);
@@ -126,17 +128,17 @@ export default function PaymentDetailPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <p className="text-muted-foreground">Amount</p>
-              <p className="font-medium">${data.amount}</p>
+              <p className="font-medium">{currencySymbol}{data.amount}</p>
             </div>
             <div>
               <p className="text-muted-foreground">Discount / Tax</p>
               <p className="font-medium">
-                -${data.discount} / +${data.tax}
+                -{currencySymbol}{data.discount} / +{currencySymbol}{data.tax}
               </p>
             </div>
             <div>
               <p className="text-muted-foreground">Final amount</p>
-              <p className="font-medium">${data.finalAmount}</p>
+              <p className="font-medium">{currencySymbol}{data.finalAmount}</p>
             </div>
             <div>
               <p className="text-muted-foreground">Method</p>
@@ -189,14 +191,14 @@ export default function PaymentDetailPage() {
             {data.refunds.map((r) => (
               <div key={r.id} className="flex items-center justify-between border-b pb-2 text-sm last:border-0 last:pb-0">
                 <span>
-                  ${r.amount} {r.reason ? `— ${r.reason}` : ''}
+                  {currencySymbol}{r.amount} {r.reason ? `— ${r.reason}` : ''}
                   <span className="block text-xs text-muted-foreground">
                     {new Date(r.refundedAt).toLocaleString()} {r.refundedBy ? `by ${r.refundedBy.name}` : ''}
                   </span>
                 </span>
               </div>
             ))}
-            <p className="text-sm font-medium">Total refunded: ${data.totalRefunded}</p>
+            <p className="text-sm font-medium">Total refunded: {currencySymbol}{data.totalRefunded}</p>
           </CardContent>
         </Card>
       ) : null}
@@ -207,7 +209,7 @@ export default function PaymentDetailPage() {
             <DialogTitle>Refund payment</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleRefund} className="space-y-4">
-            <p className="text-sm text-muted-foreground">Remaining refundable balance: ${remaining.toFixed(2)}</p>
+            <p className="text-sm text-muted-foreground">Remaining refundable balance: {currencySymbol}{remaining.toFixed(2)}</p>
             <div className="space-y-2">
               <Label htmlFor="refundAmount">Refund amount (leave blank for full remaining balance)</Label>
               <Input

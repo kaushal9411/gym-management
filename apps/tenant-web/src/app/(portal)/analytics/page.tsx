@@ -32,6 +32,7 @@ import {
   useRetention,
   useRevenueTrends,
 } from '@/features/reports/hooks/use-reports';
+import { useCurrencySymbol } from '@/lib/currency';
 
 const AXIS_TICK = { fill: 'var(--muted-foreground)', fontSize: 12 };
 const TOOLTIP_STYLE = {
@@ -67,6 +68,7 @@ function defaultFilters(branchId: string): ReportFilterValue {
 export default function AnalyticsDashboardPage() {
   const { hasPermission } = usePermissions();
   const { currentBranchId } = useCurrentBranch();
+  const currencySymbol = useCurrencySymbol();
   const [filters, setFilters] = React.useState<ReportFilterValue>(() => defaultFilters(currentBranchId ?? ''));
 
   // Defaults from, and stays in sync with, the header's branch switcher —
@@ -268,7 +270,7 @@ export default function AnalyticsDashboardPage() {
           className="lg:col-span-2"
         >
           <PieChart>
-            <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => `$${value.toFixed(2)}`} />
+            <Tooltip {...TOOLTIP_STYLE} formatter={(value: number) => `${currencySymbol}${value.toFixed(2)}`} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Pie
               data={branchPieData}

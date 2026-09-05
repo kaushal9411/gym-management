@@ -15,6 +15,7 @@ import { MemberCheckinSearch } from '@/features/attendance/components/member-che
 import type { MemberListItem } from '@/features/members/types';
 import { toFinanceError, useGenerateInvoice } from '@/features/finance/hooks/use-finance';
 import type { InvoiceItemInput } from '@/features/finance/types';
+import { useCurrencySymbol } from '@/lib/currency';
 
 interface LineItemForm {
   key: string;
@@ -29,6 +30,7 @@ function emptyLineItem(): LineItemForm {
 
 export default function GenerateInvoicePage() {
   const router = useRouter();
+  const currencySymbol = useCurrencySymbol();
   const generateInvoice = useGenerateInvoice();
 
   const [member, setMember] = React.useState<MemberListItem | null>(null);
@@ -167,7 +169,7 @@ export default function GenerateInvoicePage() {
             </div>
 
             <p className="text-sm text-muted-foreground">
-              Subtotal: ${subtotal.toFixed(2)} · Total: <span className="font-medium text-foreground">${total.toFixed(2)}</span>
+              Subtotal: {currencySymbol}{subtotal.toFixed(2)} · Total: <span className="font-medium text-foreground">{currencySymbol}{total.toFixed(2)}</span>
             </p>
 
             <div className="space-y-2">

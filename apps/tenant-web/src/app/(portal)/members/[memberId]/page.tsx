@@ -26,7 +26,7 @@ import { MembershipPlanSelect } from '@/features/members/components/membership-p
 import { MemberWorkoutCard } from '@/features/workouts/components/member-workout-card';
 import { MemberDietCard } from '@/features/diet/components/member-diet-card';
 import { MemberMeasurementsCard } from '@/features/measurements/components/member-measurements-card';
-import { MemberStatusBadge } from '@/features/members/components/member-status-badge';
+import { MemberStatusBadge, MembershipStatusBadge } from '@/features/members/components/member-status-badge';
 import { QrCodeDisplay } from '@/features/members/components/qr-code-display';
 import { TrainerSelect } from '@/features/members/components/trainer-select';
 import {
@@ -38,6 +38,8 @@ import {
   useExtendMembership,
   useFreezeMember,
   useGdprExport,
+  useLogGuestVisit,
+  useLogPtSession,
   useMemberDetail,
   useMemberStatusAction,
   useRenewMembership,
@@ -137,6 +139,8 @@ export default function MemberDetailPage() {
   const memberAttendance = useMemberAttendance(memberId, 1, 5);
   const manualCheckIn = useManualCheckIn();
   const manualCheckOut = useManualCheckOut();
+  const logGuestVisit = useLogGuestVisit();
+  const logPtSession = useLogPtSession();
 
   const canUpdate = hasPermission('members:update');
   const canDelete = hasPermission('members:delete');
@@ -158,9 +162,12 @@ export default function MemberDetailPage() {
   const [branchId, setBranchId] = React.useState<string | null>(null);
   const [trainerId, setTrainerId] = React.useState<string | null>(null);
   const [assignPlanId, setAssignPlanId] = React.useState('');
+  const [assignStartDate, setAssignStartDate] = React.useState('');
   const [assignAutoRenew, setAssignAutoRenew] = React.useState(false);
   const [renewPlanId, setRenewPlanId] = React.useState('');
   const [extendDays, setExtendDays] = React.useState('');
+  const [guestName, setGuestName] = React.useState('');
+  const [ptSessionNotes, setPtSessionNotes] = React.useState('');
 
   React.useEffect(() => {
     if (member.data && !form) setForm(toFormState(member.data));
@@ -282,11 +289,42 @@ export default function MemberDetailPage() {
       return;
     }
     assignMembership.mutate(
-      { id: memberId, payload: { planId: assignPlanId, autoRenew: assignAutoRenew } },
+      { id: memberId, payload: { planId: assignPlanId, startDate: assignStartDate || undefined, autoRenew: assignAutoRenew } },
       {
         onSuccess: () => {
-          toast.success('Membership assigned.');
+          toast.success(
+            assignStartDate && new Date(assignStartDate) > new Date()
+              ? `Membership scheduled to start ${new Date(assignStartDate).toLocaleDateString()}.`
+              : 'Membership assigned.',
+          );
           setAssignPlanId('');
+          setAssignStartDate('');
+        },
+        onError: (err) => toast.error(toMemberError(err).message),
+      },
+    );
+  };
+
+  const handleLogGuestVisit = () => {
+    logGuestVisit.mutate(
+      { id: memberId, guestName: guestName.trim() || undefined },
+      {
+        onSuccess: () => {
+          toast.success('Guest visit logged.');
+          setGuestName('');
+        },
+        onError: (err) => toast.error(toMemberError(err).message),
+      },
+    );
+  };
+
+  const handleLogPtSession = () => {
+    logPtSession.mutate(
+      { id: memberId, notes: ptSessionNotes.trim() || undefined },
+      {
+        onSuccess: () => {
+          toast.success('PT session logged.');
+          setPtSessionNotes('');
         },
         onError: (err) => toast.error(toMemberError(err).message),
       },
@@ -628,19 +666,94 @@ export default function MemberDetailPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {data.currentMembership ? (
-            <p className="text-sm">
-              Currently on <span className="font-medium">{data.currentMembership.planName}</span> — ends{' '}
-              {new Date(data.currentMembership.endDate).toLocaleDateString()}
+            <p className="flex flex-wrap items-center gap-2 text-sm">
+              <MembershipStatusBadge status={data.currentMembership.status} />
+              <span className="font-medium">{data.currentMembership.planName}</span>
+              {data.currentMembership.status === 'PENDING' ? (
+                <span>
+                  — starts {new Date(data.currentMembership.startDate).toLocaleDateString()}, ends{' '}
+                  {new Date(data.currentMembership.endDate).toLocaleDateString()}
+                </span>
+              ) : (
+                <span>— ends {new Date(data.currentMembership.endDate).toLocaleDateString()}</span>
+              )}
             </p>
           ) : (
             <p className="text-sm text-muted-foreground">No active membership.</p>
           )}
+
+          {data.planUsage &&
+          (data.planUsage.guestPassesIncluded > 0 ||
+            data.planUsage.ptSessionsIncluded > 0 ||
+            data.planUsage.groupClassesIncluded > 0 ||
+            data.planUsage.freezeDaysLimit !== null) ? (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground sm:grid-cols-4">
+              {data.planUsage.guestPassesIncluded > 0 ? (
+                <div>
+                  Guest passes: <span className="font-medium text-foreground">{data.planUsage.guestPassesUsed}</span> /{' '}
+                  {data.planUsage.guestPassesIncluded}
+                </div>
+              ) : null}
+              {data.planUsage.ptSessionsIncluded > 0 ? (
+                <div>
+                  PT sessions: <span className="font-medium text-foreground">{data.planUsage.ptSessionsUsed}</span> /{' '}
+                  {data.planUsage.ptSessionsIncluded}
+                </div>
+              ) : null}
+              {data.planUsage.groupClassesIncluded > 0 ? (
+                <div>
+                  Group classes: <span className="font-medium text-foreground">{data.planUsage.groupClassesUsed}</span> /{' '}
+                  {data.planUsage.groupClassesIncluded}
+                </div>
+              ) : null}
+              {data.planUsage.freezeDaysLimit !== null ? (
+                <div>
+                  Freeze days: <span className="font-medium text-foreground">{data.planUsage.freezeDaysUsed}</span> /{' '}
+                  {data.planUsage.freezeDaysLimit}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {canUpdate && data.currentMembership?.status === 'ACTIVE' && data.planUsage?.guestPassesIncluded ? (
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-48 space-y-2">
+                <Label htmlFor="guestName">Guest name (optional)</Label>
+                <Input id="guestName" value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Who's visiting?" />
+              </div>
+              <Button size="sm" variant="outline" disabled={logGuestVisit.isPending} onClick={handleLogGuestVisit}>
+                {logGuestVisit.isPending ? 'Logging…' : 'Log guest visit'}
+              </Button>
+            </div>
+          ) : null}
+
+          {canUpdate && data.currentMembership?.status === 'ACTIVE' && data.planUsage?.ptSessionsIncluded ? (
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-48 space-y-2">
+                <Label htmlFor="ptSessionNotes">PT session notes (optional)</Label>
+                <Input id="ptSessionNotes" value={ptSessionNotes} onChange={(e) => setPtSessionNotes(e.target.value)} placeholder="e.g. Leg day" />
+              </div>
+              <Button size="sm" variant="outline" disabled={logPtSession.isPending} onClick={handleLogPtSession}>
+                {logPtSession.isPending ? 'Logging…' : 'Log PT session'}
+              </Button>
+            </div>
+          ) : null}
 
           {canAssign && !data.currentMembership ? (
             <div className="flex flex-wrap items-end gap-2">
               <div className="min-w-56 space-y-2">
                 <Label htmlFor="assignPlan">Assign a plan</Label>
                 <MembershipPlanSelect id="assignPlan" value={assignPlanId} onChange={setAssignPlanId} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assignStartDate">Start date</Label>
+                <Input
+                  id="assignStartDate"
+                  type="date"
+                  className="h-10"
+                  value={assignStartDate}
+                  onChange={(e) => setAssignStartDate(e.target.value)}
+                />
               </div>
               <div className="flex items-center gap-1.5 pb-2">
                 <Checkbox id="assignAutoRenew" checked={assignAutoRenew} onCheckedChange={(c) => setAssignAutoRenew(c === true)} />
@@ -652,6 +765,11 @@ export default function MemberDetailPage() {
                 {assignMembership.isPending ? 'Assigning…' : 'Assign membership'}
               </Button>
             </div>
+          ) : null}
+          {canAssign && !data.currentMembership && assignStartDate && new Date(assignStartDate) > new Date() ? (
+            <p className="text-xs text-muted-foreground">
+              Starts in the future — the member won&apos;t be able to check in until {new Date(assignStartDate).toLocaleDateString()}.
+            </p>
           ) : null}
 
           {data.currentMembership ? (

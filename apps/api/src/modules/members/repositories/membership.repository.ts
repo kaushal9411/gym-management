@@ -36,4 +36,20 @@ export class MembershipRepository {
   async unfreeze(id: string): Promise<void> {
     await this.db.membershipFreeze.update({ where: { id }, data: { unfrozenAt: new Date() } });
   }
+
+  /**
+   * Cumulative CLOSED freeze days for one membership period, backing
+   * `MembershipPlan.freezeDaysLimit`. Only closed freezes count (a currently
+   * open one can't happen here — `MemberService#freeze` already rejects a
+   * second freeze while one is open) — rounds each freeze up to at least 1
+   * day so a same-day freeze/unfreeze still consumes an allowance instead of
+   * being free.
+   */
+  async sumFreezeDays(tenantId: string, membershipId: string): Promise<number> {
+    const freezes = await this.db.membershipFreeze.findMany({
+      where: { tenantId, membershipId, unfrozenAt: { not: null } },
+      select: { frozenAt: true, unfrozenAt: true },
+    });
+    return freezes.reduce((total, f) => total + Math.max(1, Math.ceil((f.unfrozenAt!.getTime() - f.frozenAt.getTime()) / 86_400_000)), 0);
+  }
 }

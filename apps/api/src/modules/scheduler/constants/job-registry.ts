@@ -14,6 +14,7 @@ import {
   membershipExpiredNotification,
   membershipExpiryCheck,
   membershipRenewalReminder,
+  pendingMembershipActivation,
 } from '../handlers/membership.handlers';
 import { birthdayWishes, sendScheduledAnnouncements, sendScheduledNotifications, welcomeMessages } from '../handlers/notification.handlers';
 import { failedPaymentRetry, invoiceGeneration, outstandingPaymentReminder, paymentReminder } from '../handlers/payment.handlers';
@@ -54,6 +55,14 @@ export const JOB_REGISTRY: JobDefinition[] = [
     cronPattern: '0 8 * * *',
     priority: 2,
     handler: membershipRenewalReminder,
+  }),
+  job({
+    name: 'pending-membership-activation',
+    category: 'MEMBERSHIP',
+    description: 'Flips PENDING (future-dated) memberships to ACTIVE once their start date arrives.',
+    cronPattern: '0 0 * * *',
+    priority: 1,
+    handler: pendingMembershipActivation,
   }),
   job({
     name: 'membership-expiry-check',

@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/app_currency.dart';
 import '../../../models/gym_member.dart';
 import '../../../models/membership_plan.dart';
 import '../../../repositories/member_repository.dart';
@@ -298,7 +299,7 @@ class _AssignPlanScreenState extends State<_AssignPlanScreen> {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          '₹${plan.price.toStringAsFixed(0)} · '
+                                          '${AppCurrency.symbol}${plan.price.toStringAsFixed(0)} · '
                                           '${plan.durationLabel} · '
                                           '${plan.perksSummary}',
                                           style: AppText.body(

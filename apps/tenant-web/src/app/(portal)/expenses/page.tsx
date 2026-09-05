@@ -19,6 +19,7 @@ import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { toFinanceError, useDeleteExpense, useExpenseList } from '@/features/finance/hooks/use-finance';
 import { financeService } from '@/features/finance/services/finance.service';
 import type { Expense, ExpenseCategory, ListExpensesParams } from '@/features/finance/types';
+import { useCurrencySymbol } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
@@ -41,6 +42,7 @@ export default function ExpensesPage() {
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('finance:expense-manage');
   const { currentBranchId } = useCurrentBranch();
+  const currencySymbol = useCurrencySymbol();
 
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -82,7 +84,7 @@ export default function ExpensesPage() {
   const columns: DataTableColumn<Expense>[] = [
     { key: 'date', header: 'Date', render: (e) => new Date(e.expenseDate).toLocaleDateString() },
     { key: 'category', header: 'Category', render: (e) => <Badge variant="secondary">{CATEGORY_LABELS[e.category]}</Badge> },
-    { key: 'amount', header: 'Amount', render: (e) => `$${e.amount}` },
+    { key: 'amount', header: 'Amount', render: (e) => `${currencySymbol}${e.amount}` },
     { key: 'branch', header: 'Branch', render: (e) => e.branch?.name ?? '—' },
     { key: 'description', header: 'Description', render: (e) => e.description ?? '—' },
     {

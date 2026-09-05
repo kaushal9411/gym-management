@@ -58,7 +58,7 @@ export class ClassBookingService {
 
     const member = await this.db.member.findFirst({
       where: { tenantId: this.tenantId, id: memberId, deletedAt: null },
-      include: { memberships: { where: { status: 'ACTIVE' } } },
+      include: { memberships: { where: { status: 'ACTIVE' }, include: { plan: { select: { groupClassesIncluded: true } } } } },
     });
     if (!member) throw new NotFoundError('Member not found.');
     if (member.status === 'FROZEN') throw new ConflictError(ErrorCode.CONFLICT, 'This member is frozen and cannot book classes.');
@@ -73,6 +73,24 @@ export class ClassBookingService {
 
     const bookedCount = await this.bookings.countActive(this.tenantId, sessionId);
     if (bookedCount >= session.capacity) throw new AppError(ErrorCode.CONFLICT, 'This session is fully booked.', 409);
+
+    // `groupClassesIncluded === 0` means "not configured" (the field's
+    // default) rather than "zero classes allowed" — a hard zero-quota read
+    // would otherwise silently lock every pre-existing plan that never
+    // touched this field out of class booking entirely. Only a plan that
+    // explicitly sets a positive quota gets enforced.
+    const quota = activeMembership.plan.groupClassesIncluded;
+    if (quota > 0) {
+      const usedThisPeriod = await this.bookings.countActiveInPeriod(
+        this.tenantId,
+        memberId,
+        activeMembership.startDate,
+        activeMembership.endDate,
+      );
+      if (usedThisPeriod >= quota) {
+        throw new ConflictError(ErrorCode.CONFLICT, `This member has used all ${quota} group class(es) included in their plan for this period.`);
+      }
+    }
 
     const booking = await this.bookings.upsertBooking({
       tenantId: this.tenantId,

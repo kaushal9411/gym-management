@@ -23,6 +23,7 @@ import {
   useMembershipPlanStatusAction,
 } from '@/features/members/hooks/use-members';
 import type { ListMembershipPlansParams, MembershipPlan } from '@/features/members/types';
+import { useCurrencySymbol } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
@@ -41,6 +42,7 @@ export default function MembershipPlansPage() {
   const canRestore = hasPermission('memberships:restore');
   const { currentBranchId } = useCurrentBranch();
   const { data: branches } = useBranches();
+  const currencySymbol = useCurrencySymbol();
   const branchNameById = React.useMemo(
     () => new Map((branches ?? []).map((b) => [b.id, b.name])),
     [branches],
@@ -132,7 +134,7 @@ export default function MembershipPlansPage() {
           : (p.accessBranchIds ?? []).map((id) => branchNameById.get(id) ?? id).join(', ') || '—',
     },
     { key: 'duration', header: 'Duration', render: (p) => `${p.durationValue} ${p.durationType.toLowerCase()}` },
-    { key: 'price', header: sortableHeader('Price', 'price'), render: (p) => `$${p.price}` },
+    { key: 'price', header: sortableHeader('Price', 'price'), render: (p) => `${currencySymbol}${p.price}` },
     { key: 'members', header: 'Members', render: (p) => p.memberCount },
     {
       key: 'status',

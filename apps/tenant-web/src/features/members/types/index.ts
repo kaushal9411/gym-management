@@ -1,7 +1,7 @@
 import type { Paginated } from '@/features/iam/types';
 
 export type MemberStatus = 'ACTIVE' | 'INACTIVE' | 'FROZEN';
-export type MembershipStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'SUPERSEDED';
+export type MembershipStatus = 'PENDING' | 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'SUPERSEDED';
 export type Gender = 'MALE' | 'FEMALE' | 'OTHER' | 'PREFER_NOT_TO_SAY';
 export type BloodGroup =
   | 'A_POSITIVE'
@@ -75,6 +75,30 @@ export interface MembershipFreezeEntry {
   unfrozenAt: string | null;
 }
 
+export interface PlanUsage {
+  guestPassesUsed: number;
+  guestPassesIncluded: number;
+  ptSessionsUsed: number;
+  ptSessionsIncluded: number;
+  groupClassesUsed: number;
+  groupClassesIncluded: number;
+  freezeDaysUsed: number;
+  freezeDaysLimit: number | null;
+}
+
+export interface GuestVisit {
+  id: string;
+  guestName: string | null;
+  visitedAt: string;
+}
+
+export interface PtSessionLog {
+  id: string;
+  trainer: { id: string; name: string } | null;
+  sessionDate: string;
+  notes: string | null;
+}
+
 export interface MemberDetail extends MemberListItem {
   dateOfBirth: string | null;
   bloodGroup: BloodGroup | null;
@@ -98,6 +122,7 @@ export interface MemberDetail extends MemberListItem {
   canCheckIn: boolean;
   membershipHistory: MembershipHistoryEntry[];
   freezeHistory: MembershipFreezeEntry[];
+  planUsage: PlanUsage | null;
   updatedAt: string;
 }
 

@@ -20,6 +20,7 @@ import { DEFAULT_INCOME_FORM_STATE, IncomeFormFields, type IncomeFormState } fro
 import { toFinanceError, useCreateIncome, useDeleteIncome, useIncomeList } from '@/features/finance/hooks/use-finance';
 import { financeService } from '@/features/finance/services/finance.service';
 import type { Income, IncomeCategory, ListIncomeParams } from '@/features/finance/types';
+import { useCurrencySymbol } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
@@ -38,6 +39,7 @@ export default function IncomePage() {
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('finance:income-manage');
   const { currentBranchId } = useCurrentBranch();
+  const currencySymbol = useCurrencySymbol();
 
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -112,7 +114,7 @@ export default function IncomePage() {
       render: (i) => new Date(i.incomeDate).toLocaleDateString(),
     },
     { key: 'category', header: 'Category', render: (i) => <Badge variant="secondary">{CATEGORY_LABELS[i.category]}</Badge> },
-    { key: 'amount', header: 'Amount', render: (i) => `$${i.amount}` },
+    { key: 'amount', header: 'Amount', render: (i) => `${currencySymbol}${i.amount}` },
     { key: 'branch', header: 'Branch', render: (i) => i.branch?.name ?? '—' },
     { key: 'description', header: 'Description', render: (i) => i.description ?? '—' },
     {

@@ -7,6 +7,7 @@ import type {
   CreateMembershipPlanPayload,
   DowngradeMembershipPayload,
   ExtendMembershipPayload,
+  GuestVisit,
   ListMembersParams,
   ListMembershipPlansParams,
   MemberBulkImportResult,
@@ -18,6 +19,7 @@ import type {
   MemberListItem,
   MembershipPlan,
   Paginated,
+  PtSessionLog,
   RenewMembershipPayload,
   UpdateMemberPayload,
   UpdateMembershipPlanPayload,
@@ -137,6 +139,26 @@ class MemberService {
 
   async sendPortalInvite(id: string): Promise<void> {
     await apiClient.post(`/members/${id}/portal-invite`);
+  }
+
+  async logGuestVisit(id: string, guestName?: string): Promise<GuestVisit> {
+    const res = await apiClient.post<ApiEnvelope<GuestVisit>>(`/members/${id}/guest-visits`, { guestName });
+    return res.data.data;
+  }
+
+  async listGuestVisits(id: string): Promise<GuestVisit[]> {
+    const res = await apiClient.get<ApiEnvelope<GuestVisit[]>>(`/members/${id}/guest-visits`);
+    return res.data.data;
+  }
+
+  async logPtSession(id: string, payload: { trainerId?: string; notes?: string }): Promise<PtSessionLog> {
+    const res = await apiClient.post<ApiEnvelope<PtSessionLog>>(`/members/${id}/pt-sessions`, payload);
+    return res.data.data;
+  }
+
+  async listPtSessions(id: string): Promise<PtSessionLog[]> {
+    const res = await apiClient.get<ApiEnvelope<PtSessionLog[]>>(`/members/${id}/pt-sessions`);
+    return res.data.data;
   }
 
   async listDocuments(id: string): Promise<MemberDocument[]> {

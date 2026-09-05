@@ -81,6 +81,23 @@ export function useFreezeMember() {
   });
 }
 
+export function useLogGuestVisit() {
+  const invalidate = useInvalidateMembers();
+  return useMutation({
+    mutationFn: ({ id, guestName }: { id: string; guestName?: string }) => memberService.logGuestVisit(id, guestName),
+    onSuccess: invalidate,
+  });
+}
+
+export function useLogPtSession() {
+  const invalidate = useInvalidateMembers();
+  return useMutation({
+    mutationFn: ({ id, trainerId, notes }: { id: string; trainerId?: string; notes?: string }) =>
+      memberService.logPtSession(id, { trainerId, notes }),
+    onSuccess: invalidate,
+  });
+}
+
 export function useAssignMembership() {
   const invalidate = useInvalidateMembers();
   return useMutation({

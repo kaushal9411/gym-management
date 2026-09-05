@@ -116,6 +116,43 @@ class FreezeHistoryEntry {
 /// health fields (frames "7d"–"7f") are `MemberDetailDto`-only too, so a
 /// `GymMember` read off the list screen will have them null even though
 /// the member record itself may have real values.
+/// Consumption against the active membership's plan quotas — `null` on the
+/// model when there's no active membership. `included`/`limit` of `0`/`null`
+/// mean "not configured on this plan," not "zero allowed" (mirrors the
+/// backend's `PlanUsageDto` — see BACKEND-GUIDE.md).
+class PlanUsage {
+  const PlanUsage({
+    required this.guestPassesUsed,
+    required this.guestPassesIncluded,
+    required this.ptSessionsUsed,
+    required this.ptSessionsIncluded,
+    required this.groupClassesUsed,
+    required this.groupClassesIncluded,
+    required this.freezeDaysUsed,
+    required this.freezeDaysLimit,
+  });
+
+  final int guestPassesUsed;
+  final int guestPassesIncluded;
+  final int ptSessionsUsed;
+  final int ptSessionsIncluded;
+  final int groupClassesUsed;
+  final int groupClassesIncluded;
+  final int freezeDaysUsed;
+  final int? freezeDaysLimit;
+
+  factory PlanUsage.fromJson(Map<String, dynamic> json) => PlanUsage(
+        guestPassesUsed: json['guestPassesUsed'] as int,
+        guestPassesIncluded: json['guestPassesIncluded'] as int,
+        ptSessionsUsed: json['ptSessionsUsed'] as int,
+        ptSessionsIncluded: json['ptSessionsIncluded'] as int,
+        groupClassesUsed: json['groupClassesUsed'] as int,
+        groupClassesIncluded: json['groupClassesIncluded'] as int,
+        freezeDaysUsed: json['freezeDaysUsed'] as int,
+        freezeDaysLimit: json['freezeDaysLimit'] as int?,
+      );
+}
+
 class GymMember {
   const GymMember({
     required this.id,
@@ -137,6 +174,7 @@ class GymMember {
     this.canCheckIn,
     this.membershipHistory = const [],
     this.freezeHistory = const [],
+    this.planUsage,
     this.gender,
     this.dateOfBirth,
     this.bloodGroup,
@@ -182,6 +220,7 @@ class GymMember {
   final bool? canCheckIn;
   final List<MembershipHistoryEntry> membershipHistory;
   final List<FreezeHistoryEntry> freezeHistory;
+  final PlanUsage? planUsage;
 
   final String? gender;
   final String? dateOfBirth;
@@ -248,6 +287,9 @@ class GymMember {
                   (e) => FreezeHistoryEntry.fromJson(e as Map<String, dynamic>),
                 )
                 .toList(),
+        planUsage: json['planUsage'] == null
+            ? null
+            : PlanUsage.fromJson(json['planUsage'] as Map<String, dynamic>),
         gender: json['gender'] as String?,
         dateOfBirth: json['dateOfBirth'] as String?,
         bloodGroup: json['bloodGroup'] as String?,

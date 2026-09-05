@@ -21,6 +21,23 @@ export class ClassBookingRepository {
     return this.db.classBooking.count({ where: { tenantId, classSessionId, status: 'BOOKED' } });
   }
 
+  /**
+   * Backing `MembershipPlan.groupClassesIncluded` — counts non-cancelled
+   * bookings (BOOKED/ATTENDED/NO_SHOW all still consume the quota; only
+   * CANCELLED frees it back up, same as session capacity's own semantics)
+   * whose session falls inside the member's current membership period.
+   */
+  async countActiveInPeriod(tenantId: string, memberId: string, periodStart: Date, periodEnd: Date): Promise<number> {
+    return this.db.classBooking.count({
+      where: {
+        tenantId,
+        memberId,
+        status: { not: 'CANCELLED' },
+        classSession: { sessionDate: { gte: periodStart, lte: periodEnd } },
+      },
+    });
+  }
+
   async findActiveByMemberAndSession(tenantId: string, classSessionId: string, memberId: string): Promise<{ id: string; status: string } | null> {
     return this.db.classBooking.findFirst({ where: { tenantId, classSessionId, memberId, status: 'BOOKED' }, select: { id: true, status: true } });
   }

@@ -27,7 +27,7 @@ const bloodGroupSchema = z.enum([
   'UNKNOWN',
 ]);
 const memberStatusSchema = z.enum(['ACTIVE', 'INACTIVE', 'FROZEN']);
-const membershipStatusSchema = z.enum(['ACTIVE', 'EXPIRED', 'CANCELLED', 'SUPERSEDED']);
+const membershipStatusSchema = z.enum(['PENDING', 'ACTIVE', 'EXPIRED', 'CANCELLED', 'SUPERSEDED']);
 const documentTypeSchema = z.enum(['IDENTITY_PROOF', 'ADDRESS_PROOF', 'MEDICAL_CERTIFICATE', 'CONSENT_FORM', 'OTHER']);
 
 export const listMembersQuerySchema = z.object({
@@ -105,6 +105,15 @@ export const assignMembershipSchema = z.object({
   planId: z.string().uuid(),
   startDate: z.string().date().optional(),
   autoRenew: z.boolean().optional(),
+});
+
+export const logGuestVisitSchema = z.object({
+  guestName: z.string().trim().max(120).optional(),
+});
+
+export const logPtSessionSchema = z.object({
+  trainerId: z.string().uuid().optional(),
+  notes: z.string().trim().max(2000).optional(),
 });
 
 export const renewMembershipSchema = z.object({

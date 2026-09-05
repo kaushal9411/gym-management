@@ -6,11 +6,13 @@ import { StatisticCard } from '@/components/ui/statistic-card';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { useKpis } from '@/features/reports/hooks/use-reports';
+import { useCurrencySymbol } from '@/lib/currency';
 
 /** Real KPIs from the Reports & Analytics module (Prompt 20) — the Prompt-10 foundation's "Coming soon" placeholders finally have data behind them, now that Members/Attendance/Memberships/Payments all exist. Scoped to the header's currently-selected branch (Prompt 24). */
 export function StatsGrid() {
   const { hasPermission } = usePermissions();
   const { currentBranchId } = useCurrentBranch();
+  const currencySymbol = useCurrencySymbol();
   const kpis = useKpis(currentBranchId ?? undefined);
   const data = kpis.data;
 
@@ -19,8 +21,8 @@ export function StatsGrid() {
     { key: 'active-members', label: 'Active Members', icon: Users, value: data?.activeMembers, tone: 'primary' },
     { key: 'expiring-memberships', label: 'Expiring Memberships', icon: CalendarClock, value: data?.expiringMemberships, tone: 'warning' },
     { key: 'new-registrations', label: 'New Members (this month)', icon: UserPlus, value: data?.newMembersThisMonth, tone: 'aqua' },
-    { key: 'revenue-summary', label: 'Monthly Revenue', icon: Wallet, value: data ? `₹${data.monthlyRevenue}` : undefined, tone: 'success' },
-    { key: 'pending-payments', label: 'Outstanding Payments', icon: Clock3, value: data ? `₹${data.outstandingPayments}` : undefined, tone: 'violet' },
+    { key: 'revenue-summary', label: 'Monthly Revenue', icon: Wallet, value: data ? `${currencySymbol}${data.monthlyRevenue}` : undefined, tone: 'success' },
+    { key: 'pending-payments', label: 'Outstanding Payments', icon: Clock3, value: data ? `${currencySymbol}${data.outstandingPayments}` : undefined, tone: 'violet' },
   ] as const;
 
   if (!hasPermission('reports:view')) return null;

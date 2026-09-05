@@ -6,12 +6,13 @@ import type { MemberStatus, MembershipStatus } from '../types';
 const MEMBER_STATUS_VARIANT: Record<MemberStatus, NonNullable<BadgeProps['variant']>> = {
   ACTIVE: 'success',
   INACTIVE: 'secondary',
-  // No semantic "info" token in the design system — keep an explicit dark-mode-aware blue for this state only.
+  // No semantic "info" token in the design system — keep an explicit dark-mode-aware blue instead (shared with PENDING below).
   FROZEN: 'outline',
 };
-const FROZEN_CLASSNAME = 'border-transparent bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300';
+const INFO_CLASSNAME = 'border-transparent bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300';
 
 const MEMBERSHIP_STATUS_VARIANT: Record<MembershipStatus, NonNullable<BadgeProps['variant']>> = {
+  PENDING: 'outline',
   ACTIVE: 'success',
   EXPIRED: 'destructive',
   CANCELLED: 'secondary',
@@ -25,7 +26,7 @@ export function MemberStatusBadge({ status, deleted }: { status: MemberStatus; d
   return (
     <Badge
       variant={MEMBER_STATUS_VARIANT[status]}
-      className={cn('font-medium', status === 'FROZEN' && FROZEN_CLASSNAME)}
+      className={cn('font-medium', status === 'FROZEN' && INFO_CLASSNAME)}
     >
       {status}
     </Badge>
@@ -34,7 +35,10 @@ export function MemberStatusBadge({ status, deleted }: { status: MemberStatus; d
 
 export function MembershipStatusBadge({ status }: { status: MembershipStatus }) {
   return (
-    <Badge variant={MEMBERSHIP_STATUS_VARIANT[status]} className="font-medium">
+    <Badge
+      variant={MEMBERSHIP_STATUS_VARIANT[status]}
+      className={cn('font-medium', status === 'PENDING' && INFO_CLASSNAME)}
+    >
       {status}
     </Badge>
   );

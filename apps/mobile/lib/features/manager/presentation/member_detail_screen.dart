@@ -12,6 +12,7 @@ import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/app_currency.dart';
 import '../../../models/attendance_summary.dart';
 import '../../../models/body_measurement.dart';
 import '../../../models/branch_option.dart';
@@ -504,6 +505,70 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     return confirmed == true;
   }
 
+  /// Shared by `_logGuestVisit`/`_logPtSession` below — a single optional
+  /// text field, same `AlertDialog` styling as `_confirm`.
+  Future<String?> _promptText({
+    required String title,
+    required String label,
+    required String confirmLabel,
+  }) async {
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.surface2,
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(labelText: label),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => context.pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => context.pop(controller.text.trim()),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
+  }
+
+  Future<void> _logGuestVisit() async {
+    final guestName = await _promptText(
+      title: 'Log guest visit',
+      label: 'Guest name (optional)',
+      confirmLabel: 'Log visit',
+    );
+    if (guestName == null) return;
+    await _runAction(
+      () => getIt<MemberRepository>().logGuestVisit(
+        widget.memberId,
+        guestName: guestName,
+      ),
+    );
+  }
+
+  Future<void> _logPtSession() async {
+    final notes = await _promptText(
+      title: 'Log PT session',
+      label: 'Notes (optional)',
+      confirmLabel: 'Log session',
+    );
+    if (notes == null) return;
+    await _runAction(
+      () => getIt<MemberRepository>().logPtSession(
+        widget.memberId,
+        notes: notes,
+      ),
+    );
+  }
+
   Future<void> _resume() =>
       _runAction(() => getIt<MemberRepository>().resume(widget.memberId));
 
@@ -792,11 +857,85 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                membership != null
-                    ? 'Ends ${_formatDate(membership.endDate)}'
-                    : 'Assign a plan from Renew',
+                membership == null
+                    ? 'Assign a plan from Renew'
+                    : membership.status == 'PENDING'
+                        ? 'Starts ${_formatDate(membership.startDate)}'
+                        : 'Ends ${_formatDate(membership.endDate)}',
                 style: AppText.display(size: 18),
               ),
+              if (member.planUsage != null &&
+                  (member.planUsage!.guestPassesIncluded > 0 ||
+                      member.planUsage!.ptSessionsIncluded > 0 ||
+                      member.planUsage!.groupClassesIncluded > 0 ||
+                      member.planUsage!.freezeDaysLimit != null)) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 14,
+                  runSpacing: 4,
+                  children: [
+                    if (member.planUsage!.guestPassesIncluded > 0)
+                      Text(
+                        'Guest passes: ${member.planUsage!.guestPassesUsed}/${member.planUsage!.guestPassesIncluded}',
+                        style: AppText.body(
+                          size: 12,
+                          color: AppColors.inkFaint,
+                        ),
+                      ),
+                    if (member.planUsage!.ptSessionsIncluded > 0)
+                      Text(
+                        'PT sessions: ${member.planUsage!.ptSessionsUsed}/${member.planUsage!.ptSessionsIncluded}',
+                        style: AppText.body(
+                          size: 12,
+                          color: AppColors.inkFaint,
+                        ),
+                      ),
+                    if (member.planUsage!.groupClassesIncluded > 0)
+                      Text(
+                        'Group classes: ${member.planUsage!.groupClassesUsed}/${member.planUsage!.groupClassesIncluded}',
+                        style: AppText.body(
+                          size: 12,
+                          color: AppColors.inkFaint,
+                        ),
+                      ),
+                    if (member.planUsage!.freezeDaysLimit != null)
+                      Text(
+                        'Freeze days: ${member.planUsage!.freezeDaysUsed}/${member.planUsage!.freezeDaysLimit}',
+                        style: AppText.body(
+                          size: 12,
+                          color: AppColors.inkFaint,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+              if (membership != null &&
+                  membership.status == 'ACTIVE' &&
+                  member.planUsage != null &&
+                  (member.planUsage!.guestPassesIncluded > 0 ||
+                      member.planUsage!.ptSessionsIncluded > 0)) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (member.planUsage!.guestPassesIncluded > 0)
+                      AppButton(
+                        label: 'Log guest visit',
+                        size: AppButtonSize.small,
+                        variant: AppButtonVariant.ghost,
+                        onPressed: _logGuestVisit,
+                      ),
+                    if (member.planUsage!.ptSessionsIncluded > 0)
+                      AppButton(
+                        label: 'Log PT session',
+                        size: AppButtonSize.small,
+                        variant: AppButtonVariant.ghost,
+                        onPressed: _logPtSession,
+                      ),
+                  ],
+                ),
+              ],
               if (membership != null) ...[
                 const SizedBox(height: 16),
                 AppButton(
@@ -873,7 +1012,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                     subtitle: '${_formatDate(h.startDate)} – '
                         '${_formatDate(h.endDate)} · Auto-renew: '
                         '${h.autoRenew ? 'Yes' : 'No'}',
-                    trailing: '₹${h.priceAtAssignment.toStringAsFixed(0)}',
+                    trailing:
+                        '${AppCurrency.symbol}${h.priceAtAssignment.toStringAsFixed(0)}',
                     status: h.status,
                   ),
                 )
@@ -1759,6 +1899,7 @@ String _reachableImageUrl(String url) {
 
 Color _historyStatusColor(String status) => switch (status) {
       'ACTIVE' => AppColors.success,
+      'PENDING' => AppColors.warning,
       'SUPERSEDED' => AppColors.inkFaint,
       'CANCELLED' => AppColors.danger,
       _ => AppColors.inkFaint,

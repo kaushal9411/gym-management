@@ -25,6 +25,7 @@ import {
   useVerifyPaymentStatus,
 } from '@/features/finance/hooks/use-finance';
 import type { MemberPaymentMethod, PaymentLinkResult } from '@/features/finance/types';
+import { useCurrencySymbol } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
@@ -47,6 +48,7 @@ type LinkStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
 
 export default function RecordPaymentPage() {
   const router = useRouter();
+  const currencySymbol = useCurrencySymbol();
   const createPayment = useCreatePayment();
   const createPaymentLink = useCreatePaymentLink();
   const verifyPaymentStatus = useVerifyPaymentStatus();
@@ -281,15 +283,15 @@ export default function RecordPaymentPage() {
                   <option value="">Don&apos;t link to an invoice</option>
                   {outstandingInvoices.map((inv) => (
                     <option key={inv.id} value={inv.id}>
-                      {inv.invoiceNumber} — ${inv.totalAmount} ({inv.status})
+                      {inv.invoiceNumber} — {currencySymbol}{inv.totalAmount} ({inv.status})
                     </option>
                   ))}
                 </select>
                 {selectedInvoice.data && totalDue !== null ? (
                   <p className="text-sm text-muted-foreground">
-                    Invoice total: <span className="font-medium text-foreground">${selectedInvoice.data.totalAmount}</span> · Paid so far:{' '}
-                    <span className="font-medium text-foreground">${amountPaidSoFar.toFixed(2)}</span> · Due amount:{' '}
-                    <span className="font-medium text-foreground">${totalDue.toFixed(2)}</span>
+                    Invoice total: <span className="font-medium text-foreground">{currencySymbol}{selectedInvoice.data.totalAmount}</span> · Paid so far:{' '}
+                    <span className="font-medium text-foreground">{currencySymbol}{amountPaidSoFar.toFixed(2)}</span> · Due amount:{' '}
+                    <span className="font-medium text-foreground">{currencySymbol}{totalDue.toFixed(2)}</span>
                   </p>
                 ) : null}
               </div>
@@ -371,7 +373,7 @@ export default function RecordPaymentPage() {
                 </div>
 
                 <p className="text-sm text-muted-foreground">
-                  Final amount: <span className="font-medium text-foreground">${finalAmount.toFixed(2)}</span>
+                  Final amount: <span className="font-medium text-foreground">{currencySymbol}{finalAmount.toFixed(2)}</span>
                 </p>
 
                 {channel === 'offline' ? (

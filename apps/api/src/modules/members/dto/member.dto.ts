@@ -60,6 +60,24 @@ export interface MembershipFreezeEntryDto {
   unfrozenAt: string | null;
 }
 
+/**
+ * Consumption against the active membership's plan quotas (Prompt 77) —
+ * `null` when there's no active membership to measure against. `included`/
+ * `limit` of `0`/`null` mean "not configured on this plan," not "zero
+ * allowed" — see `MemberService#buildPlanUsage` and `ClassBookingService
+ * #book` for why an unconfigured quota is never treated as a hard zero.
+ */
+export interface PlanUsageDto {
+  guestPassesUsed: number;
+  guestPassesIncluded: number;
+  ptSessionsUsed: number;
+  ptSessionsIncluded: number;
+  groupClassesUsed: number;
+  groupClassesIncluded: number;
+  freezeDaysUsed: number;
+  freezeDaysLimit: number | null;
+}
+
 export interface MemberDetailDto extends MemberListItemDto {
   dateOfBirth: string | null;
   bloodGroup: BloodGroup | null;
@@ -80,11 +98,34 @@ export interface MemberDetailDto extends MemberListItemDto {
   notes: string | null;
   qrCodeToken: string;
   qrCodeImageUrl: string | null;
-  /** Informational only — no attendance module exists yet to enforce this. */
+  /** Real, enforced eligibility — see `AttendanceService#eligibility`, which independently derives the same result and actually rejects check-in on it. */
   canCheckIn: boolean;
   membershipHistory: MembershipHistoryEntryDto[];
   freezeHistory: MembershipFreezeEntryDto[];
+  planUsage: PlanUsageDto | null;
   updatedAt: string;
+}
+
+export interface LogGuestVisitInput {
+  guestName?: string;
+}
+
+export interface GuestVisitDto {
+  id: string;
+  guestName: string | null;
+  visitedAt: string;
+}
+
+export interface LogPtSessionInput {
+  trainerId?: string;
+  notes?: string;
+}
+
+export interface PtSessionLogDto {
+  id: string;
+  trainer: { id: string; name: string } | null;
+  sessionDate: string;
+  notes: string | null;
 }
 
 export interface MemberDocumentDto {

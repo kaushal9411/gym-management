@@ -11,6 +11,8 @@ import type {
   ExtendMembershipInput,
   FreezeMembershipInput,
   ListMembersQuery,
+  LogGuestVisitInput,
+  LogPtSessionInput,
   MemberBulkImportRow,
   RenewMembershipInput,
   TransferBranchInput,
@@ -131,6 +133,24 @@ export class MemberController {
   async sendPortalInvite(req: Request, res: Response): Promise<void> {
     await serviceFor(req).sendPortalInvite(req.params.id!, actorFrom(req));
     sendSuccess(res, null, 'Portal activation email sent.');
+  }
+
+  async logGuestVisit(req: Request, res: Response): Promise<void> {
+    const visit = await serviceFor(req).logGuestVisit(req.params.id!, req.body as LogGuestVisitInput, actorFrom(req));
+    sendSuccess(res, visit, 'Guest visit logged.', 201);
+  }
+
+  async listGuestVisits(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await serviceFor(req).listGuestVisits(req.params.id!, req.auth!.sub));
+  }
+
+  async logPtSession(req: Request, res: Response): Promise<void> {
+    const log = await serviceFor(req).logPtSession(req.params.id!, req.body as LogPtSessionInput, actorFrom(req));
+    sendSuccess(res, log, 'PT session logged.', 201);
+  }
+
+  async listPtSessions(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await serviceFor(req).listPtSessions(req.params.id!, req.auth!.sub));
   }
 
   async listDocuments(req: Request, res: Response): Promise<void> {
