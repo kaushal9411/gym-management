@@ -64,7 +64,7 @@ export const PLATFORM_TENANT: Tenant = {
     welcomeMessage: 'The operating system for modern gyms.',
   },
   timezone: 'UTC',
-  currency: 'USD',
+  currency: 'INR',
   locale: 'en',
   subscription: null,
   featureFlags: [],

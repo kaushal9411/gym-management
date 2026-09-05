@@ -72,7 +72,7 @@ function toResolvedTenant(record: ResolvedTenantRecord): ResolvedTenant {
       welcomeMessage: table?.welcomeMessage ?? jsonBranding.welcomeMessage ?? 'Welcome back. Sign in to continue.',
     },
     timezone: record.settings?.timezone ?? 'UTC',
-    currency: record.settings?.currency ?? 'USD',
+    currency: record.settings?.currency ?? 'INR',
     locale: record.settings?.locale ?? 'en',
     emailFromName: record.settings?.emailFromName ?? null,
     emailFromAddress: record.settings?.emailFromAddress ?? null,

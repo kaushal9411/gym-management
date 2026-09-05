@@ -37,7 +37,7 @@ export const paymentReminder: JobHandler = async () => {
         { tenantName: invoice.tenant.name },
         invoice.member.firstName,
         invoice.invoiceNumber,
-        formatMoney(Number(invoice.totalAmount), invoice.tenant.settings?.currencySymbol ?? '$'),
+        formatMoney(Number(invoice.totalAmount), invoice.tenant.settings?.currencySymbol ?? '₹'),
         invoice.dueDate.toISOString().slice(0, 10),
         invoice.items[0]?.description ?? null,
       );
@@ -156,7 +156,7 @@ export const outstandingPaymentReminder: JobHandler = async () => {
         { tenantName: invoice.tenant.name },
         invoice.member.firstName,
         invoice.invoiceNumber,
-        formatMoney(Number(invoice.totalAmount), invoice.tenant.settings?.currencySymbol ?? '$'),
+        formatMoney(Number(invoice.totalAmount), invoice.tenant.settings?.currencySymbol ?? '₹'),
         invoice.dueDate.toISOString().slice(0, 10),
         invoice.items[0]?.description ?? null,
       );

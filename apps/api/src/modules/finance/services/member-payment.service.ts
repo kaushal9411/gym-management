@@ -183,7 +183,7 @@ export class MemberPaymentService {
     const tax = input.tax ?? 0;
     const finalAmount = Math.max(input.amount - discount + tax, 0);
     const settings = await this.db.tenantSettings.findUnique({ where: { tenantId: this.tenantId } });
-    const currency = (settings?.currency ?? 'USD').toUpperCase();
+    const currency = (settings?.currency ?? 'INR').toUpperCase();
     const paymentNumber = await this.payments.nextPaymentNumber(this.tenantId);
 
     const payment = await this.payments.create({
@@ -510,7 +510,7 @@ export class MemberPaymentService {
       receipt: {
         paymentDate: payment.paymentDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
         method: payment.method,
-        currencySymbol: settings?.currencySymbol ?? '$',
+        currencySymbol: settings?.currencySymbol ?? '₹',
         amountPaid: Number(payment.finalAmount),
         discount: Number(payment.discount) || undefined,
         tax: Number(payment.tax) || undefined,

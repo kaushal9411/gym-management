@@ -235,7 +235,7 @@ export class MemberInvoiceService {
       ? { tenantName: tenant.name, primaryColor: tenant.branding.primaryColor, logoUrl: tenant.branding.emailLogoUrl ?? tenant.branding.logoUrl }
       : { tenantName: 'FitCloud' };
     const settings = await this.db.tenantSettings.findUnique({ where: { tenantId: this.tenantId } });
-    const currencySymbol = settings?.currencySymbol ?? '$';
+    const currencySymbol = settings?.currencySymbol ?? '₹';
     const mail = memberInvoiceSummaryEmail(
       branding,
       invoice.member.name,

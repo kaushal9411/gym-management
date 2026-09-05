@@ -259,14 +259,14 @@ model TenantSettings {
   /// { primaryColor, primaryForeground, logoUrl?, welcomeMessage }
   branding                     Json            @default("{}")
   timezone                     String          @default("UTC") @db.VarChar(64)
-  currency                     String          @default("USD") @db.Char(3)
+  currency                     String          @default("INR") @db.Char(3)
   locale                       String          @default("en") @db.VarChar(10)
   emailFromName                String?         @map("email_from_name") @db.VarChar(120)
   emailFromAddress             String?         @map("email_from_address") @db.VarChar(255)
   /// Business Settings module (Prompt 12) — regional/display preferences.
   /// Symbol is stored (not derived) so a tenant can override the default for
   /// their currency code (e.g. "Fr" vs "CHF").
-  currencySymbol               String          @default("$") @map("currency_symbol") @db.VarChar(8)
+  currencySymbol               String          @default("₹") @map("currency_symbol") @db.VarChar(8)
   dateFormat                   String          @default("MM/DD/YYYY") @map("date_format") @db.VarChar(20)
   timeFormat                   String          @default("12h") @map("time_format") @db.VarChar(4)
   /// 0 = Sunday .. 6 = Saturday.
@@ -2101,7 +2101,7 @@ model SubscriptionPlan {
   description      String?
   priceMonthly     Decimal  @map("price_monthly") @db.Decimal(10, 2)
   priceYearly      Decimal  @map("price_yearly") @db.Decimal(10, 2)
-  currency         String   @default("USD") @db.Char(3)
+  currency         String   @default("INR") @db.Char(3)
   trialDays        Int      @default(14) @map("trial_days")
   maxBranches      Int      @map("max_branches")
   maxManagers      Int      @map("max_managers")

@@ -95,7 +95,7 @@ const SECTIONS: ContextSection[] = [
     permission: 'settings:read',
     build: async (db, tenantId) => {
       const settings = await db.tenantSettings.findUnique({ where: { tenantId }, select: { timezone: true, currency: true } });
-      return `Settings: timezone ${settings?.timezone ?? 'UTC'}, currency ${settings?.currency ?? 'USD'}.`;
+      return `Settings: timezone ${settings?.timezone ?? 'UTC'}, currency ${settings?.currency ?? 'INR'}.`;
     },
   },
 ];
