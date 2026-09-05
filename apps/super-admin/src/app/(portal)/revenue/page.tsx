@@ -9,7 +9,7 @@ import { StatisticCard } from '@/components/ui/statistic-card';
 import { useRevenueGrowth, useRevenueSummary } from '@/features/revenue/hooks/use-revenue';
 
 function formatMoney(amount: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
 }
 
 export default function RevenuePage() {
@@ -87,7 +87,7 @@ export default function RevenuePage() {
           <CardHeader><CardTitle className="text-base">Revenue by currency</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
             {summary.revenueByCurrency.map((r) => (
-              <div key={r.currency} className="flex justify-between"><span>{r.currency}</span><span className="font-medium">{r.total.toLocaleString()}</span></div>
+              <div key={r.currency} className="flex justify-between"><span>{r.currency}</span><span className="font-medium">{new Intl.NumberFormat('en-IN', { style: 'currency', currency: r.currency, maximumFractionDigits: 0 }).format(r.total)}</span></div>
             ))}
           </CardContent>
         </Card>

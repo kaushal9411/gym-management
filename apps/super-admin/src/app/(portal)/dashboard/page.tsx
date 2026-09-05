@@ -18,7 +18,7 @@ import { StatisticCard } from '@/components/ui/statistic-card';
 import { useDashboardStats } from '@/features/dashboard/hooks/use-dashboard';
 
 function formatMoney(amount: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount);
 }
 
 export default function DashboardPage() {
