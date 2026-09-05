@@ -41,6 +41,7 @@ import { financeDashboardRouter } from '../../modules/finance/routes/finance-das
 import { incomeRouter } from '../../modules/finance/routes/income.routes';
 import { memberInvoiceRouter } from '../../modules/finance/routes/member-invoice.routes';
 import { memberPaymentRouter } from '../../modules/finance/routes/member-payment.routes';
+import { razorpayWebhookRouter } from '../../modules/finance/routes/razorpay-webhook.routes';
 import { invitationRouter } from '../../modules/invitations/routes/invitation.routes';
 import { invoiceRouter } from '../../modules/invoice/routes/invoice.routes';
 import { measurementRouter } from '../../modules/measurements/routes/measurement.routes';
@@ -107,6 +108,10 @@ v1Router.use('/billing', billingRouter);
 v1Router.use('/payment', paymentRouter);
 v1Router.use('/coupon', couponRouter);
 v1Router.use('/invoice', invoiceRouter);
+// Mounted before the generic `/webhook/:provider` catch-all below — no
+// collision either way, since that pattern only ever matches a single path
+// segment (`/webhook/razorpay`, not `/webhook/razorpay-payment-link`).
+v1Router.use('/webhook/razorpay-payment-link', razorpayWebhookRouter);
 v1Router.use('/webhook', webhookRouter);
 v1Router.use('/branches', branchRouter);
 v1Router.use('/classes', groupClassRouter);

@@ -50,6 +50,8 @@ const envSchema = z.object({
 
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
+  /** Configured in the Razorpay Dashboard alongside the webhook URL (Settings → Webhooks) — signs every webhook delivery, distinct from RAZORPAY_KEY_SECRET which signs Checkout callbacks. */
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
 
   /** 32-byte AES-256 key, base64-encoded — `core/security/encryption.util.ts`. Generate with: `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`. Currently the only thing encrypted with it is a tenant's own AI provider API key. */
   ENCRYPTION_KEY: z.string().min(1, 'ENCRYPTION_KEY is required'),
@@ -171,6 +173,7 @@ export const env = {
   razorpay: {
     keyId: raw.RAZORPAY_KEY_ID,
     keySecret: raw.RAZORPAY_KEY_SECRET,
+    webhookSecret: raw.RAZORPAY_WEBHOOK_SECRET,
     get isConfigured() {
       return Boolean(raw.RAZORPAY_KEY_ID && raw.RAZORPAY_KEY_SECRET);
     },

@@ -14,6 +14,8 @@ declare global {
       admin?: AdminAccessTokenClaims;
       /** Populated by memberAuthenticateMiddleware — completely separate from `auth`/`admin` (see member-jwt.service.ts). */
       memberAuth?: MemberAccessTokenClaims;
+      /** Captured by `express.json()`'s `verify` callback in `app.ts` — the exact unparsed bytes of the request body, needed by gateway webhook signature verification (a re-serialized `JSON.stringify(req.body)` can differ from what the sender actually signed). */
+      rawBody?: Buffer;
     }
   }
 }

@@ -127,8 +127,12 @@ export class AdminTenantBillingService {
       referenceId: invoice.invoiceNumber,
       customerName: owner.name,
       customerEmail: owner.email,
+      customerContact: owner.phone ?? undefined,
       notifyEmail: true,
-      notifySms: false,
+      // Razorpay only sends the channels it's actually told to — notify by
+      // SMS too whenever the owner has a phone on file, so "send the
+      // payment link on mobile and email" doesn't silently stay email-only.
+      notifySms: Boolean(owner.phone),
       notes: { platformPaymentId: payment!.id, tenantId: this.tenantId },
     });
     await this.db.payment.update({ where: { id: payment!.id }, data: { gatewayReference: link.id } });
@@ -202,6 +206,35 @@ export class AdminTenantBillingService {
     }
 
     return { status: 'PENDING' as const };
+  }
+
+  /**
+   * Real-time counterpart to `verifyPaymentStatus`'s manual poll — called
+   * by the Razorpay webhook (`razorpay-webhook.controller.ts`) once its
+   * signature is verified, so a payment link resolves the moment Razorpay
+   * reports it instead of waiting for staff to click "Check status". No
+   * admin actor exists here (Razorpay calls this directly, not staff), so
+   * unlike the poll path there's no admin-audit-log entry — the webhook's
+   * own verified signature is the trust boundary, not staff intent.
+   */
+  async applyWebhookOutcome(paymentId: string, outcome: 'paid' | 'failed', razorpayPaymentId?: string): Promise<void> {
+    const payment = await this.db.payment.findFirst({ where: { id: paymentId, tenantId: this.tenantId } });
+    if (!payment || payment.status !== 'PENDING') return; // already resolved, or a retried/duplicate webhook delivery — idempotent no-op
+
+    if (outcome === 'paid') {
+      const updated = await this.db.payment.update({
+        where: { id: paymentId },
+        data: { status: 'SUCCEEDED', gatewayReference: razorpayPaymentId ?? payment.gatewayReference },
+      });
+      if (payment.invoiceId) await this.invoices.markPaid(payment.invoiceId);
+      await this.reactivateAfterPayment(updated);
+    } else {
+      await this.db.payment.update({
+        where: { id: paymentId },
+        data: { status: 'FAILED', failureReason: 'Razorpay webhook reported the payment link expired/cancelled.' },
+      });
+      eventBus.emitEvent('billing.payment_failed', { tenantId: this.tenantId, paymentId });
+    }
   }
 
   /** Staff-triggered resend of Razorpay's own notification — doesn't cancel/recreate the link. */

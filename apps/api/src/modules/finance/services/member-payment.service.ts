@@ -325,6 +325,37 @@ export class MemberPaymentService {
     return { status: payment.status, verifiedAt: new Date().toISOString() };
   }
 
+  /**
+   * Real-time counterpart to `verifyStatus`'s manual poll — called by the
+   * Razorpay webhook (`razorpay-webhook.controller.ts`) once its signature
+   * is verified, so a payment link resolves the moment Razorpay reports it
+   * instead of waiting for staff to click "Check status". No staff actor
+   * exists here (Razorpay calls this directly), so unlike `verifyStatus`
+   * this bypasses `mustFind`'s branch-access check and skips the audit-log
+   * entry — the webhook's own verified signature is the trust boundary.
+   */
+  async applyWebhookOutcome(paymentId: string, outcome: 'paid' | 'failed', razorpayPaymentId?: string): Promise<void> {
+    const payment = await this.payments.findById(this.tenantId, paymentId);
+    if (!payment || payment.status !== 'PENDING') return; // already resolved, or a retried/duplicate webhook delivery — idempotent no-op
+
+    if (outcome === 'paid') {
+      await this.payments.update(paymentId, { status: 'SUCCESS', transactionReference: razorpayPaymentId ?? payment.transactionReference ?? undefined });
+      const updated = (await this.payments.findById(this.tenantId, paymentId))!;
+      const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: updated.member.id } }));
+      if (member) await this.onPaymentSucceeded(updated, member, updated.branch.id);
+    } else {
+      await this.payments.update(paymentId, { status: 'FAILED' });
+      const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: payment.member.id } }));
+      if (member) {
+        await notifyPaymentFailed(this.tenantId, {
+          memberName: `${member.firstName} ${member.lastName}`.trim(),
+          amount: Number(payment.finalAmount).toFixed(2),
+          memberEmail: member.email,
+        });
+      }
+    }
+  }
+
   /** "Refunds must create financial history" — always a NEW row, the original payment is never mutated beyond its status flag. */
   async refund(id: string, input: RefundPaymentInput, actor: IamActor): Promise<MemberPaymentDetailDto> {
     const payment = await this.mustFind(id, actor.userId);

@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import Razorpay from 'razorpay';
 
@@ -127,4 +127,23 @@ export function verifyOrderPaymentSignature(params: { orderId: string; paymentId
     .update(`${params.orderId}|${params.paymentId}`)
     .digest('hex');
   return expected === params.signature;
+}
+
+/**
+ * Verifies a Razorpay webhook delivery — HMAC-SHA256 of the exact raw
+ * request body, keyed with the webhook secret configured alongside the
+ * webhook URL in the Razorpay Dashboard (distinct from `keySecret`, which
+ * only signs Checkout success callbacks). Needs the unparsed bytes Razorpay
+ * actually signed, not `JSON.stringify(req.body)` — a re-serialized object
+ * can differ in key order/whitespace and would silently fail verification
+ * against a real delivery (see `app.ts`'s `express.json({ verify })`, which
+ * captures `req.rawBody` for exactly this).
+ */
+export function verifyWebhookSignature(rawBody: string | Buffer, signature: string | undefined): boolean {
+  if (!signature || !env.razorpay.webhookSecret) return false;
+  const expected = createHmac('sha256', env.razorpay.webhookSecret).update(rawBody).digest('hex');
+  const expectedBuf = Buffer.from(expected, 'hex');
+  const signatureBuf = Buffer.from(signature, 'hex');
+  if (expectedBuf.length !== signatureBuf.length) return false;
+  return timingSafeEqual(expectedBuf, signatureBuf);
 }
