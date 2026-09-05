@@ -79,7 +79,7 @@ export interface TenantDetail {
     cancelledAt: string | null;
     cancelReason: string | null;
     gatewayProvider: string | null;
-    plan: { name: string };
+    plan: { id: string; name: string };
     coupon: { code: string } | null;
   }>;
   users: Array<{ id: string; name: string; email: string; status: string }>;

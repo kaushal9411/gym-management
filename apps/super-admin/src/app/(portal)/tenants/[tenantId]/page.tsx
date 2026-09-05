@@ -16,8 +16,10 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatisticCard } from '@/components/ui/statistic-card';
 import { useHasPermission } from '@/features/auth/hooks/use-auth';
+import { ChangePlanDialog } from '@/features/billing/components/change-plan-dialog';
 import { toBillingError, useCreatePaymentLink, useDownloadInvoicePdf, useEmailInvoice, useResendNotification, useVerifyPaymentStatus } from '@/features/billing/hooks/use-billing';
 import type { InvoiceListItem, PaymentListItem } from '@/features/payments/types';
+import { usePlans } from '@/features/plans/hooks/use-plans';
 import {
   toTenantError,
   useActivateTenant,
@@ -142,6 +144,8 @@ export default function TenantDetailPage() {
 
   const { data: tenant, isLoading } = useTenant(params.tenantId);
   const { data: auditLogs } = useTenantAuditLogs(params.tenantId);
+  const { data: allPlans } = usePlans();
+  const [changingPlan, setChangingPlan] = React.useState(false);
 
   const [paymentsPage, setPaymentsPage] = React.useState(1);
   const [invoicesPage, setInvoicesPage] = React.useState(1);
@@ -385,7 +389,14 @@ export default function TenantDetailPage() {
         <GymProfileCard tenant={tenant} />
 
         <Card>
-          <CardHeader><CardTitle className="text-base">Subscription &amp; billing</CardTitle></CardHeader>
+          <CardHeader className="flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-base">Subscription &amp; billing</CardTitle>
+            {subscription && canManageBilling ? (
+              <Button size="sm" variant="outline" onClick={() => setChangingPlan(true)}>
+                Change plan
+              </Button>
+            ) : null}
+          </CardHeader>
           <CardContent className="space-y-1 text-sm">
             {subscription ? (
               <>
@@ -546,6 +557,15 @@ export default function TenantDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {subscription ? (
+        <ChangePlanDialog
+          tenant={changingPlan ? { id: tenant.id, name: tenant.name } : null}
+          currentPlanId={subscription.plan.id}
+          plans={allPlans ?? []}
+          onClose={() => setChangingPlan(false)}
+        />
+      ) : null}
     </div>
   );
 }
