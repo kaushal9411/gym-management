@@ -14,6 +14,7 @@ import { SessionRepository } from '../../authentication/repositories/session.rep
 import { UserRepository } from '../../authentication/repositories/user.repository';
 import { SystemRole } from '../../authentication/types/auth.types';
 import type { DeviceInfo } from '../../authentication/types/auth.types';
+import { InvoiceService } from '../../invoice/services/invoice.service';
 import { tenantRepository } from '../../tenants/repository/tenant.repository';
 import { tenantService } from '../../tenants/service/tenant.service';
 import { planRepository } from '../repositories/plan.repository';
@@ -57,7 +58,16 @@ export class TenantProvisioningService {
 
     const tenantId = randomUUID();
     const now = new Date();
-    const trialEndsAt = plan.trialDays > 0 ? new Date(now.getTime() + plan.trialDays * 86_400_000) : null;
+    // A trial-eligible plan still lets the visitor pay upfront instead of
+    // starting the trial (see tenant-web's onboarding PaymentStep, which
+    // offers "pay now" even when trialDays > 0) — Razorpay genuinely
+    // captures a real charge in that case, so `paid` (not `requiresPayment`,
+    // which only reflects whether payment was mandatory) is what decides
+    // trial-vs-active status below: a visitor who actually paid must not end
+    // up TRIALING with just a 14-day period despite paying for a full cycle.
+    const paymentReference = session.paymentStatus === 'completed' ? (session.paymentReference ?? null) : null;
+    const paid = Boolean(paymentReference);
+    const trialEndsAt = !paid && plan.trialDays > 0 ? new Date(now.getTime() + plan.trialDays * 86_400_000) : null;
 
     try {
       await tenantRepository.createBareTenant({
@@ -142,7 +152,7 @@ export class TenantProvisioningService {
       }
 
       const currentPeriodEnd = trialEndsAt ?? addBillingPeriod(now, session.billingCycle);
-      await db.subscription.create({
+      const subscription = await db.subscription.create({
         data: {
           tenantId,
           planId: plan.id,
@@ -150,10 +160,51 @@ export class TenantProvisioningService {
           billingCycle: session.billingCycle,
           trialEndsAt,
           currentPeriodEnd,
-          gatewayCustomerId: session.paymentReference ? `cus_${session.paymentReference}` : null,
-          gatewaySubscriptionId: session.paymentReference ?? null,
+          gatewayCustomerId: paid ? `cus_${paymentReference}` : null,
+          gatewaySubscriptionId: paid ? paymentReference : null,
         },
       });
+
+      // The onboarding checkout (`OnboardingService.startCheckout`/`verifyCheckout`)
+      // only ever proved the Razorpay signature and flagged the Redis session
+      // paid — no Payment/Invoice row existed anywhere for that real charge, so
+      // neither the Super Admin's tenant billing tab nor the tenant's own
+      // Billing screen (both read the platform Payment/Invoice tables) ever
+      // showed it, and no payment-confirmation email fired. Mirrors
+      // `SubscriptionService`'s own checkout tail: real Invoice, marked paid,
+      // real Payment row (SUCCEEDED, the actual Razorpay payment id as the
+      // gateway reference), then the same `billing.subscription_activated`
+      // event the self-service upgrade flow emits — which is what already
+      // sends the tenant its subscription-activated + invoice emails.
+      let paidInvoice: Awaited<ReturnType<InvoiceService['generate']>> | null = null;
+      if (paid && paymentReference) {
+        const amount = session.billingCycle === 'YEARLY' ? Number(plan.priceYearly) : Number(plan.priceMonthly);
+        const invoiceService = new InvoiceService(db);
+        const invoice = await invoiceService.generate({
+          tenantId,
+          subscriptionId: subscription.id,
+          couponId: null,
+          lineItems: [{ description: `${plan.name} plan (${session.billingCycle})`, quantity: 1, unitPrice: amount, amount }],
+          taxAmount: 0,
+          discountAmount: 0,
+          currency: plan.currency,
+        });
+        await invoiceService.markPaid(invoice.id);
+        await db.payment.create({
+          data: {
+            tenantId,
+            subscriptionId: subscription.id,
+            invoiceId: invoice.id,
+            provider: 'RAZORPAY',
+            status: 'SUCCEEDED',
+            amount,
+            currency: plan.currency,
+            idempotencyKey: randomUUID(),
+            gatewayReference: paymentReference,
+          },
+        });
+        paidInvoice = invoice;
+      }
 
       await db.auditLog.create({
         data: {
@@ -206,6 +257,20 @@ export class TenantProvisioningService {
         trialEndsAt: trialEndsAt?.toISOString() ?? null,
         portalUrl: `https://${domain}`,
       });
+
+      if (paidInvoice) {
+        eventBus.emitEvent('billing.subscription_activated', {
+          tenantId,
+          tenantName: session.form.gymName,
+          email: session.form.email,
+          planName: plan.name,
+          action: 'CREATED',
+          invoiceNumber: paidInvoice.invoiceNumber,
+          invoiceId: paidInvoice.id,
+          total: Number(paidInvoice.total),
+          currency: paidInvoice.currency,
+        });
+      }
 
       authLogger.info('Tenant provisioned', { tenantId, slug: subdomain, plan: plan.slug });
 
