@@ -1,4 +1,4 @@
-import { actionButton, renderEmailLayout, type EmailBranding } from './base-layout';
+import { actionButton, detailRow, detailTable, footnote, iconStrip, renderEmailLayout, secondaryLink, type EmailBranding } from './base-layout';
 
 export function onboardingWelcomeEmail(
   branding: EmailBranding,
@@ -16,11 +16,17 @@ export function onboardingWelcomeEmail(
     subject: `${branding.tenantName} is ready on FitCloud!`,
     html: renderEmailLayout(
       branding,
-      `<h1 style="font-size:20px;margin:0 0 12px;">Welcome, ${ownerName}!</h1>
-       <p>Your gym portal has been created and is ready to use right now.</p>
+      { icon: '🎉', title: `Welcome, ${ownerName}!`, categoryLabel: 'Welcome', preheader: `${branding.tenantName} is ready — sign in to get started.` },
+      `<p>Your gym portal has been created and is ready to use right now.</p>
        ${trialLine}
        ${actionButton(portalUrl, 'Go to your portal', branding.primaryColor)}
-       <p style="margin-top:20px;font-size:13px;color:#6b7280;">Your portal: <a href="${portalUrl}">${portalUrl}</a><br/>Sign in with the email and password you just created.</p>`,
+       ${secondaryLink(portalUrl, 'Your portal')}
+       ${iconStrip([
+         { icon: '📋', label: 'Manage members' },
+         { icon: '💳', label: 'Track billing' },
+         { icon: '📈', label: 'Grow your gym' },
+       ])}
+       ${footnote('Sign in with the email and password you just created.')}`,
     ),
   };
 }
@@ -30,9 +36,10 @@ export function paymentSuccessEmail(branding: EmailBranding, ownerName: string, 
     subject: 'Payment received — thank you!',
     html: renderEmailLayout(
       branding,
-      `<h1 style="font-size:20px;margin:0 0 12px;">Payment received</h1>
-       <p>Hi ${ownerName}, we've received your payment of <strong>${amount}</strong> for the <strong>${planName}</strong> plan.</p>
-       <p style="margin-top:20px;font-size:13px;color:#6b7280;">A receipt has been generated for your records.</p>`,
+      { icon: '✅', title: 'Payment Successful!', categoryLabel: 'Payment', tone: 'success', preheader: `Payment of ${amount} received for the ${planName} plan.` },
+      `<p>Hi ${ownerName}, we've received your payment for ${branding.tenantName}. Thank you for continuing your journey with us!</p>
+       ${detailTable(detailRow('💰', 'Amount paid', amount, { emphasize: true }) + detailRow('🏷️', 'Plan', planName))}
+       ${footnote('A receipt has been generated for your records.')}`,
     ),
   };
 }

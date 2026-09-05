@@ -1,6 +1,8 @@
 import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
+import { formatMoney } from '../../../infrastructure/mail/templates/base-layout';
+import { paymentDueReminderEmail, paymentOverdueReminderEmail } from '../../../infrastructure/mail/templates/member-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { MemberInvoiceRepository } from '../../finance/repositories/member-invoice.repository';
 import { decryptMemberContact } from '../../members/utils/member-pii.util';
@@ -16,7 +18,11 @@ export const paymentReminder: JobHandler = async () => {
   const invoices = (
     await prisma.memberInvoice.findMany({
       where: { status: { in: ['UNPAID', 'PARTIALLY_PAID'] }, dueDate: { gte: new Date(), lte: windowEnd } },
-      include: { member: true, tenant: { select: { name: true } } },
+      include: {
+        member: true,
+        tenant: { select: { name: true, settings: { select: { currencySymbol: true } } } },
+        items: { orderBy: { sortOrder: 'asc' }, take: 1 },
+      },
     })
   ).map((invoice) => ({ ...invoice, member: decryptMemberContact(invoice.member) }));
 
@@ -27,11 +33,15 @@ export const paymentReminder: JobHandler = async () => {
     if (await cache.get(dedupeKey)) continue;
     if (invoice.member.email) {
       // eslint-disable-next-line no-await-in-loop
-      await enqueueEmail({
-        to: invoice.member.email,
-        subject: `Payment reminder — invoice ${invoice.invoiceNumber}`,
-        html: `<p>Hi ${invoice.member.firstName},</p><p>Your invoice <strong>${invoice.invoiceNumber}</strong> for <strong>${invoice.totalAmount}</strong> at ${invoice.tenant.name} is due on ${invoice.dueDate.toISOString().slice(0, 10)}.</p>`,
-      });
+      const mail = paymentDueReminderEmail(
+        { tenantName: invoice.tenant.name },
+        invoice.member.firstName,
+        invoice.invoiceNumber,
+        formatMoney(Number(invoice.totalAmount), invoice.tenant.settings?.currencySymbol ?? '$'),
+        invoice.dueDate.toISOString().slice(0, 10),
+        invoice.items[0]?.description ?? null,
+      );
+      await enqueueEmail({ to: invoice.member.email, subject: mail.subject, html: mail.html });
     }
     // eslint-disable-next-line no-await-in-loop
     await cache.set(dedupeKey, true, DEDUPE_TTL_SECONDS);
@@ -127,7 +137,11 @@ export const outstandingPaymentReminder: JobHandler = async () => {
   const invoices = (
     await prisma.memberInvoice.findMany({
       where: { status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] }, dueDate: { lte: cutoff } },
-      include: { member: true, tenant: { select: { name: true } } },
+      include: {
+        member: true,
+        tenant: { select: { name: true, settings: { select: { currencySymbol: true } } } },
+        items: { orderBy: { sortOrder: 'asc' }, take: 1 },
+      },
     })
   ).map((invoice) => ({ ...invoice, member: decryptMemberContact(invoice.member) }));
 
@@ -138,11 +152,15 @@ export const outstandingPaymentReminder: JobHandler = async () => {
     if (await cache.get(dedupeKey)) continue;
     if (invoice.member.email) {
       // eslint-disable-next-line no-await-in-loop
-      await enqueueEmail({
-        to: invoice.member.email,
-        subject: `Outstanding balance — invoice ${invoice.invoiceNumber}`,
-        html: `<p>Hi ${invoice.member.firstName},</p><p>Your invoice <strong>${invoice.invoiceNumber}</strong> for <strong>${invoice.totalAmount}</strong> at ${invoice.tenant.name} is now overdue (was due ${invoice.dueDate.toISOString().slice(0, 10)}). Please settle it at your earliest convenience.</p>`,
-      });
+      const mail = paymentOverdueReminderEmail(
+        { tenantName: invoice.tenant.name },
+        invoice.member.firstName,
+        invoice.invoiceNumber,
+        formatMoney(Number(invoice.totalAmount), invoice.tenant.settings?.currencySymbol ?? '$'),
+        invoice.dueDate.toISOString().slice(0, 10),
+        invoice.items[0]?.description ?? null,
+      );
+      await enqueueEmail({ to: invoice.member.email, subject: mail.subject, html: mail.html });
     }
     // eslint-disable-next-line no-await-in-loop
     await cache.set(dedupeKey, true, 7 * 86_400);

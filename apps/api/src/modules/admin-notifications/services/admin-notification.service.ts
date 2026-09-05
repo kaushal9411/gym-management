@@ -30,7 +30,11 @@ export async function dispatchNotification(notification: { id: string; title: st
   const tenants = await tenantsForAudience(notification.audience);
 
   if (notification.channel === 'EMAIL') {
-    const html = renderEmailLayout(PLATFORM_BRANDING, `<h1 style="font-size:20px;margin:0 0 12px;">${notification.title}</h1><p>${notification.body}</p>`);
+    const html = renderEmailLayout(
+      PLATFORM_BRANDING,
+      { icon: '📣', title: notification.title, categoryLabel: 'Platform announcement', preheader: notification.body },
+      `<p>${notification.body}</p>`,
+    );
     for (const tenant of tenants) {
       const owner = tenant.users[0];
       if (owner) await enqueueEmail({ to: owner.email, subject: notification.title, html });

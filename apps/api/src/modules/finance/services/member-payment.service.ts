@@ -465,11 +465,32 @@ export class MemberPaymentService {
       });
     }
 
+    const settings = await this.db.tenantSettings.findUnique({ where: { tenantId: this.tenantId } });
+    const totalPaid = payment.membership
+      ? await this.payments.sumSuccessForMembership(this.tenantId, payment.membership.id)
+      : Number(payment.finalAmount);
+    const dueAmount = payment.membership ? Math.max(Number(payment.membership.priceAtAssignment) - totalPaid, 0) : 0;
+
     await notifyPaymentReceived(this.tenantId, {
       memberName: `${member.firstName} ${member.lastName}`.trim(),
       amount: Number(payment.finalAmount).toFixed(2),
       paymentNumber: payment.paymentNumber,
       memberEmail: member.email,
+      receipt: {
+        paymentDate: payment.paymentDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        method: payment.method,
+        currencySymbol: settings?.currencySymbol ?? '$',
+        amountPaid: Number(payment.finalAmount),
+        discount: Number(payment.discount) || undefined,
+        tax: Number(payment.tax) || undefined,
+        totalPaid,
+        dueAmount,
+        membershipPlanName: payment.membership?.plan.name ?? null,
+        membershipValidTill: payment.membership
+          ? payment.membership.endDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+          : null,
+        transactionReference: payment.transactionReference,
+      },
     });
   }
 

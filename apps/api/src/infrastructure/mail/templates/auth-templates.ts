@@ -1,14 +1,15 @@
-import { actionButton, renderEmailLayout, type EmailBranding } from './base-layout';
+import { actionButton, codeBlock, footnote, infoBox, renderEmailLayout, secondaryLink, toneAccent, type EmailBranding, type HeroTone } from './base-layout';
 
 export function welcomeEmail(branding: EmailBranding, ownerName: string, verifyUrl: string) {
   return {
     subject: `Welcome to ${branding.tenantName} on FitCloud`,
     html: renderEmailLayout(
       branding,
-      `<h1 style="font-size:20px;margin:0 0 12px;">Welcome, ${ownerName}!</h1>
-       <p>Your gym <strong>${branding.tenantName}</strong> is ready on FitCloud. Verify your email to activate your account and start your 14-day free trial.</p>
+      { icon: '🎉', title: `Welcome, ${ownerName}!`, categoryLabel: 'Welcome', preheader: `Verify your email to activate ${branding.tenantName} and start your free trial.` },
+      `<p>Your gym <strong>${branding.tenantName}</strong> is set up and ready on FitCloud. Verify your email to activate your account and kick off your 14-day free trial — full access, no card charged until it ends.</p>
        ${actionButton(verifyUrl, 'Verify email address', branding.primaryColor)}
-       <p style="margin-top:20px;font-size:13px;color:#6b7280;">This link expires in 24 hours.</p>`,
+       ${secondaryLink(verifyUrl, 'Or paste this link into your browser')}
+       ${footnote('This link expires in 24 hours. If you didn’t create this account, you can safely ignore this email.')}`,
     ),
   };
 }
@@ -18,10 +19,11 @@ export function verifyEmailEmail(branding: EmailBranding, name: string, verifyUr
     subject: 'Verify your email address',
     html: renderEmailLayout(
       branding,
-      `<h1 style="font-size:20px;margin:0 0 12px;">Verify your email</h1>
-       <p>Hi ${name}, please confirm your email address to activate your account.</p>
+      { icon: '✉️', title: 'Verify Your Email', categoryLabel: 'Account Security', preheader: 'Confirm your email address to activate your account.' },
+      `<p>Hi ${name}, please confirm your email address to activate your ${branding.tenantName} account.</p>
        ${actionButton(verifyUrl, 'Verify email address', branding.primaryColor)}
-       <p style="margin-top:20px;font-size:13px;color:#6b7280;">This link expires in 24 hours. If you didn't create this account, you can ignore this email.</p>`,
+       ${secondaryLink(verifyUrl, 'Or paste this link into your browser')}
+       ${footnote('This link expires in 24 hours. If you didn’t create this account, you can safely ignore this email.')}`,
     ),
   };
 }
@@ -31,10 +33,11 @@ export function passwordResetEmail(branding: EmailBranding, name: string, resetU
     subject: 'Reset your password',
     html: renderEmailLayout(
       branding,
-      `<h1 style="font-size:20px;margin:0 0 12px;">Reset your password</h1>
-       <p>Hi ${name}, we received a request to reset your ${branding.tenantName} password.</p>
+      { icon: '🔒', title: 'Reset Your Password', categoryLabel: 'Account Security', preheader: 'Reset your password — this link expires in 30 minutes.' },
+      `<p>Hi ${name}, we received a request to reset your ${branding.tenantName} password. Click below to choose a new one.</p>
        ${actionButton(resetUrl, 'Reset password', branding.primaryColor)}
-       <p style="margin-top:20px;font-size:13px;color:#6b7280;">This link expires in 30 minutes. If you didn't request this, you can safely ignore this email — your password won't change.</p>`,
+       ${secondaryLink(resetUrl, 'Or paste this link into your browser')}
+       ${footnote('This link expires in 30 minutes. If you didn’t request this, your password won’t change.')}`,
     ),
   };
 }
@@ -44,9 +47,9 @@ export function passwordChangedEmail(branding: EmailBranding, name: string) {
     subject: 'Your password was changed',
     html: renderEmailLayout(
       branding,
-      `<h1 style="font-size:20px;margin:0 0 12px;">Password changed</h1>
-       <p>Hi ${name}, this confirms your ${branding.tenantName} password was just changed. All other sessions have been signed out.</p>
-       <p style="margin-top:20px;font-size:13px;color:#6b7280;">If you didn't make this change, contact your gym owner immediately.</p>`,
+      { icon: '✅', title: 'Password Changed', categoryLabel: 'Account Security', tone: 'success', preheader: 'Your password was just changed.' },
+      `<p>Hi ${name}, this confirms your ${branding.tenantName} password was just changed. For your security, every other device has been signed out.</p>
+       ${footnote('If you didn’t make this change, contact your gym owner immediately.')}`,
     ),
   };
 }
@@ -56,10 +59,10 @@ export function otpCodeEmail(branding: EmailBranding, name: string, code: string
     subject: `Your verification code: ${code}`,
     html: renderEmailLayout(
       branding,
-      `<h1 style="font-size:20px;margin:0 0 12px;">Your verification code</h1>
-       <p>Hi ${name}, use this code to continue signing in to ${branding.tenantName}:</p>
-       <div style="font-size:32px;font-weight:700;letter-spacing:8px;text-align:center;padding:16px;background:#f4f4f7;border-radius:8px;margin:16px 0;">${code}</div>
-       <p style="font-size:13px;color:#6b7280;">This code expires in ${expiresInMinutes} minutes. Never share it with anyone — FitCloud staff will never ask for it.</p>`,
+      { icon: '🔑', title: 'Your Verification Code', categoryLabel: 'Verification', preheader: `Your verification code is ${code}.` },
+      `<p>Hi ${name}, use this code to continue signing in to ${branding.tenantName}:</p>
+       ${codeBlock(code, branding.primaryColor)}
+       <p style="font-size:13px;color:#6b7280;">This code expires in <strong>${expiresInMinutes} minutes</strong>. Never share it with anyone.</p>`,
     ),
   };
 }
@@ -74,10 +77,11 @@ export function invitationEmail(
     subject: `You're invited to join ${branding.tenantName}`,
     html: renderEmailLayout(
       branding,
-      `<h1 style="font-size:20px;margin:0 0 12px;">You're invited!</h1>
-       <p>${inviterName} invited you to join <strong>${branding.tenantName}</strong> on FitCloud as a <strong>${roleLabel}</strong>.</p>
+      { icon: '👋', title: 'You’re Invited!', categoryLabel: 'Team Invite', preheader: `${inviterName} invited you to join ${branding.tenantName} as a ${roleLabel}.` },
+      `<p><strong>${inviterName}</strong> invited you to join <strong>${branding.tenantName}</strong> on FitCloud as a <strong>${roleLabel}</strong>.</p>
        ${actionButton(acceptUrl, 'Accept invitation', branding.primaryColor)}
-       <p style="margin-top:20px;font-size:13px;color:#6b7280;">This invitation expires in 48 hours.</p>`,
+       ${secondaryLink(acceptUrl, 'Or paste this link into your browser')}
+       ${footnote('This invitation expires in 48 hours.')}`,
     ),
   };
 }
@@ -88,10 +92,11 @@ export function memberPortalInviteEmail(branding: EmailBranding, memberName: str
     subject: `Activate your ${branding.tenantName} member portal`,
     html: renderEmailLayout(
       branding,
-      `<h1 style="font-size:20px;margin:0 0 12px;">You're invited!</h1>
-       <p>Hi ${memberName}, <strong>${branding.tenantName}</strong> has enabled portal access for you — set a password to check your own attendance, workout & diet plans, invoices, and class bookings any time.</p>
+      { icon: '👋', title: 'You’re Invited!', categoryLabel: 'Member Portal', preheader: `${branding.tenantName} enabled your member portal access — activate it now.` },
+      `<p>Hi ${memberName}, <strong>${branding.tenantName}</strong> has enabled portal access for you — set a password to check your own attendance, workout &amp; diet plans, invoices, and class bookings any time.</p>
        ${actionButton(acceptUrl, 'Activate my account', branding.primaryColor)}
-       <p style="margin-top:20px;font-size:13px;color:#6b7280;">This invitation expires in 72 hours.</p>`,
+       ${secondaryLink(acceptUrl, 'Or paste this link into your browser')}
+       ${footnote('This invitation expires in 72 hours.')}`,
     ),
   };
 }
@@ -104,24 +109,44 @@ export function subscriptionAlertEmail(
   const copy = {
     trial_ending: {
       subject: 'Your free trial ends soon',
-      body: `Hi ${name}, your ${branding.tenantName} free trial ends in 3 days. Choose a plan to keep everything running without interruption.`,
+      icon: '⏳',
+      title: 'Your Trial Ends Soon',
+      categoryLabel: 'Subscription',
+      tone: 'warning' as HeroTone,
+      body: `Hi ${name}, your ${branding.tenantName} free trial ends in <strong>3 days</strong>. Choose a plan to keep everything running without interruption.`,
     },
     renewal_reminder: {
       subject: 'Your subscription renews soon',
-      body: `Hi ${name}, ${branding.tenantName}'s subscription renews in 3 days. No action needed if your payment details are up to date.`,
+      icon: '🔄',
+      title: 'Renewal Reminder',
+      categoryLabel: 'Subscription',
+      tone: 'brand' as HeroTone,
+      body: `Hi ${name}, ${branding.tenantName}'s subscription renews in <strong>3 days</strong>. No action needed if your payment details are up to date.`,
     },
     payment_failed: {
       subject: 'Payment failed — action needed',
-      body: `Hi ${name}, we couldn't process your last payment for ${branding.tenantName}. Please update your billing details to avoid service interruption.`,
+      icon: '⚠️',
+      title: 'Payment Failed',
+      categoryLabel: 'Billing',
+      tone: 'danger' as HeroTone,
+      body: `Hi ${name}, we couldn't process your last payment for ${branding.tenantName}. Please update your billing details to avoid a service interruption.`,
     },
     suspended: {
       subject: 'Your account has been suspended',
+      icon: '🚫',
+      title: 'Account Suspended',
+      categoryLabel: 'Account Status',
+      tone: 'danger' as HeroTone,
       body: `Hi ${name}, ${branding.tenantName}'s FitCloud subscription has been suspended. Contact billing support to restore access.`,
     },
   }[kind];
 
   return {
     subject: copy.subject,
-    html: renderEmailLayout(branding, `<h1 style="font-size:20px;margin:0 0 12px;">${copy.subject}</h1><p>${copy.body}</p>`),
+    html: renderEmailLayout(
+      branding,
+      { icon: copy.icon, title: copy.title, categoryLabel: copy.categoryLabel, tone: copy.tone, preheader: copy.subject },
+      infoBox(`<p style="margin:0;">${copy.body}</p>`, toneAccent(branding, copy.tone)),
+    ),
   };
 }

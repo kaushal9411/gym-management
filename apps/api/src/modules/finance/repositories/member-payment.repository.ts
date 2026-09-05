@@ -6,7 +6,7 @@ import type { ListPaymentsQuery } from '../dto/finance.dto';
 const LIST_INCLUDE = {
   member: { select: { id: true, memberId: true, firstName: true, lastName: true } },
   branch: { select: { id: true, name: true } },
-  membership: { select: { id: true, plan: { select: { name: true } } } },
+  membership: { select: { id: true, priceAtAssignment: true, endDate: true, plan: { select: { name: true } } } },
 } satisfies Prisma.MemberPaymentInclude;
 
 const DETAIL_INCLUDE = {
@@ -109,6 +109,15 @@ export class MemberPaymentRepository {
   async sumRefunded(tenantId: string, paymentId: string): Promise<number> {
     const result = await this.db.memberPaymentRefund.aggregate({ where: { tenantId, paymentId }, _sum: { amount: true } });
     return Number(result._sum.amount ?? 0);
+  }
+
+  /** Running total actually paid toward one membership (all SUCCESS payments) — powers the payment-receipt email's "Total Paid Till Date" / "Due Amount" fields for installment-style membership fees. */
+  async sumSuccessForMembership(tenantId: string, membershipId: string): Promise<number> {
+    const result = await this.db.memberPayment.aggregate({
+      where: { tenantId, membershipId, status: 'SUCCESS' },
+      _sum: { finalAmount: true },
+    });
+    return Number(result._sum.finalAmount ?? 0);
   }
 
   // ── Dashboard aggregates ─────────────────────────────────────────────

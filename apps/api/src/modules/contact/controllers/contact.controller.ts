@@ -1,8 +1,11 @@
 import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
+import { detailRow, detailTable, renderEmailLayout } from '../../../infrastructure/mail/templates/base-layout';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import type { ContactRequestInput } from '../validators/contact.validators';
+
+const PLATFORM_BRANDING = { tenantName: 'FitCloud' };
 
 /** Internal inboxes per topic — dev mail lands in Mailpit like everything else. */
 const TOPIC_INBOX: Record<ContactRequestInput['topic'], string> = {
@@ -22,15 +25,22 @@ export class ContactController {
   async submit(req: Request, res: Response): Promise<void> {
     const input = req.body as ContactRequestInput;
 
-    const html = `
-      <h2 style="margin:0 0 12px;">New ${input.topic} inquiry</h2>
-      <table cellpadding="4" style="font-size:14px;">
-        <tr><td><strong>Name</strong></td><td>${escapeHtml(input.name)}</td></tr>
-        <tr><td><strong>Email</strong></td><td>${escapeHtml(input.email)}</td></tr>
-        ${input.phone ? `<tr><td><strong>Phone</strong></td><td>${escapeHtml(input.phone)}</td></tr>` : ''}
-        ${input.gymSlug ? `<tr><td><strong>Gym</strong></td><td>${escapeHtml(input.gymSlug)}</td></tr>` : ''}
-      </table>
-      <p style="white-space:pre-wrap;font-size:14px;border-left:3px solid #ccc;padding-left:12px;">${escapeHtml(input.message)}</p>`;
+    const html = renderEmailLayout(
+      PLATFORM_BRANDING,
+      {
+        icon: input.topic === 'sales' ? '💬' : '💳',
+        title: `New ${input.topic === 'sales' ? 'Sales' : 'Billing'} Inquiry`,
+        categoryLabel: input.topic === 'sales' ? 'Sales inquiry' : 'Billing inquiry',
+        preheader: `New ${input.topic} inquiry from ${input.name}`,
+      },
+      `${detailTable(
+        detailRow('👤', 'Name', escapeHtml(input.name)) +
+          detailRow('📧', 'Email', escapeHtml(input.email)) +
+          (input.phone ? detailRow('📱', 'Phone', escapeHtml(input.phone)) : '') +
+          (input.gymSlug ? detailRow('🏢', 'Gym', escapeHtml(input.gymSlug)) : ''),
+      )}
+       <p style="white-space:pre-wrap;margin-top:20px;padding-left:14px;border-left:3px solid #e5e7eb;color:#374151;">${escapeHtml(input.message)}</p>`,
+    );
 
     await enqueueEmail({
       to: TOPIC_INBOX[input.topic],

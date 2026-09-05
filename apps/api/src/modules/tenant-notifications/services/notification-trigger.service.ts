@@ -1,6 +1,10 @@
 import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
+import type { EmailBranding } from '../../../infrastructure/mail/templates/base-layout';
+import { memberPaymentReceiptEmail } from '../../../infrastructure/mail/templates/member-templates';
+import { tenantNotificationEmail } from '../../../infrastructure/mail/templates/notification-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
+import { tenantService } from '../../tenants/service/tenant.service';
 import { renderTemplate } from '../constants/default-templates';
 
 import { notificationTemplateService } from './notification-template.service';
@@ -33,7 +37,12 @@ async function fireTemplated(
   tenantId: string,
   type: Parameters<typeof notificationTemplateService.getEffective>[1],
   vars: Record<string, string>,
-  opts: { category: Parameters<typeof tenantNotificationService.notifyTenant>[1]; recipientEmail?: string | null },
+  opts: {
+    category: Parameters<typeof tenantNotificationService.notifyTenant>[1];
+    recipientEmail?: string | null;
+    /** When provided and the EMAIL channel is active, replaces the generic title/body wrapper with a fully-detailed template (e.g. a payment receipt) — the IN_APP feed still uses the tenant's own customizable title/body text either way. */
+    richEmail?: (branding: EmailBranding) => { subject: string; html: string };
+  },
 ): Promise<void> {
   const template = await notificationTemplateService.getEffective(tenantId, type);
   if (!template.isActive) return;
@@ -45,7 +54,12 @@ async function fireTemplated(
     await tenantNotificationService.notifyTenant(tenantId, opts.category, title, body);
   }
   if (template.channels.includes('EMAIL') && opts.recipientEmail) {
-    await enqueueEmail({ to: opts.recipientEmail, subject: title, html: `<p>${body}</p>` });
+    const tenant = await tenantService.resolveById(tenantId);
+    const branding = tenant
+      ? { tenantName: tenant.name, primaryColor: tenant.branding.primaryColor, logoUrl: tenant.branding.emailLogoUrl ?? tenant.branding.logoUrl }
+      : { tenantName: 'FitCloud' };
+    const mail = opts.richEmail ? opts.richEmail(branding) : tenantNotificationEmail(branding, title, body);
+    await enqueueEmail({ to: opts.recipientEmail, subject: mail.subject, html: mail.html });
   }
 }
 
@@ -115,13 +129,43 @@ export async function notifyMembershipExpired(
 
 export async function notifyPaymentReceived(
   tenantId: string,
-  params: { memberName: string; amount: string; paymentNumber: string; memberEmail?: string | null },
+  params: {
+    memberName: string;
+    amount: string;
+    paymentNumber: string;
+    memberEmail?: string | null;
+    /** Full receipt detail — when present, the EMAIL channel sends `memberPaymentReceiptEmail` instead of the generic customizable-text wrapper; the IN_APP feed is unaffected either way. */
+    receipt?: {
+      paymentDate: string;
+      method: string;
+      currencySymbol: string;
+      amountPaid: number;
+      discount?: number;
+      tax?: number;
+      totalPaid: number;
+      dueAmount: number;
+      membershipPlanName?: string | null;
+      membershipValidTill?: string | null;
+      transactionReference?: string | null;
+    };
+  },
 ): Promise<void> {
   await fireTemplated(
     tenantId,
     'PAYMENT_SUCCESS',
     { memberName: params.memberName, amount: params.amount, paymentNumber: params.paymentNumber },
-    { category: 'PAYMENT', recipientEmail: params.memberEmail },
+    {
+      category: 'PAYMENT',
+      recipientEmail: params.memberEmail,
+      richEmail: params.receipt
+        ? (branding) =>
+            memberPaymentReceiptEmail(branding, {
+              memberName: params.memberName,
+              paymentNumber: params.paymentNumber,
+              ...params.receipt!,
+            })
+        : undefined,
+    },
   );
 }
 

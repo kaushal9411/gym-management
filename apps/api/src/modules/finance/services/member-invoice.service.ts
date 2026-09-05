@@ -2,12 +2,15 @@ import PDFDocument from 'pdfkit';
 
 import { NotFoundError, ValidationError } from '../../../core/errors/app-error';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
+import { formatMoney } from '../../../infrastructure/mail/templates/base-layout';
+import { memberInvoiceSummaryEmail } from '../../../infrastructure/mail/templates/member-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { assertBranchAccess, getBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
 import { decryptMemberContactNullable } from '../../members/utils/member-pii.util';
 import { TenantInvoiceSettingsRepository } from '../../settings/repositories/tenant-invoice-settings.repository';
+import { tenantService } from '../../tenants/service/tenant.service';
 import type {
   GenerateInvoiceInput,
   InvoiceItemDto,
@@ -227,11 +230,23 @@ export class MemberInvoiceService {
     const to = overrideEmail ?? member?.email;
     if (!to) throw new ValidationError('This member has no email on file — provide one explicitly.');
 
-    await enqueueEmail({
-      to,
-      subject: `Invoice ${invoice.invoiceNumber}`,
-      html: `<p>Hi ${invoice.member.name},</p><p>Your invoice <strong>${invoice.invoiceNumber}</strong> dated ${invoice.invoiceDate} for <strong>$${invoice.totalAmount}</strong> is ${invoice.status === 'PAID' ? 'paid — thank you!' : `due by ${invoice.dueDate}.`}</p><p>Sign in to your gym's member portal to view the full details.</p>`,
-    });
+    const tenant = await tenantService.resolveById(this.tenantId);
+    const branding = tenant
+      ? { tenantName: tenant.name, primaryColor: tenant.branding.primaryColor, logoUrl: tenant.branding.emailLogoUrl ?? tenant.branding.logoUrl }
+      : { tenantName: 'FitCloud' };
+    const settings = await this.db.tenantSettings.findUnique({ where: { tenantId: this.tenantId } });
+    const currencySymbol = settings?.currencySymbol ?? '$';
+    const mail = memberInvoiceSummaryEmail(
+      branding,
+      invoice.member.name,
+      invoice.invoiceNumber,
+      invoice.invoiceDate,
+      formatMoney(Number(invoice.totalAmount), currencySymbol),
+      invoice.status === 'CANCELLED' ? 'UNPAID' : invoice.status,
+      invoice.dueDate,
+      invoice.items[0]?.description ?? null,
+    );
+    await enqueueEmail({ to, subject: mail.subject, html: mail.html });
     await this.audit(actor, 'member_invoice.emailed', id);
   }
 
