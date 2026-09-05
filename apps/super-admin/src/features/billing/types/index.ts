@@ -11,6 +11,17 @@ export interface VerifyPaymentResult {
 
 export type ChangePlanMode = 'manual' | 'payment_link';
 
+export type PaymentMode = 'CASH' | 'BANK_TRANSFER' | 'UPI' | 'CHEQUE' | 'CARD' | 'OTHER';
+
+/** Required when `mode: 'manual'` — captures the same detail a real payment already carries. */
+export interface ManualPaymentInput {
+  paymentMode: PaymentMode;
+  paymentDate: string;
+  amount?: number;
+  proofDataUrl?: string;
+  notes?: string;
+}
+
 /** The API returns whichever shape matches the `mode` the caller sent — no wrapper discriminator, since the caller already knows which one it asked for. */
 export interface ManualPlanChangeResult {
   id: string;

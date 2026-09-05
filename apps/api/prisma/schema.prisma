@@ -93,8 +93,26 @@ enum PaymentGatewayProvider {
   STRIPE
   RAZORPAY
   PAYPAL
+  /// An admin recorded this payment as settled offline (bank transfer, cash,
+  /// cheque, etc.) — no real gateway ever touched it. See `Payment.paymentMode`.
+  MANUAL
 
   @@map("payment_gateway_provider")
+}
+
+/// How a MANUAL platform payment was actually settled — captured by the
+/// Super Admin's "Mark Paid Manually" flow so it reads the same as a real
+/// payment (mode/date/proof) rather than just a bare invoice with no
+/// payment record at all.
+enum PaymentMode {
+  CASH
+  BANK_TRANSFER
+  UPI
+  CHEQUE
+  CARD
+  OTHER
+
+  @@map("payment_mode")
 }
 
 enum InvoiceStatus {
@@ -2582,6 +2600,17 @@ model Payment {
   /// convention documented in docs/architecture/ARCHITECTURE.md §9, not
   /// re-derived here since this environment has no real gateway secrets.
   metadata         Json                   @default("{}")
+  /// Only set for `provider: MANUAL` — how the admin says this was settled.
+  paymentMode      PaymentMode?           @map("payment_mode")
+  /// Admin-entered date the money actually changed hands (may be in the
+  /// past — e.g. logging a bank transfer received yesterday) — distinct
+  /// from `createdAt`, which is just when this row was recorded.
+  paidAt           DateTime?              @map("paid_at")
+  /// Object-storage KEY (not a URL — same `private` visibility convention
+  /// as `Expense.receiptDataUrl`) for an optional proof-of-payment
+  /// screenshot uploaded alongside a manual entry. Re-signed via
+  /// `presignGetUrl()` at read time, never stored as a permanent URL.
+  proofUrl         String?                @map("proof_url")
   createdAt        DateTime               @default(now()) @map("created_at")
   updatedAt        DateTime               @updatedAt @map("updated_at")
 

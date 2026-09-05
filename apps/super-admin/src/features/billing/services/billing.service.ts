@@ -1,5 +1,5 @@
 import { apiClient, toAdminServiceError } from '@/features/auth/services/api-client';
-import type { ChangePlanMode, ChangePlanResult, PaymentLinkResult, VerifyPaymentResult } from '../types';
+import type { ChangePlanMode, ChangePlanResult, ManualPaymentInput, PaymentLinkResult, VerifyPaymentResult } from '../types';
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -35,9 +35,9 @@ class AdminTenantBillingService {
     }
   }
 
-  async changePlan(tenantId: string, planId: string, mode: ChangePlanMode): Promise<ChangePlanResult> {
+  async changePlan(tenantId: string, planId: string, mode: ChangePlanMode, manual?: ManualPaymentInput): Promise<ChangePlanResult> {
     try {
-      const res = await apiClient.post<ApiEnvelope<ChangePlanResult>>(`/admin/tenants/${tenantId}/subscription/change-plan`, { planId, mode });
+      const res = await apiClient.post<ApiEnvelope<ChangePlanResult>>(`/admin/tenants/${tenantId}/subscription/change-plan`, { planId, mode, ...manual });
       return res.data.data;
     } catch (error) {
       throw toAdminServiceError(error);

@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
-import { AdminTenantBillingService, type ChangePlanMode } from '../services/admin-tenant-billing.service';
+import { AdminTenantBillingService, type ChangePlanMode, type ManualPaymentInput } from '../services/admin-tenant-billing.service';
 
 function serviceFor(req: Request): AdminTenantBillingService {
   return new AdminTenantBillingService(req.params.tenantId!);
@@ -25,9 +25,14 @@ export class AdminTenantBillingController {
   }
 
   async changePlan(req: Request, res: Response): Promise<void> {
-    const { planId, mode } = req.body as { planId: string; mode: ChangePlanMode };
-    const result = await serviceFor(req).changePlan(planId, mode, req.admin!.sub, req.admin!.role);
-    sendSuccess(res, result, mode === 'manual' ? 'Plan changed.' : 'Payment link created.');
+    const { planId, mode, paymentMode, paymentDate, amount, proofDataUrl, notes } = req.body as {
+      planId: string;
+      mode: ChangePlanMode;
+    } & Partial<ManualPaymentInput>;
+    const manual: ManualPaymentInput | undefined =
+      mode === 'manual' && paymentMode && paymentDate ? { paymentMode, paymentDate, amount, proofDataUrl, notes } : undefined;
+    const result = await serviceFor(req).changePlan(planId, mode, req.admin!.sub, req.admin!.role, manual);
+    sendSuccess(res, result, mode === 'manual' ? 'Marked paid — plan changed.' : 'Payment link created.');
   }
 
   async verifyPaymentStatus(req: Request, res: Response): Promise<void> {

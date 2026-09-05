@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
-import type { SubscriptionHistoryAction } from '@prisma/client';
+import type { PaymentMode, SubscriptionHistoryAction } from '@prisma/client';
 
 import { env } from '../../../config/env';
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { eventBus } from '../../../core/events/event-bus';
+import { presignGetUrl, uploadDataUrl } from '../../../core/storage/storage.service';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { invoiceEmail } from '../../../infrastructure/mail/templates/billing-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
@@ -20,6 +21,17 @@ import { tenantService } from '../../tenants/service/tenant.service';
 import { adminTenantRepository } from '../repositories/admin-tenant.repository';
 
 export type ChangePlanMode = 'manual' | 'payment_link';
+
+export interface ManualPaymentInput {
+  paymentMode: PaymentMode;
+  /** Date string (e.g. "2026-09-05") the money actually changed hands — may be in the past. */
+  paymentDate: string;
+  /** Overrides the plan's own price when the amount actually received differs — defaults to the generated invoice's total. */
+  amount?: number;
+  /** A `data:image/...;base64,...` screenshot/proof of payment — stored `private`, never a permanent public URL. */
+  proofDataUrl?: string;
+  notes?: string;
+}
 
 function portalPath(tenantSlug: string, path: string): string {
   return `http://${tenantSlug}.${env.platformDomain}${path}`;
@@ -47,7 +59,13 @@ export class AdminTenantBillingService {
   async payments(page: number, limit: number) {
     const skip = (page - 1) * limit;
     const { total, items } = await adminPaymentRepository.list({ tenantId: this.tenantId, skip, take: limit });
-    return { items, page, limit, total, totalPages: Math.ceil(total / limit) };
+    // `proofUrl` is a private object-storage KEY, not a working URL (same
+    // convention as Expense.receiptDataUrl) — re-signed to a fresh, short-
+    // lived URL here at read time rather than ever stored/returned permanently.
+    const withPresignedProof = await Promise.all(
+      items.map(async (item) => ({ ...item, proofUrl: item.proofUrl ? await presignGetUrl(item.proofUrl) : item.proofUrl })),
+    );
+    return { items: withPresignedProof, page, limit, total, totalPages: Math.ceil(total / limit) };
   }
 
   async invoiceList(page: number, limit: number) {
@@ -148,23 +166,54 @@ export class AdminTenantBillingService {
     return { paymentId: payment!.id, invoiceId: invoice.id, shortUrl: link.shortUrl, status: 'PENDING' as const };
   }
 
-  /** Single entry point for "Upgrade/Downgrade" from the Plan Detail page's subscriber list — dispatches to a same-session admin override or a real Razorpay collection. */
-  async changePlan(planId: string, mode: ChangePlanMode, adminUserId: string, adminRole: string) {
-    if (mode === 'manual') return this.changePlanManually(planId, adminUserId, adminRole);
+  /** Single entry point for "Upgrade/Downgrade" from the Plan Detail page's subscriber list (and the Tenant Detail page's own "Change plan" button) — dispatches to a same-session admin override or a real Razorpay collection. */
+  async changePlan(planId: string, mode: ChangePlanMode, adminUserId: string, adminRole: string, manual?: ManualPaymentInput) {
+    if (mode === 'manual') {
+      if (!manual) throw new AppError(ErrorCode.VALIDATION_ERROR, 'Payment mode and date are required to mark a plan paid manually.', 422);
+      return this.changePlanManually(planId, manual, adminUserId, adminRole);
+    }
     return this.createPaymentLink({ planId }, adminUserId, adminRole);
   }
 
   /**
-   * Admin-asserted plan switch with no online payment collected (e.g. the
-   * gym paid via bank transfer, or this is a comp/support override) —
-   * mirrors `SubscriptionService.checkout()`'s exact success tail, generating
-   * and immediately marking an invoice PAID rather than going through the
-   * (sandboxed) charge step, since there's no real gateway call to make here.
+   * Admin-asserted plan switch with no online gateway involved (e.g. the
+   * gym paid via bank transfer/cash/cheque, or this is a comp/support
+   * override) — mirrors `SubscriptionService.checkout()`'s exact success
+   * tail (generates and immediately marks an invoice PAID), and — unlike
+   * the original version of this method — also records a real `Payment`
+   * row (`provider: MANUAL`) carrying the mode/date/amount/proof the admin
+   * entered, so this reads exactly like a real payment (Payments tab,
+   * amount, reference) rather than a paid invoice with no payment behind
+   * it. `applyPlanChange` still fires the same `billing.subscription_activated`
+   * event a real payment does, so the tenant gets the identical
+   * subscription-activated + invoice emails either way.
    */
-  private async changePlanManually(planId: string, adminUserId: string, adminRole: string) {
+  private async changePlanManually(planId: string, manual: ManualPaymentInput, adminUserId: string, adminRole: string) {
     const invoice = await this.generatePlanChangeInvoice(planId);
     await this.invoices.markPaid(invoice.id);
-    await this.applyPlanChange(planId, invoice, 'Manually changed by admin (no online payment collected)');
+
+    const proofUrl = manual.proofDataUrl
+      ? await uploadDataUrl(manual.proofDataUrl, { keyPrefix: 'payment-proofs', visibility: 'private' })
+      : null;
+
+    await this.db.payment.create({
+      data: {
+        tenantId: this.tenantId,
+        subscriptionId: invoice.subscriptionId,
+        invoiceId: invoice.id,
+        provider: 'MANUAL',
+        status: 'SUCCEEDED',
+        amount: manual.amount ?? invoice.total,
+        currency: invoice.currency,
+        idempotencyKey: randomUUID(),
+        paymentMode: manual.paymentMode,
+        paidAt: new Date(manual.paymentDate),
+        proofUrl,
+        metadata: manual.notes ? { notes: manual.notes } : {},
+      },
+    });
+
+    await this.applyPlanChange(planId, invoice, `Marked paid manually by admin — ${manual.paymentMode}${manual.notes ? ` (${manual.notes})` : ''}`);
 
     await adminAuditLogRepository.record({
       adminUserId,
@@ -172,7 +221,7 @@ export class AdminTenantBillingService {
       action: 'admin.tenant_plan_changed_manual',
       entityType: 'Tenant',
       entityId: this.tenantId,
-      after: { planId },
+      after: { planId, paymentMode: manual.paymentMode, paymentDate: manual.paymentDate },
     });
 
     return this.subscriptions.findCurrent(this.tenantId);

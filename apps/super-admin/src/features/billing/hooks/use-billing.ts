@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { AdminServiceError } from '@/features/auth/types';
 import { adminTenantBillingService } from '../services/billing.service';
-import type { ChangePlanMode } from '../types';
+import type { ChangePlanMode, ManualPaymentInput } from '../types';
 
 export function toBillingError(error: unknown): AdminServiceError {
   if (error instanceof AdminServiceError) return error;
@@ -30,7 +30,8 @@ export function useChangePlan(tenantId: string) {
   const queryClient = useQueryClient();
   const invalidate = useInvalidateTenantBilling(tenantId);
   return useMutation({
-    mutationFn: ({ planId, mode }: { planId: string; mode: ChangePlanMode }) => adminTenantBillingService.changePlan(tenantId, planId, mode),
+    mutationFn: ({ planId, mode, manual }: { planId: string; mode: ChangePlanMode; manual?: ManualPaymentInput }) =>
+      adminTenantBillingService.changePlan(tenantId, planId, mode, manual),
     onSuccess: () => {
       invalidate();
       // Subscriber counts moved between plans — refresh every plan's list/detail/subscribers view.
