@@ -201,9 +201,13 @@ export function RegisterForm() {
                     />
                     <Label htmlFor="acceptTerms" className="cursor-pointer font-normal leading-snug text-muted-foreground">
                       I agree to the{' '}
-                      <Link href="#" className="text-primary underline-offset-4 hover:underline">Terms of Service</Link>{' '}
+                      <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-4 hover:underline">
+                        Terms of Service
+                      </Link>{' '}
                       and{' '}
-                      <Link href="#" className="text-primary underline-offset-4 hover:underline">Privacy Policy</Link>
+                      <Link href="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary underline-offset-4 hover:underline">
+                        Privacy Policy
+                      </Link>
                     </Label>
                   </div>
                   {fieldError('acceptTerms') ? (

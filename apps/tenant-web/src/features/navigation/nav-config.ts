@@ -144,7 +144,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'billing', label: 'Billing', href: '/billing', icon: Receipt, permission: 'billing:read', section: 'Finance' },
   { key: 'reports', label: 'Reports', href: '/reports', icon: BarChart3, permission: 'reports:view', featureFlag: 'reports', section: 'Insights' },
   { key: 'analytics', label: 'Analytics', href: '/analytics', icon: PieChart, permission: 'analytics:view', featureFlag: 'reports', section: 'Insights' },
-  { key: 'notifications', label: 'Notifications', href: '/notifications', icon: Bell, section: 'Communication' },
+  { key: 'notifications', label: 'Notifications', href: '/notifications', icon: Bell, featureFlag: 'notifications', section: 'Communication' },
   {
     key: 'announcements',
     label: 'Announcements',

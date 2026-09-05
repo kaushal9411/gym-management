@@ -15,6 +15,14 @@ export function useCmsPages() {
   return useQuery({ queryKey: ['admin', 'cms'], queryFn: () => adminCmsService.list() });
 }
 
+export function useCmsPage(slug: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'cms', slug],
+    queryFn: () => adminCmsService.getBySlug(slug!),
+    enabled: slug !== null,
+  });
+}
+
 export function useCreateCmsPage() {
   const queryClient = useQueryClient();
   return useMutation({

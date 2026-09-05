@@ -9,18 +9,13 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination } from '@/components/ui/pagination';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { usePublishedCmsPages } from '@/features/cms/hooks/use-cms';
 import { NewTicketDialog } from '@/features/support/components/new-ticket-dialog';
 import { TicketDetailDialog } from '@/features/support/components/ticket-detail-dialog';
 import { TicketPriorityBadge, TicketStatusBadge } from '@/features/support/components/ticket-badges';
 import { useTicketList } from '@/features/support/hooks/use-tickets';
 import type { TicketListItem } from '@/features/support/types';
 import { useTenant } from '@/features/tenant/tenant-provider';
-
-const FAQS = [
-  { question: 'How do I invite a staff member?', answer: 'Staff invitations are managed from the Staff module once it ships.' },
-  { question: 'How do I change my subscription plan?', answer: 'Go to Billing → Overview and choose "Change plan".' },
-  { question: 'Can I add another branch?', answer: 'Branch management is coming with the Branches module.' },
-];
 
 function buildColumns(onView: (ticketId: string) => void): DataTableColumn<TicketListItem>[] {
   return [
@@ -61,6 +56,8 @@ export default function SupportPage() {
   const hasTickets = tenant.featureFlags.includes('support_tickets');
   const canView = hasPermission('support:view');
   const canCreate = hasPermission('support:create');
+  const faqsQuery = usePublishedCmsPages('FAQ');
+  const faqs = faqsQuery.data ?? [];
 
   const [page, setPage] = React.useState(1);
   const [selectedTicketId, setSelectedTicketId] = React.useState<string | null>(null);
@@ -87,13 +84,19 @@ export default function SupportPage() {
             Frequently asked questions
           </CardTitle>
         </CardHeader>
-        <CardContent className="divide-y divide-border">
-          {FAQS.map((faq) => (
-            <div key={faq.question} className="py-3.5 first:pt-0 last:pb-0">
-              <p className="text-sm font-medium">{faq.question}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{faq.answer}</p>
-            </div>
-          ))}
+        <CardContent className={faqs.length > 0 ? 'divide-y divide-border' : undefined}>
+          {faqsQuery.isPending ? (
+            <p className="py-3.5 text-sm text-muted-foreground">Loading…</p>
+          ) : faqs.length === 0 ? (
+            <p className="py-3.5 text-sm text-muted-foreground">No FAQs published yet.</p>
+          ) : (
+            faqs.map((faq) => (
+              <div key={faq.id} className="py-3.5 first:pt-0 last:pb-0">
+                <p className="text-sm font-medium">{faq.title}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{String(faq.content.answer ?? '')}</p>
+              </div>
+            ))
+          )}
         </CardContent>
       </Card>
 

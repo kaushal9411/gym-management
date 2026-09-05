@@ -17,6 +17,15 @@ class AdminCmsService {
     }
   }
 
+  async getBySlug(slug: string): Promise<CmsPage> {
+    try {
+      const res = await apiClient.get<ApiEnvelope<CmsPage>>(`/admin/cms/pages/${slug}`);
+      return res.data.data;
+    } catch (error) {
+      throw toAdminServiceError(error);
+    }
+  }
+
   async create(input: UpsertCmsPageInput): Promise<CmsPage> {
     try {
       const res = await apiClient.post<ApiEnvelope<CmsPage>>('/admin/cms/pages', input);
