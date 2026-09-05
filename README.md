@@ -60,8 +60,6 @@ Mailpit UI: `http://localhost:8025`.
 
 ```bash
 pnpm build                                  # turbo builds all affected workspaces
-docker build -f infrastructure/docker/api.Dockerfile .
-docker build -f infrastructure/docker/web.Dockerfile --build-arg APP=tenant-web .
 ```
 
 ## Deployment
@@ -69,7 +67,8 @@ docker build -f infrastructure/docker/web.Dockerfile --build-arg APP=tenant-web 
 - **staging** — auto-deploys from `develop` (`.github/workflows/deploy-staging.yml`)
 - **production** — promotes staging-verified images from `main` behind a manual
   approval gate (`.github/workflows/deploy-production.yml`)
-- Runbooks: [docs/deployment/](docs/deployment/) · IaC: [infrastructure/terraform/](infrastructure/terraform/)
+- Runbooks: [docs/deployment/](docs/deployment/)
+- Real test-server deploy (the one actually in use): [infrastructure/testing-deploy/](infrastructure/testing-deploy/) — a single EC2 instance, pm2 + pnpm build, no containers
 
 ## Folder Structure
 
@@ -94,11 +93,9 @@ gym-saas-platform/
 │   ├── eslint-config/      # Shared ESLint preset
 │   └── typescript-config/  # tsconfig presets: base / node / nextjs / react-library
 ├── infrastructure/
-│   ├── docker/             # Dockerfiles (api, web) + docker-compose.prod.yml
-│   ├── nginx/              # dev.conf / prod.conf — subdomain reverse proxy + ws upgrade
-│   ├── github-actions/     # Reusable composite actions (workflows live in .github/)
-│   ├── terraform/          # AWS IaC — modules/ + environments/{staging,production}
-│   └── scripts/            # Idempotent ops & dev scripts
+│   ├── nginx/              # dev.conf — local dev's optional subdomain reverse proxy
+│   └── testing-deploy/     # The real deploy tooling — single EC2 instance, pm2 + pnpm
+│                           #   build (no containers/IaC/CI pipeline exist for this yet)
 ├── docs/
 │   ├── architecture/       # ARCHITECTURE.md (25 sections) + adr/
 │   ├── api/  database/  deployment/          # reference docs per concern

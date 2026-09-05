@@ -1,13 +1,13 @@
 # Testing-only AWS deploy
 
 Gets the whole FitCloud stack running on one AWS EC2 instance for real
-end-to-end testing — not a production setup. No load balancer, no HTTPS, no
-managed database, no container registry. Intentionally the simplest thing
-that works, so it fits comfortably inside a free-tier account's $200/6-month
-credit. See `infrastructure/docker/docker-compose.prod.yml` +
-`infrastructure/terraform/` for what a real production deploy looks like
-instead (registry images, RDS, ElastiCache, TLS, replicas) — don't reuse
-this for that.
+end-to-end testing — not a production setup. No load balancer, no HTTPS
+beyond a single certbot cert, no managed database, no container registry,
+no autoscaling/replicas. Intentionally the simplest thing that works, so it
+fits comfortably inside a free-tier account's $200/6-month credit. A real
+production deploy (registry images, RDS, ElastiCache, TLS at a load
+balancer, replicas) would look meaningfully different from this — this
+setup is not meant to be reused as that starting point.
 
 ## What it sets up
 

@@ -3,7 +3,8 @@
 # Backing services only; apps run on the host via `pnpm dev` for fast HMR.
 # Optional subdomain proxy: `docker compose --profile proxy up` (requires
 # *.fitcloud.local pointed at 127.0.0.1 in your hosts file / dnsmasq).
-# Production compose lives in infrastructure/docker/docker-compose.prod.yml.
+# Production runs on a plain EC2 instance via infrastructure/testing-deploy/
+# (pm2 + pnpm build, not containers) — see that folder's README.
 # ════════════════════════════════════════════════════════════════════════
 
 name: gym-saas-platform
