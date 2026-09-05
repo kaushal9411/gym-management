@@ -514,20 +514,39 @@ const ADMIN_ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
   ],
 };
 
+/**
+ * Platform-wide kill switches — one real, enforced flag per optional
+ * tenant-facing module (Prompt 80). Every `key` here is deliberately the
+ * SAME key `TenantModule`/`SubscriptionPlan.features` already uses (see
+ * `nav-config.ts`'s `featureFlag:` values and `ai-launcher-button.tsx`/
+ * `support/page.tsx`'s direct `tenant.featureFlags.includes(...)` checks) —
+ * `TenantService#toResolvedTenant` ANDs a tenant's plan-granted modules
+ * against this list, so toggling one off here disables it for EVERY
+ * tenant regardless of their plan, while a plan simply never granting a
+ * module in the first place still works exactly as before.
+ *
+ * Deliberately EXCLUDES `members`/`staff`/`branches`/`membership_plans` —
+ * those are foundational (every plan grants them; there is no real
+ * "temporarily disable Members platform-wide" scenario, only "break the
+ * entire app"), so they aren't offered as a kill switch. Also deliberately
+ * drops the six previously-seeded keys with no code behind them at all
+ * (`chat`, `inventory`, `pos`, `white_label`, `custom_domain`,
+ * `video_training`, `marketplace`) — toggling those did nothing before and
+ * would keep doing nothing now; a kill switch nobody can verify works is
+ * worse than not having it.
+ */
 const FEATURE_FLAGS: Array<{ key: string; label: string; category: string }> = [
   { key: 'attendance', label: 'Attendance', category: 'operations' },
-  { key: 'workout', label: 'Workout plans', category: 'operations' },
-  { key: 'diet', label: 'Diet plans', category: 'operations' },
-  { key: 'reports', label: 'Reports', category: 'operations' },
-  { key: 'analytics', label: 'Analytics', category: 'operations' },
-  { key: 'chat', label: 'Chat', category: 'communication' },
-  { key: 'inventory', label: 'Inventory', category: 'operations' },
-  { key: 'pos', label: 'Point of sale', category: 'operations' },
-  { key: 'white_label', label: 'White label branding', category: 'platform' },
-  { key: 'custom_domain', label: 'Custom domain', category: 'platform' },
-  { key: 'video_training', label: 'Video training (future)', category: 'future' },
-  { key: 'ai_coach', label: 'AI coach (future)', category: 'future' },
-  { key: 'marketplace', label: 'Marketplace (future)', category: 'future' },
+  { key: 'workout_plans', label: 'Workout plans', category: 'operations' },
+  { key: 'diet_plans', label: 'Diet plans', category: 'operations' },
+  { key: 'live_classes', label: 'Group classes', category: 'operations' },
+  { key: 'payments', label: 'Payments & invoices', category: 'finance' },
+  { key: 'income', label: 'Income tracking', category: 'finance' },
+  { key: 'expenses', label: 'Expense tracking', category: 'finance' },
+  { key: 'reports', label: 'Reports & analytics', category: 'insights' },
+  { key: 'notifications', label: 'Notifications & announcements', category: 'communication' },
+  { key: 'support_tickets', label: 'Support tickets', category: 'communication' },
+  { key: 'ai_coach', label: 'AI assistant', category: 'communication' },
 ];
 
 const COUNTRIES: Array<{ code: string; name: string }> = [
@@ -717,6 +736,11 @@ async function main(): Promise<void> {
   }
 
   console.log('Seeding feature flags...');
+  // Prompt 80 replaced the old key set entirely (real modules, not
+  // fictional ones) — delete anything not in the new list so a stale
+  // `workout`/`chat`/`inventory`/etc. row doesn't linger as a dead toggle.
+  const deleted = await prisma.featureFlag.deleteMany({ where: { key: { notIn: FEATURE_FLAGS.map((f) => f.key) } } });
+  if (deleted.count > 0) console.log(`  Removed ${deleted.count} stale feature flag(s)`);
   for (const flag of FEATURE_FLAGS) {
     await prisma.featureFlag.upsert({
       where: { key: flag.key },

@@ -18,6 +18,17 @@ export class AdminCmsService {
     return prisma.cmsPage.findMany({ where: type ? { type } : {}, orderBy: { updatedAt: 'desc' } });
   }
 
+  /**
+   * Public-facing read (Prompt 81) — only ever `isPublished` rows, never a
+   * draft. Ordered oldest-first so a multi-row type (FAQ — one row per
+   * question) keeps a stable order as new entries are added, rather than
+   * reshuffling on every edit the way `updatedAt desc` (used by the admin
+   * `list()` above) would.
+   */
+  async listPublished(type: CmsPageType) {
+    return prisma.cmsPage.findMany({ where: { type, isPublished: true }, orderBy: { createdAt: 'asc' } });
+  }
+
   async getBySlug(slug: string) {
     const page = await prisma.cmsPage.findUnique({ where: { slug } });
     if (!page) throw new AppError(ErrorCode.NOT_FOUND, 'Page not found', 404);

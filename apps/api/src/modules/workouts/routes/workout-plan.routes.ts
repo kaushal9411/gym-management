@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { workoutPlanController } from '../controllers/workout-plan.controller';
 import {
   assignmentIdParamSchema,
@@ -26,6 +27,7 @@ const asyncHandler =
   };
 
 workoutPlanRouter.use(authenticateMiddleware);
+workoutPlanRouter.use(requireModuleEnabled('workout_plans'));
 
 /** @openapi { "/workout-plans/assignable": { get: { tags: [Workouts], summary: "Unfiltered active-only plan list — backs the Assign Workout Plan dropdown", security: [{bearerAuth: []}], responses: { 200: { description: "WorkoutPlan[]" } } } } } */
 workoutPlanRouter.get('/assignable', requirePermission('workouts:view'), asyncHandler(workoutPlanController.listAssignable.bind(workoutPlanController)));

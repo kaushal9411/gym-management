@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { foodController } from '../controllers/food.controller';
 import { createFoodSchema, idParamSchema, listFoodsQuerySchema, updateFoodSchema } from '../validators/diet.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 foodRouter.use(authenticateMiddleware);
+foodRouter.use(requireModuleEnabled('diet_plans'));
 
 /** @openapi { "/foods/active": { get: { tags: [Diet], summary: "Unfiltered active-only food list — backs the food picker", security: [{bearerAuth: []}], responses: { 200: { description: "Food[]" } } } } } */
 foodRouter.get('/active', requirePermission('diets:view'), asyncHandler(foodController.listActive.bind(foodController)));

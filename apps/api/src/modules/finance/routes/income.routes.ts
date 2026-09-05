@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { incomeController } from '../controllers/income.controller';
 import { createIncomeSchema, idParamSchema, listIncomeQuerySchema, updateIncomeSchema } from '../validators/finance.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 incomeRouter.use(authenticateMiddleware);
+incomeRouter.use(requireModuleEnabled('income'));
 
 /** @openapi { "/income/export": { get: { tags: [Finance], summary: "Download filtered income as CSV", security: [{bearerAuth: []}], responses: { 200: { description: CSV file } } } } } */
 incomeRouter.get('/export', requirePermission('finance:view'), asyncHandler(incomeController.exportCsv.bind(incomeController)));

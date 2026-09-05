@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { tenantAnnouncementController } from '../controllers/tenant-announcement.controller';
 import {
   createAnnouncementSchema,
@@ -21,6 +22,7 @@ const asyncHandler =
   };
 
 tenantAnnouncementRouter.use(authenticateMiddleware);
+tenantAnnouncementRouter.use(requireModuleEnabled('notifications'));
 
 /** @openapi { "/tenant-announcements": { get: { tags: [Tenant Announcements], summary: "List this tenant's announcements", security: [{bearerAuth: []}], responses: { 200: { description: OK } } } } } */
 tenantAnnouncementRouter.get(

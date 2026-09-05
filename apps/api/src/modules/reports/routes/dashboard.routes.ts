@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { dashboardController } from '../controllers/dashboard.controller';
 
 export const dashboardRouter: Router = Router();
@@ -13,6 +14,7 @@ const asyncHandler =
   };
 
 dashboardRouter.use(authenticateMiddleware);
+dashboardRouter.use(requireModuleEnabled('reports'));
 
 /** @openapi { "/reports/dashboard/summary": { get: { tags: [Reports], summary: "Full dashboard: all KPIs + recent activity feed", security: [{bearerAuth: []}], responses: { 200: { description: Dashboard summary } } } } } */
 dashboardRouter.get('/summary', requirePermission('reports:view'), asyncHandler(dashboardController.getSummary.bind(dashboardController)));

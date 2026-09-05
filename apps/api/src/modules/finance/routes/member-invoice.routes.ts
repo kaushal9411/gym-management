@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { memberInvoiceController } from '../controllers/member-invoice.controller';
 import { emailInvoiceSchema, generateInvoiceSchema, idParamSchema, listInvoicesQuerySchema } from '../validators/finance.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 memberInvoiceRouter.use(authenticateMiddleware);
+memberInvoiceRouter.use(requireModuleEnabled('payments'));
 
 /**
  * @openapi

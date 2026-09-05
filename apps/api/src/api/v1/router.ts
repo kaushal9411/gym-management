@@ -8,6 +8,7 @@ import { publicAppReleaseRouter } from '../../modules/admin-app-releases/routes/
 import { adminAuditRouter } from '../../modules/admin-audit/routes/admin-audit.routes';
 import { adminAuthRouter } from '../../modules/admin-auth/routes/admin-auth.routes';
 import { adminCmsRouter } from '../../modules/admin-cms/routes/admin-cms.routes';
+import { publicCmsRouter } from '../../modules/admin-cms/routes/public-cms.routes';
 import { adminCouponRouter } from '../../modules/admin-coupons/routes/admin-coupon.routes';
 import { adminDashboardRouter } from '../../modules/admin-dashboard/routes/admin-dashboard.routes';
 import { adminFeatureFlagRouter } from '../../modules/admin-feature-flags/routes/admin-feature-flag.routes';
@@ -102,6 +103,7 @@ v1Router.use('/admin/templates', adminTemplateRouter);
 v1Router.use('/admin/scheduler', adminSchedulerRouter);
 v1Router.use('/admin/app-releases', adminAppReleaseRouter);
 v1Router.use('/public/app-releases', publicAppReleaseRouter);
+v1Router.use('/public/cms', publicCmsRouter);
 v1Router.use('/onboarding', onboardingRouter);
 v1Router.use('/subscription', subscriptionRouter);
 v1Router.use('/billing', billingRouter);

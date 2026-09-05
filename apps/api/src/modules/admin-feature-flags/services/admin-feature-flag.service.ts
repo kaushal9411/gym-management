@@ -2,6 +2,7 @@ import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
+import { invalidatePlatformFeatureFlagsCache } from '../../tenants/service/tenant.service';
 
 export class AdminFeatureFlagService {
   async list() {
@@ -13,6 +14,9 @@ export class AdminFeatureFlagService {
     if (!flag) throw new AppError(ErrorCode.NOT_FOUND, 'Feature flag not found', 404);
 
     const updated = await prisma.featureFlag.update({ where: { key }, data: { enabled } });
+    // Real, enforced kill switch (Prompt 80) — every tenant must see this
+    // change immediately, not after the platform-flags cache's TTL lapses.
+    await invalidatePlatformFeatureFlagsCache();
     await adminAuditLogRepository.record({
       adminUserId,
       actorRole: adminRole,

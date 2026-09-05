@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { exerciseController } from '../controllers/exercise.controller';
 import { createExerciseSchema, idParamSchema, listExercisesQuerySchema, updateExerciseSchema } from '../validators/workout.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 exerciseRouter.use(authenticateMiddleware);
+exerciseRouter.use(requireModuleEnabled('workout_plans'));
 
 /** @openapi { "/exercises/active": { get: { tags: [Workouts], summary: "Unfiltered active-only exercise list — backs the exercise picker", security: [{bearerAuth: []}], responses: { 200: { description: "Exercise[]" } } } } } */
 exerciseRouter.get('/active', requirePermission('workouts:view'), asyncHandler(exerciseController.listActive.bind(exerciseController)));

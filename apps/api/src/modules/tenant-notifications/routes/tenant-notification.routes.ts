@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { tenantNotificationController } from '../controllers/tenant-notification.controller';
 import { createNotificationSchema, listNotificationsQuerySchema, notificationIdParamSchema } from '../validators/tenant-notification.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 tenantNotificationRouter.use(authenticateMiddleware);
+tenantNotificationRouter.use(requireModuleEnabled('notifications'));
 
 /**
  * @openapi

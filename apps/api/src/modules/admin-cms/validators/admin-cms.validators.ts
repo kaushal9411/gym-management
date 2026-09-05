@@ -15,3 +15,6 @@ export const updateCmsPageSchema = createCmsPageSchema.omit({ slug: true }).part
 export const cmsPageSlugParamSchema = z.object({ slug: z.string().trim().min(1) });
 
 export const cmsPageQuerySchema = z.object({ type: z.enum(CMS_PAGE_TYPES).optional() });
+
+/** Public read (Prompt 81) — `type` is required, unlike the admin list above, so a public caller can't dump every page type in one request. */
+export const publicCmsPageQuerySchema = z.object({ type: z.enum(CMS_PAGE_TYPES) });

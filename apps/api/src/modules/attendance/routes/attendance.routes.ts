@@ -4,6 +4,7 @@ import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
 import { requireBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { attendanceController } from '../controllers/attendance.controller';
 import {
   attendanceParamSchema,
@@ -27,6 +28,7 @@ const asyncHandler =
   };
 
 attendanceRouter.use(authenticateMiddleware);
+attendanceRouter.use(requireModuleEnabled('attendance'));
 
 /**
  * @openapi

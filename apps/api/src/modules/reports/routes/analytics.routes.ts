@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { analyticsController } from '../controllers/analytics.controller';
 import { trendQuerySchema } from '../validators/reports.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 analyticsRouter.use(authenticateMiddleware);
+analyticsRouter.use(requireModuleEnabled('reports'));
 
 /** @openapi { "/analytics/revenue-trends": { get: { tags: [Analytics], summary: "Daily income vs expenses over a date range", security: [{bearerAuth: []}], responses: { 200: { description: "RevenueTrendPoint[]" } } } } } */
 analyticsRouter.get('/revenue-trends', requirePermission('analytics:view'), validate({ query: trendQuerySchema }), asyncHandler(analyticsController.revenueTrends.bind(analyticsController)));

@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { dietPlanController } from '../controllers/diet-plan.controller';
 import {
   assignDietPlanSchema,
@@ -26,6 +27,7 @@ const asyncHandler =
   };
 
 dietPlanRouter.use(authenticateMiddleware);
+dietPlanRouter.use(requireModuleEnabled('diet_plans'));
 
 /** @openapi { "/diet-plans/assignable": { get: { tags: [Diet], summary: "Unfiltered active-only plan list — backs the Assign Diet Plan dropdown", security: [{bearerAuth: []}], responses: { 200: { description: "DietPlan[]" } } } } } */
 dietPlanRouter.get('/assignable', requirePermission('diets:view'), asyncHandler(dietPlanController.listAssignable.bind(dietPlanController)));

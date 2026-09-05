@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { financeDashboardController } from '../controllers/finance-dashboard.controller';
 import { financeDashboardQuerySchema } from '../validators/finance.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 financeDashboardRouter.use(authenticateMiddleware);
+financeDashboardRouter.use(requireModuleEnabled('payments'));
 
 /** @openapi { "/finance/summary": { get: { tags: [Finance], summary: "Dashboard widgets — today's/monthly income, monthly expenses, outstanding payments, recent payments, revenue trend", security: [{bearerAuth: []}], responses: { 200: { description: Summary } } } } } */
 financeDashboardRouter.get(

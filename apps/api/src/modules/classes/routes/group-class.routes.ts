@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { groupClassController } from '../controllers/group-class.controller';
 import { createGroupClassSchema, idParamSchema, listGroupClassesQuerySchema, setScheduleSchema, updateGroupClassSchema } from '../validators/classes.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 groupClassRouter.use(authenticateMiddleware);
+groupClassRouter.use(requireModuleEnabled('live_classes'));
 
 groupClassRouter.get('/assignable', requirePermission('classes:view'), asyncHandler(groupClassController.listActive.bind(groupClassController)));
 groupClassRouter.get('/', requirePermission('classes:view'), validate({ query: listGroupClassesQuerySchema }), asyncHandler(groupClassController.list.bind(groupClassController)));

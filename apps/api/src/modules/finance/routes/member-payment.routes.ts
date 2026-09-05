@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { memberPaymentController } from '../controllers/member-payment.controller';
 import {
   createPaymentLinkSchema,
@@ -23,6 +24,7 @@ const asyncHandler =
   };
 
 memberPaymentRouter.use(authenticateMiddleware);
+memberPaymentRouter.use(requireModuleEnabled('payments'));
 
 /** @openapi { "/payments/export": { get: { tags: [Finance], summary: "Download filtered payment history as CSV", security: [{bearerAuth: []}], responses: { 200: { description: CSV file } } } } } */
 memberPaymentRouter.get('/export', requirePermission('finance:view'), asyncHandler(memberPaymentController.exportCsv.bind(memberPaymentController)));

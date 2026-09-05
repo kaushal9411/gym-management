@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { classSessionController } from '../controllers/class-session.controller';
 import { generateSessionsSchema, idParamSchema, listSessionsQuerySchema } from '../validators/classes.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 classSessionRouter.use(authenticateMiddleware);
+classSessionRouter.use(requireModuleEnabled('live_classes'));
 
 classSessionRouter.get('/', requirePermission('classes:view'), validate({ query: listSessionsQuerySchema }), asyncHandler(classSessionController.list.bind(classSessionController)));
 classSessionRouter.get('/:id', requirePermission('classes:view'), validate({ params: idParamSchema }), asyncHandler(classSessionController.getById.bind(classSessionController)));

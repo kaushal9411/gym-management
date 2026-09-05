@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { ticketController } from '../controllers/ticket.controller';
 import { createTicketSchema, listTicketsQuerySchema, ticketIdParamSchema } from '../validators/ticket.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 ticketRouter.use(authenticateMiddleware);
+ticketRouter.use(requireModuleEnabled('support_tickets'));
 
 /** @openapi { "/support/tickets": { get: { tags: [Support], summary: List my tickets, security: [{bearerAuth: []}], responses: { 200: { description: Paginated tickets } } } } } */
 ticketRouter.get(

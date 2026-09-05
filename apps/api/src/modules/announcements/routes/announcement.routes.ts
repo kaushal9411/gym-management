@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { announcementController } from '../controllers/announcement.controller';
 
 export const announcementRouter: Router = Router();
@@ -21,4 +22,9 @@ const asyncHandler =
  *     responses:
  *       200: { description: List of active announcements }
  */
-announcementRouter.get('/active', authenticateMiddleware, asyncHandler(announcementController.listActive.bind(announcementController)));
+announcementRouter.get(
+  '/active',
+  authenticateMiddleware,
+  requireModuleEnabled('notifications'),
+  asyncHandler(announcementController.listActive.bind(announcementController)),
+);

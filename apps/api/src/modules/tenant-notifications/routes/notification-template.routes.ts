@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { notificationTemplateController } from '../controllers/notification-template.controller';
 import { templateTypeParamSchema, updateTemplateSchema } from '../validators/tenant-notification.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 notificationTemplateRouter.use(authenticateMiddleware);
+notificationTemplateRouter.use(requireModuleEnabled('notifications'));
 
 /** @openapi { "/notifications/templates": { get: { tags: [Notification Templates], summary: "List all 10 templates (tenant override merged with the default)", security: [{bearerAuth: []}], responses: { 200: { description: OK } } } } } */
 notificationTemplateRouter.get('/', requirePermission('notifications:manage'), asyncHandler(notificationTemplateController.list.bind(notificationTemplateController)));

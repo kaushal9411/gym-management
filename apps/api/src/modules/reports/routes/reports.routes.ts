@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { reportsController } from '../controllers/reports.controller';
 import { exportQuerySchema, reportFiltersQuerySchema, reportTypeParamSchema } from '../validators/reports.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 reportsRouter.use(authenticateMiddleware);
+reportsRouter.use(requireModuleEnabled('reports'));
 
 /** @openapi { "/reports/membership": { get: { tags: [Reports], summary: "Membership Report — members with plan/status/dates", security: [{bearerAuth: []}], responses: { 200: { description: Paginated membership rows } } } } } */
 reportsRouter.get('/membership', requirePermission('reports:view'), validate({ query: reportFiltersQuerySchema }), asyncHandler(reportsController.membership.bind(reportsController)));

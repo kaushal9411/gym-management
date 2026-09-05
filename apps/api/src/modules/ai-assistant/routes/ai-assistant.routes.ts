@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { aiAssistantController } from '../controllers/ai-assistant.controller';
 import {
   conversationIdParamSchema,
@@ -21,7 +22,7 @@ const asyncHandler =
     Promise.resolve(fn(req, res)).catch(next);
   };
 
-aiAssistantRouter.use(authenticateMiddleware, requirePermission('ai:use'));
+aiAssistantRouter.use(authenticateMiddleware, requireModuleEnabled('ai_coach'), requirePermission('ai:use'));
 
 /** @openapi { "/ai/config": { get: { tags: [AI Assistant], summary: Get AI Configuration, security: [{bearerAuth: []}], responses: { 200: { description: Provider/model config (no secrets) } } } } } */
 aiAssistantRouter.get('/config', asyncHandler(aiAssistantController.getConfig.bind(aiAssistantController)));

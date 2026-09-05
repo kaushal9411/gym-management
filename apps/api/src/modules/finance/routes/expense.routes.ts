@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { expenseController } from '../controllers/expense.controller';
 import { createExpenseSchema, idParamSchema, listExpensesQuerySchema, updateExpenseSchema } from '../validators/finance.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 expenseRouter.use(authenticateMiddleware);
+expenseRouter.use(requireModuleEnabled('expenses'));
 
 /** @openapi { "/expenses/export": { get: { tags: [Finance], summary: "Download filtered expenses as CSV", security: [{bearerAuth: []}], responses: { 200: { description: CSV file } } } } } */
 expenseRouter.get('/export', requirePermission('finance:view'), asyncHandler(expenseController.exportCsv.bind(expenseController)));

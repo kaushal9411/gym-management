@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { classBookingController } from '../controllers/class-booking.controller';
 import { createBookingSchema, idParamSchema } from '../validators/classes.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 classBookingRouter.use(authenticateMiddleware);
+classBookingRouter.use(requireModuleEnabled('live_classes'));
 
 // Staff/front-desk booking any member into any session — the member
 // portal's own self-booking lives at `/portal/classes/*` (modules/member-portal),

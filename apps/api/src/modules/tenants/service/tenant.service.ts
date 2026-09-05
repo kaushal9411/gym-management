@@ -1,6 +1,7 @@
 import { TenantError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { cache } from '../../../infrastructure/cache/redis';
+import { prisma } from '../../../infrastructure/database/prisma';
 import type {
   PublicTenantSummary,
   ResolvedTenant,
@@ -13,6 +14,38 @@ import { RESERVED_SLUGS, SLUG_PATTERN } from '../types/tenant.types';
 const CACHE_TTL_SECONDS = 300;
 const slugCacheKey = (slug: string) => `tenant:slug:${slug}`;
 const idCacheKey = (id: string) => `tenant:id:${id}`;
+
+/**
+ * Platform-wide `FeatureFlag.enabled` keys (Prompt 80's kill switch) — a
+ * separate, single, short-TTL cache entry (NOT baked into the per-tenant
+ * cached record above), so an admin toggling one takes effect within
+ * seconds for every tenant, not up to 5 minutes per already-cached tenant.
+ */
+const PLATFORM_FLAGS_CACHE_KEY = 'platform:feature-flags:enabled';
+const PLATFORM_FLAGS_CACHE_TTL_SECONDS = 30;
+
+/**
+ * Every key that's actually under platform-flag control, mapped to its
+ * current `enabled` value — NOT just the enabled ones. A `TenantModule`
+ * key with no row here at all (e.g. `members`/`staff`/`branches`/
+ * `membership_plans`, deliberately never made a kill switch — see
+ * `FEATURE_FLAGS` in `prisma/seed.ts`) must read as "platform-enabled by
+ * default", which a plain enabled-only Set couldn't distinguish from
+ * "platform-disabled."
+ */
+async function getPlatformFeatureFlagMap(): Promise<Map<string, boolean>> {
+  const cached = await cache.get<Array<[string, boolean]>>(PLATFORM_FLAGS_CACHE_KEY);
+  if (cached) return new Map(cached);
+  const rows = await prisma.featureFlag.findMany({ select: { key: true, enabled: true } });
+  const entries: Array<[string, boolean]> = rows.map((r) => [r.key, r.enabled]);
+  await cache.set(PLATFORM_FLAGS_CACHE_KEY, entries, PLATFORM_FLAGS_CACHE_TTL_SECONDS);
+  return new Map(entries);
+}
+
+/** Called by `AdminFeatureFlagService#setEnabled` right after a toggle so the change is live immediately, not after the TTL lapses. */
+export async function invalidatePlatformFeatureFlagsCache(): Promise<void> {
+  await cache.del(PLATFORM_FLAGS_CACHE_KEY);
+}
 
 interface TenantBrandingShape {
   primaryColor: string;
@@ -49,7 +82,7 @@ function reviveTenantRecordDates(record: ResolvedTenantRecord): ResolvedTenantRe
  * before it existed — not a rearchitecture, just resolving an inherited
  * inconsistency honestly instead of silently picking one and breaking the other.
  */
-function toResolvedTenant(record: ResolvedTenantRecord): ResolvedTenant {
+function toResolvedTenant(record: ResolvedTenantRecord, platformFlags: Map<string, boolean>): ResolvedTenant {
   const jsonBranding = (record.settings?.branding ?? {}) as Partial<TenantBrandingShape>;
   const table = record.branding;
   const subscription = record.subscriptions[0] ?? null;
@@ -85,7 +118,12 @@ function toResolvedTenant(record: ResolvedTenantRecord): ResolvedTenant {
           currentPeriodEnd: subscription.currentPeriodEnd ? subscription.currentPeriodEnd.toISOString() : null,
         }
       : null,
-    featureFlags: record.modules.filter((m) => m.enabled).map((m) => m.key),
+    // ANDed with the platform-wide kill switch (Prompt 80) — a module the
+    // tenant's plan grants (`m.enabled`) is still hidden/blocked if a super
+    // admin has disabled it platform-wide. `platformFlags.get(key) ?? true`
+    // treats a key with no matching `FeatureFlag` row as platform-enabled
+    // by default (see `getPlatformFeatureFlagMap`'s doc comment).
+    featureFlags: record.modules.filter((m) => m.enabled && (platformFlags.get(m.key) ?? true)).map((m) => m.key),
     defaultBranch: record.branches[0] ? { id: record.branches[0].id, name: record.branches[0].name, timezone: record.branches[0].timezone } : null,
   };
 }
@@ -106,7 +144,8 @@ export class TenantService {
     if (!record) return null;
 
     if (!cached) await cache.set(slugCacheKey(slug), record, CACHE_TTL_SECONDS);
-    return { tenant: toResolvedTenant(record), record };
+    const platformFlags = await getPlatformFeatureFlagMap();
+    return { tenant: toResolvedTenant(record, platformFlags), record };
   }
 
   /**
@@ -120,7 +159,8 @@ export class TenantService {
     if (!record) return null;
 
     if (!cached) await cache.set(idCacheKey(tenantId), record, CACHE_TTL_SECONDS);
-    return toResolvedTenant(record);
+    const platformFlags = await getPlatformFeatureFlagMap();
+    return toResolvedTenant(record, platformFlags);
   }
 
   /** Not cached — this list changes rarely and a stale-for-5-minutes picker is worse than one extra query per pre-login screen view. */

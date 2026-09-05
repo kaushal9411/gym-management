@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { scheduledReportController } from '../controllers/scheduled-report.controller';
 import { createScheduledReportSchema, idParamSchema, updateScheduledReportSchema } from '../validators/reports.validators';
 
@@ -15,6 +16,7 @@ const asyncHandler =
   };
 
 scheduledReportRouter.use(authenticateMiddleware);
+scheduledReportRouter.use(requireModuleEnabled('reports'));
 
 /** @openapi { "/reports/scheduled": { get: { tags: [Reports], summary: "List scheduled reports", security: [{bearerAuth: []}], responses: { 200: { description: "ScheduledReport[]" } } } } } */
 scheduledReportRouter.get('/', requirePermission('reports:view'), asyncHandler(scheduledReportController.list.bind(scheduledReportController)));
