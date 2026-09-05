@@ -1,6 +1,7 @@
 import PDFDocument from 'pdfkit';
 
 import { NotFoundError, ValidationError } from '../../../core/errors/app-error';
+import { PDF_FONT_REGULAR } from '../../../core/pdf/pdf-fonts';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { formatMoney } from '../../../infrastructure/mail/templates/base-layout';
 import { memberInvoiceSummaryEmail } from '../../../infrastructure/mail/templates/member-templates';
@@ -170,8 +171,10 @@ export class MemberInvoiceService {
     return this.renderPdfFor(toDetailDto(invoice), tenantName);
   }
 
-  private renderPdfFor(invoice: MemberInvoiceDetailDto, tenantName: string): Promise<Buffer> {
-    const money = (amount: string | number) => `$${Number(amount).toFixed(2)}`;
+  private async renderPdfFor(invoice: MemberInvoiceDetailDto, tenantName: string): Promise<Buffer> {
+    const settings = await this.db.tenantSettings.findUnique({ where: { tenantId: this.tenantId } });
+    const currencySymbol = settings?.currencySymbol ?? '₹';
+    const money = (amount: string | number) => formatMoney(Number(amount), currencySymbol);
 
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 50 });
@@ -179,6 +182,9 @@ export class MemberInvoiceService {
       doc.on('data', (chunk) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
+
+      // PDFKit's default Helvetica has no ₹ glyph — see pdf-fonts.ts.
+      doc.registerFont('body', PDF_FONT_REGULAR).font('body');
 
       doc.fontSize(20).text(`Invoice ${invoice.invoiceNumber}`, { align: 'left' });
       doc.moveDown(0.5);

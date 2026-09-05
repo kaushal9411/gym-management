@@ -7,6 +7,7 @@ import { eventBus } from '../../../core/events/event-bus';
 import { authLogger } from '../../../core/logging/logger';
 import { jwtService } from '../../../core/security/jwt.service';
 import { generateOpaqueToken, hashToken } from '../../../core/security/token.util';
+import { deriveCurrencySymbol } from '../../../core/utils/currency.util';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { RoleRepository } from '../../authentication/repositories/role.repository';
@@ -23,26 +24,6 @@ import { addBillingPeriod } from '../utils/billing-period';
 
 const REFRESH_TTL_DAYS = env.jwt.refreshTtlDays;
 const USAGE_METRICS = ['branches', 'managers', 'trainers', 'members', 'storage_mb'] as const;
-
-/**
- * The onboarding wizard's "Billing currency" step lets a gym owner pick any
- * currency, but presents no symbol field of its own — leaving
- * `TenantSettings.currencySymbol` at its schema default (INR's `₹`)
- * regardless of what was actually chosen would be wrong for anyone who
- * picked something else (e.g. GBP still showing `₹`). Derives the real
- * symbol via `Intl`, same mechanism `formatMoney` uses elsewhere, rather
- * than hand-maintaining a currency→symbol map.
- */
-function deriveCurrencySymbol(currencyCode: string): string {
-  try {
-    const part = new Intl.NumberFormat('en', { style: 'currency', currency: currencyCode })
-      .formatToParts(0)
-      .find((p) => p.type === 'currency');
-    return part?.value ?? currencyCode;
-  } catch {
-    return currencyCode;
-  }
-}
 
 /**
  * The Step-7 "Automatic Provisioning" saga — the entire reason this module

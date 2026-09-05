@@ -2,6 +2,7 @@ import PDFDocument from 'pdfkit';
 
 import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
+import { PDF_FONT_REGULAR } from '../../../core/pdf/pdf-fonts';
 import type { TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { InvoiceRepository, type InvoiceLineInput } from '../repositories/invoice.repository';
 
@@ -63,7 +64,7 @@ export class InvoiceService {
     if (!invoice) throw new AppError(ErrorCode.NOT_FOUND, 'Invoice not found.', 404);
 
     const money = (amount: number) =>
-      new Intl.NumberFormat('en-US', { style: 'currency', currency: invoice.currency }).format(amount);
+      new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(amount);
 
     const rows = invoice.items
       .map(
@@ -103,7 +104,7 @@ export class InvoiceService {
     if (!invoice) throw new AppError(ErrorCode.NOT_FOUND, 'Invoice not found.', 404);
 
     const money = (amount: number | string | { toString(): string }) =>
-      new Intl.NumberFormat('en-US', { style: 'currency', currency: invoice.currency }).format(Number(amount.toString()));
+      new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(Number(amount.toString()));
 
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 50 });
@@ -111,6 +112,9 @@ export class InvoiceService {
       doc.on('data', (chunk) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
+
+      // PDFKit's default Helvetica has no ₹ glyph — see pdf-fonts.ts.
+      doc.registerFont('body', PDF_FONT_REGULAR).font('body');
 
       doc.fontSize(20).text(`Invoice ${invoice.invoiceNumber}`, { align: 'left' });
       doc.moveDown(0.5);
