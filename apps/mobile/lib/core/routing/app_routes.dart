@@ -8,6 +8,7 @@ class AppRoutes {
   static const otp = '/otp';
   static const mfaSetup = '/mfa-setup';
   static const forgotPassword = '/forgot-password';
+  static const memberResetPassword = '/member/reset-password';
   static const home = '/home';
   static const myProfile = '/profile/me';
   static const profileData = '/profile/me/data';

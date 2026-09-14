@@ -282,6 +282,18 @@ class MemberRepository {
     }
   }
 
+  /// Staff-triggered password-reset link for a member whose portal account
+  /// is already ACTIVE — distinct from [sendPortalInvite], which 409s once
+  /// activated. 404s if no portal account exists yet, 422s if it's still
+  /// PENDING_ACTIVATION/SUSPENDED (use [sendPortalInvite] instead).
+  Future<void> sendPortalPasswordReset(String memberId) async {
+    try {
+      await _dio.post<void>('/members/$memberId/portal-reset-password');
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   /// GDPR data-portability export — the full bundle (profile, attendance,
   /// plans, invoices, payments, documents, bookings) as raw JSON. Staff-
   /// triggered, for any member; distinct from the member portal's own

@@ -172,6 +172,7 @@ class GymMember {
     this.qrCodeToken,
     this.qrCodeImageUrl,
     this.canCheckIn,
+    this.portalStatus,
     this.membershipHistory = const [],
     this.freezeHistory = const [],
     this.planUsage,
@@ -218,6 +219,13 @@ class GymMember {
   final String? qrCodeToken;
   final String? qrCodeImageUrl;
   final bool? canCheckIn;
+
+  /// `PENDING_ACTIVATION` | `ACTIVE` | `SUSPENDED`, or `null` when the
+  /// member has no `MemberCredential` row at all (portal access never
+  /// enabled). Left as a plain string, same convention as [status]/[gender]/
+  /// [bloodGroup] on this same model, rather than a new enum class — drives
+  /// which action the "Member portal" card on the detail screen shows.
+  final String? portalStatus;
   final List<MembershipHistoryEntry> membershipHistory;
   final List<FreezeHistoryEntry> freezeHistory;
   final PlanUsage? planUsage;
@@ -271,6 +279,7 @@ class GymMember {
         qrCodeToken: json['qrCodeToken'] as String?,
         qrCodeImageUrl: json['qrCodeImageUrl'] as String?,
         canCheckIn: json['canCheckIn'] as bool?,
+        portalStatus: json['portalStatus'] as String?,
         membershipHistory: json['membershipHistory'] == null
             ? const []
             : (json['membershipHistory'] as List)

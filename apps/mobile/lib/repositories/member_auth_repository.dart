@@ -56,6 +56,24 @@ class MemberAuthRepository {
     }
   }
 
+  /// Consumes the token from the emailed reset link and sets a new
+  /// password — the counterpart to [forgotPassword]. No deep-link handling
+  /// exists in this app yet, so the caller is a token the user pastes in
+  /// manually rather than one resolved from a tapped link.
+  Future<void> resetPassword({
+    required String token,
+    required String password,
+  }) async {
+    try {
+      await _dio.post<void>(
+        '/member/auth/reset-password',
+        data: {'token': token, 'password': password},
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   Future<void> logout() async {
     try {
       final refreshToken = await _storage.readRefreshToken();

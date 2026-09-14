@@ -7,6 +7,7 @@ import '../../features/announcements/presentation/schedule_announcement_screen.d
 import '../../features/announcements/presentation/announcements_screen.dart';
 import '../../features/auth/presentation/find_gym_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
+import '../../features/auth/presentation/member_reset_password_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/auth/presentation/staff_mfa_setup_screen.dart';
@@ -158,6 +159,7 @@ const _signedOutPaths = {
   AppRoutes.otp,
   AppRoutes.mfaSetup,
   AppRoutes.forgotPassword,
+  AppRoutes.memberResetPassword,
 };
 
 GoRouter buildAppRouter(SessionCubit sessionCubit) {
@@ -229,6 +231,10 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         path: AppRoutes.forgotPassword,
         builder: (context, state) =>
             ForgotPasswordScreen(args: state.extra as ForgotPasswordScreenArgs),
+      ),
+      GoRoute(
+        path: AppRoutes.memberResetPassword,
+        builder: (context, state) => const MemberResetPasswordScreen(),
       ),
       GoRoute(
         path: AppRoutes.home,

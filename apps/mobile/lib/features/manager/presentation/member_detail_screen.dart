@@ -459,11 +459,16 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   Future<void> _runAction(
     Future<void> Function() action, {
     bool reload = true,
+    String? successMessage,
   }) async {
     setState(() => _busy = true);
     try {
       await action();
       if (reload) await _load();
+      if (successMessage != null && mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(successMessage)));
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -698,7 +703,14 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
   Future<void> _sendPortalInvite() => _runAction(
         () => getIt<MemberRepository>().sendPortalInvite(widget.memberId),
+        successMessage: 'Portal activation email sent.',
+      );
+
+  Future<void> _sendPortalPasswordReset() => _runAction(
+        () =>
+            getIt<MemberRepository>().sendPortalPasswordReset(widget.memberId),
         reload: false,
+        successMessage: 'Password reset link sent.',
       );
 
   Future<void> _eraseData() async {
@@ -1726,34 +1738,78 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
 
   Widget _buildPortalCard(GymMember member) {
     final hasEmail = member.email != null && member.email!.isNotEmpty;
+    final status = member.portalStatus;
+
+    final String description;
+    switch (status) {
+      case 'ACTIVE':
+        description =
+            '${member.name} already has portal access — send them a link '
+            'to reset their password.';
+      case 'PENDING_ACTIVATION':
+        description = "${member.name} was invited but hasn't activated "
+            'their account yet — resend the activation email if it never '
+            'arrived.';
+      case 'SUSPENDED':
+        description = "${member.name}'s portal access is suspended.";
+      default:
+        description = "Let ${member.name} log in on their own to view "
+            'attendance, workout/diet plans, invoices, and their QR code.'
+            '${hasEmail ? '' : ' Add an email on file first.'}';
+    }
+
+    Widget? action;
+    if (status == 'ACTIVE') {
+      action = AppButton(
+        label: 'Send reset password link',
+        variant: AppButtonVariant.ghost,
+        size: AppButtonSize.small,
+        fullWidth: false,
+        loading: _busy,
+        onPressed: hasEmail ? _sendPortalPasswordReset : null,
+      );
+    } else if (status != 'SUSPENDED') {
+      action = AppButton(
+        label: status == 'PENDING_ACTIVATION'
+            ? 'Resend activation email'
+            : 'Enable portal access',
+        variant: AppButtonVariant.ghost,
+        size: AppButtonSize.small,
+        fullWidth: false,
+        loading: _busy,
+        onPressed: hasEmail ? _sendPortalInvite : null,
+      );
+    }
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _CardHeading(
-            icon: Icons.smartphone_rounded,
-            title: 'Member portal',
+          Row(
+            children: [
+              Expanded(
+                child: _CardHeading(
+                  icon: Icons.smartphone_rounded,
+                  title: 'Member portal',
+                ),
+              ),
+              if (status == 'ACTIVE')
+                const AppPill(label: 'Active', tone: AppPillTone.success)
+              else if (status == 'PENDING_ACTIVATION')
+                const AppPill(label: 'Invited', tone: AppPillTone.warning)
+              else if (status == 'SUSPENDED')
+                const AppPill(label: 'Suspended', tone: AppPillTone.danger),
+            ],
           ),
           const SizedBox(height: 8),
           Text(
-            hasEmail
-                ? "Let ${member.name} log in on their own to view "
-                    'attendance, workout/diet plans, invoices, and their QR '
-                    'code.'
-                : "Let ${member.name} log in on their own to view "
-                    'attendance, workout/diet plans, invoices, and their QR '
-                    'code. Add an email on file first.',
+            description,
             style: AppText.body(size: 12, color: AppColors.inkFaint),
           ),
-          const SizedBox(height: 10),
-          AppButton(
-            label: 'Enable portal access',
-            variant: AppButtonVariant.ghost,
-            size: AppButtonSize.small,
-            fullWidth: false,
-            loading: _busy,
-            onPressed: hasEmail ? _sendPortalInvite : null,
-          ),
+          if (action != null) ...[
+            const SizedBox(height: 10),
+            action,
+          ],
         ],
       ),
     );
