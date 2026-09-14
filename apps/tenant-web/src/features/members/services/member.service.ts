@@ -141,6 +141,10 @@ class MemberService {
     await apiClient.post(`/members/${id}/portal-invite`);
   }
 
+  async sendPortalPasswordReset(id: string): Promise<void> {
+    await apiClient.post(`/members/${id}/portal-reset-password`);
+  }
+
   async logGuestVisit(id: string, guestName?: string): Promise<GuestVisit> {
     const res = await apiClient.post<ApiEnvelope<GuestVisit>>(`/members/${id}/guest-visits`, { guestName });
     return res.data.data;

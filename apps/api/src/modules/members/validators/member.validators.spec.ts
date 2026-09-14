@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  assignMembershipSchema,
   bulkMemberActionSchema,
   createMemberSchema,
   createMembershipPlanSchema,
@@ -51,6 +52,37 @@ describe('member validators', () => {
     it('rejects an unknown blood group', () => {
       expect(createMemberSchema.safeParse({ ...base, bloodGroup: 'O+' }).success).toBe(false);
     });
+
+    it('accepts the Add Member wizard fields (Prompt 82)', () => {
+      const result = createMemberSchema.safeParse({
+        ...base,
+        fatherNameOrAadhaar: 'Ramesh Kumar',
+        maritalStatus: 'SINGLE',
+        anniversary: '2020-05-15',
+        goal: 'WEIGHT_LOSS',
+        registrationFee: 500,
+        bodyType: 'MESOMORPH',
+        foodPreference: 'VEGETARIAN',
+        healthHeartCondition: false,
+        healthAsthma: true,
+        awarenessSource: 'SOCIAL_MEDIA',
+        healthScreeningOtherDetails: 'None',
+        referredByMemberId: '22222222-2222-2222-2222-222222222222',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects an unknown marital status', () => {
+      expect(createMemberSchema.safeParse({ ...base, maritalStatus: 'ENGAGED' }).success).toBe(false);
+    });
+
+    it('rejects an unknown goal', () => {
+      expect(createMemberSchema.safeParse({ ...base, goal: 'GET_SWOLE' }).success).toBe(false);
+    });
+
+    it('rejects a negative registration fee', () => {
+      expect(createMemberSchema.safeParse({ ...base, registrationFee: -1 }).success).toBe(false);
+    });
   });
 
   describe('updateMemberSchema', () => {
@@ -64,6 +96,27 @@ describe('member validators', () => {
 
     it('accepts a single-field partial update', () => {
       expect(updateMemberSchema.safeParse({ fitnessGoals: 'Lose 5kg' }).success).toBe(true);
+    });
+
+    it('allows explicit null to clear a wizard field (Prompt 82)', () => {
+      expect(updateMemberSchema.safeParse({ maritalStatus: null, referredByMemberId: null }).success).toBe(true);
+    });
+  });
+
+  describe('assignMembershipSchema', () => {
+    const base = { planId: '11111111-1111-1111-1111-111111111111' };
+
+    it('accepts a plan-only assignment', () => {
+      expect(assignMembershipSchema.safeParse(base).success).toBe(true);
+    });
+
+    it('accepts an optional targetWeight (Prompt 82)', () => {
+      expect(assignMembershipSchema.safeParse({ ...base, targetWeight: 70 }).success).toBe(true);
+    });
+
+    it('rejects an out-of-range targetWeight', () => {
+      expect(assignMembershipSchema.safeParse({ ...base, targetWeight: -5 }).success).toBe(false);
+      expect(assignMembershipSchema.safeParse({ ...base, targetWeight: 501 }).success).toBe(false);
     });
   });
 

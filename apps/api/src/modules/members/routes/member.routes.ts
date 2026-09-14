@@ -270,6 +270,14 @@ memberRouter.post(
   asyncHandler(memberController.sendPortalInvite.bind(memberController)),
 );
 
+/** @openapi { "/members/{id}/portal-reset-password": { post: { tags: [Members], summary: Send a password-reset link to a member who already has ACTIVE portal access, security: [{bearerAuth: []}], responses: { 200: { description: Reset link sent } } } } } */
+memberRouter.post(
+  '/:id/portal-reset-password',
+  requirePermission('members:update'),
+  validate({ params: memberParamSchema }),
+  asyncHandler(memberController.sendPortalPasswordReset.bind(memberController)),
+);
+
 /**
  * @openapi
  * /members/{id}/guest-visits:

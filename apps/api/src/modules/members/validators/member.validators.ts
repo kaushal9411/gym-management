@@ -29,6 +29,19 @@ const bloodGroupSchema = z.enum([
 const memberStatusSchema = z.enum(['ACTIVE', 'INACTIVE', 'FROZEN']);
 const membershipStatusSchema = z.enum(['PENDING', 'ACTIVE', 'EXPIRED', 'CANCELLED', 'SUPERSEDED']);
 const documentTypeSchema = z.enum(['IDENTITY_PROOF', 'ADDRESS_PROOF', 'MEDICAL_CERTIFICATE', 'CONSENT_FORM', 'OTHER']);
+const maritalStatusSchema = z.enum(['SINGLE', 'MARRIED', 'DIVORCED', 'WIDOWED', 'PREFER_NOT_TO_SAY']);
+const bodyTypeSchema = z.enum(['ECTOMORPH', 'MESOMORPH', 'ENDOMORPH', 'AVERAGE', 'UNKNOWN']);
+const foodPreferenceSchema = z.enum(['VEGETARIAN', 'NON_VEGETARIAN', 'VEGAN', 'EGGETARIAN', 'UNKNOWN']);
+const fitnessGoalSchema = z.enum([
+  'WEIGHT_LOSS',
+  'WEIGHT_GAIN',
+  'MUSCLE_BUILDING',
+  'GENERAL_FITNESS',
+  'ENDURANCE',
+  'REHABILITATION',
+  'OTHER',
+]);
+const awarenessSourceSchema = z.enum(['SOCIAL_MEDIA', 'FRIEND_REFERRAL', 'WALK_IN', 'ADVERTISEMENT', 'ONLINE_SEARCH', 'OTHER']);
 
 export const listMembersQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -70,6 +83,23 @@ export const createMemberSchema = z.object({
   branchId: z.string().uuid(),
   trainerId: z.string().uuid().optional(),
   notes: z.string().trim().max(2000).optional(),
+  fatherNameOrAadhaar: z.string().trim().max(200).optional(),
+  maritalStatus: maritalStatusSchema.optional(),
+  anniversary: z.string().date().optional(),
+  goal: fitnessGoalSchema.optional(),
+  registrationFee: z.coerce.number().min(0).max(999_999.99).optional(),
+  bodyType: bodyTypeSchema.optional(),
+  foodPreference: foodPreferenceSchema.optional(),
+  healthHeartCondition: z.boolean().optional(),
+  healthPainDuringActivity: z.boolean().optional(),
+  healthDizzinessOrBalance: z.boolean().optional(),
+  healthDiabetesOrBp: z.boolean().optional(),
+  healthAsthma: z.boolean().optional(),
+  healthBoneOrJointProblem: z.boolean().optional(),
+  healthOtherCondition: z.boolean().optional(),
+  awarenessSource: awarenessSourceSchema.optional(),
+  healthScreeningOtherDetails: z.string().trim().max(2000).optional(),
+  referredByMemberId: z.string().uuid().optional(),
 });
 
 export const updateMemberSchema = z
@@ -98,6 +128,23 @@ export const updateMemberSchema = z
     allergies: z.string().trim().max(2000).nullable().optional(),
     fitnessGoals: z.string().trim().max(2000).nullable().optional(),
     notes: z.string().trim().max(2000).nullable().optional(),
+    fatherNameOrAadhaar: z.string().trim().max(200).nullable().optional(),
+    maritalStatus: maritalStatusSchema.nullable().optional(),
+    anniversary: z.string().date().nullable().optional(),
+    goal: fitnessGoalSchema.nullable().optional(),
+    registrationFee: z.coerce.number().min(0).max(999_999.99).nullable().optional(),
+    bodyType: bodyTypeSchema.nullable().optional(),
+    foodPreference: foodPreferenceSchema.nullable().optional(),
+    healthHeartCondition: z.boolean().nullable().optional(),
+    healthPainDuringActivity: z.boolean().nullable().optional(),
+    healthDizzinessOrBalance: z.boolean().nullable().optional(),
+    healthDiabetesOrBp: z.boolean().nullable().optional(),
+    healthAsthma: z.boolean().nullable().optional(),
+    healthBoneOrJointProblem: z.boolean().nullable().optional(),
+    healthOtherCondition: z.boolean().nullable().optional(),
+    awarenessSource: awarenessSourceSchema.nullable().optional(),
+    healthScreeningOtherDetails: z.string().trim().max(2000).nullable().optional(),
+    referredByMemberId: z.string().uuid().nullable().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'Provide at least one field to update' });
 
@@ -105,6 +152,7 @@ export const assignMembershipSchema = z.object({
   planId: z.string().uuid(),
   startDate: z.string().date().optional(),
   autoRenew: z.boolean().optional(),
+  targetWeight: z.coerce.number().min(0).max(500).optional(),
 });
 
 export const logGuestVisitSchema = z.object({

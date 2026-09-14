@@ -1,12 +1,29 @@
 #requires -version 5.1
 <#
-  Frees the app ports (api=4000, tenant-web=3001, super-admin=3002), then
-  opens each dev server in its own Windows Terminal tab.
+  Single entry point for local dev: brings up the Docker backing services
+  (postgres/redis/mailpit), frees the app ports (api=4000, tenant-web=3001,
+  super-admin=3002), then opens one Windows Terminal window with a separate
+  tab per service (docker logs, api, tenant-web, super-admin).
 #>
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$ports = 3001, 3002, 4000
 
+Write-Host "Starting Docker backing services (postgres/redis/mailpit)..."
+Push-Location $repoRoot
+docker compose up -d
+Pop-Location
+
+Write-Host "Waiting for postgres to become healthy..."
+$deadline = (Get-Date).AddSeconds(60)
+while ((docker inspect -f "{{.State.Health.Status}}" gym-saas-postgres 2>$null) -ne "healthy") {
+    if ((Get-Date) -gt $deadline) {
+        Write-Host "Timed out waiting for postgres - continuing anyway."
+        break
+    }
+    Start-Sleep -Seconds 1
+}
+
+$ports = 3001, 3002, 4000
 foreach ($port in $ports) {
     $conns = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | Where-Object { $_.OwningProcess -gt 0 }
     foreach ($conn in $conns) {
@@ -16,9 +33,10 @@ foreach ($port in $ports) {
 }
 
 $apps = @(
-    @{ Title = "api";         Filter = "@gym-saas/api" },
-    @{ Title = "tenant-web";  Filter = "@gym-saas/tenant-web" },
-    @{ Title = "super-admin"; Filter = "@gym-saas/super-admin" }
+    @{ Title = "docker";      Command = "docker compose logs -f" },
+    @{ Title = "api";         Command = "corepack pnpm --filter @gym-saas/api dev" },
+    @{ Title = "tenant-web";  Command = "corepack pnpm --filter @gym-saas/tenant-web dev" },
+    @{ Title = "super-admin"; Command = "corepack pnpm --filter @gym-saas/super-admin dev" }
 )
 
 $wtArgs = @()
@@ -28,7 +46,7 @@ foreach ($app in $apps) {
         "new-tab", "--title", $app.Title,
         "-d", $repoRoot,
         "powershell", "-NoExit", "-Command",
-        "pnpm --filter $($app.Filter) dev"
+        $app.Command
     )
 }
 

@@ -14,6 +14,19 @@ export type BloodGroup =
   | 'O_NEGATIVE'
   | 'UNKNOWN';
 export type MemberDocumentType = 'IDENTITY_PROOF' | 'ADDRESS_PROOF' | 'MEDICAL_CERTIFICATE' | 'CONSENT_FORM' | 'OTHER';
+export type MaritalStatus = 'SINGLE' | 'MARRIED' | 'DIVORCED' | 'WIDOWED' | 'PREFER_NOT_TO_SAY';
+export type BodyType = 'ECTOMORPH' | 'MESOMORPH' | 'ENDOMORPH' | 'AVERAGE' | 'UNKNOWN';
+export type FoodPreference = 'VEGETARIAN' | 'NON_VEGETARIAN' | 'VEGAN' | 'EGGETARIAN' | 'UNKNOWN';
+export type FitnessGoal =
+  | 'WEIGHT_LOSS'
+  | 'WEIGHT_GAIN'
+  | 'MUSCLE_BUILDING'
+  | 'GENERAL_FITNESS'
+  | 'ENDURANCE'
+  | 'REHABILITATION'
+  | 'OTHER';
+export type AwarenessSource = 'SOCIAL_MEDIA' | 'FRIEND_REFERRAL' | 'WALK_IN' | 'ADVERTISEMENT' | 'ONLINE_SEARCH' | 'OTHER';
+export type MemberPortalStatus = 'PENDING_ACTIVATION' | 'ACTIVE' | 'SUSPENDED';
 
 export interface BranchSummary {
   id: string;
@@ -62,9 +75,16 @@ export interface MembershipHistoryEntry {
   endDate: string;
   durationDays: number;
   priceAtAssignment: string;
+  targetWeight: string | null;
   status: MembershipStatus;
   autoRenew: boolean;
   createdAt: string;
+}
+
+export interface ReferredByMemberSummary {
+  id: string;
+  memberId: string;
+  name: string;
 }
 
 export interface MembershipFreezeEntry {
@@ -119,6 +139,24 @@ export interface MemberDetail extends MemberListItem {
   notes: string | null;
   qrCodeToken: string;
   qrCodeImageUrl: string | null;
+  fatherNameOrAadhaar: string | null;
+  maritalStatus: MaritalStatus | null;
+  anniversary: string | null;
+  goal: FitnessGoal | null;
+  registrationFee: string | null;
+  bodyType: BodyType | null;
+  foodPreference: FoodPreference | null;
+  healthHeartCondition: boolean | null;
+  healthPainDuringActivity: boolean | null;
+  healthDizzinessOrBalance: boolean | null;
+  healthDiabetesOrBp: boolean | null;
+  healthAsthma: boolean | null;
+  healthBoneOrJointProblem: boolean | null;
+  healthOtherCondition: boolean | null;
+  awarenessSource: AwarenessSource | null;
+  healthScreeningOtherDetails: string | null;
+  referredByMember: ReferredByMemberSummary | null;
+  portalStatus: MemberPortalStatus | null;
   canCheckIn: boolean;
   membershipHistory: MembershipHistoryEntry[];
   freezeHistory: MembershipFreezeEntry[];
@@ -174,6 +212,23 @@ export interface CreateMemberPayload {
   branchId: string;
   trainerId?: string;
   notes?: string;
+  fatherNameOrAadhaar?: string;
+  maritalStatus?: MaritalStatus;
+  anniversary?: string;
+  goal?: FitnessGoal;
+  registrationFee?: number;
+  bodyType?: BodyType;
+  foodPreference?: FoodPreference;
+  healthHeartCondition?: boolean;
+  healthPainDuringActivity?: boolean;
+  healthDizzinessOrBalance?: boolean;
+  healthDiabetesOrBp?: boolean;
+  healthAsthma?: boolean;
+  healthBoneOrJointProblem?: boolean;
+  healthOtherCondition?: boolean;
+  awarenessSource?: AwarenessSource;
+  healthScreeningOtherDetails?: string;
+  referredByMemberId?: string;
 }
 
 export interface UpdateMemberPayload {
@@ -201,12 +256,30 @@ export interface UpdateMemberPayload {
   allergies?: string | null;
   fitnessGoals?: string | null;
   notes?: string | null;
+  fatherNameOrAadhaar?: string | null;
+  maritalStatus?: MaritalStatus | null;
+  anniversary?: string | null;
+  goal?: FitnessGoal | null;
+  registrationFee?: number | null;
+  bodyType?: BodyType | null;
+  foodPreference?: FoodPreference | null;
+  healthHeartCondition?: boolean | null;
+  healthPainDuringActivity?: boolean | null;
+  healthDizzinessOrBalance?: boolean | null;
+  healthDiabetesOrBp?: boolean | null;
+  healthAsthma?: boolean | null;
+  healthBoneOrJointProblem?: boolean | null;
+  healthOtherCondition?: boolean | null;
+  awarenessSource?: AwarenessSource | null;
+  healthScreeningOtherDetails?: string | null;
+  referredByMemberId?: string | null;
 }
 
 export interface AssignMembershipPayload {
   planId: string;
   startDate?: string;
   autoRenew?: boolean;
+  targetWeight?: number;
 }
 
 export interface RenewMembershipPayload {

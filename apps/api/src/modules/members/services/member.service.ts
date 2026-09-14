@@ -110,6 +110,30 @@ function toDetail(member: MemberRow, planUsage: PlanUsageDto | null): MemberDeta
     notes: member.notes,
     qrCodeToken: member.qrCodeToken,
     qrCodeImageUrl: member.qrCodeImageUrl,
+    fatherNameOrAadhaar: member.fatherNameOrAadhaar,
+    maritalStatus: member.maritalStatus,
+    anniversary: member.anniversary?.toISOString() ?? null,
+    goal: member.goal,
+    registrationFee: member.registrationFee?.toString() ?? null,
+    bodyType: member.bodyType,
+    foodPreference: member.foodPreference,
+    healthHeartCondition: member.healthHeartCondition,
+    healthPainDuringActivity: member.healthPainDuringActivity,
+    healthDizzinessOrBalance: member.healthDizzinessOrBalance,
+    healthDiabetesOrBp: member.healthDiabetesOrBp,
+    healthAsthma: member.healthAsthma,
+    healthBoneOrJointProblem: member.healthBoneOrJointProblem,
+    healthOtherCondition: member.healthOtherCondition,
+    awarenessSource: member.awarenessSource,
+    healthScreeningOtherDetails: member.healthScreeningOtherDetails,
+    referredByMember: member.referredByMember
+      ? {
+          id: member.referredByMember.id,
+          memberId: member.referredByMember.memberId,
+          name: `${member.referredByMember.firstName} ${member.referredByMember.lastName}`.trim(),
+        }
+      : null,
+    portalStatus: member.credential?.status ?? null,
     canCheckIn,
     membershipHistory: member.memberships.map((m) => ({
       id: m.id,
@@ -119,6 +143,7 @@ function toDetail(member: MemberRow, planUsage: PlanUsageDto | null): MemberDeta
       endDate: m.endDate.toISOString(),
       durationDays: m.durationDays,
       priceAtAssignment: m.priceAtAssignment.toString(),
+      targetWeight: m.targetWeight?.toString() ?? null,
       status: m.status,
       autoRenew: m.autoRenew,
       createdAt: m.createdAt.toISOString(),
@@ -198,6 +223,7 @@ export class MemberService {
     await this.assertBranchExists(input.branchId);
     await assertBranchAccess(this.tenantId, actor.userId, input.branchId);
     if (input.trainerId) await this.assertTrainerValid(input.trainerId);
+    if (input.referredByMemberId) await this.assertReferredMemberValid(input.referredByMemberId);
 
     const memberCode = input.memberId
       ? await this.assertMemberCodeAvailable(input.memberId)
@@ -236,6 +262,23 @@ export class MemberService {
       notes: input.notes,
       qrCodeToken,
       qrCodeImageUrl,
+      fatherNameOrAadhaar: input.fatherNameOrAadhaar,
+      maritalStatus: input.maritalStatus,
+      anniversary: input.anniversary ? new Date(input.anniversary) : undefined,
+      goal: input.goal,
+      registrationFee: input.registrationFee,
+      bodyType: input.bodyType,
+      foodPreference: input.foodPreference,
+      healthHeartCondition: input.healthHeartCondition,
+      healthPainDuringActivity: input.healthPainDuringActivity,
+      healthDizzinessOrBalance: input.healthDizzinessOrBalance,
+      healthDiabetesOrBp: input.healthDiabetesOrBp,
+      healthAsthma: input.healthAsthma,
+      healthBoneOrJointProblem: input.healthBoneOrJointProblem,
+      healthOtherCondition: input.healthOtherCondition,
+      awarenessSource: input.awarenessSource,
+      healthScreeningOtherDetails: input.healthScreeningOtherDetails,
+      referredByMemberId: input.referredByMemberId,
     });
     await this.audit(actor, 'member.created', member.id);
     await notifyNewMemberRegistration(this.tenantId, {
@@ -251,6 +294,7 @@ export class MemberService {
     const existing = await this.mustFind(id, actor.userId);
     if (input.email && input.email !== existing.email) await this.assertEmailAvailable(input.email);
     if (input.phone && input.phone !== existing.phone) await this.assertPhoneAvailable(input.phone);
+    if (input.referredByMemberId) await this.assertReferredMemberValid(input.referredByMemberId, id);
     const memberCode =
       input.memberId && input.memberId !== existing.memberId
         ? await this.assertMemberCodeAvailable(input.memberId)
@@ -284,6 +328,23 @@ export class MemberService {
       allergies: input.allergies,
       fitnessGoals: input.fitnessGoals,
       notes: input.notes,
+      fatherNameOrAadhaar: input.fatherNameOrAadhaar,
+      maritalStatus: input.maritalStatus,
+      anniversary: input.anniversary === null ? null : input.anniversary ? new Date(input.anniversary) : undefined,
+      goal: input.goal,
+      registrationFee: input.registrationFee,
+      bodyType: input.bodyType,
+      foodPreference: input.foodPreference,
+      healthHeartCondition: input.healthHeartCondition,
+      healthPainDuringActivity: input.healthPainDuringActivity,
+      healthDizzinessOrBalance: input.healthDizzinessOrBalance,
+      healthDiabetesOrBp: input.healthDiabetesOrBp,
+      healthAsthma: input.healthAsthma,
+      healthBoneOrJointProblem: input.healthBoneOrJointProblem,
+      healthOtherCondition: input.healthOtherCondition,
+      awarenessSource: input.awarenessSource,
+      healthScreeningOtherDetails: input.healthScreeningOtherDetails,
+      referredByMemberId: input.referredByMemberId,
     });
     await this.audit(actor, 'member.updated', id);
     return this.getById(id, actor.userId);
@@ -392,6 +453,7 @@ export class MemberService {
       endDate,
       durationDays: daysBetween(startDate, endDate),
       priceAtAssignment: plan.price,
+      targetWeight: input.targetWeight,
       status,
       autoRenew: input.autoRenew ?? false,
     });
@@ -531,6 +593,23 @@ export class MemberService {
     if (!member.email) throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has no email on file — add one before enabling portal access.', 422);
     await new MemberAuthService(this.tenantId).createOrResendInvite(id, `${member.firstName} ${member.lastName}`.trim(), member.email);
     await this.audit(actor, 'member.portal_invite_sent', id);
+  }
+
+  /**
+   * Staff-initiated — "Send reset password link" on the member detail page,
+   * for a member who has ALREADY activated portal access (distinct from
+   * `sendPortalInvite`, which is for enabling access the first time / while
+   * still PENDING_ACTIVATION). Unlike the member-auth module's own
+   * self-service `forgotPassword` (deliberately silent/enumeration-safe,
+   * keyed by the public `memberId` code), this is an authenticated staff
+   * action against an internal id already fetched via `mustFind`, so it can
+   * fail loudly with a specific reason instead of no-op'ing.
+   */
+  async sendPortalPasswordReset(id: string, actor: IamActor): Promise<void> {
+    const member = await this.mustFind(id, actor.userId);
+    if (!member.email) throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has no email on file — add one before sending a reset link.', 422);
+    await new MemberAuthService(this.tenantId).adminResetPassword(id, `${member.firstName} ${member.lastName}`.trim(), member.email);
+    await this.audit(actor, 'member.portal_password_reset_requested', id);
   }
 
   async regenerateQrCode(id: string, actor: IamActor): Promise<{ qrCodeToken: string; qrCodeImageUrl: string }> {
@@ -921,6 +1000,15 @@ export class MemberService {
       where: { id: trainerId, tenantId: this.tenantId, deletedAt: null, userRoles: { some: { role: { name: 'TRAINER' } } } },
     });
     if (!trainer) throw new NotFoundError('Selected trainer does not exist or is not a Trainer.');
+  }
+
+  /** `selfId` excludes the member being created/updated — a member can't refer themselves. */
+  private async assertReferredMemberValid(referredByMemberId: string, selfId?: string): Promise<void> {
+    if (referredByMemberId === selfId) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, 'A member cannot be their own referrer.', 422);
+    }
+    const found = await this.db.member.count({ where: { id: referredByMemberId, tenantId: this.tenantId, deletedAt: null } });
+    if (found === 0) throw new NotFoundError('Selected referring member does not exist.');
   }
 
   /** No live enforcement existed anywhere before Staff Management (Prompt 13) added the pattern — mirrored here for members. */

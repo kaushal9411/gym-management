@@ -14,6 +14,8 @@ import {
 const MEMBER_INCLUDE = {
   branch: { select: { id: true, name: true } },
   trainer: { select: { id: true, name: true } },
+  referredByMember: { select: { id: true, memberId: true, firstName: true, lastName: true } },
+  credential: { select: { status: true } },
   memberships: {
     orderBy: { createdAt: 'desc' },
     // Selected fields beyond id/name back plan-based enforcement (freeze

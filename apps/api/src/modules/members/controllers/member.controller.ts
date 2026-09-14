@@ -135,6 +135,11 @@ export class MemberController {
     sendSuccess(res, null, 'Portal activation email sent.');
   }
 
+  async sendPortalPasswordReset(req: Request, res: Response): Promise<void> {
+    await serviceFor(req).sendPortalPasswordReset(req.params.id!, actorFrom(req));
+    sendSuccess(res, null, 'Password reset link sent.');
+  }
+
   async logGuestVisit(req: Request, res: Response): Promise<void> {
     const visit = await serviceFor(req).logGuestVisit(req.params.id!, req.body as LogGuestVisitInput, actorFrom(req));
     sendSuccess(res, visit, 'Guest visit logged.', 201);

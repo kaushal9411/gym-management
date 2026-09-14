@@ -173,7 +173,12 @@ export function useRegenerateQrCode() {
 }
 
 export function useSendPortalInvite() {
-  return useMutation({ mutationFn: (id: string) => memberService.sendPortalInvite(id) });
+  const invalidate = useInvalidateMembers();
+  return useMutation({ mutationFn: (id: string) => memberService.sendPortalInvite(id), onSuccess: invalidate });
+}
+
+export function useSendPortalPasswordReset() {
+  return useMutation({ mutationFn: (id: string) => memberService.sendPortalPasswordReset(id) });
 }
 
 export function useGdprExport() {

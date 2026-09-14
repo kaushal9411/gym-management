@@ -10,6 +10,7 @@ export function MembershipHistoryTable({ entries }: { entries: MembershipHistory
     { key: 'start', header: 'Start', render: (entry) => new Date(entry.startDate).toLocaleDateString() },
     { key: 'end', header: 'End', render: (entry) => new Date(entry.endDate).toLocaleDateString() },
     { key: 'price', header: 'Price', render: (entry) => `${currencySymbol}${entry.priceAtAssignment}` },
+    { key: 'targetWeight', header: 'Target weight', render: (entry) => (entry.targetWeight ? `${entry.targetWeight} kg` : '—') },
     { key: 'status', header: 'Status', render: (entry) => <MembershipStatusBadge status={entry.status} /> },
     { key: 'autoRenew', header: 'Auto-renew', render: (entry) => (entry.autoRenew ? 'Yes' : 'No') },
   ];

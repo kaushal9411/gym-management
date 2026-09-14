@@ -168,6 +168,31 @@ export class MemberAuthService {
     eventBus.emitEvent(MemberAuthEvents.PasswordResetRequested, { tenantId: this.tenantId, email: member.email, name: `${member.firstName} ${member.lastName}`.trim(), token });
   }
 
+  /**
+   * Staff-triggered (from `MemberService#sendPortalPasswordReset`) — unlike
+   * `forgotPassword` above (self-service, enumeration-safe, silently no-ops
+   * on a bad/inactive lookup), the caller here already fetched the member by
+   * internal id and confirmed they have an email on file, so this fails
+   * loudly: 404 if portal access was never enabled, a clear validation error
+   * if it's still PENDING_ACTIVATION/SUSPENDED rather than ACTIVE (use
+   * "Enable portal access" / resend-invite for a not-yet-activated member —
+   * this endpoint is specifically for "I already have an account but forgot
+   * my password").
+   */
+  async adminResetPassword(memberId: string, memberName: string, email: string): Promise<void> {
+    const credential = await this.credentials.findByMemberId(this.tenantId, memberId);
+    if (!credential) throw new AppError(ErrorCode.NOT_FOUND, 'Portal access is not set up for this member.', 404);
+    if (credential.status !== 'ACTIVE') {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has not activated portal access yet — use "Enable portal access" instead.', 422);
+    }
+
+    const token = generateOpaqueToken();
+    const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MINUTES * 60_000);
+    await this.verifications.create({ tenantId: this.tenantId, memberId, purpose: 'PASSWORD_RESET', tokenHash: hashToken(token), expiresAt });
+    eventBus.emitEvent(MemberAuthEvents.PasswordResetRequested, { tenantId: this.tenantId, email, name: memberName, token });
+    authLogger.info('Member portal password reset requested by staff', { memberId });
+  }
+
   async resetPassword(token: string, password: string): Promise<void> {
     assertPasswordPolicy(password);
     const verification = await this.mustFindVerification(token, 'PASSWORD_RESET');

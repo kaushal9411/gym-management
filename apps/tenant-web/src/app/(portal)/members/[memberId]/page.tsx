@@ -21,6 +21,8 @@ import { AvatarUpload } from '@/features/iam/components/avatar-upload';
 import { UnsavedChangesBar } from '@/features/gym-settings/components/unsaved-changes-bar';
 import { BranchSelect } from '@/features/members/components/branch-select';
 import { DocumentUpload } from '@/features/members/components/document-upload';
+import { MemberExtendedInfoFields } from '@/features/members/components/member-extended-info-fields';
+import { MemberHealthScreeningFields } from '@/features/members/components/member-health-screening-fields';
 import { FreezeHistoryTable, MembershipHistoryTable } from '@/features/members/components/membership-history-table';
 import { MembershipPlanSelect } from '@/features/members/components/membership-plan-select';
 import { MemberWorkoutCard } from '@/features/workouts/components/member-workout-card';
@@ -45,10 +47,11 @@ import {
   useRenewMembership,
   useResumeMembership,
   useSendPortalInvite,
+  useSendPortalPasswordReset,
   useTransferBranch,
   useUpdateMember,
 } from '@/features/members/hooks/use-members';
-import type { BloodGroup, Gender, MemberDetail } from '@/features/members/types';
+import type { AwarenessSource, BloodGroup, BodyType, FitnessGoal, FoodPreference, Gender, MaritalStatus, MemberDetail } from '@/features/members/types';
 
 interface FormState {
   firstName: string;
@@ -75,6 +78,24 @@ interface FormState {
   allergies: string;
   fitnessGoals: string;
   notes: string;
+  fatherNameOrAadhaar: string;
+  maritalStatus: string;
+  anniversary: string;
+  goal: string;
+  registrationFee: string;
+  bodyType: string;
+  foodPreference: string;
+  healthHeartCondition: boolean;
+  healthPainDuringActivity: boolean;
+  healthDizzinessOrBalance: boolean;
+  healthDiabetesOrBp: boolean;
+  healthAsthma: boolean;
+  healthBoneOrJointProblem: boolean;
+  healthOtherCondition: boolean;
+  awarenessSource: string;
+  healthScreeningOtherDetails: string;
+  referredByMemberId: string;
+  referredByMemberLabel: string;
 }
 
 function toFormState(m: MemberDetail): FormState {
@@ -103,6 +124,24 @@ function toFormState(m: MemberDetail): FormState {
     allergies: m.allergies ?? '',
     fitnessGoals: m.fitnessGoals ?? '',
     notes: m.notes ?? '',
+    fatherNameOrAadhaar: m.fatherNameOrAadhaar ?? '',
+    maritalStatus: m.maritalStatus ?? '',
+    anniversary: m.anniversary ? m.anniversary.slice(0, 10) : '',
+    goal: m.goal ?? '',
+    registrationFee: m.registrationFee ?? '',
+    bodyType: m.bodyType ?? '',
+    foodPreference: m.foodPreference ?? '',
+    healthHeartCondition: m.healthHeartCondition ?? false,
+    healthPainDuringActivity: m.healthPainDuringActivity ?? false,
+    healthDizzinessOrBalance: m.healthDizzinessOrBalance ?? false,
+    healthDiabetesOrBp: m.healthDiabetesOrBp ?? false,
+    healthAsthma: m.healthAsthma ?? false,
+    healthBoneOrJointProblem: m.healthBoneOrJointProblem ?? false,
+    healthOtherCondition: m.healthOtherCondition ?? false,
+    awarenessSource: m.awarenessSource ?? '',
+    healthScreeningOtherDetails: m.healthScreeningOtherDetails ?? '',
+    referredByMemberId: m.referredByMember?.id ?? '',
+    referredByMemberLabel: m.referredByMember ? `${m.referredByMember.name} (${m.referredByMember.memberId})` : '',
   };
 }
 
@@ -134,6 +173,7 @@ export default function MemberDetailPage() {
   const transferBranch = useTransferBranch();
   const assignTrainer = useAssignTrainer();
   const sendPortalInvite = useSendPortalInvite();
+  const sendPortalPasswordReset = useSendPortalPasswordReset();
   const gdprExport = useGdprExport();
   const eraseGdprData = useEraseGdprData();
   const memberAttendance = useMemberAttendance(memberId, 1, 5);
@@ -164,6 +204,7 @@ export default function MemberDetailPage() {
   const [assignPlanId, setAssignPlanId] = React.useState('');
   const [assignStartDate, setAssignStartDate] = React.useState('');
   const [assignAutoRenew, setAssignAutoRenew] = React.useState(false);
+  const [assignTargetWeight, setAssignTargetWeight] = React.useState('');
   const [renewPlanId, setRenewPlanId] = React.useState('');
   const [extendDays, setExtendDays] = React.useState('');
   const [guestName, setGuestName] = React.useState('');
@@ -233,6 +274,23 @@ export default function MemberDetailPage() {
           allergies: form.allergies || null,
           fitnessGoals: form.fitnessGoals || null,
           notes: form.notes || null,
+          fatherNameOrAadhaar: form.fatherNameOrAadhaar || null,
+          maritalStatus: (form.maritalStatus || null) as MaritalStatus | null,
+          anniversary: form.anniversary || null,
+          goal: (form.goal || null) as FitnessGoal | null,
+          registrationFee: form.registrationFee ? Number(form.registrationFee) : null,
+          bodyType: (form.bodyType || null) as BodyType | null,
+          foodPreference: (form.foodPreference || null) as FoodPreference | null,
+          healthHeartCondition: form.healthHeartCondition,
+          healthPainDuringActivity: form.healthPainDuringActivity,
+          healthDizzinessOrBalance: form.healthDizzinessOrBalance,
+          healthDiabetesOrBp: form.healthDiabetesOrBp,
+          healthAsthma: form.healthAsthma,
+          healthBoneOrJointProblem: form.healthBoneOrJointProblem,
+          healthOtherCondition: form.healthOtherCondition,
+          awarenessSource: (form.awarenessSource || null) as AwarenessSource | null,
+          healthScreeningOtherDetails: form.healthScreeningOtherDetails || null,
+          referredByMemberId: form.referredByMemberId || null,
         },
       },
       {
@@ -289,7 +347,15 @@ export default function MemberDetailPage() {
       return;
     }
     assignMembership.mutate(
-      { id: memberId, payload: { planId: assignPlanId, startDate: assignStartDate || undefined, autoRenew: assignAutoRenew } },
+      {
+        id: memberId,
+        payload: {
+          planId: assignPlanId,
+          startDate: assignStartDate || undefined,
+          autoRenew: assignAutoRenew,
+          targetWeight: assignTargetWeight ? Number(assignTargetWeight) : undefined,
+        },
+      },
       {
         onSuccess: () => {
           toast.success(
@@ -525,6 +591,27 @@ export default function MemberDetailPage() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="text-base">Additional details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MemberExtendedInfoFields
+            value={{
+              fatherNameOrAadhaar: form.fatherNameOrAadhaar,
+              maritalStatus: form.maritalStatus as MaritalStatus | '',
+              anniversary: form.anniversary,
+              goal: form.goal as FitnessGoal | '',
+              registrationFee: form.registrationFee,
+              bodyType: form.bodyType as BodyType | '',
+              foodPreference: form.foodPreference as FoodPreference | '',
+            }}
+            onChange={(v) => setForm((prev) => (prev ? { ...prev, ...v } : prev))}
+            disabled={!canUpdate}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-base">Address</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -608,6 +695,37 @@ export default function MemberDetailPage() {
               onChange={(e) => set('fitnessGoals', e.target.value)}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Health Screening</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <MemberHealthScreeningFields
+            hideBloodGroup
+            value={{
+              healthHeartCondition: form.healthHeartCondition,
+              healthPainDuringActivity: form.healthPainDuringActivity,
+              healthDizzinessOrBalance: form.healthDizzinessOrBalance,
+              healthDiabetesOrBp: form.healthDiabetesOrBp,
+              healthAsthma: form.healthAsthma,
+              healthBoneOrJointProblem: form.healthBoneOrJointProblem,
+              healthOtherCondition: form.healthOtherCondition,
+              awarenessSource: form.awarenessSource as AwarenessSource | '',
+              referredByMemberId: form.referredByMemberId,
+              referredByMemberLabel: form.referredByMemberLabel,
+              bloodGroup: form.bloodGroup as BloodGroup | '',
+              healthScreeningOtherDetails: form.healthScreeningOtherDetails,
+            }}
+            onChange={(v) =>
+              setForm((prev) =>
+                prev ? { ...prev, ...v, referredByMemberLabel: v.referredByMemberId ? v.referredByMemberLabel : '' } : prev,
+              )
+            }
+            disabled={!canUpdate}
+          />
         </CardContent>
       </Card>
 
@@ -755,6 +873,18 @@ export default function MemberDetailPage() {
                   onChange={(e) => setAssignStartDate(e.target.value)}
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="assignTargetWeight">Target weight (kg)</Label>
+                <Input
+                  id="assignTargetWeight"
+                  type="number"
+                  min={0}
+                  step="0.1"
+                  className="h-10 w-32"
+                  value={assignTargetWeight}
+                  onChange={(e) => setAssignTargetWeight(e.target.value)}
+                />
+              </div>
               <div className="flex items-center gap-1.5 pb-2">
                 <Checkbox id="assignAutoRenew" checked={assignAutoRenew} onCheckedChange={(c) => setAssignAutoRenew(c === true)} />
                 <Label htmlFor="assignAutoRenew" className="cursor-pointer font-normal">
@@ -893,24 +1023,52 @@ export default function MemberDetailPage() {
           </CardHeader>
           <CardContent className="flex items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              Let {data.name} log in on their own to view attendance, workout/diet plans, invoices, and their QR code.
+              {data.portalStatus === 'ACTIVE'
+                ? `${data.name} already has portal access — send them a link to reset their password.`
+                : data.portalStatus === 'PENDING_ACTIVATION'
+                  ? `${data.name} was invited but hasn't activated their account yet — resend the activation email if it never arrived.`
+                  : data.portalStatus === 'SUSPENDED'
+                    ? `${data.name}'s portal access is suspended.`
+                    : `Let ${data.name} log in on their own to view attendance, workout/diet plans, invoices, and their QR code.`}
               {!data.email ? ' Add an email on file first.' : ''}
             </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-              disabled={sendPortalInvite.isPending || !data.email}
-              onClick={() =>
-                sendPortalInvite.mutate(memberId, {
-                  onSuccess: () => toast.success('Portal activation email sent.'),
-                  onError: (err) => toast.error(toMemberError(err).message),
-                })
-              }
-            >
-              {sendPortalInvite.isPending ? 'Sending…' : 'Enable portal access'}
-            </Button>
+            {data.portalStatus === 'ACTIVE' ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                disabled={sendPortalPasswordReset.isPending || !data.email}
+                onClick={() =>
+                  sendPortalPasswordReset.mutate(memberId, {
+                    onSuccess: () => toast.success('Password reset link sent.'),
+                    onError: (err) => toast.error(toMemberError(err).message),
+                  })
+                }
+              >
+                {sendPortalPasswordReset.isPending ? 'Sending…' : 'Send reset password link'}
+              </Button>
+            ) : data.portalStatus === 'SUSPENDED' ? null : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                disabled={sendPortalInvite.isPending || !data.email}
+                onClick={() =>
+                  sendPortalInvite.mutate(memberId, {
+                    onSuccess: () => toast.success('Portal activation email sent.'),
+                    onError: (err) => toast.error(toMemberError(err).message),
+                  })
+                }
+              >
+                {sendPortalInvite.isPending
+                  ? 'Sending…'
+                  : data.portalStatus === 'PENDING_ACTIVATION'
+                    ? 'Resend activation email'
+                    : 'Enable portal access'}
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

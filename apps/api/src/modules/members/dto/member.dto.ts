@@ -1,4 +1,17 @@
-import type { BloodGroup, DurationType, Gender, MemberDocumentType, MemberStatus, MembershipStatus } from '@prisma/client';
+import type {
+  AwarenessSource,
+  BloodGroup,
+  BodyType,
+  DurationType,
+  FitnessGoal,
+  FoodPreference,
+  Gender,
+  MaritalStatus,
+  MemberDocumentType,
+  MemberPortalStatus,
+  MemberStatus,
+  MembershipStatus,
+} from '@prisma/client';
 
 export interface BranchSummary {
   id: string;
@@ -47,9 +60,16 @@ export interface MembershipHistoryEntryDto {
   endDate: string;
   durationDays: number;
   priceAtAssignment: string;
+  targetWeight: string | null;
   status: MembershipStatus;
   autoRenew: boolean;
   createdAt: string;
+}
+
+export interface ReferredByMemberSummary {
+  id: string;
+  memberId: string;
+  name: string;
 }
 
 export interface MembershipFreezeEntryDto {
@@ -98,6 +118,26 @@ export interface MemberDetailDto extends MemberListItemDto {
   notes: string | null;
   qrCodeToken: string;
   qrCodeImageUrl: string | null;
+  // ── Extended personal info + Health Screening (Add Member wizard, Prompt 82) ──
+  fatherNameOrAadhaar: string | null;
+  maritalStatus: MaritalStatus | null;
+  anniversary: string | null;
+  goal: FitnessGoal | null;
+  registrationFee: string | null;
+  bodyType: BodyType | null;
+  foodPreference: FoodPreference | null;
+  healthHeartCondition: boolean | null;
+  healthPainDuringActivity: boolean | null;
+  healthDizzinessOrBalance: boolean | null;
+  healthDiabetesOrBp: boolean | null;
+  healthAsthma: boolean | null;
+  healthBoneOrJointProblem: boolean | null;
+  healthOtherCondition: boolean | null;
+  awarenessSource: AwarenessSource | null;
+  healthScreeningOtherDetails: string | null;
+  referredByMember: ReferredByMemberSummary | null;
+  /** `null` = no `MemberCredential` row yet (portal access never enabled). Drives which button the member detail page shows — "Enable portal access" (null/PENDING_ACTIVATION) vs. "Send reset password link" (ACTIVE). */
+  portalStatus: MemberPortalStatus | null;
   /** Real, enforced eligibility — see `AttendanceService#eligibility`, which independently derives the same result and actually rejects check-in on it. */
   canCheckIn: boolean;
   membershipHistory: MembershipHistoryEntryDto[];
@@ -176,6 +216,23 @@ export interface CreateMemberInput {
   branchId: string;
   trainerId?: string;
   notes?: string;
+  fatherNameOrAadhaar?: string;
+  maritalStatus?: MaritalStatus;
+  anniversary?: string;
+  goal?: FitnessGoal;
+  registrationFee?: number;
+  bodyType?: BodyType;
+  foodPreference?: FoodPreference;
+  healthHeartCondition?: boolean;
+  healthPainDuringActivity?: boolean;
+  healthDizzinessOrBalance?: boolean;
+  healthDiabetesOrBp?: boolean;
+  healthAsthma?: boolean;
+  healthBoneOrJointProblem?: boolean;
+  healthOtherCondition?: boolean;
+  awarenessSource?: AwarenessSource;
+  healthScreeningOtherDetails?: string;
+  referredByMemberId?: string;
 }
 
 export interface UpdateMemberInput {
@@ -203,12 +260,30 @@ export interface UpdateMemberInput {
   allergies?: string | null;
   fitnessGoals?: string | null;
   notes?: string | null;
+  fatherNameOrAadhaar?: string | null;
+  maritalStatus?: MaritalStatus | null;
+  anniversary?: string | null;
+  goal?: FitnessGoal | null;
+  registrationFee?: number | null;
+  bodyType?: BodyType | null;
+  foodPreference?: FoodPreference | null;
+  healthHeartCondition?: boolean | null;
+  healthPainDuringActivity?: boolean | null;
+  healthDizzinessOrBalance?: boolean | null;
+  healthDiabetesOrBp?: boolean | null;
+  healthAsthma?: boolean | null;
+  healthBoneOrJointProblem?: boolean | null;
+  healthOtherCondition?: boolean | null;
+  awarenessSource?: AwarenessSource | null;
+  healthScreeningOtherDetails?: string | null;
+  referredByMemberId?: string | null;
 }
 
 export interface AssignMembershipInput {
   planId: string;
   startDate?: string;
   autoRenew?: boolean;
+  targetWeight?: number;
 }
 
 export interface RenewMembershipInput {

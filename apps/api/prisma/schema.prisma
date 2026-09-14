@@ -694,6 +694,63 @@ enum MemberDocumentType {
   @@map("member_document_type")
 }
 
+enum MaritalStatus {
+  SINGLE
+  MARRIED
+  DIVORCED
+  WIDOWED
+  PREFER_NOT_TO_SAY
+
+  @@map("marital_status")
+}
+
+enum BodyType {
+  ECTOMORPH
+  MESOMORPH
+  ENDOMORPH
+  AVERAGE
+  UNKNOWN
+
+  @@map("body_type")
+}
+
+enum FoodPreference {
+  VEGETARIAN
+  NON_VEGETARIAN
+  VEGAN
+  EGGETARIAN
+  UNKNOWN
+
+  @@map("food_preference")
+}
+
+/// A structured, dropdown-driven goal classification captured at onboarding
+/// (Add Member wizard) — deliberately separate from the pre-existing
+/// free-text `Member.fitnessGoals` column, which stays untouched and keeps
+/// its own independent meaning (open-ended notes vs. this fixed category).
+enum FitnessGoal {
+  WEIGHT_LOSS
+  WEIGHT_GAIN
+  MUSCLE_BUILDING
+  GENERAL_FITNESS
+  ENDURANCE
+  REHABILITATION
+  OTHER
+
+  @@map("fitness_goal")
+}
+
+enum AwarenessSource {
+  SOCIAL_MEDIA
+  FRIEND_REFERRAL
+  WALK_IN
+  ADVERTISEMENT
+  ONLINE_SEARCH
+  OTHER
+
+  @@map("awareness_source")
+}
+
 enum DurationType {
   DAYS
   WEEKS
@@ -822,17 +879,51 @@ model Member {
   trainerId                String?      @map("trainer_id") @db.Uuid
   status                   MemberStatus @default(ACTIVE)
   notes                    String?
+
+  // ── Extended personal info (Add Member wizard, Prompt 82) ──────────────
+  fatherNameOrAadhaar String?         @map("father_name_or_aadhaar") @db.VarChar(200)
+  maritalStatus       MaritalStatus?  @map("marital_status")
+  anniversary         DateTime?       @db.Date
+  /// Structured goal dropdown — see the `FitnessGoal` enum doc comment.
+  goal                FitnessGoal?
+  /// One-time gym registration fee captured at onboarding — distinct from
+  /// `MembershipPlan.joiningFee` (a per-plan fee), this is a per-member,
+  /// one-off charge independent of which plan is assigned.
+  registrationFee     Decimal?        @map("registration_fee") @db.Decimal(10, 2)
+  bodyType            BodyType?       @map("body_type")
+  foodPreference      FoodPreference? @map("food_preference")
+
+  // ── Health Background Screening (Add Member wizard, Prompt 82) ─────────
+  // Nullable rather than defaulted to false: "never asked" (every member
+  // created before this migration) must stay distinguishable from "asked
+  // and answered No" once the edit page starts surfacing these.
+  healthHeartCondition        Boolean?         @map("health_heart_condition")
+  healthPainDuringActivity    Boolean?         @map("health_pain_during_activity")
+  healthDizzinessOrBalance    Boolean?         @map("health_dizziness_or_balance")
+  healthDiabetesOrBp          Boolean?         @map("health_diabetes_or_bp")
+  healthAsthma                Boolean?         @map("health_asthma")
+  healthBoneOrJointProblem    Boolean?         @map("health_bone_or_joint_problem")
+  healthOtherCondition        Boolean?         @map("health_other_condition")
+  awarenessSource             AwarenessSource? @map("awareness_source")
+  /// Kept distinct from the general-purpose `notes` column above (staff
+  /// notes) — this is specifically the screening step's own free-text box.
+  healthScreeningOtherDetails String?          @map("health_screening_other_details")
+  /// Self-referential — an existing member who referred this one. Optional,
+  /// `SetNull` so deleting the referrer never blocks/cascades this row.
+  referredByMemberId          String?          @map("referred_by_member_id") @db.Uuid
   /// Opaque token encoded into the QR — attendance check-in (future module)
   /// looks members up by this, never by the human-editable memberId.
-  qrCodeToken              String       @unique @map("qr_code_token")
-  qrCodeImageUrl           String?      @map("qr_code_image_url")
-  createdAt                DateTime     @default(now()) @map("created_at")
-  updatedAt                DateTime     @updatedAt @map("updated_at")
-  deletedAt                DateTime?    @map("deleted_at")
+  qrCodeToken                 String           @unique @map("qr_code_token")
+  qrCodeImageUrl              String?          @map("qr_code_image_url")
+  createdAt                   DateTime         @default(now()) @map("created_at")
+  updatedAt                   DateTime         @updatedAt @map("updated_at")
+  deletedAt                   DateTime?        @map("deleted_at")
 
   tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   branch           Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
   trainer          User?                @relation("MemberTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+  referredByMember Member?              @relation("MemberReferral", fields: [referredByMemberId], references: [id], onDelete: SetNull)
+  referrals        Member[]             @relation("MemberReferral")
   memberships      Membership[]
   freezes          MembershipFreeze[]
   documents        MemberDocument[]
@@ -862,6 +953,7 @@ model Member {
   /// findByPhone) — see the `emailHash`/`phoneHash` doc comments above.
   @@index([tenantId, emailHash])
   @@index([tenantId, phoneHash])
+  @@index([tenantId, referredByMemberId])
   @@map("members")
 }
 
@@ -963,6 +1055,9 @@ model Membership {
   /// retroactively change a membership someone already bought.
   durationDays      Int              @map("duration_days")
   priceAtAssignment Decimal          @map("price_at_assignment") @db.Decimal(10, 2)
+  /// Optional per-member weight-loss/gain target for this assignment
+  /// (Add Member wizard, Prompt 82) — member-specific, not a plan property.
+  targetWeight      Decimal?         @map("target_weight") @db.Decimal(5, 2)
   status            MembershipStatus @default(ACTIVE)
   autoRenew         Boolean          @default(false) @map("auto_renew")
   createdAt         DateTime         @default(now()) @map("created_at")
