@@ -130,6 +130,8 @@ adb shell monkey -p com.fitcloud.gym_saas_mobile -c android.intent.category.LAUN
 
 Package id is **`com.fitcloud.gym_saas_mobile`** (not `com.fitcloud.mobile`).
 
+**Release build (Play Store)**: production API is `https://api.appkraft.info/api/v1` — baked into the debug default at your own risk; instead run `apps/mobile/scripts/build-release.sh` (or `.ps1` on Windows), which passes it via `--dart-define` explicitly so it can't be forgotten, and builds the `.aab` Play Console actually wants (not an `.apk`). Requires `android/key.properties` to exist first (see `key.properties.example` for the `keytool` command) — the script refuses to run without it rather than producing a debug-signed release build. Neither Flutter nor a JDK were available on the machine these scripts were written on; unverified by a real build.
+
 **Verification standard** (per `CLAUDE.md`): `flutter analyze` clean **+** every new endpoint curl-tested against the running stack with a token for that actual role **+** an on-device pass. Static checks alone are not "done". Test credentials live in `docs/PROJECT-STATE.md`.
 
 **Driving the device over adb** — screenshots proved unreliable; the accessibility tree is the signal:

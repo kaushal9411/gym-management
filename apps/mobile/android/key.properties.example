@@ -1,0 +1,20 @@
+# Copy this file to `key.properties` (same directory) and fill in real
+# values once a release keystore exists — `key.properties` itself is
+# gitignored (see .gitignore in this directory) and must never be committed.
+#
+# Generate the keystore first (run on any machine with a JDK installed —
+# this dev machine currently has none):
+#
+#   keytool -genkey -v -keystore fitcloud-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias fitcloud
+#
+# Store fitcloud-release.jks somewhere safe OUTSIDE this repo — if it's lost,
+# the app can never be updated on Play Store again under the same listing.
+#
+# storeFile below is resolved relative to apps/mobile/android/ (where this
+# file lives once renamed), so either place the .jks there too (still
+# gitignored by **/*.jks) or use an absolute path.
+
+storePassword=
+keyPassword=
+keyAlias=fitcloud
+storeFile=fitcloud-release.jks

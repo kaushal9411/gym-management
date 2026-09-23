@@ -47,6 +47,9 @@ apps/api/prisma/*.db
 .DS_Store
 Thumbs.db
 
+# Claude Code — personal/local overrides, never shared with the team
+.claude/settings.local.json
+
 # misc
 *.pem
 .vercel
