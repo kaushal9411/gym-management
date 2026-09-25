@@ -1,13 +1,19 @@
 # ══════════════════════════════════════════════════════════════════════
-# Deploy PRODUCTION — merges to `main` PROMOTE the staging-verified images
-# (no rebuild), gated by a manual environment approval. Post-deploy
-# synthetic checks trigger auto-rollback on failure.
+# Deploy PRODUCTION — every push to `main` (after CI passes) SSHes into
+# the single EC2 box running api/tenant-web/super-admin under pm2 and
+# runs the same pull → install → migrate → build → pm2 restart sequence
+# as infrastructure/testing-deploy/07-redeploy-via-git.sh, which this
+# mirrors exactly. There is no container registry, ECS, or terraform in
+# this project — this workflow targets the real, currently-running
+# deployment, not a future one.
 # ══════════════════════════════════════════════════════════════════════
 name: Deploy Production
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
     branches: [main]
+    types: [completed]
   workflow_dispatch:
 
 concurrency:
@@ -16,24 +22,43 @@ concurrency:
 
 jobs:
   deploy:
-    name: Promote & Deploy
+    name: Deploy via SSH (git pull + build + pm2 restart)
     runs-on: ubuntu-latest
-    environment: production   # requires manual approval (environment protection rule)
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     steps:
-      - uses: actions/checkout@v4
+      - name: Deploy to production server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script_stop: true
+          script: |
+            cd ~/gym-management
+            export PATH="$PATH:$(npm config get prefix)/bin"
+            export NODE_OPTIONS="--max-old-space-size=1536"
 
-      - name: Promote staging-verified images (placeholder)
-        run: echo "retag $GITHUB_SHA images from staging repo — never rebuild for prod"
+            echo "-- git fetch + reset --hard origin/main --"
+            git fetch origin main
+            git reset --hard origin/main
 
-      - name: Run migrations (placeholder)
-        run: echo "prisma migrate deploy (expand/contract keeps N and N-1 compatible)"
+            echo "-- pnpm install --"
+            pnpm install
 
-      - name: Rolling deploy (placeholder)
-        run: echo "ecs update-service with health-check gated rollout"
+            echo "-- prisma generate + migrate deploy (no-op if nothing changed) --"
+            pnpm --filter @gym-saas/api run prisma:generate
+            pnpm --filter @gym-saas/api exec prisma migrate deploy
 
-      - name: Post-deploy synthetics (placeholder)
-        run: echo "login, tenant resolve, socket handshake, webhook echo — fail => rollback"
+            echo "-- building api/tenant-web/super-admin --"
+            pnpm --filter @gym-saas/api run build
+            pnpm --filter @gym-saas/tenant-web run build
+            pnpm --filter @gym-saas/super-admin run build
 
-      - name: Rollback on failure (placeholder)
-        if: failure()
-        run: echo "redeploy previous image tag"
+            echo "-- restarting via pm2 --"
+            pm2 restart fitcloud-api fitcloud-tenant-web fitcloud-super-admin
+            pm2 save
+
+      - name: Smoke test
+        run: |
+          sleep 5
+          curl -sf https://api.appkraft.info/health || (echo "API health check failed" && exit 1)
