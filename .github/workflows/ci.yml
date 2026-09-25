@@ -40,6 +40,11 @@ jobs:
     name: Build & Typecheck
     runs-on: ubuntu-latest
     needs: lint
+    # Prisma's postinstall hook runs `prisma generate` during `pnpm install`,
+    # which needs DATABASE_URL to be *present* (not reachable) since the
+    # schema declares `url = env("DATABASE_URL")` — no real DB needed here.
+    env:
+      DATABASE_URL: postgresql://gym:gym@localhost:5432/gym_saas_build?schema=public
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
