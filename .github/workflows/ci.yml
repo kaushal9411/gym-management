@@ -84,6 +84,11 @@ jobs:
     name: Accessibility (axe)
     runs-on: ubuntu-latest
     needs: build
+    # Confirmed hanging past 20+ min with no output progress (no job-level
+    # default other than GitHub's 360min cap) — bound it so a stuck run
+    # fails fast instead of blocking this whole workflow's completion
+    # (and therefore Deploy Production, which waits on that completion).
+    timeout-minutes: 12
     # NOTE: this job spins up the full stack (API + both Next.js apps) from
     # scratch and hasn't been exercised against a real GitHub Actions run
     # yet — the Playwright/axe test itself (e2e/a11y.spec.ts) IS verified,
