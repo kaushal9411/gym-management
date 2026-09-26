@@ -60,5 +60,8 @@ jobs:
 
       - name: Smoke test
         run: |
-          sleep 5
-          curl -sf https://api.appkraft.info/health || (echo "API health check failed" && exit 1)
+          for i in $(seq 1 30); do
+            curl -sf https://api.appkraft.info/health -o /dev/null && exit 0
+            sleep 5
+          done
+          echo "API health check failed after 150s" && exit 1
