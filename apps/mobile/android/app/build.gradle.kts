@@ -37,16 +37,16 @@ android {
 
     defaultConfig {
         applicationId = "com.fitcloud.gym_saas_mobile"
-        // `compileSdk`/`targetSdk` deliberately stay tied to whatever Flutter
-        // SDK is installed (`flutter.compileSdkVersion`/`targetSdkVersion`,
-        // above/below) rather than a hardcoded number — Flutter's own
-        // tooling keeps these current with Play Store's evolving minimum
-        // target API requirement, which changes yearly; a number pinned
-        // here would silently go stale. `minSdk` is pinned explicitly since
-        // it rarely needs to change and this project's one native-permission
-        // dependency (`mobile_scanner`, the QR check-in scanner) documents
-        // 21 as its own floor — confirmed against its android/build.gradle.
-        minSdk = 21
+        // `compileSdk`/`targetSdk`/`minSdk` all deliberately stay tied to
+        // whatever Flutter SDK is installed rather than hardcoded numbers —
+        // Flutter's own build tooling silently rewrites a pinned `minSdk`
+        // back to `flutter.minSdkVersion` on every release build (confirmed:
+        // it clobbered an explicit `minSdk = 21` pin twice in a row), so
+        // fighting it isn't sustainable. Current Flutter (3.47.5) defaults
+        // this to 24 — still well above mobile_scanner's own documented
+        // floor of 21, so no functionality is lost, just ~1-2% of very old
+        // devices (Android 5.0-6.0) that were never a real target anyway.
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

@@ -10,11 +10,15 @@
 # Store fitcloud-release.jks somewhere safe OUTSIDE this repo — if it's lost,
 # the app can never be updated on Play Store again under the same listing.
 #
-# storeFile below is resolved relative to apps/mobile/android/ (where this
-# file lives once renamed), so either place the .jks there too (still
-# gitignored by **/*.jks) or use an absolute path.
+# storeFile below is resolved by Gradle relative to apps/mobile/android/app/
+# (the app module directory, NOT the android/ directory this file lives in)
+# — confirmed the hard way: `storeFile=fitcloud-release.jks` with the .jks
+# actually sitting in android/ fails signing with "Keystore file ... not
+# found". Keep the .jks next to this file (in android/, still gitignored by
+# **/*.jks) and reference it as ../fitcloud-release.jks, or use an absolute
+# path instead.
 
 storePassword=
 keyPassword=
 keyAlias=fitcloud
-storeFile=fitcloud-release.jks
+storeFile=../fitcloud-release.jks
