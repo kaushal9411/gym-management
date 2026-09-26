@@ -243,6 +243,7 @@ jobs:
         with:
           server_address: email-smtp.ap-south-1.amazonaws.com
           server_port: 465
+          secure: true
           username: ${{ secrets.SES_SMTP_USERNAME }}
           password: ${{ secrets.SES_SMTP_PASSWORD }}
           from: FitCloud CI <ci-alerts@appkraft.info>
