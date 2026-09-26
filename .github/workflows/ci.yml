@@ -210,3 +210,42 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @gym-saas/api run prisma:generate
       - run: pnpm test
+
+  notify:
+    name: Email results
+    runs-on: ubuntu-latest
+    needs: [lint, build, audit, a11y, test]
+    # Queries the real per-job conclusions via the API (not `needs.*.result`,
+    # which reports "success" for continue-on-error jobs even when they
+    # actually failed) so the email reflects what really happened.
+    if: always()
+    steps:
+      - name: Build report
+        id: report
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.runId,
+            });
+            const icon = (c) => c === 'success' ? 'PASS' : c === 'failure' ? 'FAIL' : (c || 'unknown').toUpperCase();
+            const jobs = data.jobs.filter((j) => j.name !== 'Email results');
+            const lines = jobs.map((j) => `${icon(j.conclusion)}  ${j.name}`);
+            // These two block deploys for real; Test/a11y are known pre-existing
+            // issues made non-blocking on purpose (continue-on-error).
+            const blocking = ['Lint & Format', 'Build & Typecheck', 'Dependency Audit'];
+            const blockingFailed = jobs.some((j) => blocking.includes(j.name) && j.conclusion !== 'success');
+            core.setOutput('subject', blockingFailed ? 'FitCloud CI FAILED' : 'FitCloud CI passed');
+            core.setOutput('body', lines.join('\n') + `\n\nRun: ${context.payload.repository.html_url}/actions/runs/${context.runId}`);
+      - uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: email-smtp.ap-south-1.amazonaws.com
+          server_port: 465
+          username: ${{ secrets.SES_SMTP_USERNAME }}
+          password: ${{ secrets.SES_SMTP_PASSWORD }}
+          from: FitCloud CI <ci-alerts@appkraft.info>
+          to: kaushalchauhan9411@gmail.com
+          subject: ${{ steps.report.outputs.subject }}
+          body: ${{ steps.report.outputs.body }}

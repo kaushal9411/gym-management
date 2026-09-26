@@ -27,6 +27,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     steps:
       - name: Deploy to production server
+        id: deploy
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.DEPLOY_HOST }}
@@ -59,9 +60,35 @@ jobs:
             pm2 save
 
       - name: Smoke test
+        id: smoke
         run: |
           for i in $(seq 1 30); do
             curl -sf https://api.appkraft.info/health -o /dev/null && exit 0
             sleep 5
           done
           echo "API health check failed after 150s" && exit 1
+
+      - name: Email result
+        if: always()
+        run: |
+          if [ "${{ steps.deploy.outcome }}" != "success" ]; then
+            echo "SUBJECT=FitCloud DEPLOY FAILED" >> "$GITHUB_ENV"
+            echo "BODY=Deploy step failed (SSH/build/pm2 restart). See run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+          elif [ "${{ steps.smoke.outcome }}" != "success" ]; then
+            echo "SUBJECT=FitCloud DEPLOY partially failed (smoke test)" >> "$GITHUB_ENV"
+            echo "BODY=Deploy succeeded but the post-deploy health check never returned healthy within 150s. See run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+          else
+            echo "SUBJECT=FitCloud DEPLOY succeeded" >> "$GITHUB_ENV"
+            echo "BODY=Deploy + health check both passed. See run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+          fi
+      - uses: dawidd6/action-send-mail@v3
+        if: always()
+        with:
+          server_address: email-smtp.ap-south-1.amazonaws.com
+          server_port: 465
+          username: ${{ secrets.SES_SMTP_USERNAME }}
+          password: ${{ secrets.SES_SMTP_PASSWORD }}
+          from: FitCloud CI <ci-alerts@appkraft.info>
+          to: kaushalchauhan9411@gmail.com
+          subject: ${{ env.SUBJECT }}
+          body: ${{ env.BODY }}
