@@ -135,6 +135,7 @@ jobs:
       - name: Migrate + seed
         working-directory: apps/api
         run: |
+          pnpm run prisma:generate
           pnpm exec prisma migrate deploy
           pnpm run prisma:seed
       - name: Start API + both frontends in the background
@@ -194,4 +195,5 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @gym-saas/api run prisma:generate
       - run: pnpm test
