@@ -81,7 +81,7 @@ jobs:
             echo "SUBJECT=FitCloud DEPLOY succeeded" >> "$GITHUB_ENV"
             echo "BODY=Deploy + health check both passed. See run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> "$GITHUB_ENV"
           fi
-      - uses: dawidd6/action-send-mail@v3
+      - uses: dawidd6/action-send-mail@v22
         if: always()
         with:
           server_address: email-smtp.ap-south-1.amazonaws.com

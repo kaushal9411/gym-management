@@ -239,7 +239,7 @@ jobs:
             const blockingFailed = jobs.some((j) => blocking.includes(j.name) && j.conclusion !== 'success');
             core.setOutput('subject', blockingFailed ? 'FitCloud CI FAILED' : 'FitCloud CI passed');
             core.setOutput('body', lines.join('\n') + `\n\nRun: ${context.payload.repository.html_url}/actions/runs/${context.runId}`);
-      - uses: dawidd6/action-send-mail@v3
+      - uses: dawidd6/action-send-mail@v22
         with:
           server_address: email-smtp.ap-south-1.amazonaws.com
           server_port: 465
