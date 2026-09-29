@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/network/auth_event_bus.dart';
+import '../../core/push/push_notification_service.dart';
 import '../../core/storage/secure_storage.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/app_currency.dart';
@@ -24,10 +25,12 @@ class SessionCubit extends Cubit<SessionState> {
     required PublicTenantRepository publicTenantRepository,
     required SecureStorage storage,
     required AuthEventBus authEventBus,
+    required PushNotificationService pushNotificationService,
   })  : _authRepository = authRepository,
         _memberAuthRepository = memberAuthRepository,
         _publicTenantRepository = publicTenantRepository,
         _storage = storage,
+        _pushNotificationService = pushNotificationService,
         super(const SessionUnknown()) {
     _forcedLogoutSub =
         authEventBus.onForcedLogout.listen((_) => _handleForcedLogout());
@@ -37,6 +40,7 @@ class SessionCubit extends Cubit<SessionState> {
   final MemberAuthRepository _memberAuthRepository;
   final PublicTenantRepository _publicTenantRepository;
   final SecureStorage _storage;
+  final PushNotificationService _pushNotificationService;
   late final StreamSubscription<void> _forcedLogoutSub;
 
   Future<void> restore() async {
@@ -53,6 +57,7 @@ class SessionCubit extends Cubit<SessionState> {
               SessionAuthenticatedStaff(await userFuture, await tenantFuture),
             );
             unawaited(AppCurrency.refresh());
+            unawaited(_pushNotificationService.registerForSession(actorType));
             return;
           case ActorType.member:
             final member = await _memberAuthRepository.restoreCachedProfile();
@@ -62,6 +67,9 @@ class SessionCubit extends Cubit<SessionState> {
                   member,
                   await _publicTenantRepository.resolve(slug),
                 ),
+              );
+              unawaited(
+                _pushNotificationService.registerForSession(actorType),
               );
               return;
             }
@@ -117,6 +125,7 @@ class SessionCubit extends Cubit<SessionState> {
   void staffSignedIn(UserProfile user, TenantBranding tenant) {
     emit(SessionAuthenticatedStaff(user, tenant));
     unawaited(AppCurrency.refresh());
+    unawaited(_pushNotificationService.registerForSession(ActorType.staff));
   }
 
   /// Re-fetches `/auth/me` and re-emits — used after a self-profile edit
@@ -129,14 +138,20 @@ class SessionCubit extends Cubit<SessionState> {
     emit(SessionAuthenticatedStaff(user, current.tenant));
   }
 
-  void memberSignedIn(MemberProfile member, TenantBranding tenant) =>
-      emit(SessionAuthenticatedMember(member, tenant));
+  void memberSignedIn(MemberProfile member, TenantBranding tenant) {
+    emit(SessionAuthenticatedMember(member, tenant));
+    unawaited(_pushNotificationService.registerForSession(ActorType.member));
+  }
 
   Future<void> signOut() async {
     final current = state;
     if (current is SessionAuthenticatedStaff) {
+      // Unregister BEFORE logout invalidates this device's tokens — the
+      // DELETE call still needs a valid Authorization header.
+      await _pushNotificationService.unregister(ActorType.staff);
       await _authRepository.logout();
     } else if (current is SessionAuthenticatedMember) {
+      await _pushNotificationService.unregister(ActorType.member);
       await _memberAuthRepository.logout();
     }
     AppCurrency.reset();
@@ -145,6 +160,10 @@ class SessionCubit extends Cubit<SessionState> {
 
   Future<void> _handleForcedLogout() async {
     if (state is SessionUnauthenticated || state is SessionUnknown) return;
+    final actorType = await _storage.readActorType();
+    if (actorType != null) {
+      await _pushNotificationService.unregister(actorType);
+    }
     await _storage.clearSession();
     emit(await _unauthenticatedWithMemory());
   }

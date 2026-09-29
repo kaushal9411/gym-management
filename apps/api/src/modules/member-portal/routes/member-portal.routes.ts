@@ -9,6 +9,8 @@ import {
   memberPortalClassesQuerySchema,
   memberPortalIdParamSchema,
   memberPortalPaginationSchema,
+  memberRegisterDeviceTokenSchema,
+  memberUnregisterDeviceTokenSchema,
   memberWorkoutProgressSchema,
 } from '../validators/member-portal.validators';
 
@@ -63,3 +65,14 @@ memberPortalRouter.get('/classes', validate({ query: memberPortalClassesQuerySch
 memberPortalRouter.get('/bookings', asyncHandler(memberPortalController.myBookings.bind(memberPortalController)));
 memberPortalRouter.post('/classes/:id/book', validate({ params: memberPortalIdParamSchema }), asyncHandler(memberPortalController.bookClass.bind(memberPortalController)));
 memberPortalRouter.post('/bookings/:id/cancel', validate({ params: memberPortalIdParamSchema }), asyncHandler(memberPortalController.cancelBooking.bind(memberPortalController)));
+
+memberPortalRouter.post(
+  '/device-token',
+  validate({ body: memberRegisterDeviceTokenSchema }),
+  asyncHandler(memberPortalController.registerDeviceToken.bind(memberPortalController)),
+);
+memberPortalRouter.delete(
+  '/device-token',
+  validate({ body: memberUnregisterDeviceTokenSchema }),
+  asyncHandler(memberPortalController.unregisterDeviceToken.bind(memberPortalController)),
+);

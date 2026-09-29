@@ -306,7 +306,7 @@ export class DietPlanService {
       assignedBy: actor.userId,
     });
     await this.audit(actor, 'diet_plan.assigned', assignment.id);
-    await notifyDietAssigned(this.tenantId, { memberName: `${member.firstName} ${member.lastName}`.trim(), planName: plan.name });
+    await notifyDietAssigned(this.tenantId, { memberId: member.id, memberName: `${member.firstName} ${member.lastName}`.trim(), planName: plan.name });
     return toAssignmentDto(assignment);
   }
 

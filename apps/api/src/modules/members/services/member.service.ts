@@ -459,6 +459,7 @@ export class MemberService {
     });
     await this.audit(actor, 'member.membership_assigned', id);
     await notifyMembershipAssigned(this.tenantId, {
+      memberId: member.id,
       memberName: `${member.firstName} ${member.lastName}`.trim(),
       planName: plan.name,
       endDate: endDate.toISOString().slice(0, 10),
@@ -493,6 +494,7 @@ export class MemberService {
     });
     await this.audit(actor, 'member.membership_renewed', id);
     await notifyMembershipRenewed(this.tenantId, {
+      memberId: member.id,
       memberName: `${member.firstName} ${member.lastName}`.trim(),
       planName: plan.name,
       endDate: endDate.toISOString().slice(0, 10),

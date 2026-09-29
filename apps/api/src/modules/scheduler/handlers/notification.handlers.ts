@@ -42,7 +42,12 @@ export const sendScheduledAnnouncements: JobHandler = async () => {
     // eslint-disable-next-line no-await-in-loop -- sequential across a small, infrequent (hourly) batch; no throughput requirement justifies parallelizing
     await prisma.tenantAnnouncement.update({ where: { id: announcement.id }, data: { status: 'PUBLISHED', publishAt: null, publishedAt: now } });
     // eslint-disable-next-line no-await-in-loop
-    await notifyAnnouncementPublished(announcement.tenantId, { title: announcement.title, body: stripHtml(announcement.body) });
+    await notifyAnnouncementPublished(announcement.tenantId, {
+      title: announcement.title,
+      body: stripHtml(announcement.body),
+      audience: announcement.audience,
+      branchId: announcement.branchId,
+    });
   }
 
   const expiring = await TenantAnnouncementRepository.findDueExpirations(prisma, new Date());
@@ -78,7 +83,7 @@ export const birthdayWishes: JobHandler = async () => {
     // eslint-disable-next-line no-await-in-loop -- sequential across a small, infrequent (daily) batch; no throughput requirement justifies parallelizing
     if (await cache.get(dedupeKey)) continue;
     // eslint-disable-next-line no-await-in-loop
-    await notifyBirthdayWishes(member.tenantId, { memberName: `${member.firstName} ${member.lastName}`.trim(), memberEmail: member.email });
+    await notifyBirthdayWishes(member.tenantId, { memberId: member.id, memberName: `${member.firstName} ${member.lastName}`.trim(), memberEmail: member.email });
     // eslint-disable-next-line no-await-in-loop
     await cache.set(dedupeKey, true, 400 * 86_400); // outlives a year so it never double-fires within the same birthday
     wished += 1;

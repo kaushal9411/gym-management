@@ -1,4 +1,4 @@
-import type { Prisma } from '@prisma/client';
+import type { DeviceTokenPlatform, Prisma } from '@prisma/client';
 
 import { AppError, NotFoundError, ValidationError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
@@ -7,6 +7,7 @@ import { AttendanceRepository } from '../../attendance/repositories/attendance.r
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import { ClassBookingService } from '../../classes/services/class-booking.service';
 import { ClassSessionService } from '../../classes/services/class-session.service';
+import { deviceTokenService } from '../../device-tokens/services/device-token.service';
 import { MemberDietPlanRepository } from '../../diet/repositories/member-diet-plan.repository';
 import { MemberInvoiceService } from '../../finance/services/member-invoice.service';
 import { MeasurementService } from '../../measurements/services/measurement.service';
@@ -153,6 +154,14 @@ export class MemberPortalService {
 
   async getMyBookings(memberId: string) {
     return this.classBookings.listForMember(memberId);
+  }
+
+  async registerDeviceToken(memberId: string, token: string, platform: DeviceTokenPlatform): Promise<void> {
+    await deviceTokenService.registerMemberToken(this.tenantId, memberId, token, platform);
+  }
+
+  async unregisterDeviceToken(token: string): Promise<void> {
+    await deviceTokenService.unregisterMemberToken(this.tenantId, token);
   }
 }
 

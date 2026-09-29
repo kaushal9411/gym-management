@@ -27,3 +27,14 @@ export const memberPortalClassesQuerySchema = z.object({
   dateFrom: z.string().min(1, 'dateFrom is required'),
   dateTo: z.string().min(1, 'dateTo is required'),
 });
+
+const DEVICE_TOKEN_PLATFORMS = ['ANDROID', 'IOS', 'WEB'] as const;
+
+export const memberRegisterDeviceTokenSchema = z.object({
+  token: z.string().trim().min(1).max(255),
+  platform: z.enum(DEVICE_TOKEN_PLATFORMS).default('ANDROID'),
+});
+
+export const memberUnregisterDeviceTokenSchema = z.object({
+  token: z.string().trim().min(1).max(255),
+});

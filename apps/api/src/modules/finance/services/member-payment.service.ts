@@ -136,6 +136,7 @@ export class MemberPaymentService {
       await this.onPaymentSucceeded(payment, member, branchId);
     } else if (status === 'FAILED') {
       await notifyPaymentFailed(this.tenantId, {
+        memberId: member.id,
         memberName: `${member.firstName} ${member.lastName}`.trim(),
         amount: Number(payment.finalAmount).toFixed(2),
         memberEmail: member.email,
@@ -314,6 +315,7 @@ export class MemberPaymentService {
       const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: payment.member.id } }));
       if (member) {
         await notifyPaymentFailed(this.tenantId, {
+          memberId: member.id,
           memberName: `${member.firstName} ${member.lastName}`.trim(),
           amount: Number(payment.finalAmount).toFixed(2),
           memberEmail: member.email,
@@ -348,6 +350,7 @@ export class MemberPaymentService {
       const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: payment.member.id } }));
       if (member) {
         await notifyPaymentFailed(this.tenantId, {
+          memberId: member.id,
           memberName: `${member.firstName} ${member.lastName}`.trim(),
           amount: Number(payment.finalAmount).toFixed(2),
           memberEmail: member.email,
@@ -503,6 +506,7 @@ export class MemberPaymentService {
     const dueAmount = payment.membership ? Math.max(Number(payment.membership.priceAtAssignment) - totalPaid, 0) : 0;
 
     await notifyPaymentReceived(this.tenantId, {
+      memberId: payment.member.id,
       memberName: `${member.firstName} ${member.lastName}`.trim(),
       amount: Number(payment.finalAmount).toFixed(2),
       paymentNumber: payment.paymentNumber,

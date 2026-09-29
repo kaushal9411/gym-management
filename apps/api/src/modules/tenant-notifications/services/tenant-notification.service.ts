@@ -4,6 +4,7 @@ import { NotFoundError } from '../../../core/errors/app-error';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { emitToTenant } from '../../../infrastructure/realtime/socket-server';
+import { deviceTokenService } from '../../device-tokens/services/device-token.service';
 import { TenantNotificationRepository } from '../repositories/tenant-notification.repository';
 
 export class TenantNotificationService {
@@ -31,6 +32,7 @@ export class TenantNotificationService {
     const repository = new TenantNotificationRepository(getTenantScopedClient(tenantId));
     const notification = await repository.create(tenantId, input);
     emitToTenant(tenantId, 'notification:new', notification);
+    await deviceTokenService.pushToStaff(tenantId, input.title, input.body, { category: input.category });
     return notification;
   }
 
@@ -59,6 +61,7 @@ export class TenantNotificationService {
     const repository = new TenantNotificationRepository(getTenantScopedClient(tenantId));
     const notification = await repository.create(tenantId, { category, title, body });
     emitToTenant(tenantId, 'notification:new', notification);
+    await deviceTokenService.pushToStaff(tenantId, title, body, { category });
   }
 
   /**

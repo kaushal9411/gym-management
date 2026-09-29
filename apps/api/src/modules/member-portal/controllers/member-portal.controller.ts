@@ -1,3 +1,4 @@
+import type { DeviceTokenPlatform } from '@prisma/client';
 import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
@@ -30,6 +31,18 @@ export class MemberPortalController {
   async markWorkoutProgress(req: Request<{ id: string }>, res: Response): Promise<void> {
     const result = await serviceFor(req).markWorkoutProgress(memberId(req), req.params.id, req.body);
     sendSuccess(res, result, 'Progress updated.');
+  }
+
+  async registerDeviceToken(req: Request, res: Response): Promise<void> {
+    const { token, platform } = req.body as { token: string; platform: DeviceTokenPlatform };
+    await serviceFor(req).registerDeviceToken(memberId(req), token, platform);
+    sendSuccess(res, null, 'Device registered for push notifications.');
+  }
+
+  async unregisterDeviceToken(req: Request, res: Response): Promise<void> {
+    const { token } = req.body as { token: string };
+    await serviceFor(req).unregisterDeviceToken(token);
+    sendSuccess(res, null, 'Device unregistered.');
   }
 
   async diet(req: Request, res: Response): Promise<void> {

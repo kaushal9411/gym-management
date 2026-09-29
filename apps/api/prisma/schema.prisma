@@ -253,6 +253,8 @@ model Tenant {
   aiSettings            TenantAiSettings?
   memberCredentials     MemberCredential[]
   memberSessions        MemberSession[]
+  staffDeviceTokens     StaffDeviceToken[]
+  memberDeviceTokens    MemberDeviceToken[]
   memberVerifications   MemberVerification[]
   groupClasses          GroupClass[]
   groupClassSchedules   GroupClassSchedule[]
@@ -395,6 +397,7 @@ model User {
   classBookingsMade            ClassBooking[]        @relation("ClassBookingBookedBy")
   bodyMeasurementsRecorded     BodyMeasurement[]     @relation("BodyMeasurementRecordedBy")
   ptSessionsAsTrainer          PtSessionLog[]        @relation("PtSessionTrainer")
+  deviceTokens                 StaffDeviceToken[]
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
@@ -939,6 +942,7 @@ model Member {
   classBookings    ClassBooking[]
   guestVisits      GuestVisit[]
   ptSessionLogs    PtSessionLog[]
+  deviceTokens     MemberDeviceToken[]
 
   @@unique([tenantId, memberId])
   @@index([tenantId, status])
@@ -3542,6 +3546,60 @@ model NotificationTemplate {
 
   @@unique([tenantId, type])
   @@map("notification_templates")
+}
+
+/// Android/iOS/web push-target platform for a registered device token — only
+/// ANDROID is actually sent to today (this app has no iOS build), the other
+/// two values are modeled now so the table doesn't need reshaping later, same
+/// "ship the enum value now" precedent as `TenantNotificationChannel.WHATSAPP`.
+enum DeviceTokenPlatform {
+  ANDROID
+  IOS
+  WEB
+
+  @@map("device_token_platform")
+}
+
+/// One row per (device, staff user) FCM registration. Deliberately a
+/// separate table from `MemberDeviceToken` rather than one table with two
+/// nullable FKs — this codebase never shares a table across the staff/member
+/// identity planes (see `UserSession`/`MemberSession`). `token` is globally
+/// unique (an FCM token belongs to one app install at a time): if the same
+/// physical device logs out and a different staff member logs in, the
+/// register endpoint reassigns this row's `userId` rather than inserting a
+/// duplicate — see `DeviceTokenService#registerStaffToken`.
+model StaffDeviceToken {
+  id         String              @id @default(uuid()) @db.Uuid
+  tenantId   String              @map("tenant_id") @db.Uuid
+  userId     String              @map("user_id") @db.Uuid
+  token      String              @unique @db.VarChar(255)
+  platform   DeviceTokenPlatform @default(ANDROID)
+  lastSeenAt DateTime            @default(now()) @map("last_seen_at")
+  createdAt  DateTime            @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId])
+  @@map("staff_device_tokens")
+}
+
+/// Member-plane counterpart to `StaffDeviceToken` — see that model's doc
+/// comment for why this is a separate table rather than a shared one.
+model MemberDeviceToken {
+  id         String              @id @default(uuid()) @db.Uuid
+  tenantId   String              @map("tenant_id") @db.Uuid
+  memberId   String              @map("member_id") @db.Uuid
+  token      String              @unique @db.VarChar(255)
+  platform   DeviceTokenPlatform @default(ANDROID)
+  lastSeenAt DateTime            @default(now()) @map("last_seen_at")
+  createdAt  DateTime            @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, memberId])
+  @@map("member_device_tokens")
 }
 
 enum AiMessageRole {

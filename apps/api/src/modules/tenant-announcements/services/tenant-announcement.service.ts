@@ -109,7 +109,12 @@ export class TenantAnnouncementService {
     const now = new Date();
     await this.announcements.update(id, { status: 'PUBLISHED', publishAt: null, publishedAt: now });
     await this.audit(actor, 'tenant_announcement.published', id);
-    await notifyAnnouncementPublished(this.tenantId, { title: existing.title, body: stripHtml(existing.body) });
+    await notifyAnnouncementPublished(this.tenantId, {
+      title: existing.title,
+      body: stripHtml(existing.body),
+      audience: existing.audience,
+      branchId: existing.branchId,
+    });
     return this.getById(id);
   }
 

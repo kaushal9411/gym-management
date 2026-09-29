@@ -12,3 +12,8 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Firebase config — per-environment, downloaded from the Firebase console
+# (Project settings > General > Your apps), not committed like every other
+# local credential/config file in this project (key.properties, *.jks above).
+app/google-services.json

@@ -20,3 +20,14 @@ export const updateProfileSchema = z
     notificationPreferences: z.record(z.boolean()).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'Provide at least one field to update' });
+
+const DEVICE_TOKEN_PLATFORMS = ['ANDROID', 'IOS', 'WEB'] as const;
+
+export const registerDeviceTokenSchema = z.object({
+  token: z.string().trim().min(1).max(255),
+  platform: z.enum(DEVICE_TOKEN_PLATFORMS).default('ANDROID'),
+});
+
+export const unregisterDeviceTokenSchema = z.object({
+  token: z.string().trim().min(1).max(255),
+});

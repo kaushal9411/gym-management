@@ -15,6 +15,7 @@ import '../../repositories/body_measurement_repository.dart';
 import '../../repositories/branch_repository.dart';
 import '../../repositories/class_session_repository.dart';
 import '../../repositories/dashboard_repository.dart';
+import '../../repositories/device_token_repository.dart';
 import '../../repositories/diet_plan_repository.dart';
 import '../../repositories/exercise_repository.dart';
 import '../../repositories/expense_repository.dart';
@@ -43,6 +44,7 @@ import '../../repositories/tenant_role_repository.dart';
 import '../../repositories/workout_plan_repository.dart';
 import '../network/auth_event_bus.dart';
 import '../network/dio_client.dart';
+import '../push/push_notification_service.dart';
 import '../storage/secure_storage.dart';
 
 final getIt = GetIt.instance;
@@ -165,6 +167,12 @@ void setupServiceLocator() {
   getIt.registerLazySingleton<ProfileRepository>(
     () => ProfileRepository(getIt()),
   );
+  getIt.registerLazySingleton<DeviceTokenRepository>(
+    () => DeviceTokenRepository(getIt()),
+  );
+  getIt.registerLazySingleton<PushNotificationService>(
+    () => PushNotificationService(getIt(), getIt()),
+  );
 
   // Screen-scoped cubits — a fresh instance per screen, not app-wide state.
   getIt.registerFactory<DashboardCubit>(
@@ -182,6 +190,7 @@ void setupServiceLocator() {
       publicTenantRepository: getIt(),
       storage: getIt(),
       authEventBus: getIt(),
+      pushNotificationService: getIt(),
     ),
   );
 }

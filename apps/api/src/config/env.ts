@@ -48,6 +48,9 @@ const envSchema = z.object({
   PUSHER_SECRET: z.string().optional(),
   PUSHER_CLUSTER: z.string().optional(),
 
+  /** Firebase Admin SDK service-account key (Project settings → Service accounts → Generate new private key in the Firebase console), base64-encoded whole-file so it survives as a single-line env var — `infrastructure/push/fcm.client.ts` decodes + JSON.parses it. Mobile push notifications (`modules/device-tokens/`) no-op with a debug log if unset, same "never required to boot" pattern as every other optional integration here. */
+  FIREBASE_SERVICE_ACCOUNT_JSON_BASE64: z.string().optional(),
+
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
   /** Configured in the Razorpay Dashboard alongside the webhook URL (Settings → Webhooks) — signs every webhook delivery, distinct from RAZORPAY_KEY_SECRET which signs Checkout callbacks. */
@@ -166,6 +169,21 @@ export const env = {
     cluster: raw.PUSHER_CLUSTER,
     get isConfigured() {
       return Boolean(raw.PUSHER_APP_ID && raw.PUSHER_KEY && raw.PUSHER_SECRET && raw.PUSHER_CLUSTER);
+    },
+  },
+
+  firebase: {
+    /** Parsed lazily (not at module load) so a malformed value degrades to `isConfigured: false` with a log line instead of crashing boot — see `fcm.client.ts`. */
+    get serviceAccountJson(): Record<string, unknown> | null {
+      if (!raw.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64) return null;
+      try {
+        return JSON.parse(Buffer.from(raw.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64, 'base64').toString('utf8')) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
+    },
+    get isConfigured() {
+      return this.serviceAccountJson !== null;
     },
   },
 

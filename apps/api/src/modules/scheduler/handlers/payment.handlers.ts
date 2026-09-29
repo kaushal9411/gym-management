@@ -67,6 +67,7 @@ export const failedPaymentRetry: JobHandler = async () => {
     if (await cache.get(dedupeKey)) continue;
     // eslint-disable-next-line no-await-in-loop
     await notifyPaymentFailed(payment.tenantId, {
+      memberId: payment.member.id,
       memberName: `${payment.member.firstName} ${payment.member.lastName}`.trim(),
       amount: payment.finalAmount.toString(),
       memberEmail: payment.member.email,

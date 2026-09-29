@@ -32,6 +32,7 @@ export const membershipRenewalReminder: JobHandler = async () => {
     const daysRemaining = Math.max(1, Math.ceil((membership.endDate.getTime() - Date.now()) / DAY_MS));
     // eslint-disable-next-line no-await-in-loop
     await notifyMembershipExpiring(membership.tenantId, {
+      memberId: membership.member.id,
       memberName: `${membership.member.firstName} ${membership.member.lastName}`.trim(),
       planName: membership.plan.name,
       endDate: membership.endDate.toISOString().slice(0, 10),
@@ -115,6 +116,7 @@ export const membershipExpiredNotification: JobHandler = async () => {
 
     // eslint-disable-next-line no-await-in-loop
     await notifyMembershipExpired(membership.tenantId, {
+      memberId: membership.member.id,
       memberName: `${membership.member.firstName} ${membership.member.lastName}`.trim(),
       planName: membership.plan.name,
       endDate: membership.endDate.toISOString().slice(0, 10),

@@ -223,7 +223,7 @@ export class AttendanceService {
 
     const dto = toDto(record);
     emitToTenant(this.tenantId, 'attendance:checkin', dto);
-    await notifyAttendanceCheckIn(this.tenantId, { memberName: dto.member.name, time: dto.checkInTime });
+    await notifyAttendanceCheckIn(this.tenantId, { memberId: dto.member.id, memberName: dto.member.name, time: dto.checkInTime });
     return dto;
   }
 
@@ -269,7 +269,7 @@ export class AttendanceService {
 
     const dto = toDto((await this.attendance.findById(this.tenantId, record.id, { includeDeleted: true }))!);
     emitToTenant(this.tenantId, 'attendance:checkout', dto);
-    await notifyAttendanceCheckOut(this.tenantId, { memberName: dto.member.name, time: dto.checkOutTime ?? new Date().toISOString() });
+    await notifyAttendanceCheckOut(this.tenantId, { memberId: dto.member.id, memberName: dto.member.name, time: dto.checkOutTime ?? new Date().toISOString() });
     return dto;
   }
 

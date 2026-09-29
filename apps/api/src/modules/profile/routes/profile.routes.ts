@@ -4,7 +4,7 @@ import { validate } from '../../../core/middleware/validate.middleware';
 import { authenticateMiddleware } from '../../authentication/middlewares/authenticate.middleware';
 import { twoFactorConfirmSchema, twoFactorDisableSchema } from '../../authentication/validators/auth.validators';
 import { profileController } from '../controllers/profile.controller';
-import { updateProfileSchema } from '../validators/profile.validators';
+import { registerDeviceTokenSchema, unregisterDeviceTokenSchema, updateProfileSchema } from '../validators/profile.validators';
 
 export const profileRouter: Router = Router();
 
@@ -114,4 +114,31 @@ profileRouter.post(
   '/two-factor/backup-codes/regenerate',
   validate({ body: twoFactorConfirmSchema }),
   asyncHandler(profileController.regenerateBackupCodes.bind(profileController)),
+);
+
+/**
+ * @openapi
+ * /profile/device-token:
+ *   post:
+ *     tags: [Profile]
+ *     summary: Register this device's FCM token for push notifications
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Registered }
+ *   delete:
+ *     tags: [Profile]
+ *     summary: Unregister this device's FCM token (called on logout)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Unregistered }
+ */
+profileRouter.post(
+  '/device-token',
+  validate({ body: registerDeviceTokenSchema }),
+  asyncHandler(profileController.registerDeviceToken.bind(profileController)),
+);
+profileRouter.delete(
+  '/device-token',
+  validate({ body: unregisterDeviceTokenSchema }),
+  asyncHandler(profileController.unregisterDeviceToken.bind(profileController)),
 );

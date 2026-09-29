@@ -9,6 +9,8 @@ import { disconnectRedis } from './infrastructure/cache/redis';
 import { disconnectPrisma } from './infrastructure/database/prisma';
 import { emailQueue } from './infrastructure/queue/email.queue';
 import { startEmailWorker, stopEmailWorker } from './infrastructure/queue/email.worker';
+import { pushQueue } from './infrastructure/queue/push.queue';
+import { startPushWorker, stopPushWorker } from './infrastructure/queue/push.worker';
 import { initSocketServer } from './infrastructure/realtime/socket-server';
 import { registerAuthEmailListeners } from './modules/authentication/events/auth-email.listeners';
 import { registerInvitationEmailListeners } from './modules/invitations/events/invitation-email.listeners';
@@ -42,6 +44,7 @@ async function bootstrap(): Promise<void> {
   registerStaffEmailListeners();
   registerMemberAuthEmailListeners();
   startEmailWorker();
+  startPushWorker();
   await initScheduler();
 
   const app = createApp();
@@ -59,8 +62,10 @@ async function bootstrap(): Promise<void> {
     logger.info(`${signal} received — shutting down gracefully`);
     server.close(async () => {
       await stopEmailWorker();
+      await stopPushWorker();
       await stopScheduler();
       await emailQueue.close();
+      await pushQueue.close();
       await disconnectPrisma();
       await disconnectRedis();
       logger.info('Shutdown complete');
