@@ -34,6 +34,14 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script_stop: true
+          # Default is 10m — building api+tenant-web+super-admin sequentially
+          # on this box's small instance size started exceeding that once
+          # firebase-admin (Prompt 89) pulled in a much heavier dependency
+          # tree (most of the Google Cloud SDK — gRPC, Firestore, Storage
+          # clients — just to use its messaging piece). Confirmed live: the
+          # deploy got killed by this exact timeout mid-`tsc` build, not a
+          # real build error (git/install/migrate all succeeded first).
+          command_timeout: 30m
           script: |
             cd ~/gym-management
             export PATH="$PATH:$(npm config get prefix)/bin"
