@@ -1,0 +1,41 @@
+# ══════════════════════════════════════════════════════════════════════
+# One-off: writes FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 into the production
+# server's apps/api/.env and restarts the API — for updating that one
+# secret without a full code deploy. Reuses the same DEPLOY_* secrets
+# deploy-production.yml already uses to reach the box; requires the
+# FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 repo secret to exist (Settings >
+# Secrets and variables > Actions > New repository secret).
+# ══════════════════════════════════════════════════════════════════════
+name: Set Firebase Env (one-off)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  set-env:
+    name: Write FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 + restart API
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update .env on production server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script_stop: true
+          envs: FIREBASE_VALUE
+          script: |
+            ENV_FILE=~/gym-management/apps/api/.env
+            if grep -q '^FIREBASE_SERVICE_ACCOUNT_JSON_BASE64=' "$ENV_FILE"; then
+              sed -i "s|^FIREBASE_SERVICE_ACCOUNT_JSON_BASE64=.*|FIREBASE_SERVICE_ACCOUNT_JSON_BASE64=${FIREBASE_VALUE}|" "$ENV_FILE"
+              echo "Updated existing FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 line."
+            else
+              echo "FIREBASE_SERVICE_ACCOUNT_JSON_BASE64=${FIREBASE_VALUE}" >> "$ENV_FILE"
+              echo "Appended new FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 line."
+            fi
+            export PATH="$PATH:$(npm config get prefix)/bin"
+            pm2 restart fitcloud-api
+            pm2 save
+            echo "Restarted fitcloud-api."
+        env:
+          FIREBASE_VALUE: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 }}
