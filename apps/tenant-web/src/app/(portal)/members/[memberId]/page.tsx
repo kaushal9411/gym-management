@@ -239,6 +239,7 @@ export default function MemberDetailPage() {
   }
 
   const data = member.data;
+  const membershipHasExpired = !data.currentMembership || new Date(data.currentMembership.endDate) <= new Date();
   const baseline = toFormState(data);
   const isDirty = JSON.stringify(form) !== JSON.stringify(baseline);
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
@@ -784,7 +785,7 @@ export default function MemberDetailPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {data.currentMembership ? (
-            <p className="flex flex-wrap items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
               <MembershipStatusBadge status={data.currentMembership.status} />
               <span className="font-medium">{data.currentMembership.planName}</span>
               {data.currentMembership.status === 'PENDING' ? (
@@ -795,7 +796,7 @@ export default function MemberDetailPage() {
               ) : (
                 <span>— ends {new Date(data.currentMembership.endDate).toLocaleDateString()}</span>
               )}
-            </p>
+            </div>
           ) : (
             <p className="text-sm text-muted-foreground">No active membership.</p>
           )}
@@ -910,7 +911,12 @@ export default function MemberDetailPage() {
                     <Label htmlFor="renewPlan">Renew (same plan if left blank)</Label>
                     <MembershipPlanSelect id="renewPlan" value={renewPlanId} onChange={setRenewPlanId} />
                   </div>
-                  <Button size="sm" disabled={renewMembership.isPending} onClick={handleRenew}>
+                  <Button
+                    size="sm"
+                    disabled={renewMembership.isPending || !membershipHasExpired}
+                    title={!membershipHasExpired ? 'This membership can only be renewed once it has expired.' : undefined}
+                    onClick={handleRenew}
+                  >
                     {renewMembership.isPending ? 'Renewing…' : 'Renew'}
                   </Button>
                   <div className="max-w-32 space-y-2">
@@ -921,6 +927,11 @@ export default function MemberDetailPage() {
                     {extendMembership.isPending ? 'Extending…' : 'Extend'}
                   </Button>
                 </div>
+              ) : null}
+              {canRenew && !membershipHasExpired ? (
+                <p className="text-xs text-muted-foreground">
+                  Renew is disabled until this membership expires on {new Date(data.currentMembership.endDate).toLocaleDateString()} — use Extend to add days to the current period instead.
+                </p>
               ) : null}
               {canUpgrade ? (
                 <div className="flex flex-wrap items-end gap-2">

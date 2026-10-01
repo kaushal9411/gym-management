@@ -11,19 +11,26 @@ class MemberRepository {
 
   Future<PaginatedResult<GymMember>> list({
     int page = 1,
+    int limit = 20,
     String? search,
     String? status,
     String? trainerId,
+    String? branchId,
+    String? sortBy,
+    String? sortDir,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/members',
         queryParameters: {
           'page': page,
-          'limit': 20,
+          'limit': limit,
           if (search != null && search.isNotEmpty) 'search': search,
           if (status != null) 'status': status,
           if (trainerId != null) 'trainerId': trainerId,
+          if (branchId != null) 'branchId': branchId,
+          if (sortBy != null) 'sortBy': sortBy,
+          if (sortDir != null) 'sortDir': sortDir,
         },
       );
       return PaginatedResult.fromJson(

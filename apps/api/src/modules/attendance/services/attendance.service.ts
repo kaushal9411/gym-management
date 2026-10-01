@@ -9,7 +9,6 @@ import { getBranchAccess } from '../../authentication/middlewares/branch-access.
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
 import { MemberRepository, type MemberRow } from '../../members/repositories/member.repository';
-import { isWithinGracePeriod } from '../../members/utils/duration.util';
 import { notifyAttendanceCheckIn, notifyAttendanceCheckOut } from '../../tenant-notifications/services/notification-trigger.service';
 import type {
   AttendanceRecordDto,
@@ -109,10 +108,7 @@ export class AttendanceService {
     if (member.status !== 'ACTIVE') return { canCheckIn: false, reason: 'Member is not active.' };
     const activeMembership = member.memberships.find((m) => m.status === 'ACTIVE');
     if (!activeMembership) return { canCheckIn: false, reason: 'Member has no active membership.' };
-    // Plan's gracePeriodDays extends usability past the raw endDate — see
-    // `isWithinGracePeriod`'s doc comment for why this must stay in sync
-    // with the scheduler's expiry-flip job.
-    if (!isWithinGracePeriod(new Date(activeMembership.endDate), activeMembership.plan.gracePeriodDays)) {
+    if (new Date(activeMembership.endDate) < new Date()) {
       return { canCheckIn: false, reason: 'Membership has expired.' };
     }
     return { canCheckIn: true, reason: null };

@@ -11,15 +11,20 @@ class InvoiceRepository {
 
   Future<PaginatedResult<MemberInvoice>> list({
     int page = 1,
+    int limit = 20,
     String? search,
+    String? status,
+    String? branchId,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/invoices',
         queryParameters: {
           'page': page,
-          'limit': 20,
+          'limit': limit,
           if (search != null && search.isNotEmpty) 'search': search,
+          if (status != null) 'status': status,
+          if (branchId != null) 'branchId': branchId,
         },
       );
       return PaginatedResult.fromJson(

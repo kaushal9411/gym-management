@@ -4,7 +4,6 @@ import type { EmailBranding } from '../../../infrastructure/mail/templates/base-
 import { memberPaymentReceiptEmail } from '../../../infrastructure/mail/templates/member-templates';
 import { tenantNotificationEmail } from '../../../infrastructure/mail/templates/notification-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
-import { deviceTokenService } from '../../device-tokens/services/device-token.service';
 import { tenantService } from '../../tenants/service/tenant.service';
 import { renderTemplate } from '../constants/default-templates';
 
@@ -69,7 +68,7 @@ async function fireTemplated(
     await enqueueEmail({ to: opts.recipientEmail, subject: mail.subject, html: mail.html });
   }
   if (template.channels.includes('PUSH') && opts.recipientMemberId) {
-    await deviceTokenService.pushToMember(tenantId, opts.recipientMemberId, title, body, { category: opts.category, type });
+    await tenantNotificationService.notifyMember(tenantId, opts.recipientMemberId, opts.category, title, body);
   }
 }
 
@@ -99,7 +98,7 @@ export async function notifyMembershipAssigned(
     ? `${params.memberName} was assigned the ${params.planName} plan, starting ${params.startDate} and valid through ${params.endDate}.`
     : `${params.memberName} was assigned the ${params.planName} plan, valid through ${params.endDate}.`;
   await tenantNotificationService.notifyTenant(tenantId, 'MEMBERSHIP', 'Membership assigned', message);
-  await deviceTokenService.pushToMember(tenantId, params.memberId, 'Membership assigned', message, { category: 'MEMBERSHIP' });
+  await tenantNotificationService.notifyMember(tenantId, params.memberId, 'MEMBERSHIP', 'Membership assigned', message);
 }
 
 export async function notifyMembershipRenewed(
@@ -246,7 +245,7 @@ export async function notifyAnnouncementPublished(
 ): Promise<void> {
   await tenantNotificationService.notifyTenant(tenantId, 'ANNOUNCEMENT', params.title, params.body);
   if (params.audience === 'ALL' || params.audience === 'MEMBERS') {
-    await deviceTokenService.pushToMembersInTenant(tenantId, params.title, params.body, params.branchId ?? undefined, { category: 'ANNOUNCEMENT' });
+    await tenantNotificationService.notifyMembersInTenant(tenantId, 'ANNOUNCEMENT', params.title, params.body, params.branchId ?? undefined);
   }
 }
 

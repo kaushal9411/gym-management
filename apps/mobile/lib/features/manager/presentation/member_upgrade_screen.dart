@@ -157,7 +157,8 @@ class _MemberUpgradeScreenState extends State<MemberUpgradeScreen> {
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
-                                        '${AppCurrency.symbol}${plan.price.toStringAsFixed(0)} · ${plan.durationLabel} · ${plan.perksSummary}',
+                                        '${AppCurrency.symbol}${plan.finalPrice.toStringAsFixed(0)}'
+                                        '${plan.finalPrice != plan.price ? ' (base ${AppCurrency.symbol}${plan.price.toStringAsFixed(0)})' : ''} · ${plan.durationLabel} · ${plan.perksSummary}',
                                         style: AppText.body(
                                           size: 12,
                                           color: AppColors.inkFaint,

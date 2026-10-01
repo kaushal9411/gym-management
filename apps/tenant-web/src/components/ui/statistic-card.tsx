@@ -26,6 +26,7 @@ interface StatisticCardProps {
   trend?: { direction: 'up' | 'down' | 'flat'; label: string };
   loading?: boolean;
   className?: string;
+  onClick?: () => void;
 }
 
 const trendStyle: Record<NonNullable<StatisticCardProps['trend']>['direction'], { color: string; Icon: LucideIcon }> = {
@@ -40,9 +41,24 @@ const trendStyle: Record<NonNullable<StatisticCardProps['trend']>['direction'], 
  * memoized (Prompt 23: Global Loading & Performance Optimization) since its
  * props are typically primitive/stable across the parent's re-renders.
  */
-const StatisticCard = React.memo(function StatisticCard({ label, value, icon: Icon, tone = 'primary', trend, loading, className }: StatisticCardProps) {
+const StatisticCard = React.memo(function StatisticCard({ label, value, icon: Icon, tone = 'primary', trend, loading, className, onClick }: StatisticCardProps) {
   return (
-    <Card className={cn('transition-all duration-200 hover:shadow-sm', className)}>
+    <Card
+      className={cn('transition-all duration-200 hover:shadow-sm', onClick && !loading && 'cursor-pointer hover:border-primary/40', className)}
+      {...(onClick && !loading
+        ? {
+            role: 'button',
+            tabIndex: 0,
+            onClick,
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onClick();
+              }
+            },
+          }
+        : {})}
+    >
       <CardContent className="flex items-start justify-between gap-4 p-5">
         <div className="min-w-0 space-y-1.5">
           <p className="truncate text-sm text-muted-foreground">{label}</p>

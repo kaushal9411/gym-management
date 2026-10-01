@@ -32,6 +32,12 @@ const _entries = [
     route: AppRoutes.memberAttendance,
   ),
   _MenuEntry(
+    icon: Icons.notifications_none_rounded,
+    title: 'Notifications',
+    subtitle: 'Membership, payments, and gym updates',
+    route: AppRoutes.memberNotifications,
+  ),
+  _MenuEntry(
     icon: Icons.receipt_long_outlined,
     title: 'Invoices',
     subtitle: 'Payment history',

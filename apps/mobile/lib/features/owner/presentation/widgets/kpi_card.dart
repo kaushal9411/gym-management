@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radii.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../shared/widgets/app_card.dart';
 
@@ -9,6 +10,9 @@ import '../../../../shared/widgets/app_card.dart';
 /// mockup also shows a fabricated "▲ 4.2%" trend pill on each KPI card, but
 /// the real `KpiMetricsDto` has no prior-period comparison to compute that
 /// from, so it's omitted here rather than invented.
+///
+/// [onTap], when given, opens the detail sheet with the real records behind
+/// this number (mirrors web's clickable `StatisticCard` → dashboard modal).
 class KpiCard extends StatelessWidget {
   const KpiCard({
     super.key,
@@ -17,6 +21,7 @@ class KpiCard extends StatelessWidget {
     this.valueColor,
     this.icon,
     this.iconColor,
+    this.onTap,
   });
 
   final String label;
@@ -26,10 +31,11 @@ class KpiCard extends StatelessWidget {
 
   /// Icon + badge-background accent. Ignored if [icon] is null.
   final Color? iconColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    final card = AppCard(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -70,6 +76,16 @@ class KpiCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+    if (onTap == null) return card;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadii.card),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        onTap: onTap,
+        child: card,
       ),
     );
   }

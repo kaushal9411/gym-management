@@ -217,6 +217,7 @@ model Tenant {
   couponRedemptions     CouponRedemption[]
   supportTickets        SupportTicket[]
   notifications         TenantNotification[]
+  memberNotifications   MemberNotification[]
   userPermissions       UserPermission[]
   userBranches          UserBranch[]
   userInvitations       UserInvitation[]
@@ -806,19 +807,6 @@ model MembershipPlan {
   /// null = no cap on total freeze days while `freezeAllowed`.
   freezeDaysLimit          Int?    @map("freeze_days_limit")
 
-  // ── Membership Rules ─────────────────────────────────────────────────
-  /// Window during which this plan itself may be purchased/assigned — null
-  /// on either side means no restriction. Distinct from a Membership's own
-  /// start/end dates (this gates the PLAN, not a specific member's period).
-  validityStart      DateTime? @map("validity_start") @db.Date
-  validityEnd        DateTime? @map("validity_end") @db.Date
-  gracePeriodDays    Int       @default(0) @map("grace_period_days")
-  /// Days before expiry a renewal is allowed; 0 = anytime.
-  renewalWindowDays  Int       @default(0) @map("renewal_window_days")
-  autoRenewalAllowed Boolean   @default(true) @map("auto_renewal_allowed")
-  minAge             Int?      @map("min_age")
-  maxAge             Int?      @map("max_age")
-
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
@@ -943,6 +931,7 @@ model Member {
   guestVisits      GuestVisit[]
   ptSessionLogs    PtSessionLog[]
   deviceTokens     MemberDeviceToken[]
+  notifications    MemberNotification[]
 
   @@unique([tenantId, memberId])
   @@index([tenantId, status])
@@ -3442,6 +3431,30 @@ model TenantNotification {
 
   @@index([tenantId, createdAt])
   @@map("tenant_notifications")
+}
+
+/// Member-plane counterpart to `TenantNotification` (Prompt 90) — one row
+/// per member per event, unlike the staff table's tenant-wide sharing,
+/// since a member's read/unread state is genuinely per-person. Reuses
+/// `TenantNotificationCategory` rather than a new enum — every member-
+/// facing trigger already passes one of these category values. Populated
+/// by `TenantNotificationService#notifyMember`/`#notifyMembersInTenant`,
+/// the member-plane siblings of `#notifyTenant`.
+model MemberNotification {
+  id        String                     @id @default(uuid()) @db.Uuid
+  tenantId  String                     @map("tenant_id") @db.Uuid
+  memberId  String                     @map("member_id") @db.Uuid
+  category  TenantNotificationCategory @default(GENERAL)
+  title     String                     @db.VarChar(200)
+  body      String
+  readAt    DateTime?                  @map("read_at")
+  createdAt DateTime                   @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, memberId, createdAt])
+  @@map("member_notifications")
 }
 
 enum TenantAnnouncementAudience {

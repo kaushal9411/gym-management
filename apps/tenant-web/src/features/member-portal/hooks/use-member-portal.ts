@@ -48,6 +48,26 @@ export function useMemberInvoices(page = 1, limit = 20) {
   return useQuery({ queryKey: ['member-portal', 'invoices', page, limit], queryFn: () => memberPortalService.getInvoices(page, limit) });
 }
 
+export function useMemberNotifications(params: { unreadOnly?: boolean; page?: number; limit?: number } = {}) {
+  return useQuery({ queryKey: ['member-portal', 'notifications', params], queryFn: () => memberPortalService.getNotifications(params) });
+}
+
+export function useMarkMemberNotificationRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (notificationId: string) => memberPortalService.markNotificationRead(notificationId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['member-portal', 'notifications'] }),
+  });
+}
+
+export function useMarkAllMemberNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => memberPortalService.markAllNotificationsRead(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['member-portal', 'notifications'] }),
+  });
+}
+
 export function useMemberClasses(dateFrom: string, dateTo: string) {
   return useQuery({ queryKey: ['member-portal', 'classes', dateFrom, dateTo], queryFn: () => memberPortalService.getUpcomingClasses(dateFrom, dateTo) });
 }

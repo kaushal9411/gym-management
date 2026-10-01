@@ -38,3 +38,9 @@ export const memberRegisterDeviceTokenSchema = z.object({
 export const memberUnregisterDeviceTokenSchema = z.object({
   token: z.string().trim().min(1).max(255),
 });
+
+export const memberNotificationsQuerySchema = z.object({
+  unreadOnly: z.coerce.boolean().optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+});

@@ -5,6 +5,7 @@ import { prisma } from '../../../infrastructure/database/prisma';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { emitToTenant } from '../../../infrastructure/realtime/socket-server';
 import { deviceTokenService } from '../../device-tokens/services/device-token.service';
+import { MemberNotificationRepository } from '../repositories/member-notification.repository';
 import { TenantNotificationRepository } from '../repositories/tenant-notification.repository';
 
 export class TenantNotificationService {
@@ -80,6 +81,56 @@ export class TenantNotificationService {
     for (const tenantId of tenantIds) {
       emitToTenant(tenantId, 'notification:new', { tenantId, category: 'ANNOUNCEMENT', title, body, sourceNotificationId, createdAt: new Date().toISOString() });
     }
+  }
+
+  // ── Member plane — mirrors the staff methods above, one row per member ────
+
+  async listForMember(tenantId: string, memberId: string, params: { unreadOnly?: boolean; page: number; limit: number }) {
+    const repository = new MemberNotificationRepository(getTenantScopedClient(tenantId));
+    const skip = (params.page - 1) * params.limit;
+    const { total, unreadCount, items } = await repository.list(tenantId, memberId, { unreadOnly: params.unreadOnly, skip, take: params.limit });
+    return { items, unreadCount, page: params.page, limit: params.limit, total, totalPages: Math.ceil(total / params.limit) };
+  }
+
+  async unreadCountForMember(tenantId: string, memberId: string): Promise<{ unreadCount: number }> {
+    const repository = new MemberNotificationRepository(getTenantScopedClient(tenantId));
+    return { unreadCount: await repository.countUnread(tenantId, memberId) };
+  }
+
+  async markReadForMember(tenantId: string, memberId: string, id: string): Promise<void> {
+    const repository = new MemberNotificationRepository(getTenantScopedClient(tenantId));
+    await repository.markRead(tenantId, memberId, id);
+  }
+
+  async markAllReadForMember(tenantId: string, memberId: string): Promise<void> {
+    const repository = new MemberNotificationRepository(getTenantScopedClient(tenantId));
+    await repository.markAllRead(tenantId, memberId);
+  }
+
+  /**
+   * Member-plane sibling of `notifyTenant` — the single choke point every
+   * member-facing trigger in `notification-trigger.service.ts` goes
+   * through. Writes the history row FIRST (so it's there even if the push
+   * itself no-ops — e.g. no device registered, or Firebase unconfigured),
+   * then pushes.
+   */
+  async notifyMember(tenantId: string, memberId: string, category: TenantNotificationCategory, title: string, body: string): Promise<void> {
+    const repository = new MemberNotificationRepository(getTenantScopedClient(tenantId));
+    await repository.create(tenantId, memberId, { category, title, body });
+    await deviceTokenService.pushToMember(tenantId, memberId, title, body, { category });
+  }
+
+  /**
+   * Announcement bulk fan-out — every member in the tenant (or one branch)
+   * gets their own history row, not just the ones with a registered device
+   * token, so it's still there in their history once they DO log in.
+   */
+  async notifyMembersInTenant(tenantId: string, category: TenantNotificationCategory, title: string, body: string, branchId?: string): Promise<void> {
+    const db = getTenantScopedClient(tenantId);
+    const members = await db.member.findMany({ where: { tenantId, ...(branchId ? { branchId } : {}) }, select: { id: true } });
+    const repository = new MemberNotificationRepository(db);
+    await repository.createManyForMembers(tenantId, members.map((m) => m.id), { category, title, body });
+    await deviceTokenService.pushToMembersInTenant(tenantId, title, body, branchId, { category });
   }
 }
 

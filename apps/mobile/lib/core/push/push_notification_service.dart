@@ -82,16 +82,17 @@ class PushNotificationService {
     if (message != null) _navigateFor(message);
   }
 
-  /// This app has no per-member or per-category notification-history
-  /// screen to deep-link into (see docs/MOBILE-GUIDE.md — mobile only ever
-  /// renders real backend data, and no such endpoint exists), so a tap
-  /// opens a real, always-correct destination: staff go to the existing
-  /// Notification Center list, everyone else lands on their home shell.
+  /// No per-category deep link (e.g. straight to a specific payment) — a
+  /// tap opens the right notification LIST for whichever plane the signed-in
+  /// user is on: staff go to the existing Notification Center, members go
+  /// to their own history (`MemberNotificationsScreen`, `/portal/notifications`
+  /// on the backend — this used to fall through to the home shell before
+  /// that endpoint/screen existed).
   Future<void> _navigateFor(RemoteMessage message) async {
     final actorType = await _storage.readActorType();
     final destination = actorType == ActorType.staff
         ? AppRoutes.notifications
-        : AppRoutes.home;
+        : AppRoutes.memberNotifications;
     _router?.go(destination);
   }
 

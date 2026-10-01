@@ -144,4 +144,5 @@ class AppRoutes {
   static const memberDataExport = '/member/data-export';
   static const memberClassBooked = '/member/classes/booked';
   static const memberMeasurements = '/member/measurements';
+  static const memberNotifications = '/member/notifications';
 }

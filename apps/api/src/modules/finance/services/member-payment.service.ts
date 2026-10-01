@@ -475,8 +475,19 @@ export class MemberPaymentService {
       const invoice = await this.invoiceService.generateForPayment({
         memberId: payment.member.id,
         branchId,
-        amount: Number(payment.finalAmount),
-        description: payment.membership ? `Membership payment — ${payment.membership.plan.name}` : 'Membership payment',
+        items: [
+          {
+            description: payment.membership ? `Membership payment — ${payment.membership.plan.name}` : 'Membership payment',
+            quantity: 1,
+            unitPrice: Number(payment.amount),
+          },
+        ],
+        // Threaded through from the Payment row itself (not re-derived from
+        // the plan) so `subtotal - discountAmount + taxAmount` always equals
+        // `Payment.finalAmount` exactly, by construction — see
+        // `MemberInvoiceService#generateForPayment`'s doc comment.
+        taxAmount: Number(payment.tax),
+        discountAmount: Number(payment.discount),
         paymentDate: payment.paymentDate,
       });
       await this.payments.update(payment.id, { invoiceId: invoice.id });

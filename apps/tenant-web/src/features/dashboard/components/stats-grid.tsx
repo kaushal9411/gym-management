@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { CalendarClock, UserCheck, UserPlus, Users, Wallet, Clock3 } from 'lucide-react';
 
 import { StatisticCard } from '@/components/ui/statistic-card';
@@ -7,14 +8,16 @@ import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { useKpis } from '@/features/reports/hooks/use-reports';
 import { useCurrencySymbol } from '@/lib/currency';
+import { DashboardCardDetailModal, type DashboardStatKind } from './dashboard-detail-modal';
 
-/** Real KPIs from the Reports & Analytics module (Prompt 20) — the Prompt-10 foundation's "Coming soon" placeholders finally have data behind them, now that Members/Attendance/Memberships/Payments all exist. Scoped to the header's currently-selected branch (Prompt 24). */
+/** Real KPIs from the Reports & Analytics module (Prompt 20) — the Prompt-10 foundation's "Coming soon" placeholders finally have data behind them, now that Members/Attendance/Memberships/Payments all exist. Scoped to the header's currently-selected branch (Prompt 24). Every tile is clickable (Prompt 96) — opens `DashboardCardDetailModal` with the real records behind that number. */
 export function StatsGrid() {
   const { hasPermission } = usePermissions();
   const { currentBranchId } = useCurrentBranch();
   const currencySymbol = useCurrencySymbol();
   const kpis = useKpis(currentBranchId ?? undefined);
   const data = kpis.data;
+  const [openStat, setOpenStat] = React.useState<DashboardStatKind | null>(null);
 
   const stats = [
     { key: 'attendance', label: "Today's Attendance", icon: UserCheck, value: data?.todaysAttendance, tone: 'orange' },
@@ -28,10 +31,21 @@ export function StatsGrid() {
   if (!hasPermission('reports:view')) return null;
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-      {stats.map((stat) => (
-        <StatisticCard key={stat.key} label={stat.label} value={stat.value ?? '—'} icon={stat.icon} tone={stat.tone} loading={kpis.isPending} />
-      ))}
-    </div>
+    <>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {stats.map((stat) => (
+          <StatisticCard
+            key={stat.key}
+            label={stat.label}
+            value={stat.value ?? '—'}
+            icon={stat.icon}
+            tone={stat.tone}
+            loading={kpis.isPending}
+            onClick={() => setOpenStat(stat.key)}
+          />
+        ))}
+      </div>
+      <DashboardCardDetailModal kind={openStat} branchId={currentBranchId ?? undefined} onClose={() => setOpenStat(null)} />
+    </>
   );
 }

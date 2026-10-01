@@ -48,6 +48,7 @@ import '../../features/member/presentation/member_data_export_screen.dart';
 import '../../features/member/presentation/member_invoice_detail_screen.dart';
 import '../../features/member/presentation/member_invoices_screen.dart';
 import '../../features/member/presentation/member_measurements_screen.dart';
+import '../../features/member/presentation/member_notifications_screen.dart';
 import '../../features/member/presentation/member_change_password_screen.dart';
 import '../../features/member/presentation/member_profile_screen.dart';
 import '../../features/member/presentation/member_visit_detail_screen.dart';
@@ -793,6 +794,10 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       GoRoute(
         path: AppRoutes.memberMeasurements,
         builder: (context, state) => const MemberMeasurementsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.memberNotifications,
+        builder: (context, state) => const MemberNotificationsScreen(),
       ),
       GoRoute(
         path: AppRoutes.memberClassBooked,

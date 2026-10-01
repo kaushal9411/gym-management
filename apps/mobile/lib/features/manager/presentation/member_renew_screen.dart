@@ -38,6 +38,7 @@ class MemberRenewScreen extends StatelessWidget {
       return _AssignPlanScreen(member: member);
     }
     final membership = member.currentMembership!;
+    final hasExpired = !membership.endDate.isAfter(DateTime.now());
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
@@ -90,13 +91,17 @@ class MemberRenewScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               Text(
-                'Renewing keeps the same plan and extends the membership '
-                'period starting from the current end date.',
+                hasExpired
+                    ? 'Renewing keeps the same plan and extends the membership '
+                        'period starting from today.'
+                    : 'This membership is still active until '
+                        '${_formatDate(membership.endDate)} — it can only be '
+                        'renewed once it has expired.',
                 style: AppText.body(size: 13, color: AppColors.inkFaint),
               ),
               const Spacer(),
               const SizedBox(height: 16),
-              _RenewButton(member: member),
+              _RenewButton(member: member, enabled: hasExpired),
               const SizedBox(height: 24),
             ],
           ),
@@ -109,9 +114,10 @@ class MemberRenewScreen extends StatelessWidget {
 }
 
 class _RenewButton extends StatefulWidget {
-  const _RenewButton({required this.member});
+  const _RenewButton({required this.member, required this.enabled});
 
   final GymMember member;
+  final bool enabled;
 
   @override
   State<_RenewButton> createState() => _RenewButtonState();
@@ -150,7 +156,7 @@ class _RenewButtonState extends State<_RenewButton> {
         AppButton(
           label: 'Confirm renewal',
           loading: _loading,
-          onPressed: _confirm,
+          onPressed: widget.enabled ? _confirm : null,
         ),
       ],
     );
@@ -299,7 +305,8 @@ class _AssignPlanScreenState extends State<_AssignPlanScreen> {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          '${AppCurrency.symbol}${plan.price.toStringAsFixed(0)} · '
+                                          '${AppCurrency.symbol}${plan.finalPrice.toStringAsFixed(0)}'
+                                          '${plan.finalPrice != plan.price ? ' (base ${AppCurrency.symbol}${plan.price.toStringAsFixed(0)})' : ''} · '
                                           '${plan.durationLabel} · '
                                           '${plan.perksSummary}',
                                           style: AppText.body(

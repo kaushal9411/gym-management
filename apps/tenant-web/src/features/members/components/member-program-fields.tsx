@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useCurrencySymbol } from '@/lib/currency';
 import { useAssignablePlans } from '../hooks/use-members';
+import { computePlanPrice } from '../utils/plan-pricing';
 import { MembershipPlanSelect } from './membership-plan-select';
 
 export interface MemberProgramFormState {
@@ -80,9 +81,23 @@ export function MemberProgramFields({ value, onChange, disabled, optional }: Mem
               <dt className="text-muted-foreground">Duration</dt>
               <dd>{selectedPlan.durationValue} {selectedPlan.durationType.toLowerCase()}</dd>
               <dt className="text-muted-foreground">Price</dt>
-              <dd>{currencySymbol}{selectedPlan.price}</dd>
-              <dt className="text-muted-foreground">Joining fee</dt>
-              <dd>{currencySymbol}{selectedPlan.joiningFee}</dd>
+              <dd>{currencySymbol}{Number(selectedPlan.price).toFixed(2)}</dd>
+              {Number(selectedPlan.discountPercentage) > 0 ? (
+                <>
+                  <dt className="text-muted-foreground">Discount ({selectedPlan.discountPercentage}%)</dt>
+                  <dd>-{currencySymbol}{computePlanPrice(selectedPlan).discountAmount.toFixed(2)}</dd>
+                </>
+              ) : null}
+              {Number(selectedPlan.taxPercentage) > 0 ? (
+                <>
+                  <dt className="text-muted-foreground">Tax ({selectedPlan.taxPercentage}%)</dt>
+                  <dd>{currencySymbol}{computePlanPrice(selectedPlan).taxAmount.toFixed(2)}</dd>
+                </>
+              ) : null}
+              <dt className="text-muted-foreground">Registration fee</dt>
+              <dd>{currencySymbol}{Number(selectedPlan.joiningFee).toFixed(2)}</dd>
+              <dt className="font-medium text-foreground">Total</dt>
+              <dd className="font-medium">{currencySymbol}{computePlanPrice(selectedPlan).totalWithJoiningFee.toFixed(2)}</dd>
               <dt className="text-muted-foreground">PT sessions included</dt>
               <dd>{selectedPlan.ptSessionsIncluded}</dd>
               <dt className="text-muted-foreground">Group classes included</dt>

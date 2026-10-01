@@ -39,10 +39,10 @@ import {
 import { GuestVisitRepository } from '../repositories/guest-visit.repository';
 import { MemberDocumentRepository } from '../repositories/member-document.repository';
 import { MemberRepository, type MemberRow } from '../repositories/member.repository';
-import { MembershipPlanRepository, type MembershipPlanRow } from '../repositories/membership-plan.repository';
+import { MembershipPlanRepository } from '../repositories/membership-plan.repository';
 import { MembershipRepository } from '../repositories/membership.repository';
 import { PtSessionLogRepository } from '../repositories/pt-session-log.repository';
-import { addDuration, isWithinGracePeriod } from '../utils/duration.util';
+import { addDuration } from '../utils/duration.util';
 
 function toListItem(member: MemberRow): MemberListItemDto {
   // Falls back to a PENDING (future-dated) membership when there's no ACTIVE
@@ -84,10 +84,7 @@ function toListItem(member: MemberRow): MemberListItemDto {
 function toDetail(member: MemberRow, planUsage: PlanUsageDto | null): MemberDetailDto {
   const listItem = toListItem(member);
   const activeMembership = member.memberships.find((m) => m.status === 'ACTIVE');
-  const canCheckIn =
-    member.status === 'ACTIVE' &&
-    !!activeMembership &&
-    isWithinGracePeriod(new Date(activeMembership.endDate), activeMembership.plan.gracePeriodDays);
+  const canCheckIn = member.status === 'ACTIVE' && !!activeMembership && new Date(activeMembership.endDate) >= new Date();
   return {
     ...listItem,
     planUsage,
@@ -429,10 +426,6 @@ export class MemberService {
       );
     }
     const plan = await this.mustFindPlan(input.planId);
-    this.assertPlanAssignable(plan, member);
-    if (input.autoRenew && !plan.autoRenewalAllowed) {
-      throw new AppError(ErrorCode.VALIDATION_ERROR, `Plan "${plan.name}" does not allow auto-renewal.`, 422);
-    }
 
     // India-common flow: a member signs up and pays today but tells the
     // owner to start on a specific future date (e.g. after their old gym's
@@ -474,20 +467,25 @@ export class MemberService {
     if (!current) {
       throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has no active membership to renew — assign one first.', 422);
     }
+    const now = new Date();
+    if (current.endDate > now) {
+      throw new AppError(
+        ErrorCode.VALIDATION_ERROR,
+        `This membership is still active until ${current.endDate.toISOString().slice(0, 10)} — it can only be renewed once it has expired.`,
+        422,
+      );
+    }
     const plan = input.planId ? await this.mustFindPlan(input.planId) : await this.mustFindPlan(current.planId);
-    this.assertRenewalWindow(plan, current.endDate);
 
     await this.memberships.supersede(current.id);
-    const now = new Date();
-    const startDate = current.endDate > now ? current.endDate : now;
-    const endDate = addDuration(startDate, plan.durationValue, plan.durationType);
+    const endDate = addDuration(now, plan.durationValue, plan.durationType);
     await this.memberships.create({
       tenantId: this.tenantId,
       memberId: id,
       planId: plan.id,
-      startDate,
+      startDate: now,
       endDate,
-      durationDays: daysBetween(startDate, endDate),
+      durationDays: daysBetween(now, endDate),
       priceAtAssignment: plan.price,
       status: 'ACTIVE',
       autoRenew: input.autoRenew ?? current.autoRenew,
@@ -518,7 +516,6 @@ export class MemberService {
       throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has no active membership to change — assign one first.', 422);
     }
     const plan = await this.mustFindPlan(planId);
-    this.assertPlanAssignable(plan, member);
 
     await this.memberships.supersede(current.id);
     const now = new Date();
@@ -943,39 +940,6 @@ export class MemberService {
     return plan;
   }
 
-  /** Plan purchase window + member age eligibility — both no-op when the plan doesn't set them. */
-  private assertPlanAssignable(plan: MembershipPlanRow, member: MemberRow): void {
-    const now = new Date();
-    if (plan.validityStart && now < plan.validityStart) {
-      throw new AppError(ErrorCode.VALIDATION_ERROR, `Plan "${plan.name}" is not available for purchase yet.`, 422);
-    }
-    if (plan.validityEnd && now > plan.validityEnd) {
-      throw new AppError(ErrorCode.VALIDATION_ERROR, `Plan "${plan.name}" is no longer available for purchase.`, 422);
-    }
-    if ((plan.minAge !== null || plan.maxAge !== null) && member.dateOfBirth) {
-      const age = ageInYears(member.dateOfBirth, now);
-      if (plan.minAge !== null && age < plan.minAge) {
-        throw new AppError(ErrorCode.VALIDATION_ERROR, `Plan "${plan.name}" requires a minimum age of ${plan.minAge}.`, 422);
-      }
-      if (plan.maxAge !== null && age > plan.maxAge) {
-        throw new AppError(ErrorCode.VALIDATION_ERROR, `Plan "${plan.name}" has a maximum age of ${plan.maxAge}.`, 422);
-      }
-    }
-  }
-
-  /** `renewalWindowDays === 0` means "anytime" — otherwise renewal is blocked until that many days before expiry. */
-  private assertRenewalWindow(plan: MembershipPlanRow, currentEndDate: Date): void {
-    if (plan.renewalWindowDays <= 0) return;
-    const windowOpensAt = addDuration(currentEndDate, -plan.renewalWindowDays, 'DAYS');
-    if (new Date() < windowOpensAt) {
-      throw new AppError(
-        ErrorCode.VALIDATION_ERROR,
-        `Plan "${plan.name}" can only be renewed within ${plan.renewalWindowDays} day(s) of expiry.`,
-        422,
-      );
-    }
-  }
-
   private async assertEmailAvailable(email: string): Promise<void> {
     const existing = await this.members.findByEmail(this.tenantId, email.toLowerCase());
     if (existing) throw new ConflictError(ErrorCode.CONFLICT, 'A member with this email already exists.');
@@ -1042,13 +1006,4 @@ export class MemberService {
 
 function daysBetween(start: Date, end: Date): number {
   return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000));
-}
-
-function ageInYears(dateOfBirth: Date, at: Date): number {
-  let age = at.getFullYear() - dateOfBirth.getFullYear();
-  const hasHadBirthdayThisYear =
-    at.getMonth() > dateOfBirth.getMonth() ||
-    (at.getMonth() === dateOfBirth.getMonth() && at.getDate() >= dateOfBirth.getDate());
-  if (!hasHadBirthdayThisYear) age -= 1;
-  return age;
 }

@@ -45,6 +45,7 @@ class MemberInvoice {
     required this.invoiceNumber,
     required this.member,
     required this.invoiceDate,
+    required this.dueDate,
     required this.subtotal,
     required this.taxAmount,
     required this.totalAmount,
@@ -56,6 +57,7 @@ class MemberInvoice {
   final String invoiceNumber;
   final InvoiceMemberSummary member;
   final DateTime invoiceDate;
+  final DateTime dueDate;
   final double subtotal;
   final double taxAmount;
   final double totalAmount;
@@ -69,6 +71,7 @@ class MemberInvoice {
           json['member'] as Map<String, dynamic>,
         ),
         invoiceDate: DateTime.parse(json['invoiceDate'] as String),
+        dueDate: DateTime.parse(json['dueDate'] as String),
         subtotal: double.parse(json['subtotal'] as String),
         taxAmount: double.parse(json['taxAmount'] as String),
         totalAmount: double.parse(json['totalAmount'] as String),

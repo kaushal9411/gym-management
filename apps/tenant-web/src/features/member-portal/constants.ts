@@ -11,5 +11,6 @@ export const MEMBER_PORTAL_ROUTES = {
   measurements: '/portal/measurements',
   invoices: '/portal/invoices',
   classes: '/portal/classes',
+  notifications: '/portal/notifications',
   profile: '/portal/profile',
 } as const;

@@ -115,15 +115,22 @@ export class MemberInvoiceService {
 
   /**
    * Auto-invoice on a successful payment (business rule) — called by
-   * `MemberPaymentService`, never exposed directly as a route. A single
-   * line item summarizing the payment; `status` is `PAID` since the
-   * settling payment already exists.
+   * `MemberPaymentService`, never exposed directly as a route. One line
+   * item per `input.items` entry (e.g. plan price, plan registration fee,
+   * member registration fee, kept separate so the invoice itemizes exactly
+   * what was charged) plus the payment's own `taxAmount`/`discountAmount` —
+   * both now threaded through from `MemberPaymentService#onPaymentSucceeded`
+   * instead of being hardcoded to 0, so `subtotal - discountAmount +
+   * taxAmount` always reconciles to the actual `Payment.finalAmount` by
+   * construction. `status` is `PAID` since the settling payment already
+   * exists.
    */
   async generateForPayment(input: {
     memberId: string;
     branchId: string;
-    amount: number;
-    description: string;
+    items: InvoiceItemInput[];
+    taxAmount: number;
+    discountAmount: number;
     paymentDate: Date;
   }): Promise<MemberInvoiceDetailRow> {
     return this.createInvoiceRow({
@@ -131,9 +138,9 @@ export class MemberInvoiceService {
       branchId: input.branchId,
       invoiceDate: input.paymentDate,
       dueDate: input.paymentDate,
-      items: [{ description: input.description, quantity: 1, unitPrice: input.amount }],
-      taxAmount: 0,
-      discountAmount: 0,
+      items: input.items,
+      taxAmount: input.taxAmount,
+      discountAmount: input.discountAmount,
       status: 'PAID',
     });
   }

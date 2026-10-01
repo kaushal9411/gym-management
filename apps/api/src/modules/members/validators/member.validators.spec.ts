@@ -188,14 +188,6 @@ describe('member validators', () => {
       expect(createMembershipPlanSchema.safeParse({ ...base, planCode: 'PLAN-0007' }).success).toBe(true);
     });
 
-    it('rejects minAge greater than maxAge', () => {
-      expect(createMembershipPlanSchema.safeParse({ ...base, minAge: 40, maxAge: 18 }).success).toBe(false);
-    });
-
-    it('accepts minAge less than or equal to maxAge', () => {
-      expect(createMembershipPlanSchema.safeParse({ ...base, minAge: 18, maxAge: 65 }).success).toBe(true);
-    });
-
     it('accepts feature fields', () => {
       const result = createMembershipPlanSchema.safeParse({
         ...base,

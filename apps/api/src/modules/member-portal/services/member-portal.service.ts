@@ -12,6 +12,7 @@ import { MemberDietPlanRepository } from '../../diet/repositories/member-diet-pl
 import { MemberInvoiceService } from '../../finance/services/member-invoice.service';
 import { MeasurementService } from '../../measurements/services/measurement.service';
 import { MemberService } from '../../members/services/member.service';
+import { tenantNotificationService } from '../../tenant-notifications/services/tenant-notification.service';
 import { tenantService } from '../../tenants/service/tenant.service';
 import { MemberWorkoutPlanRepository } from '../../workouts/repositories/member-workout-plan.repository';
 
@@ -162,6 +163,22 @@ export class MemberPortalService {
 
   async unregisterDeviceToken(token: string): Promise<void> {
     await deviceTokenService.unregisterMemberToken(this.tenantId, token);
+  }
+
+  async getNotifications(memberId: string, params: { unreadOnly?: boolean; page: number; limit: number }) {
+    return tenantNotificationService.listForMember(this.tenantId, memberId, params);
+  }
+
+  async getUnreadNotificationCount(memberId: string) {
+    return tenantNotificationService.unreadCountForMember(this.tenantId, memberId);
+  }
+
+  async markNotificationRead(memberId: string, id: string): Promise<void> {
+    await tenantNotificationService.markReadForMember(this.tenantId, memberId, id);
+  }
+
+  async markAllNotificationsRead(memberId: string): Promise<void> {
+    await tenantNotificationService.markAllReadForMember(this.tenantId, memberId);
   }
 }
 

@@ -11,7 +11,8 @@ import type { MemberPaymentMethod } from '@/features/finance/types';
 import { DEFAULT_MEMBER_EXTENDED_INFO_FORM_STATE, type MemberExtendedInfoFormState } from '../member-extended-info-fields';
 import { DEFAULT_MEMBER_HEALTH_FORM_STATE, type MemberHealthFormState } from '../member-health-screening-fields';
 import { DEFAULT_MEMBER_PROGRAM_FORM_STATE, type MemberProgramFormState } from '../member-program-fields';
-import { toMemberError, useAssignMembership, useCreateMember } from '../../hooks/use-members';
+import { toMemberError, useAssignMembership, useAssignablePlans, useCreateMember } from '../../hooks/use-members';
+import { computePlanPrice } from '../../utils/plan-pricing';
 import { StepHealthScreening } from './step-health-screening';
 import { StepPaymentSummary } from './step-payment-summary';
 import { StepPersonalInfo } from './step-personal-info';
@@ -23,6 +24,7 @@ export function AddMemberWizard() {
   const createMember = useCreateMember();
   const assignMembership = useAssignMembership();
   const createPayment = useCreatePayment();
+  const plans = useAssignablePlans();
 
   const [step, setStep] = React.useState<1 | 2 | 3>(1);
   const [core, setCore] = React.useState<WizardCorePersonalState>(defaultWizardCorePersonalState());
@@ -64,6 +66,20 @@ export function AddMemberWizard() {
 
   async function handleFinalSubmit() {
     setError(null);
+
+    const amountTyped = Number(payment.amount || 0);
+    const selectedPlan = plans.data?.find((p) => p.id === program.planId) ?? null;
+    const priceBreakdown = selectedPlan ? computePlanPrice(selectedPlan) : null;
+    const registrationFee = Number(extended.registrationFee || 0);
+    const manualDiscount = Number(payment.discount || 0);
+    const totalDue = (priceBreakdown?.finalPrice ?? 0) + (priceBreakdown?.joiningFee ?? 0) + registrationFee - manualDiscount;
+
+    if (amountTyped > totalDue + 0.005) {
+      setError(`Payment received cannot exceed the total due of ${totalDue.toFixed(2)}.`);
+      setStep(3);
+      return;
+    }
+
     let memberId: string;
     let memberName: string;
     try {
@@ -133,14 +149,30 @@ export function AddMemberWizard() {
       }
     }
 
-    const amount = Number(payment.amount || 0);
-    if (amount > 0) {
+    if (amountTyped > 0) {
+      const grossBase = (priceBreakdown?.basePrice ?? 0) + (priceBreakdown?.joiningFee ?? 0) + registrationFee;
+
+      // Paying the full balance: send the itemizable breakdown (plan price, plan
+      // discount/tax, registration fee all folded into amount/discount/tax) so the
+      // auto-generated invoice shows the real detail instead of one flat number.
+      // A partial payment (staff typed less than the total due) falls back to the
+      // literal pre-existing behavior — just what was typed, no plan-level
+      // discount/tax applied — since a partial amount can't be cleanly decomposed
+      // without guessing how much of the shortfall is "pre-tax" vs "pre-discount".
+      const isFullPayment = priceBreakdown !== null && amountTyped >= totalDue - 0.005;
+      const paymentPayload = isFullPayment
+        ? {
+            amount: grossBase,
+            discount: (priceBreakdown?.discountAmount ?? 0) + manualDiscount,
+            tax: priceBreakdown?.taxAmount ?? 0,
+          }
+        : { amount: amountTyped, discount: manualDiscount };
+
       try {
         await createPayment.mutateAsync({
           memberId,
           membershipId,
-          amount,
-          discount: Number(payment.discount || 0),
+          ...paymentPayload,
           method: payment.method as MemberPaymentMethod,
           status: 'SUCCESS',
         });

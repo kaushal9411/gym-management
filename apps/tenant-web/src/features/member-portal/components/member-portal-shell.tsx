@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { CalendarCheck, CalendarRange, Dumbbell, LayoutDashboard, LogOut, Menu, Receipt, Ruler, Salad, UserRound } from 'lucide-react';
+import { Bell, CalendarCheck, CalendarRange, Dumbbell, LayoutDashboard, LogOut, Menu, Receipt, Ruler, Salad, UserRound } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
@@ -22,6 +22,7 @@ const TABS = [
   { href: MEMBER_PORTAL_ROUTES.measurements, label: 'Measurements', icon: Ruler },
   { href: MEMBER_PORTAL_ROUTES.classes, label: 'Classes', icon: CalendarRange },
   { href: MEMBER_PORTAL_ROUTES.invoices, label: 'Invoices', icon: Receipt },
+  { href: MEMBER_PORTAL_ROUTES.notifications, label: 'Notifications', icon: Bell },
   { href: MEMBER_PORTAL_ROUTES.profile, label: 'Profile', icon: UserRound },
 ] as const;
 
@@ -62,7 +63,7 @@ function NavList({ pathname, onNavigate }: { pathname: string; onNavigate?: () =
  * the staff `Sidebar`/`SidebarNav` (active-item accent bar, icon+label
  * rows) — deliberately not wired to the `navigation` Redux slice those use
  * (no collapse state, no permission/feature-flag filtering: the member auth
- * plane has no RBAC and only ever has these 8 fixed tabs), so this stays a
+ * plane has no RBAC and only ever has these fixed tabs), so this stays a
  * small self-contained component with local `useState` for the mobile
  * drawer instead.
  */

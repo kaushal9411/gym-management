@@ -24,8 +24,8 @@ extension MembershipDurationTypeX on MembershipDurationType {
 }
 
 /// Mirrors `MembershipPlanDto` (`GET /membership-plans`,
-/// `GET /membership-plans/:id`) — the full 32-field shape, matching web's
-/// plan form exactly (design frame "7. Membership plans").
+/// `GET /membership-plans/:id`), matching web's plan form exactly
+/// (design frame "7. Membership plans").
 class MembershipPlan {
   const MembershipPlan({
     required this.id,
@@ -50,13 +50,6 @@ class MembershipPlan {
     required this.guestPasses,
     required this.freezeAllowed,
     required this.freezeDaysLimit,
-    required this.validityStart,
-    required this.validityEnd,
-    required this.gracePeriodDays,
-    required this.renewalWindowDays,
-    required this.autoRenewalAllowed,
-    required this.minAge,
-    required this.maxAge,
     required this.memberCount,
     required this.deletedAt,
   });
@@ -83,13 +76,6 @@ class MembershipPlan {
   final int guestPasses;
   final bool freezeAllowed;
   final int? freezeDaysLimit;
-  final DateTime? validityStart;
-  final DateTime? validityEnd;
-  final int gracePeriodDays;
-  final int renewalWindowDays;
-  final bool autoRenewalAllowed;
-  final int? minAge;
-  final int? maxAge;
   final int memberCount;
 
   /// Non-null means soft-deleted — same convention as `GymMember`/`StaffMember`.
@@ -111,6 +97,18 @@ class MembershipPlan {
     ];
     return perks.isEmpty ? 'Gym access only' : '${perks.join(' + ')} included';
   }
+
+  /// Discount-then-tax, mirroring web's `computePlanPrice()`
+  /// (`features/members/utils/plan-pricing.ts`) — keep both in sync.
+  double get discountAmount => price * discountPercentage / 100;
+
+  double get taxAmount => (price - discountAmount) * taxPercentage / 100;
+
+  /// `(price − discountAmount) + taxAmount` — discount applied before tax.
+  double get finalPrice => price - discountAmount + taxAmount;
+
+  /// `finalPrice + joiningFee` — the full amount this plan bills to on its own.
+  double get totalWithJoiningFee => finalPrice + joiningFee;
 
   factory MembershipPlan.fromJson(Map<String, dynamic> json) => MembershipPlan(
         id: json['id'] as String,
@@ -138,17 +136,6 @@ class MembershipPlan {
         guestPasses: json['guestPasses'] as int? ?? 0,
         freezeAllowed: json['freezeAllowed'] as bool? ?? false,
         freezeDaysLimit: json['freezeDaysLimit'] as int?,
-        validityStart: json['validityStart'] == null
-            ? null
-            : DateTime.parse(json['validityStart'] as String),
-        validityEnd: json['validityEnd'] == null
-            ? null
-            : DateTime.parse(json['validityEnd'] as String),
-        gracePeriodDays: json['gracePeriodDays'] as int? ?? 0,
-        renewalWindowDays: json['renewalWindowDays'] as int? ?? 0,
-        autoRenewalAllowed: json['autoRenewalAllowed'] as bool? ?? false,
-        minAge: json['minAge'] as int?,
-        maxAge: json['maxAge'] as int?,
         memberCount: json['memberCount'] as int? ?? 0,
         deletedAt: json['deletedAt'] == null
             ? null

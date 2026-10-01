@@ -15,14 +15,9 @@ import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/category_chip_selector.dart';
 
-String _fmtDate(DateTime? d) => d == null
-    ? ''
-    : '${d.day.toString().padLeft(2, '0')}/'
-        '${d.month.toString().padLeft(2, '0')}/${d.year}';
-
 /// Design frame "7a. Create/edit plan" — mirrors web's `PlanFormFields`
-/// section-for-section ("Plan information" / "Plan features" / "Membership
-/// rules") and the merged detail+edit screen web uses at `/memberships/:id`
+/// section-for-section ("Plan information" / "Plan features") and the
+/// merged detail+edit screen web uses at `/memberships/:id`
 /// (header with status + Duplicate/Activate-Deactivate/Delete/Restore,
 /// same form body, pre-filled). `widget.plan == null` → create
 /// (`POST /membership-plans`); otherwise → edit
@@ -55,21 +50,12 @@ class _MembershipPlanFormScreenState extends State<MembershipPlanFormScreen> {
   final _groupClasses = TextEditingController(text: '0');
   final _guestPasses = TextEditingController(text: '0');
   final _freezeDaysLimit = TextEditingController();
-  final _gracePeriodDays = TextEditingController(text: '0');
-  final _renewalWindowDays = TextEditingController(text: '0');
-  final _minAge = TextEditingController();
-  final _maxAge = TextEditingController();
-  final _validityStartText = TextEditingController();
-  final _validityEndText = TextEditingController();
 
   MembershipDurationType _durationType = MembershipDurationType.months;
   bool _gymAccessAllBranches = false;
   bool _dietConsultationIncluded = false;
   bool _lockerAccess = false;
   bool _freezeAllowed = false;
-  bool _autoRenewalAllowed = false;
-  DateTime? _validityStart;
-  DateTime? _validityEnd;
 
   late MembershipPlan? _currentPlan = widget.plan;
   bool _saving = false;
@@ -105,15 +91,6 @@ class _MembershipPlanFormScreenState extends State<MembershipPlanFormScreen> {
       _lockerAccess = plan.lockerAccess;
       _freezeAllowed = plan.freezeAllowed;
       _freezeDaysLimit.text = plan.freezeDaysLimit?.toString() ?? '';
-      _validityStart = plan.validityStart;
-      _validityEnd = plan.validityEnd;
-      _validityStartText.text = _fmtDate(_validityStart);
-      _validityEndText.text = _fmtDate(_validityEnd);
-      _gracePeriodDays.text = '${plan.gracePeriodDays}';
-      _renewalWindowDays.text = '${plan.renewalWindowDays}';
-      _autoRenewalAllowed = plan.autoRenewalAllowed;
-      _minAge.text = plan.minAge?.toString() ?? '';
-      _maxAge.text = plan.maxAge?.toString() ?? '';
     }
   }
 
@@ -135,12 +112,6 @@ class _MembershipPlanFormScreenState extends State<MembershipPlanFormScreen> {
       _groupClasses,
       _guestPasses,
       _freezeDaysLimit,
-      _gracePeriodDays,
-      _renewalWindowDays,
-      _minAge,
-      _maxAge,
-      _validityStartText,
-      _validityEndText,
     ]) {
       c.dispose();
     }
@@ -192,13 +163,6 @@ class _MembershipPlanFormScreenState extends State<MembershipPlanFormScreen> {
       guestPasses: _int(_guestPasses) ?? 0,
       freezeAllowed: _freezeAllowed,
       freezeDaysLimit: _freezeAllowed ? _int(_freezeDaysLimit) : null,
-      validityStart: _validityStart,
-      validityEnd: _validityEnd,
-      gracePeriodDays: _int(_gracePeriodDays),
-      renewalWindowDays: _int(_renewalWindowDays),
-      autoRenewalAllowed: _autoRenewalAllowed,
-      minAge: _int(_minAge),
-      maxAge: _int(_maxAge),
     );
     try {
       final repo = getIt<MembershipPlanRepository>();
@@ -345,25 +309,6 @@ class _MembershipPlanFormScreenState extends State<MembershipPlanFormScreen> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  Future<void> _pickDate({required bool isStart}) async {
-    final picked = await showDatePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-      initialDate: (isStart ? _validityStart : _validityEnd) ?? DateTime.now(),
-    );
-    if (picked == null) return;
-    setState(() {
-      if (isStart) {
-        _validityStart = picked;
-        _validityStartText.text = _fmtDate(picked);
-      } else {
-        _validityEnd = picked;
-        _validityEndText.text = _fmtDate(picked);
-      }
-    });
   }
 
   @override
@@ -534,7 +479,7 @@ class _MembershipPlanFormScreenState extends State<MembershipPlanFormScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: AppLabeledField(
-                      label: 'Joining fee',
+                      label: 'Registration fee',
                       controller: _joiningFee,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
@@ -659,104 +604,6 @@ class _MembershipPlanFormScreenState extends State<MembershipPlanFormScreen> {
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 ),
               ],
-              const SizedBox(height: 22),
-              Text('Membership rules', style: AppText.eyebrow()),
-              const SizedBox(height: 10),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'Validity start',
-                      hintText: 'dd/mm/yyyy',
-                      controller: _validityStartText,
-                      readOnly: true,
-                      onTap: () => _pickDate(isStart: true),
-                      suffixIcon: const Icon(
-                        Icons.calendar_today_rounded,
-                        size: 16,
-                        color: AppColors.inkFaint,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'Validity end',
-                      hintText: 'dd/mm/yyyy',
-                      controller: _validityEndText,
-                      readOnly: true,
-                      onTap: () => _pickDate(isStart: false),
-                      suffixIcon: const Icon(
-                        Icons.calendar_today_rounded,
-                        size: 16,
-                        color: AppColors.inkFaint,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'Grace period (days)',
-                      controller: _gracePeriodDays,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'Renewal window (days)',
-                      hintText: '0 = anytime',
-                      controller: _renewalWindowDays,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'Minimum age',
-                      controller: _minAge,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'Maximum age',
-                      controller: _maxAge,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _CheckboxRow(
-                label: 'Auto-renewal allowed',
-                value: _autoRenewalAllowed,
-                onChanged: (v) => setState(() => _autoRenewalAllowed = v),
-              ),
               const SizedBox(height: 24),
               AppButton(
                 label: widget.isEdit ? 'Save changes' : 'Create plan',

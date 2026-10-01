@@ -45,6 +45,25 @@ export class MemberPortalController {
     sendSuccess(res, null, 'Device unregistered.');
   }
 
+  async notifications(req: Request, res: Response): Promise<void> {
+    const { unreadOnly, page, limit } = req.query as unknown as { unreadOnly?: boolean; page: number; limit: number };
+    sendSuccess(res, await serviceFor(req).getNotifications(memberId(req), { unreadOnly, page, limit }));
+  }
+
+  async unreadNotificationCount(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await serviceFor(req).getUnreadNotificationCount(memberId(req)));
+  }
+
+  async markNotificationRead(req: Request<{ id: string }>, res: Response): Promise<void> {
+    await serviceFor(req).markNotificationRead(memberId(req), req.params.id);
+    sendSuccess(res, null, 'Marked as read.');
+  }
+
+  async markAllNotificationsRead(req: Request, res: Response): Promise<void> {
+    await serviceFor(req).markAllNotificationsRead(memberId(req));
+    sendSuccess(res, null, 'All notifications marked as read.');
+  }
+
   async diet(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await serviceFor(req).getDiet(memberId(req)));
   }

@@ -31,13 +31,6 @@ class MembershipPlanFormInput {
     this.guestPasses = 0,
     this.freezeAllowed = false,
     this.freezeDaysLimit,
-    this.validityStart,
-    this.validityEnd,
-    this.gracePeriodDays,
-    this.renewalWindowDays,
-    this.autoRenewalAllowed = false,
-    this.minAge,
-    this.maxAge,
   });
 
   final String name;
@@ -60,13 +53,6 @@ class MembershipPlanFormInput {
   final int guestPasses;
   final bool freezeAllowed;
   final int? freezeDaysLimit;
-  final DateTime? validityStart;
-  final DateTime? validityEnd;
-  final int? gracePeriodDays;
-  final int? renewalWindowDays;
-  final bool autoRenewalAllowed;
-  final int? minAge;
-  final int? maxAge;
 
   Map<String, dynamic> toJson() => {
         'name': name,
@@ -90,15 +76,6 @@ class MembershipPlanFormInput {
         'guestPasses': guestPasses,
         'freezeAllowed': freezeAllowed,
         if (freezeDaysLimit != null) 'freezeDaysLimit': freezeDaysLimit,
-        if (validityStart != null)
-          'validityStart': validityStart!.toIso8601String().substring(0, 10),
-        if (validityEnd != null)
-          'validityEnd': validityEnd!.toIso8601String().substring(0, 10),
-        if (gracePeriodDays != null) 'gracePeriodDays': gracePeriodDays,
-        if (renewalWindowDays != null) 'renewalWindowDays': renewalWindowDays,
-        'autoRenewalAllowed': autoRenewalAllowed,
-        if (minAge != null) 'minAge': minAge,
-        if (maxAge != null) 'maxAge': maxAge,
       };
 }
 

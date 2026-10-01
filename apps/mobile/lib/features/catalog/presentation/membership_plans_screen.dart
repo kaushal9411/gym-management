@@ -470,8 +470,9 @@ class _PlanCardState extends State<_PlanCard> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${Formatters.currency(plan.price)} · ${plan.durationLabel}'
-                  ' · ${plan.perksSummary}',
+                  '${Formatters.currency(plan.finalPrice)}'
+                  '${plan.finalPrice != plan.price ? ' (base ${Formatters.currency(plan.price)})' : ''}'
+                  ' · ${plan.durationLabel} · ${plan.perksSummary}',
                   style: AppText.body(
                     size: 12,
                     color: AppColors.inkFaint,

@@ -51,13 +51,6 @@ export default function NewMembershipPlanPage() {
         guestPasses: toNumberOrUndefined(form.guestPasses),
         freezeAllowed: form.freezeAllowed,
         freezeDaysLimit: toNumberOrUndefined(form.freezeDaysLimit) ?? null,
-        validityStart: form.validityStart || null,
-        validityEnd: form.validityEnd || null,
-        gracePeriodDays: toNumberOrUndefined(form.gracePeriodDays),
-        renewalWindowDays: toNumberOrUndefined(form.renewalWindowDays),
-        autoRenewalAllowed: form.autoRenewalAllowed,
-        minAge: toNumberOrUndefined(form.minAge) ?? null,
-        maxAge: toNumberOrUndefined(form.maxAge) ?? null,
       },
       {
         onSuccess: (plan) => {

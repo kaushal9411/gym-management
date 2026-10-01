@@ -17,6 +17,7 @@ import '../../../repositories/reports_repository.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/user_avatar.dart';
+import '../../owner/presentation/widgets/dashboard_detail_sheet.dart';
 import '../../owner/presentation/widgets/kpi_card.dart';
 import '../../owner/presentation/widgets/recent_activity_tile.dart';
 
@@ -140,6 +141,10 @@ class _ManagerDashboardViewState extends State<_ManagerDashboardView> {
                               valueColor: kpis.expiringMemberships > 0
                                   ? AppColors.warning
                                   : null,
+                              onTap: () => showDashboardDetailSheet(
+                                context,
+                                kind: DashboardStatKind.expiringMemberships,
+                              ),
                             ),
                           ),
                         ],

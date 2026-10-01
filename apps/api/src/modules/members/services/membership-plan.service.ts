@@ -38,13 +38,6 @@ function toDto(plan: MembershipPlanRow): MembershipPlanDto {
     guestPasses: plan.guestPasses,
     freezeAllowed: plan.freezeAllowed,
     freezeDaysLimit: plan.freezeDaysLimit,
-    validityStart: plan.validityStart?.toISOString() ?? null,
-    validityEnd: plan.validityEnd?.toISOString() ?? null,
-    gracePeriodDays: plan.gracePeriodDays,
-    renewalWindowDays: plan.renewalWindowDays,
-    autoRenewalAllowed: plan.autoRenewalAllowed,
-    minAge: plan.minAge,
-    maxAge: plan.maxAge,
     memberCount: plan._count.memberships,
     createdAt: plan.createdAt.toISOString(),
     updatedAt: plan.updatedAt.toISOString(),
@@ -111,13 +104,6 @@ export class MembershipPlanService {
       guestPasses: input.guestPasses ?? 0,
       freezeAllowed: input.freezeAllowed ?? true,
       freezeDaysLimit: input.freezeDaysLimit,
-      validityStart: input.validityStart ? new Date(input.validityStart) : undefined,
-      validityEnd: input.validityEnd ? new Date(input.validityEnd) : undefined,
-      gracePeriodDays: input.gracePeriodDays ?? 0,
-      renewalWindowDays: input.renewalWindowDays ?? 0,
-      autoRenewalAllowed: input.autoRenewalAllowed ?? true,
-      minAge: input.minAge,
-      maxAge: input.maxAge,
     });
     await this.audit(actor, 'membership_plan.created', plan.id);
     return toDto(plan);
@@ -157,13 +143,6 @@ export class MembershipPlanService {
       guestPasses: input.guestPasses,
       freezeAllowed: input.freezeAllowed,
       freezeDaysLimit: input.freezeDaysLimit,
-      validityStart: input.validityStart === null ? null : input.validityStart ? new Date(input.validityStart) : undefined,
-      validityEnd: input.validityEnd === null ? null : input.validityEnd ? new Date(input.validityEnd) : undefined,
-      gracePeriodDays: input.gracePeriodDays,
-      renewalWindowDays: input.renewalWindowDays,
-      autoRenewalAllowed: input.autoRenewalAllowed,
-      minAge: input.minAge,
-      maxAge: input.maxAge,
     });
     await this.audit(actor, 'membership_plan.updated', planId);
     return this.getById(planId);
@@ -230,11 +209,6 @@ export class MembershipPlanService {
       guestPasses: source.guestPasses,
       freezeAllowed: source.freezeAllowed,
       freezeDaysLimit: source.freezeDaysLimit,
-      gracePeriodDays: source.gracePeriodDays,
-      renewalWindowDays: source.renewalWindowDays,
-      autoRenewalAllowed: source.autoRenewalAllowed,
-      minAge: source.minAge,
-      maxAge: source.maxAge,
     });
     await this.audit(actor, 'membership_plan.duplicated', plan.id);
     return toDto(plan);

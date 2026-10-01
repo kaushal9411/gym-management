@@ -6,6 +6,7 @@ import { memberChangePasswordSchema } from '../../member-auth/validators/member-
 import { memberPortalController } from '../controllers/member-portal.controller';
 import {
   memberDietLogSchema,
+  memberNotificationsQuerySchema,
   memberPortalClassesQuerySchema,
   memberPortalIdParamSchema,
   memberPortalPaginationSchema,
@@ -75,4 +76,17 @@ memberPortalRouter.delete(
   '/device-token',
   validate({ body: memberUnregisterDeviceTokenSchema }),
   asyncHandler(memberPortalController.unregisterDeviceToken.bind(memberPortalController)),
+);
+
+memberPortalRouter.get(
+  '/notifications',
+  validate({ query: memberNotificationsQuerySchema }),
+  asyncHandler(memberPortalController.notifications.bind(memberPortalController)),
+);
+memberPortalRouter.get('/notifications/unread-count', asyncHandler(memberPortalController.unreadNotificationCount.bind(memberPortalController)));
+memberPortalRouter.post('/notifications/read-all', asyncHandler(memberPortalController.markAllNotificationsRead.bind(memberPortalController)));
+memberPortalRouter.post(
+  '/notifications/:id/read',
+  validate({ params: memberPortalIdParamSchema }),
+  asyncHandler(memberPortalController.markNotificationRead.bind(memberPortalController)),
 );

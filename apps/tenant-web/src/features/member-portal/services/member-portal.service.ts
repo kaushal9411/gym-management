@@ -82,6 +82,32 @@ export interface MemberPortalClassSession {
   status: 'SCHEDULED' | 'CANCELLED' | 'COMPLETED';
 }
 
+export type MemberNotificationCategory =
+  | 'ANNOUNCEMENT'
+  | 'SYSTEM'
+  | 'SUBSCRIPTION'
+  | 'GENERAL'
+  | 'MEMBER'
+  | 'MEMBERSHIP'
+  | 'PAYMENT'
+  | 'ATTENDANCE'
+  | 'WORKOUT'
+  | 'DIET'
+  | 'STAFF';
+
+export interface MemberPortalNotification {
+  id: string;
+  category: MemberNotificationCategory;
+  title: string;
+  body: string;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface MemberNotificationListResult extends Paginated<MemberPortalNotification> {
+  unreadCount: number;
+}
+
 export interface MemberPortalBooking {
   id: string;
   status: 'BOOKED' | 'CANCELLED' | 'ATTENDED' | 'NO_SHOW';
@@ -199,6 +225,40 @@ export const memberPortalService = {
   async cancelBooking(bookingId: string): Promise<void> {
     try {
       await memberApiClient.post(`/portal/bookings/${bookingId}/cancel`);
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async getNotifications(params: { unreadOnly?: boolean; page?: number; limit?: number } = {}): Promise<MemberNotificationListResult> {
+    try {
+      const res = await memberApiClient.get<Envelope<MemberNotificationListResult>>('/portal/notifications', { params });
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async getUnreadNotificationCount(): Promise<{ unreadCount: number }> {
+    try {
+      const res = await memberApiClient.get<Envelope<{ unreadCount: number }>>('/portal/notifications/unread-count');
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async markNotificationRead(notificationId: string): Promise<void> {
+    try {
+      await memberApiClient.post(`/portal/notifications/${notificationId}/read`);
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async markAllNotificationsRead(): Promise<void> {
+    try {
+      await memberApiClient.post('/portal/notifications/read-all');
     } catch (error) {
       throw toMemberAuthServiceError(error);
     }

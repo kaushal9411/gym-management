@@ -39,13 +39,6 @@ export interface PlanFormState {
   guestPasses: string;
   freezeAllowed: boolean;
   freezeDaysLimit: string;
-  validityStart: string;
-  validityEnd: string;
-  gracePeriodDays: string;
-  renewalWindowDays: string;
-  autoRenewalAllowed: boolean;
-  minAge: string;
-  maxAge: string;
 }
 
 export const DEFAULT_PLAN_FORM_STATE: PlanFormState = {
@@ -69,13 +62,6 @@ export const DEFAULT_PLAN_FORM_STATE: PlanFormState = {
   guestPasses: '0',
   freezeAllowed: true,
   freezeDaysLimit: '',
-  validityStart: '',
-  validityEnd: '',
-  gracePeriodDays: '0',
-  renewalWindowDays: '0',
-  autoRenewalAllowed: true,
-  minAge: '',
-  maxAge: '',
 };
 
 interface PlanFormFieldsProps {
@@ -149,7 +135,7 @@ export function PlanFormFields({ value, onChange, disabled, hidePlanCode }: Plan
             <Input id="planPrice" type="number" min={0} step="0.01" value={value.price} disabled={disabled} onChange={(e) => set('price', e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="planJoiningFee">Joining fee</Label>
+            <Label htmlFor="planJoiningFee">Registration fee</Label>
             <Input id="planJoiningFee" type="number" min={0} step="0.01" value={value.joiningFee} disabled={disabled} onChange={(e) => set('joiningFee', e.target.value)} />
           </div>
           <div className="space-y-2">
@@ -220,42 +206,6 @@ export function PlanFormFields({ value, onChange, disabled, hidePlanCode }: Plan
             />
           </div>
         ) : null}
-      </section>
-
-      <section className="space-y-4">
-        <h3 className="text-sm font-medium">Membership rules</h3>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="planValidityStart">Validity start (plan purchasable from)</Label>
-            <Input id="planValidityStart" type="date" value={value.validityStart} disabled={disabled} onChange={(e) => set('validityStart', e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="planValidityEnd">Validity end (plan purchasable until)</Label>
-            <Input id="planValidityEnd" type="date" value={value.validityEnd} disabled={disabled} onChange={(e) => set('validityEnd', e.target.value)} />
-          </div>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-4">
-          <div className="space-y-2">
-            <Label htmlFor="planGracePeriod">Grace period (days)</Label>
-            <Input id="planGracePeriod" type="number" min={0} value={value.gracePeriodDays} disabled={disabled} onChange={(e) => set('gracePeriodDays', e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="planRenewalWindow">Renewal window (days, 0 = anytime)</Label>
-            <Input id="planRenewalWindow" type="number" min={0} value={value.renewalWindowDays} disabled={disabled} onChange={(e) => set('renewalWindowDays', e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="planMinAge">Minimum age</Label>
-            <Input id="planMinAge" type="number" min={0} value={value.minAge} disabled={disabled} onChange={(e) => set('minAge', e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="planMaxAge">Maximum age</Label>
-            <Input id="planMaxAge" type="number" min={0} value={value.maxAge} disabled={disabled} onChange={(e) => set('maxAge', e.target.value)} />
-          </div>
-        </div>
-        <label className="flex items-center gap-1.5 text-sm">
-          <Checkbox id="planAutoRenewalAllowed" checked={value.autoRenewalAllowed} disabled={disabled} onCheckedChange={(c) => set('autoRenewalAllowed', c === true)} />
-          Auto-renewal allowed
-        </label>
       </section>
     </div>
   );

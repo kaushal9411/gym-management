@@ -374,13 +374,6 @@ export interface MembershipPlanDto {
   guestPasses: number;
   freezeAllowed: boolean;
   freezeDaysLimit: number | null;
-  validityStart: string | null;
-  validityEnd: string | null;
-  gracePeriodDays: number;
-  renewalWindowDays: number;
-  autoRenewalAllowed: boolean;
-  minAge: number | null;
-  maxAge: number | null;
   memberCount: number;
   createdAt: string;
   updatedAt: string;
@@ -411,17 +404,7 @@ export interface MembershipPlanFeatureFields {
   freezeDaysLimit?: number | null;
 }
 
-export interface MembershipPlanRuleFields {
-  validityStart?: string | null;
-  validityEnd?: string | null;
-  gracePeriodDays?: number;
-  renewalWindowDays?: number;
-  autoRenewalAllowed?: boolean;
-  minAge?: number | null;
-  maxAge?: number | null;
-}
-
-export interface CreateMembershipPlanInput extends MembershipPlanFeatureFields, MembershipPlanRuleFields {
+export interface CreateMembershipPlanInput extends MembershipPlanFeatureFields {
   name: string;
   planCode?: string;
   description?: string;
@@ -437,7 +420,7 @@ export interface CreateMembershipPlanInput extends MembershipPlanFeatureFields, 
   notes?: string;
 }
 
-export interface UpdateMembershipPlanInput extends MembershipPlanFeatureFields, MembershipPlanRuleFields {
+export interface UpdateMembershipPlanInput extends MembershipPlanFeatureFields {
   name?: string;
   planCode?: string;
   description?: string | null;

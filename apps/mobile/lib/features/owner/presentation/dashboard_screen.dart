@@ -15,6 +15,7 @@ import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../reports/presentation/widgets/report_filter_bar.dart';
+import 'widgets/dashboard_detail_sheet.dart';
 import 'widgets/kpi_card.dart';
 import 'widgets/recent_activity_tile.dart';
 import 'widgets/trend_chart.dart';
@@ -124,6 +125,11 @@ class _DashboardView extends StatelessWidget {
                               value: '${kpis.todaysAttendance}',
                               icon: Icons.how_to_reg_rounded,
                               iconColor: AppColors.staffA,
+                              onTap: () => showDashboardDetailSheet(
+                                context,
+                                kind: DashboardStatKind.attendance,
+                                branchId: selectedBranchId,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -133,6 +139,11 @@ class _DashboardView extends StatelessWidget {
                               value: '${kpis.activeMembers}',
                               icon: Icons.groups_rounded,
                               iconColor: AppColors.staffB,
+                              onTap: () => showDashboardDetailSheet(
+                                context,
+                                kind: DashboardStatKind.activeMembers,
+                                branchId: selectedBranchId,
+                              ),
                             ),
                           ),
                         ],
@@ -149,6 +160,11 @@ class _DashboardView extends StatelessWidget {
                                   : null,
                               icon: Icons.event_busy_rounded,
                               iconColor: AppColors.warning,
+                              onTap: () => showDashboardDetailSheet(
+                                context,
+                                kind: DashboardStatKind.expiringMemberships,
+                                branchId: selectedBranchId,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -158,6 +174,11 @@ class _DashboardView extends StatelessWidget {
                               value: '${kpis.newMembersThisMonth}',
                               icon: Icons.person_add_alt_1_rounded,
                               iconColor: AppColors.memberA,
+                              onTap: () => showDashboardDetailSheet(
+                                context,
+                                kind: DashboardStatKind.newRegistrations,
+                                branchId: selectedBranchId,
+                              ),
                             ),
                           ),
                         ],
@@ -174,6 +195,11 @@ class _DashboardView extends StatelessWidget {
                               valueColor: AppColors.memberB,
                               icon: Icons.account_balance_wallet_rounded,
                               iconColor: AppColors.success,
+                              onTap: () => showDashboardDetailSheet(
+                                context,
+                                kind: DashboardStatKind.revenueSummary,
+                                branchId: selectedBranchId,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
@@ -188,6 +214,11 @@ class _DashboardView extends StatelessWidget {
                                   : null,
                               icon: Icons.schedule_rounded,
                               iconColor: AppColors.danger,
+                              onTap: () => showDashboardDetailSheet(
+                                context,
+                                kind: DashboardStatKind.pendingPayments,
+                                branchId: selectedBranchId,
+                              ),
                             ),
                           ),
                         ],

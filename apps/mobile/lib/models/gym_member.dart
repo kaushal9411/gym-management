@@ -168,6 +168,7 @@ class GymMember {
     required this.trainer,
     required this.currentMembership,
     required this.joiningDate,
+    required this.createdAt,
     required this.deletedAt,
     this.qrCodeToken,
     this.qrCodeImageUrl,
@@ -209,6 +210,12 @@ class GymMember {
   final MemberTrainerSummary? trainer;
   final CurrentMembershipSummary? currentMembership;
   final DateTime joiningDate;
+
+  /// Server-stamped record creation time — distinct from [joiningDate]
+  /// (user-editable). The dashboard's "New Members (this month)" KPI
+  /// counts off this field (`DashboardService#getKpis`), so the detail
+  /// sheet filters on it too, to stay consistent with the number shown.
+  final DateTime createdAt;
 
   /// Non-null means soft-deleted — the header's Delete/Restore action pair
   /// keys off this, same convention as `StaffMember`.
@@ -273,6 +280,7 @@ class GymMember {
                 json['currentMembership'] as Map<String, dynamic>,
               ),
         joiningDate: DateTime.parse(json['joiningDate'] as String),
+        createdAt: DateTime.parse(json['createdAt'] as String),
         deletedAt: json['deletedAt'] == null
             ? null
             : DateTime.parse(json['deletedAt'] as String),

@@ -5,6 +5,7 @@ import type { ListMembersQuery } from '../dto/member.dto';
 import {
   decryptMemberContact,
   decryptMemberContactMany,
+  decryptMemberField,
   encryptEmail,
   encryptPhone,
   hashEmail,
@@ -19,16 +20,15 @@ const MEMBER_INCLUDE = {
   memberships: {
     orderBy: { createdAt: 'desc' },
     // Selected fields beyond id/name back plan-based enforcement (freeze
-    // gating, grace-period check-in, branch access, guest-pass/PT-session/
-    // class quotas) that reads a member's active membership's plan —
-    // AttendanceService, MemberService#freeze, and the new guest-visit/
-    // pt-session/class-booking quota checks all rely on this same include.
+    // gating, branch access, guest-pass/PT-session/class quotas) that reads
+    // a member's active membership's plan — AttendanceService,
+    // MemberService#freeze, and the guest-visit/pt-session/class-booking
+    // quota checks all rely on this same include.
     include: {
       plan: {
         select: {
           id: true,
           name: true,
-          gracePeriodDays: true,
           freezeAllowed: true,
           freezeDaysLimit: true,
           gymAccessAllBranches: true,
@@ -46,13 +46,33 @@ const MEMBER_INCLUDE = {
 export type MemberRow = Prisma.MemberGetPayload<{ include: typeof MEMBER_INCLUDE }>;
 
 /**
- * `email`/`phone` are excluded from the free-text search — they're AES-GCM
- * ciphertext at rest (see `member-pii.util.ts`), which can't be
- * `contains`-matched in SQL. An exact email/phone still resolves via
- * `findByEmail`/`findByPhone`'s hash lookup; only PARTIAL email/phone
- * matching is gone (name/Member ID search is unaffected). Confirmed
- * trade-off with the user before building field-level encryption.
+ * Phone is AES-GCM ciphertext at rest (see `member-pii.util.ts`), so it
+ * can't be `contains`-matched in SQL like `firstName`/`lastName`/`memberId`
+ * — substring phone search (Prompt 95, user-requested despite the
+ * documented Prompt 43 trade-off) instead decrypts every phone in the
+ * tenant that matches every OTHER active filter (branch/status/etc, just
+ * not `search` itself) and filters in memory on digits-only containment.
+ * Deliberately not capped/paginated — a partial match that silently missed
+ * rows past some cutoff would be worse than the cost of decrypting a
+ * tenant's full member roster per search-with-digits request. Only runs
+ * when `search` contains at least one digit, so a pure-name search never
+ * pays this cost. Email stays exact-match-only (hash lookup) — not asked
+ * for the same treatment here.
  */
+async function findPhoneMatchingIds(
+  db: TenantScopedPrisma,
+  whereWithoutSearch: Prisma.MemberWhereInput,
+  search: string,
+): Promise<string[]> {
+  const digits = search.replace(/\D/g, '');
+  if (!digits) return [];
+  const candidates = await db.member.findMany({
+    where: { ...whereWithoutSearch, phone: { not: null } },
+    select: { id: true, phone: true },
+  });
+  return candidates.filter((c) => c.phone && decryptMemberField(c.phone).replace(/\D/g, '').includes(digits)).map((c) => c.id);
+}
+
 /**
  * `restrictToBranchIds` is the actor's OWN branch scope (omitted entirely
  * for `allBranches` staff) — found missing during a QA pass (Prompt 48):
@@ -62,7 +82,12 @@ export type MemberRow = Prisma.MemberGetPayload<{ include: typeof MEMBER_INCLUDE
  * actor's own scope is intersected down to zero rows, not silently
  * widened to "show everything" or ignored.
  */
-function buildWhere(tenantId: string, query: Partial<ListMembersQuery>, restrictToBranchIds?: string[]): Prisma.MemberWhereInput {
+function buildWhere(
+  tenantId: string,
+  query: Partial<ListMembersQuery>,
+  restrictToBranchIds?: string[],
+  phoneMatchIds?: string[],
+): Prisma.MemberWhereInput {
   const where: Prisma.MemberWhereInput = { tenantId };
   if (!query.includeDeleted) where.deletedAt = null;
   if (query.status) where.status = query.status;
@@ -70,7 +95,16 @@ function buildWhere(tenantId: string, query: Partial<ListMembersQuery>, restrict
   if (query.membershipStatus) where.memberships = { some: { status: query.membershipStatus } };
   if (query.search) {
     const contains = { contains: query.search, mode: 'insensitive' as const };
-    where.AND = [{ OR: [{ firstName: contains }, { lastName: contains }, { memberId: contains }] }];
+    where.AND = [
+      {
+        OR: [
+          { firstName: contains },
+          { lastName: contains },
+          { memberId: contains },
+          ...(phoneMatchIds && phoneMatchIds.length > 0 ? [{ id: { in: phoneMatchIds } }] : []),
+        ],
+      },
+    ];
   }
 
   if (restrictToBranchIds) {
@@ -117,7 +151,10 @@ export class MemberRepository {
   constructor(private readonly db: TenantScopedPrisma) {}
 
   async list(tenantId: string, query: ListMembersQuery, restrictToBranchIds?: string[]): Promise<{ items: MemberRow[]; total: number }> {
-    const where = buildWhere(tenantId, query, restrictToBranchIds);
+    const phoneMatchIds = query.search
+      ? await findPhoneMatchingIds(this.db, buildWhere(tenantId, { ...query, search: undefined }, restrictToBranchIds), query.search)
+      : [];
+    const where = buildWhere(tenantId, query, restrictToBranchIds, phoneMatchIds);
     const orderBy: Prisma.MemberOrderByWithRelationInput =
       query.sortBy === 'name'
         ? { firstName: query.sortDir }

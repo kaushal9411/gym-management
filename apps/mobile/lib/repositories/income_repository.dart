@@ -12,11 +12,20 @@ class IncomeRepository {
   Future<PaginatedResult<IncomeEntry>> list({
     int page = 1,
     int limit = 20,
+    String? branchId,
+    String? dateFrom,
+    String? dateTo,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/income',
-        queryParameters: {'page': page, 'limit': limit},
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+          if (branchId != null) 'branchId': branchId,
+          if (dateFrom != null) 'dateFrom': dateFrom,
+          if (dateTo != null) 'dateTo': dateTo,
+        },
       );
       return PaginatedResult.fromJson(
         response.data!['data'] as Map<String, dynamic>,

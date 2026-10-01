@@ -23,6 +23,7 @@ import {
   useMembershipPlanStatusAction,
 } from '@/features/members/hooks/use-members';
 import type { ListMembershipPlansParams, MembershipPlan } from '@/features/members/types';
+import { computePlanPrice } from '@/features/members/utils/plan-pricing';
 import { useCurrencySymbol } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
@@ -134,7 +135,22 @@ export default function MembershipPlansPage() {
           : (p.accessBranchIds ?? []).map((id) => branchNameById.get(id) ?? id).join(', ') || '—',
     },
     { key: 'duration', header: 'Duration', render: (p) => `${p.durationValue} ${p.durationType.toLowerCase()}` },
-    { key: 'price', header: sortableHeader('Price', 'price'), render: (p) => `${currencySymbol}${p.price}` },
+    {
+      key: 'price',
+      header: sortableHeader('Price', 'price'),
+      render: (p) => {
+        const { basePrice, finalPrice } = computePlanPrice(p);
+        const hasAdjustment = Math.abs(finalPrice - basePrice) >= 0.005;
+        return (
+          <div>
+            <span>{currencySymbol}{finalPrice.toFixed(2)}</span>
+            {hasAdjustment ? (
+              <span className="block text-xs text-muted-foreground">Base {currencySymbol}{basePrice.toFixed(2)}</span>
+            ) : null}
+          </div>
+        );
+      },
+    },
     { key: 'members', header: 'Members', render: (p) => p.memberCount },
     {
       key: 'status',

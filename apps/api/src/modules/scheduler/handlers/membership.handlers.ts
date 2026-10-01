@@ -1,6 +1,5 @@
 import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
-import { isWithinGracePeriod } from '../../members/utils/duration.util';
 import { decryptMemberContact } from '../../members/utils/member-pii.util';
 import { notifyMembershipExpired, notifyMembershipExpiring } from '../../tenant-notifications/services/notification-trigger.service';
 import type { JobHandler } from '../types';
@@ -56,21 +55,13 @@ export const membershipExpiryCheck: JobHandler = async () => {
  * The status-flip half of the old `expirePastDue` — ACTIVE memberships past
  * `endDate` become EXPIRED. Notification is a separate job
  * (`membership-expired-notification`) so a notification failure never
- * blocks the status mutation. Respects the plan's `gracePeriodDays` (see
- * `isWithinGracePeriod`'s doc comment) — a plain `updateMany` can't express
- * "past endDate + a per-row related plan's gracePeriodDays" in one WHERE,
- * so this fetches the (small, daily-batch) candidate set with its plan's
- * grace period, filters in JS, then updates only the ones actually past grace.
+ * blocks the status mutation.
  */
 export const autoMembershipStatusUpdate: JobHandler = async () => {
-  const now = new Date();
-  const candidates = await prisma.membership.findMany({
-    where: { status: 'ACTIVE', endDate: { lt: now } },
-    select: { id: true, endDate: true, plan: { select: { gracePeriodDays: true } } },
+  const result = await prisma.membership.updateMany({
+    where: { status: 'ACTIVE', endDate: { lt: new Date() } },
+    data: { status: 'EXPIRED' },
   });
-  const idsToExpire = candidates.filter((m) => !isWithinGracePeriod(m.endDate, m.plan.gracePeriodDays, now)).map((m) => m.id);
-  if (idsToExpire.length === 0) return { updated: 0 };
-  const result = await prisma.membership.updateMany({ where: { id: { in: idsToExpire } }, data: { status: 'EXPIRED' } });
   return { updated: result.count };
 };
 
