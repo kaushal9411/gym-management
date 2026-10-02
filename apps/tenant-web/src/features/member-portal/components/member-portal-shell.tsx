@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bell, CalendarCheck, CalendarRange, Dumbbell, LayoutDashboard, LogOut, Menu, Receipt, Ruler, Salad, UserRound } from 'lucide-react';
+import { Bell, CalendarCheck, CalendarRange, CreditCard, Dumbbell, LayoutDashboard, LogOut, Menu, Receipt, Ruler, Salad, UserRound } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Drawer, DrawerContent } from '@/components/ui/drawer';
@@ -21,6 +21,7 @@ const TABS = [
   { href: MEMBER_PORTAL_ROUTES.diet, label: 'Diet', icon: Salad },
   { href: MEMBER_PORTAL_ROUTES.measurements, label: 'Measurements', icon: Ruler },
   { href: MEMBER_PORTAL_ROUTES.classes, label: 'Classes', icon: CalendarRange },
+  { href: MEMBER_PORTAL_ROUTES.renew, label: 'Renew', icon: CreditCard },
   { href: MEMBER_PORTAL_ROUTES.invoices, label: 'Invoices', icon: Receipt },
   { href: MEMBER_PORTAL_ROUTES.notifications, label: 'Notifications', icon: Bell },
   { href: MEMBER_PORTAL_ROUTES.profile, label: 'Profile', icon: UserRound },

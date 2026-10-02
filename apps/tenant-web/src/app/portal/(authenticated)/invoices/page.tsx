@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PayInvoiceButton } from '@/features/member-portal/components/pay-invoice-button';
 import { memberPortalService } from '@/features/member-portal/services/member-portal.service';
 import { useMemberInvoices } from '@/features/member-portal/hooks/use-member-portal';
 
@@ -41,6 +42,7 @@ export default function MemberInvoicesPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge variant={STATUS_VARIANT[inv.status] ?? 'secondary'}>{inv.status}</Badge>
+                  {inv.status !== 'PAID' ? <PayInvoiceButton invoiceId={inv.id} invoiceNumber={inv.invoiceNumber} /> : null}
                   <Button size="icon" variant="ghost" className="size-8" aria-label={`Download ${inv.invoiceNumber}`} onClick={() => memberPortalService.downloadInvoice(inv.id, inv.invoiceNumber)}>
                     <Download className="size-4" />
                   </Button>

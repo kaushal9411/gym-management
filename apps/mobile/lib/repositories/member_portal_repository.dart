@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
 import '../models/body_measurement.dart';
+import '../models/checkout_result.dart';
 import '../models/class_session.dart';
 import '../models/diet_plan.dart';
 import '../models/member_booking.dart';
@@ -220,6 +221,97 @@ class MemberPortalRepository {
       return data
           .map((e) => BodyMeasurement.fromJson(e as Map<String, dynamic>))
           .toList();
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Renews the member's CURRENT plan only (no self-service upgrade/
+  /// downgrade — staff-only, separate feature), and only once it has
+  /// actually expired — same rule the staff-side Renew action enforces.
+  /// Mirrors [BillingRepository.checkout] exactly: a free/fully-discounted
+  /// result renews immediately ([CheckoutResult.requiresPayment] false);
+  /// anything with a balance due returns a real Razorpay Order for the
+  /// native Checkout modal. Reuses the same [CheckoutResult] model — the
+  /// backend returns byte-for-byte the same shape.
+  Future<CheckoutResult> renewCheckout() async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/portal/membership/renew/checkout',
+      );
+      return CheckoutResult.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Called once the Razorpay Checkout modal's success callback fires,
+  /// with the signed order/payment pair it returned — the backend verifies
+  /// the signature before actually renewing the membership. [status] on
+  /// the result is `SUCCESS`/`FAILED` (this plane's own `MemberPayment`
+  /// status wording), not `SUCCEEDED` like the platform-billing flow.
+  Future<VerifyCheckoutResult> verifyRenewCheckout({
+    required String paymentId,
+    required String razorpayOrderId,
+    required String razorpayPaymentId,
+    required String razorpaySignature,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/portal/membership/renew/checkout/$paymentId/verify',
+        data: {
+          'razorpayOrderId': razorpayOrderId,
+          'razorpayPaymentId': razorpayPaymentId,
+          'razorpaySignature': razorpaySignature,
+        },
+      );
+      return VerifyCheckoutResult.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Same Razorpay Orders + Checkout-modal shape as [renewCheckout], just
+  /// against an existing outstanding invoice's own `totalAmount` instead of
+  /// a computed plan price. Paying it off can also activate a still-PENDING
+  /// membership on the backend — nothing special needed here for that, it
+  /// falls out of the same `verifyInvoicePaymentCheckout` call.
+  Future<CheckoutResult> invoicePaymentCheckout(String invoiceId) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/portal/invoices/$invoiceId/pay/checkout',
+      );
+      return CheckoutResult.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<VerifyCheckoutResult> verifyInvoicePaymentCheckout({
+    required String invoiceId,
+    required String paymentId,
+    required String razorpayOrderId,
+    required String razorpayPaymentId,
+    required String razorpaySignature,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/portal/invoices/$invoiceId/pay/checkout/$paymentId/verify',
+        data: {
+          'razorpayOrderId': razorpayOrderId,
+          'razorpayPaymentId': razorpayPaymentId,
+          'razorpaySignature': razorpaySignature,
+        },
+      );
+      return VerifyCheckoutResult.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
     } on DioException catch (e) {
       throw _mapError(e);
     }

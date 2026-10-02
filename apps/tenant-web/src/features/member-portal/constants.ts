@@ -10,6 +10,7 @@ export const MEMBER_PORTAL_ROUTES = {
   diet: '/portal/diet',
   measurements: '/portal/measurements',
   invoices: '/portal/invoices',
+  renew: '/portal/renew',
   classes: '/portal/classes',
   notifications: '/portal/notifications',
   profile: '/portal/profile',

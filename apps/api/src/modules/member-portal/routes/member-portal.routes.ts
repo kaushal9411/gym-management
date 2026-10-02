@@ -6,12 +6,16 @@ import { memberChangePasswordSchema } from '../../member-auth/validators/member-
 import { memberPortalController } from '../controllers/member-portal.controller';
 import {
   memberDietLogSchema,
+  memberInvoicePaymentParamSchema,
   memberNotificationsQuerySchema,
   memberPortalClassesQuerySchema,
   memberPortalIdParamSchema,
   memberPortalPaginationSchema,
   memberRegisterDeviceTokenSchema,
+  memberRenewalPaymentParamSchema,
   memberUnregisterDeviceTokenSchema,
+  memberVerifyInvoicePaymentSchema,
+  memberVerifyRenewalCheckoutSchema,
   memberWorkoutProgressSchema,
 } from '../validators/member-portal.validators';
 
@@ -37,6 +41,16 @@ memberPortalRouter.post(
   asyncHandler(memberPortalController.changePassword.bind(memberPortalController)),
 );
 
+memberPortalRouter.post(
+  '/membership/renew/checkout',
+  asyncHandler(memberPortalController.startRenewalCheckout.bind(memberPortalController)),
+);
+memberPortalRouter.post(
+  '/membership/renew/checkout/:paymentId/verify',
+  validate({ params: memberRenewalPaymentParamSchema, body: memberVerifyRenewalCheckoutSchema }),
+  asyncHandler(memberPortalController.verifyRenewalCheckout.bind(memberPortalController)),
+);
+
 memberPortalRouter.get('/attendance', validate({ query: memberPortalPaginationSchema }), asyncHandler(memberPortalController.attendance.bind(memberPortalController)));
 
 memberPortalRouter.get('/workout', asyncHandler(memberPortalController.workout.bind(memberPortalController)));
@@ -60,6 +74,16 @@ memberPortalRouter.get(
   '/invoices/:id/download',
   validate({ params: memberPortalIdParamSchema }),
   asyncHandler(memberPortalController.downloadInvoice.bind(memberPortalController)),
+);
+memberPortalRouter.post(
+  '/invoices/:id/pay/checkout',
+  validate({ params: memberPortalIdParamSchema }),
+  asyncHandler(memberPortalController.startInvoicePaymentCheckout.bind(memberPortalController)),
+);
+memberPortalRouter.post(
+  '/invoices/:id/pay/checkout/:paymentId/verify',
+  validate({ params: memberInvoicePaymentParamSchema, body: memberVerifyInvoicePaymentSchema }),
+  asyncHandler(memberPortalController.verifyInvoicePaymentCheckout.bind(memberPortalController)),
 );
 
 memberPortalRouter.get('/classes', validate({ query: memberPortalClassesQuerySchema }), asyncHandler(memberPortalController.classes.bind(memberPortalController)));

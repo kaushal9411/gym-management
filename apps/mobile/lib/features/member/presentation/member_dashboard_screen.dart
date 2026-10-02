@@ -5,17 +5,25 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../models/member_invoice.dart';
 import '../../../models/member_portal_profile.dart';
 import '../../../models/member_visit.dart';
+import '../../../models/member_workout_assignment.dart';
+import '../../../models/member_workout_progress.dart';
 import '../../../repositories/member_portal_repository.dart';
+import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/notification_bell_icon.dart';
+import 'member_dashboard_detail_sheet.dart';
+import 'member_renew_sheet.dart';
 
-/// Design frame "4. Dashboard". The design's "Renew membership" CTA (and
-/// its "4a. Renew — Confirm & pay" screen) are **not** built: `/portal/*`
-/// is the member plane's entire API surface and it has no renew or payment
-/// route — renewals are staff-initiated only. The expiry card states the
-/// real status instead of offering an action the backend can't perform.
+/// Design frame "4. Dashboard". The design's "Renew membership" CTA (frame
+/// "4a. Renew — Confirm & pay") is now built — `MemberRenewSheet`, opened
+/// from `_MembershipCard` below once the membership has expired. Every tile
+/// (Membership, This month, Streak, Workout, Outstanding) is tappable,
+/// opening `MemberDashboardDetailSheet` with the real records behind it —
+/// mirrors the Owner dashboard's `DashboardStatKind`/`showDashboardDetailSheet`
+/// pattern, reusing data this screen already loaded rather than re-fetching.
 class MemberDashboardScreen extends StatefulWidget {
   const MemberDashboardScreen({required this.onQuickAction, super.key});
 
@@ -29,6 +37,8 @@ class MemberDashboardScreen extends StatefulWidget {
 class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
   MemberPortalProfile? _profile;
   List<MemberVisit> _visits = const [];
+  MemberWorkoutAssignment? _workout;
+  List<MemberInvoice> _invoices = const [];
   bool _loading = true;
   String? _error;
 
@@ -45,12 +55,24 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
     });
     try {
       final repo = getIt<MemberPortalRepository>();
-      final (profile, visits) =
-          await (repo.me(), repo.attendance(limit: 60)).wait;
+      // Fired in parallel (not individually awaited yet) — a plain
+      // Future.wait/record .wait both work here, but this avoids depending
+      // on the `async` package's record-wait extension actually covering
+      // 4-tuples on whatever version is pinned.
+      final profileFuture = repo.me();
+      final visitsFuture = repo.attendance(limit: 60);
+      final workoutFuture = repo.workout();
+      final invoicesFuture = repo.invoices(limit: 20);
+      final profile = await profileFuture;
+      final visits = await visitsFuture;
+      final workout = await workoutFuture;
+      final invoices = await invoicesFuture;
       if (!mounted) return;
       setState(() {
         _profile = profile;
         _visits = visits.items;
+        _workout = workout;
+        _invoices = invoices.items;
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -103,6 +125,36 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
+  }
+
+  /// Percent of the assigned plan's exercises marked COMPLETED — null when
+  /// no plan is assigned, or the plan has no exercises to measure against.
+  int? get _workoutPercent {
+    final w = _workout;
+    if (w == null || w.exercises.isEmpty) return null;
+    final completed = w.exercises
+        .where((e) => w.statusOf(e.exerciseId) == ExerciseProgressStatus.completed)
+        .length;
+    return (completed / w.exercises.length * 100).round();
+  }
+
+  double get _outstandingTotal => _invoices
+      .where((i) => i.status != 'PAID')
+      .fold(0.0, (sum, i) => sum + i.totalAmount);
+
+  void _openDetail(MemberDashboardStatKind kind) {
+    final profile = _profile;
+    if (profile == null) return;
+    showMemberDashboardDetailSheet(
+      context,
+      kind: kind,
+      profile: profile,
+      visits: _visits,
+      workout: _workout,
+      invoices: _invoices,
+      onViewWorkout: () => widget.onQuickAction(1),
+      onInvoicePaid: _load,
+    );
   }
 
   @override
@@ -158,7 +210,11 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          _MembershipCard(profile: profile),
+          _MembershipCard(
+            profile: profile,
+            onRenewed: _load,
+            onTap: () => _openDetail(MemberDashboardStatKind.membership),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -167,6 +223,7 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
                   label: 'This month',
                   value: '$_visitsThisMonth',
                   caption: 'visits',
+                  onTap: () => _openDetail(MemberDashboardStatKind.attendance),
                 ),
               ),
               const SizedBox(width: 12),
@@ -176,6 +233,32 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
                   value: '$_streak',
                   caption: 'days',
                   accent: true,
+                  onTap: () => _openDetail(MemberDashboardStatKind.attendance),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  label: 'Workout',
+                  value: _workoutPercent != null ? '$_workoutPercent%' : '—',
+                  caption: 'progress',
+                  onTap: () => _openDetail(MemberDashboardStatKind.workout),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatCard(
+                  label: 'Outstanding',
+                  value: _outstandingTotal > 0
+                      ? '₹${_outstandingTotal.toStringAsFixed(0)}'
+                      : 'All paid',
+                  caption: _outstandingTotal > 0 ? 'due' : 'settled',
+                  accent: _outstandingTotal > 0,
+                  onTap: () => _openDetail(MemberDashboardStatKind.outstanding),
                 ),
               ),
             ],
@@ -222,14 +305,41 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
 }
 
 class _MembershipCard extends StatelessWidget {
-  const _MembershipCard({required this.profile});
+  const _MembershipCard({
+    required this.profile,
+    required this.onRenewed,
+    required this.onTap,
+  });
 
   final MemberPortalProfile profile;
+
+  /// Called after a successful renewal (the sheet popped `true`) so the
+  /// dashboard re-fetches and this card reflects the fresh expiry date.
+  final VoidCallback onRenewed;
+
+  /// Opens the Membership detail sheet — a separate tap target from the
+  /// "Renew now" button below (Flutter's gesture arena resolves a tap on
+  /// the nested button to the button alone, never both).
+  final VoidCallback onTap;
+
+  Future<void> _openRenewSheet(BuildContext context, String planName) async {
+    final renewed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => MemberRenewSheet(planName: planName),
+    );
+    if (renewed == true) onRenewed();
+  }
 
   @override
   Widget build(BuildContext context) {
     final membership = profile.currentMembership;
     final days = profile.daysLeft;
+    final expired = membership != null && days != null && days < 0;
 
     final headline = membership == null
         ? 'No active plan'
@@ -241,7 +351,7 @@ class _MembershipCard extends StatelessWidget {
                     ? 'Expires today'
                     : '$days day${days == 1 ? '' : 's'} left';
 
-    return Container(
+    final card = Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -270,10 +380,31 @@ class _MembershipCard extends StatelessWidget {
           Text(
             membership == null
                 ? 'Ask the front desk to set up your membership.'
-                : 'Renewals are handled at the front desk.',
+                : expired
+                    ? 'Renew to keep using the gym.'
+                    : 'Renewals open up once this expires.',
             style: AppText.body(size: 12, color: AppColors.inkFaint),
           ),
+          if (expired) ...[
+            const SizedBox(height: 12),
+            AppButton(
+              label: 'Renew now',
+              role: AppRole.member,
+              size: AppButtonSize.small,
+              fullWidth: false,
+              onPressed: () => _openRenewSheet(context, membership!.planName),
+            ),
+          ],
         ],
+      ),
+    );
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadii.card),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        onTap: onTap,
+        child: card,
       ),
     );
   }
@@ -285,16 +416,18 @@ class _StatCard extends StatelessWidget {
     required this.value,
     required this.caption,
     this.accent = false,
+    this.onTap,
   });
 
   final String label;
   final String value;
   final String caption;
   final bool accent;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final content = Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surface2,
@@ -322,6 +455,16 @@ class _StatCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+    if (onTap == null) return content;
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadii.card),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        onTap: onTap,
+        child: content,
       ),
     );
   }

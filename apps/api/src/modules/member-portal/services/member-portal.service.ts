@@ -1,6 +1,7 @@
 import type { DeviceTokenPlatform, Prisma } from '@prisma/client';
 
-import { AppError, NotFoundError, ValidationError } from '../../../core/errors/app-error';
+import { env } from '../../../config/env';
+import { AppError, ConflictError, NotFoundError, ValidationError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { AttendanceRepository } from '../../attendance/repositories/attendance.repository';
@@ -9,12 +10,35 @@ import { ClassBookingService } from '../../classes/services/class-booking.servic
 import { ClassSessionService } from '../../classes/services/class-session.service';
 import { deviceTokenService } from '../../device-tokens/services/device-token.service';
 import { MemberDietPlanRepository } from '../../diet/repositories/member-diet-plan.repository';
+import { MemberPaymentRepository } from '../../finance/repositories/member-payment.repository';
 import { MemberInvoiceService } from '../../finance/services/member-invoice.service';
+import { MemberPaymentService } from '../../finance/services/member-payment.service';
+import { createOrder, verifyOrderPaymentSignature } from '../../finance/services/razorpay-gateway.service';
 import { MeasurementService } from '../../measurements/services/measurement.service';
-import { MemberService } from '../../members/services/member.service';
+import { MemberRepository } from '../../members/repositories/member.repository';
+import { MembershipRepository } from '../../members/repositories/membership.repository';
+import { assertRenewalEligible, performRenewal, MemberService } from '../../members/services/member.service';
+import { computeFinalMembershipPrice } from '../../members/utils/plan-pricing.util';
+import { notifyMembershipRenewed } from '../../tenant-notifications/services/notification-trigger.service';
 import { tenantNotificationService } from '../../tenant-notifications/services/tenant-notification.service';
 import { tenantService } from '../../tenants/service/tenant.service';
 import { MemberWorkoutPlanRepository } from '../../workouts/repositories/member-workout-plan.repository';
+
+/** Same shape `SubscriptionService#startCheckout`/`OnboardingService#startCheckout` already return — both tenant-web's and mobile's existing Checkout-modal code consume this exact union with zero translation. */
+export type RenewalCheckoutResult =
+  | { requiresPayment: false }
+  | { requiresPayment: true; paymentId: string; orderId: string; amount: number; currency: string; keyId: string };
+
+export interface VerifyRenewalCheckoutInput {
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  razorpaySignature: string;
+}
+
+/** `'SUCCESS'`/`'FAILED'` matches `MemberPaymentStatus` directly (the Prisma enum this payment actually uses) — deliberately not `'SUCCEEDED'` like the platform-billing `Payment` model's own enum, a different model entirely. */
+export interface VerifyRenewalCheckoutResult {
+  status: 'SUCCESS' | 'FAILED';
+}
 
 /**
  * Every method here is called with the member's OWN id (`req.memberAuth.sub`)
@@ -34,6 +58,10 @@ export class MemberPortalService {
   private readonly auditLog: AuditLogRepository;
   private readonly classSessions: ClassSessionService;
   private readonly classBookings: ClassBookingService;
+  private readonly members: MemberRepository;
+  private readonly memberships: MembershipRepository;
+  private readonly payments: MemberPaymentRepository;
+  private readonly paymentService: MemberPaymentService;
 
   constructor(private readonly tenantId: string) {
     this.db = getTenantScopedClient(tenantId);
@@ -44,11 +72,228 @@ export class MemberPortalService {
     this.auditLog = new AuditLogRepository(this.db);
     this.classSessions = new ClassSessionService(tenantId);
     this.classBookings = new ClassBookingService(tenantId);
+    this.members = new MemberRepository(this.db);
+    this.memberships = new MembershipRepository(this.db);
+    this.payments = new MemberPaymentRepository(this.db);
+    this.paymentService = new MemberPaymentService(tenantId);
   }
 
   /** Reuses the exact same DTO the staff-side member detail page renders — it's the member's own data, so nothing needs hiding. */
   async getProfile(memberId: string) {
     return new MemberService(this.tenantId).getOwnProfile(memberId);
+  }
+
+  /**
+   * Self-service renewal, step 1 — same "no self-service upgrade/downgrade"
+   * scope as staff's own Renew action: this only ever renews the member's
+   * CURRENT plan, and only once it has actually expired (`assertRenewalEligible`,
+   * shared with `MemberService#renewMembership` so both paths enforce the
+   * identical rule). The amount is always computed HERE from the plan's own
+   * price/discount%/tax% (`computeFinalMembershipPrice`) — never accepted
+   * from the client, since unlike the staff-trusted Add Member wizard, the
+   * caller here is the member themselves. Mirrors `SubscriptionService#startCheckout`'s
+   * shape exactly (Razorpay Orders + Checkout-modal, not a Payment Link —
+   * see BACKEND-GUIDE.md's note on Payment Links' ~50% intermittent
+   * failure rate on self-service-style flows) so both tenant-web and mobile
+   * can reuse their existing Checkout-modal code against this response
+   * almost verbatim.
+   */
+  async startRenewalCheckout(memberId: string): Promise<RenewalCheckoutResult> {
+    const member = await this.members.findDetail(this.tenantId, memberId);
+    if (!member) throw new NotFoundError('Member not found.');
+    const current = await this.memberships.findActiveForMember(this.tenantId, memberId);
+    if (!current) throw new AppError(ErrorCode.VALIDATION_ERROR, 'You have no membership to renew — contact the front desk.', 422);
+    assertRenewalEligible(current);
+
+    const price = computeFinalMembershipPrice(current.plan);
+    if (price.finalPrice <= 0) {
+      const renewed = await performRenewal(this.memberships, this.tenantId, memberId, current.id, current.plan, current.autoRenew);
+      await this.auditLog.record({ tenantId: this.tenantId, actorUserId: null, actorRole: 'MEMBER', action: 'member_portal.renewed_free', entityType: 'Membership', entityId: renewed.id });
+      await notifyMembershipRenewed(this.tenantId, {
+        memberId: member.id,
+        memberName: `${member.firstName} ${member.lastName}`.trim(),
+        planName: current.plan.name,
+        endDate: renewed.endDate.toISOString().slice(0, 10),
+        memberEmail: member.email,
+      });
+      return { requiresPayment: false };
+    }
+
+    const paymentNumber = await this.payments.nextPaymentNumber(this.tenantId);
+    const payment = await this.payments.create({
+      tenantId: this.tenantId,
+      paymentNumber,
+      memberId,
+      membershipId: current.id,
+      branchId: member.branchId,
+      amount: price.basePrice,
+      discount: price.discountAmount,
+      tax: price.taxAmount,
+      finalAmount: price.finalPrice,
+      method: 'ONLINE_GATEWAY',
+      paymentDate: new Date(),
+      status: 'PENDING',
+      notes: 'Self-service membership renewal',
+      recordedBy: null,
+    });
+
+    const order = await createOrder({
+      amountInSmallestUnit: Math.round(price.finalPrice * 100),
+      currency: 'INR',
+      receipt: payment.paymentNumber,
+      notes: { memberPaymentId: payment.id, tenantId: this.tenantId },
+    });
+    await this.payments.update(payment.id, { transactionReference: order.id });
+
+    return {
+      requiresPayment: true,
+      paymentId: payment.id,
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: env.razorpay.keyId!,
+    };
+  }
+
+  /**
+   * Self-service renewal, step 2 — called once Razorpay's Checkout modal
+   * fires its success handler. Re-derives ownership (`payment.member.id ===
+   * memberId`, never trusted from the route alone) before touching
+   * anything, verifies the signature locally (no Razorpay API call), then
+   * renews the membership (`performRenewal`, the same mutation staff's own
+   * Renew action uses) and hands the payment off to
+   * `MemberPaymentService#applyWebhookOutcome` — the exact same
+   * invoice-generation/income-row/notification orchestration a Payment
+   * Link's real webhook delivery already triggers, reused rather than
+   * duplicated.
+   */
+  async verifyRenewalCheckout(memberId: string, paymentId: string, input: VerifyRenewalCheckoutInput): Promise<VerifyRenewalCheckoutResult> {
+    const payment = await this.payments.findById(this.tenantId, paymentId);
+    if (!payment || payment.member.id !== memberId) throw new NotFoundError('Payment not found.');
+    if (payment.status === 'SUCCESS' || payment.status === 'FAILED') return { status: payment.status };
+    if (payment.transactionReference !== input.razorpayOrderId) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, 'This payment does not match the order being verified.', 400);
+    }
+
+    const valid = verifyOrderPaymentSignature({
+      orderId: input.razorpayOrderId,
+      paymentId: input.razorpayPaymentId,
+      signature: input.razorpaySignature,
+    });
+    if (!valid) {
+      await this.paymentService.applyWebhookOutcome(paymentId, 'failed');
+      return { status: 'FAILED' };
+    }
+
+    const current = await this.memberships.findActiveForMember(this.tenantId, memberId);
+    if (!current) throw new ConflictError(ErrorCode.CONFLICT, 'No active membership was found to renew.');
+    assertRenewalEligible(current);
+    const member = await this.members.findDetail(this.tenantId, memberId);
+    if (!member) throw new NotFoundError('Member not found.');
+
+    const renewed = await performRenewal(this.memberships, this.tenantId, memberId, current.id, current.plan, current.autoRenew);
+    await this.payments.update(paymentId, { membershipId: renewed.id });
+    await this.paymentService.applyWebhookOutcome(paymentId, 'paid', input.razorpayPaymentId);
+    await this.auditLog.record({ tenantId: this.tenantId, actorUserId: null, actorRole: 'MEMBER', action: 'member_portal.renewed_paid', entityType: 'Membership', entityId: renewed.id });
+    await notifyMembershipRenewed(this.tenantId, {
+      memberId: member.id,
+      memberName: `${member.firstName} ${member.lastName}`.trim(),
+      planName: current.plan.name,
+      endDate: renewed.endDate.toISOString().slice(0, 10),
+      memberEmail: member.email,
+    });
+
+    return { status: 'SUCCESS' };
+  }
+
+  /**
+   * Self-service "pay my outstanding invoice", step 1 — same Razorpay
+   * Orders + Checkout-modal shape as `startRenewalCheckout`, reused
+   * verbatim by both frontends. Unlike renewal, the amount is never
+   * computed here — it's just the invoice's own `totalAmount`, already
+   * fixed at generation time. Rejects an invoice that's already settled,
+   * voided, or already has an active payment against it — same "one
+   * payment per invoice" rule `MemberPaymentService#create` enforces for
+   * staff-recorded payments.
+   */
+  async startInvoicePaymentCheckout(memberId: string, invoiceId: string): Promise<RenewalCheckoutResult> {
+    const invoice = await this.db.memberInvoice.findFirst({ where: { tenantId: this.tenantId, id: invoiceId, memberId } });
+    if (!invoice) throw new NotFoundError('Invoice not found.');
+    if (invoice.status === 'PAID' || invoice.status === 'CANCELLED') {
+      throw new ConflictError(ErrorCode.CONFLICT, 'This invoice is already settled.');
+    }
+    const existing = await this.payments.findActiveByInvoice(this.tenantId, invoiceId);
+    if (existing) throw new ConflictError(ErrorCode.CONFLICT, 'This invoice already has a payment in progress.');
+
+    const amount = Number(invoice.totalAmount);
+    const paymentNumber = await this.payments.nextPaymentNumber(this.tenantId);
+    const payment = await this.payments.create({
+      tenantId: this.tenantId,
+      paymentNumber,
+      memberId,
+      invoiceId,
+      branchId: invoice.branchId,
+      amount,
+      discount: 0,
+      tax: 0,
+      finalAmount: amount,
+      method: 'ONLINE_GATEWAY',
+      paymentDate: new Date(),
+      status: 'PENDING',
+      notes: 'Self-service invoice payment',
+      recordedBy: null,
+    });
+
+    const order = await createOrder({
+      amountInSmallestUnit: Math.round(amount * 100),
+      currency: 'INR',
+      receipt: payment.paymentNumber,
+      notes: { memberPaymentId: payment.id, tenantId: this.tenantId },
+    });
+    await this.payments.update(payment.id, { transactionReference: order.id });
+
+    return {
+      requiresPayment: true,
+      paymentId: payment.id,
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      keyId: env.razorpay.keyId!,
+    };
+  }
+
+  /**
+   * Self-service "pay my outstanding invoice", step 2 — verifies the
+   * signature locally, then hands off to the exact same
+   * `MemberPaymentService#applyWebhookOutcome` orchestration every other
+   * settlement path uses (marks the invoice PAID, generates the Income
+   * row, activates a PENDING membership if this invoice was its
+   * registration fee, sends the payment-received notification). Nothing
+   * membership-specific happens here — that's all inside
+   * `onPaymentSucceeded`, reused rather than duplicated.
+   */
+  async verifyInvoicePaymentCheckout(memberId: string, invoiceId: string, paymentId: string, input: VerifyRenewalCheckoutInput): Promise<VerifyRenewalCheckoutResult> {
+    const payment = await this.payments.findById(this.tenantId, paymentId);
+    if (!payment || payment.member.id !== memberId || payment.invoiceId !== invoiceId) throw new NotFoundError('Payment not found.');
+    if (payment.status === 'SUCCESS' || payment.status === 'FAILED') return { status: payment.status };
+    if (payment.transactionReference !== input.razorpayOrderId) {
+      throw new AppError(ErrorCode.VALIDATION_ERROR, 'This payment does not match the order being verified.', 400);
+    }
+
+    const valid = verifyOrderPaymentSignature({
+      orderId: input.razorpayOrderId,
+      paymentId: input.razorpayPaymentId,
+      signature: input.razorpaySignature,
+    });
+    if (!valid) {
+      await this.paymentService.applyWebhookOutcome(paymentId, 'failed');
+      return { status: 'FAILED' };
+    }
+
+    await this.paymentService.applyWebhookOutcome(paymentId, 'paid', input.razorpayPaymentId);
+    await this.auditLog.record({ tenantId: this.tenantId, actorUserId: null, actorRole: 'MEMBER', action: 'member_portal.invoice_paid', entityType: 'MemberInvoice', entityId: invoiceId });
+
+    return { status: 'SUCCESS' };
   }
 
   async getAttendance(memberId: string, pagination: { page: number; limit: number }) {

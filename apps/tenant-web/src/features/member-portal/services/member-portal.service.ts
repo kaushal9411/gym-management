@@ -108,6 +108,16 @@ export interface MemberNotificationListResult extends Paginated<MemberPortalNoti
   unreadCount: number;
 }
 
+/** Same shape `/subscription/checkout` and `/onboarding/checkout` already return — reuses the existing `loadRazorpayScript`+Checkout-modal pattern verbatim, see `features/billing/components/checkout-dialog.tsx`. */
+export type RenewalCheckoutResult =
+  | { requiresPayment: false }
+  | { requiresPayment: true; paymentId: string; orderId: string; amount: number; currency: string; keyId: string };
+
+/** `'SUCCESS'`/`'FAILED'` — matches the backend's `MemberPaymentStatus` enum, not the platform-billing `'SUCCEEDED'` wording used elsewhere in this app. */
+export interface VerifyRenewalCheckoutResult {
+  status: 'SUCCESS' | 'FAILED';
+}
+
 export interface MemberPortalBooking {
   id: string;
   status: 'BOOKED' | 'CANCELLED' | 'ATTENDED' | 'NO_SHOW';
@@ -259,6 +269,50 @@ export const memberPortalService = {
   async markAllNotificationsRead(): Promise<void> {
     try {
       await memberApiClient.post('/portal/notifications/read-all');
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async startRenewalCheckout(): Promise<RenewalCheckoutResult> {
+    try {
+      const res = await memberApiClient.post<Envelope<RenewalCheckoutResult>>('/portal/membership/renew/checkout');
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async verifyRenewalCheckout(
+    paymentId: string,
+    payload: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string },
+  ): Promise<VerifyRenewalCheckoutResult> {
+    try {
+      const res = await memberApiClient.post<Envelope<VerifyRenewalCheckoutResult>>(`/portal/membership/renew/checkout/${paymentId}/verify`, payload);
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  /** Same Razorpay Orders + Checkout-modal shape as `startRenewalCheckout`, just for an existing outstanding invoice instead of a plan renewal. */
+  async startInvoicePaymentCheckout(invoiceId: string): Promise<RenewalCheckoutResult> {
+    try {
+      const res = await memberApiClient.post<Envelope<RenewalCheckoutResult>>(`/portal/invoices/${invoiceId}/pay/checkout`);
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async verifyInvoicePaymentCheckout(
+    invoiceId: string,
+    paymentId: string,
+    payload: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string },
+  ): Promise<VerifyRenewalCheckoutResult> {
+    try {
+      const res = await memberApiClient.post<Envelope<VerifyRenewalCheckoutResult>>(`/portal/invoices/${invoiceId}/pay/checkout/${paymentId}/verify`, payload);
+      return res.data.data;
     } catch (error) {
       throw toMemberAuthServiceError(error);
     }

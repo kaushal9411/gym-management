@@ -6,6 +6,7 @@ import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrast
 import { assertBranchAccess, getBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
+import { addDuration } from '../../members/utils/duration.util';
 import { decryptMemberContactNullable } from '../../members/utils/member-pii.util';
 import { notifyPaymentFailed, notifyPaymentReceived } from '../../tenant-notifications/services/notification-trigger.service';
 import type {
@@ -495,6 +496,13 @@ export class MemberPaymentService {
       await this.invoiceService.markStatus(payment.invoiceId, 'PAID');
     }
 
+    // Any successful payment — staff-recorded CASH/UPI, a Payment Link, or
+    // the member's own self-service checkout — activates a still-PENDING
+    // membership early instead of making them wait out the scheduler's
+    // daily `startDate <= now` sweep. No-op if the member has no PENDING
+    // membership (the normal case).
+    await this.activatePendingMembershipIfAny(payment.member.id);
+
     const existingIncome = await this.db.income.findFirst({ where: { tenantId: this.tenantId, sourcePaymentId: payment.id } });
     if (!existingIncome) {
       await this.db.income.create({
@@ -538,6 +546,30 @@ export class MemberPaymentService {
         transactionReference: payment.transactionReference,
       },
     });
+  }
+
+  /**
+   * `MembershipStatus.PENDING` means "assigned with a future `startDate`,
+   * not yet in effect" (see schema comment) — ordinarily the scheduler's
+   * daily `startDate <= now` sweep (`membership.handlers.ts`) is what flips
+   * it to `ACTIVE`. Settling an outstanding invoice shouldn't make a member
+   * wait that out: `startDate` moves to today and `endDate` is recomputed
+   * from the plan's own duration, so they get their full paid period
+   * starting from when they actually paid, not a shortened one from the
+   * original (now moot) start date. "One active/pending membership per
+   * member" is already an enforced invariant elsewhere, so there's at most
+   * one row to find here.
+   */
+  private async activatePendingMembershipIfAny(memberId: string): Promise<void> {
+    const pending = await this.db.membership.findFirst({
+      where: { tenantId: this.tenantId, memberId, status: 'PENDING' },
+      include: { plan: true },
+    });
+    if (!pending) return;
+
+    const startDate = new Date();
+    const endDate = addDuration(startDate, pending.plan.durationValue, pending.plan.durationType);
+    await this.db.membership.update({ where: { id: pending.id }, data: { status: 'ACTIVE', startDate, endDate } });
   }
 
   private async audit(actor: IamActor, action: string, entityId: string): Promise<void> {

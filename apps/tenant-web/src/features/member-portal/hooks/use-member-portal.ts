@@ -10,6 +10,21 @@ export function useChangeMemberPassword() {
   return useMutation({ mutationFn: memberPortalService.changePassword });
 }
 
+export function useStartRenewalCheckout() {
+  return useMutation({ mutationFn: memberPortalService.startRenewalCheckout });
+}
+
+export function useVerifyRenewalCheckout() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ paymentId, payload }: { paymentId: string; payload: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string } }) =>
+      memberPortalService.verifyRenewalCheckout(paymentId, payload),
+    onSuccess: (result) => {
+      if (result.status === 'SUCCESS') void queryClient.invalidateQueries({ queryKey: ['member-portal'] });
+    },
+  });
+}
+
 export function useMemberAttendance(page = 1, limit = 20) {
   return useQuery({ queryKey: ['member-portal', 'attendance', page, limit], queryFn: () => memberPortalService.getAttendance(page, limit) });
 }
@@ -46,6 +61,25 @@ export function useLogDiet() {
 
 export function useMemberInvoices(page = 1, limit = 20) {
   return useQuery({ queryKey: ['member-portal', 'invoices', page, limit], queryFn: () => memberPortalService.getInvoices(page, limit) });
+}
+
+export function useStartInvoicePaymentCheckout() {
+  return useMutation({ mutationFn: (invoiceId: string) => memberPortalService.startInvoicePaymentCheckout(invoiceId) });
+}
+
+export function useVerifyInvoicePaymentCheckout() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ invoiceId, paymentId, payload }: { invoiceId: string; paymentId: string; payload: { razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string } }) =>
+      memberPortalService.verifyInvoicePaymentCheckout(invoiceId, paymentId, payload),
+    // Paying an invoice can also activate a PENDING membership (see
+    // `activatePendingMembershipIfAny` on the backend) — invalidate
+    // everything member-portal, not just 'invoices', so the dashboard's
+    // membership tile reflects it immediately too.
+    onSuccess: (result) => {
+      if (result.status === 'SUCCESS') void queryClient.invalidateQueries({ queryKey: ['member-portal'] });
+    },
+  });
 }
 
 export function useMemberNotifications(params: { unreadOnly?: boolean; page?: number; limit?: number } = {}) {

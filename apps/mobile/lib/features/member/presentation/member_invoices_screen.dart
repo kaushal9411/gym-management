@@ -9,8 +9,10 @@ import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/member_invoice.dart';
 import '../../../repositories/member_portal_repository.dart';
+import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import 'member_pay_invoice_sheet.dart';
 
 /// Design frame "8c. Invoices" — the member's own invoices via
 /// `GET /portal/invoices`.
@@ -83,6 +85,7 @@ class _MemberInvoicesScreenState extends State<MemberInvoicesScreen> {
                             AppRoutes.memberInvoiceDetail,
                             extra: _invoices[i],
                           ),
+                          onPaid: _load,
                         ),
                       ),
       ),
@@ -91,10 +94,32 @@ class _MemberInvoicesScreenState extends State<MemberInvoicesScreen> {
 }
 
 class _InvoiceCard extends StatelessWidget {
-  const _InvoiceCard({required this.invoice, required this.onTap});
+  const _InvoiceCard({
+    required this.invoice,
+    required this.onTap,
+    required this.onPaid,
+  });
 
   final MemberInvoice invoice;
   final VoidCallback onTap;
+  final VoidCallback onPaid;
+
+  Future<void> _openPaySheet(BuildContext context) async {
+    final paid = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => MemberPayInvoiceSheet(
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        amount: invoice.totalAmount,
+      ),
+    );
+    if (paid == true) onPaid();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -145,6 +170,16 @@ class _InvoiceCard extends StatelessWidget {
                         ? AppPillTone.success
                         : AppPillTone.warning,
                   ),
+                  if (invoice.status != 'PAID') ...[
+                    const SizedBox(height: 6),
+                    AppButton(
+                      label: 'Pay now',
+                      role: AppRole.member,
+                      fullWidth: false,
+                      size: AppButtonSize.small,
+                      onPressed: () => _openPaySheet(context),
+                    ),
+                  ],
                 ],
               ),
             ],

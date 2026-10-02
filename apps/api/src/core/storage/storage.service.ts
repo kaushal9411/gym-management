@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { mkdir, rename, stat, unlink } from 'node:fs/promises';
+import { copyFile, mkdir, rename, stat, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
@@ -134,7 +134,17 @@ export async function uploadLargeFile(
     }
     const destPath = join(LOCAL_UPLOADS_DIR, key);
     await mkdir(dirname(destPath), { recursive: true });
-    await rename(tempFilePath, destPath);
+    try {
+      await rename(tempFilePath, destPath);
+    } catch (err) {
+      // `rename` is an atomic, cheap inode move but fails with EXDEV when
+      // the OS temp dir and this dir are on different filesystems/drives —
+      // routine on Windows dev boxes where TEMP is on C: and the repo is on
+      // D:. Fall back to an actual byte copy in that case only.
+      if ((err as NodeJS.ErrnoException).code !== 'EXDEV') throw err;
+      await copyFile(tempFilePath, destPath);
+      await unlink(tempFilePath);
+    }
     return localFileUrl(key);
   }
 

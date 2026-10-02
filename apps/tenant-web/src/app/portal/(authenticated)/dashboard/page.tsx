@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { StatisticCard } from '@/components/ui/statistic-card';
 import { MEMBER_PORTAL_ROUTES } from '@/features/member-portal/constants';
+import { MemberDashboardDetailModal, type MemberDashboardStatKind } from '@/features/member-portal/components/member-dashboard-detail-modal';
 import {
   useMemberAttendance,
   useMemberBookings,
@@ -80,6 +81,7 @@ export default function MemberDashboardPage() {
   const { data: upcomingSessions } = useMemberClasses(toDateKey(weekFrom), toDateKey(weekTo));
   const { data: bookings } = useMemberBookings();
   const [exporting, setExporting] = React.useState(false);
+  const [openStat, setOpenStat] = React.useState<MemberDashboardStatKind | null>(null);
 
   if (loadingProfile || !profile) return <Skeleton className="h-64 w-full rounded-xl" />;
 
@@ -133,6 +135,11 @@ export default function MemberDashboardPage() {
               {profile.trainer ? <Badge variant="outline">Trainer: {profile.trainer.name}</Badge> : null}
             </div>
           </div>
+          {profile.currentMembership && daysUntil(profile.currentMembership.endDate) <= 0 ? (
+            <Button asChild size="sm">
+              <Link href={MEMBER_PORTAL_ROUTES.renew}>Renew now</Link>
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -142,21 +149,33 @@ export default function MemberDashboardPage() {
           value={profile.currentMembership ? `${Math.max(daysUntil(profile.currentMembership.endDate), 0)}d left` : 'None'}
           icon={CalendarRange}
           tone="violet"
+          onClick={() => setOpenStat('membership')}
         />
-        <StatisticCard label="Total visits" value={totalVisits} icon={CalendarCheck} tone="aqua" />
+        <StatisticCard label="Total visits" value={totalVisits} icon={CalendarCheck} tone="aqua" onClick={() => setOpenStat('attendance')} />
         <StatisticCard
           label="Workout progress"
           value={workoutPercent !== null ? `${workoutPercent}%` : '—'}
           icon={Dumbbell}
           tone="orange"
+          onClick={() => setOpenStat('workout')}
         />
         <StatisticCard
           label="Outstanding"
           value={outstandingTotal > 0 ? `₹${outstandingTotal.toLocaleString('en-IN')}` : 'All paid'}
           icon={Wallet}
           tone={outstandingTotal > 0 ? 'warning' : 'success'}
+          onClick={() => setOpenStat('outstanding')}
         />
       </div>
+
+      <MemberDashboardDetailModal
+        kind={openStat}
+        onClose={() => setOpenStat(null)}
+        membership={profile.currentMembership}
+        attendanceItems={attendance?.items ?? []}
+        workout={workout ?? null}
+        invoices={invoices?.items ?? []}
+      />
 
       <ChartWrapper
         title="Attendance"

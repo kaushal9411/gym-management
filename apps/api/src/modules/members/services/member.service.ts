@@ -1,3 +1,4 @@
+import type { DurationType, Prisma } from '@prisma/client';
 import QRCode from 'qrcode';
 
 import { AppError, ConflictError, NotFoundError } from '../../../core/errors/app-error';
@@ -43,6 +44,51 @@ import { MembershipPlanRepository } from '../repositories/membership-plan.reposi
 import { MembershipRepository } from '../repositories/membership.repository';
 import { PtSessionLogRepository } from '../repositories/pt-session-log.repository';
 import { addDuration } from '../utils/duration.util';
+
+
+interface RenewablePlan {
+  id: string;
+  durationValue: number;
+  durationType: DurationType;
+  price: Prisma.Decimal;
+}
+
+/** Shared with `member-portal`'s self-service renewal checkout — a member-initiated renewal must pass the exact same "already expired" rule a staff-initiated one does. */
+export function assertRenewalEligible(current: { endDate: Date }): void {
+  const now = new Date();
+  if (current.endDate > now) {
+    throw new AppError(
+      ErrorCode.VALIDATION_ERROR,
+      `This membership is still active until ${current.endDate.toISOString().slice(0, 10)} — it can only be renewed once it has expired.`,
+      422,
+    );
+  }
+}
+
+/** Shared with `member-portal`'s self-service renewal checkout — the actual supersede-old/create-new mutation, identical for a staff-initiated or member-initiated renewal. */
+export async function performRenewal(
+  memberships: MembershipRepository,
+  tenantId: string,
+  memberId: string,
+  currentMembershipId: string,
+  plan: RenewablePlan,
+  autoRenew: boolean,
+) {
+  await memberships.supersede(currentMembershipId);
+  const now = new Date();
+  const endDate = addDuration(now, plan.durationValue, plan.durationType);
+  return memberships.create({
+    tenantId,
+    memberId,
+    planId: plan.id,
+    startDate: now,
+    endDate,
+    durationDays: daysBetween(now, endDate),
+    priceAtAssignment: plan.price,
+    status: 'ACTIVE',
+    autoRenew,
+  });
+}
 
 function toListItem(member: MemberRow, outstandingAmount = '0.00'): MemberListItemDto {
   // Falls back to a PENDING (future-dated) membership when there's no ACTIVE
@@ -474,35 +520,16 @@ export class MemberService {
     if (!current) {
       throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has no active membership to renew — assign one first.', 422);
     }
-    const now = new Date();
-    if (current.endDate > now) {
-      throw new AppError(
-        ErrorCode.VALIDATION_ERROR,
-        `This membership is still active until ${current.endDate.toISOString().slice(0, 10)} — it can only be renewed once it has expired.`,
-        422,
-      );
-    }
+    assertRenewalEligible(current);
     const plan = input.planId ? await this.mustFindPlan(input.planId) : await this.mustFindPlan(current.planId);
 
-    await this.memberships.supersede(current.id);
-    const endDate = addDuration(now, plan.durationValue, plan.durationType);
-    await this.memberships.create({
-      tenantId: this.tenantId,
-      memberId: id,
-      planId: plan.id,
-      startDate: now,
-      endDate,
-      durationDays: daysBetween(now, endDate),
-      priceAtAssignment: plan.price,
-      status: 'ACTIVE',
-      autoRenew: input.autoRenew ?? current.autoRenew,
-    });
+    const renewed = await performRenewal(this.memberships, this.tenantId, id, current.id, plan, input.autoRenew ?? current.autoRenew);
     await this.audit(actor, 'member.membership_renewed', id);
     await notifyMembershipRenewed(this.tenantId, {
       memberId: member.id,
       memberName: `${member.firstName} ${member.lastName}`.trim(),
       planName: plan.name,
-      endDate: endDate.toISOString().slice(0, 10),
+      endDate: renewed.endDate.toISOString().slice(0, 10),
       memberEmail: member.email,
     });
     return this.getById(id, actor.userId);

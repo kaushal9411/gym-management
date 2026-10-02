@@ -116,6 +116,22 @@ export class MemberPortalController {
     await buildMemberAuthService(req.tenant!.id).changePassword(memberId(req), currentPassword, newPassword);
     sendSuccess(res, null, 'Password changed. Please sign in again on your other devices.');
   }
+
+  async startRenewalCheckout(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await serviceFor(req).startRenewalCheckout(memberId(req)), 'Checkout started.', 201);
+  }
+
+  async verifyRenewalCheckout(req: Request<{ paymentId: string }>, res: Response): Promise<void> {
+    sendSuccess(res, await serviceFor(req).verifyRenewalCheckout(memberId(req), req.params.paymentId, req.body));
+  }
+
+  async startInvoicePaymentCheckout(req: Request<{ id: string }>, res: Response): Promise<void> {
+    sendSuccess(res, await serviceFor(req).startInvoicePaymentCheckout(memberId(req), req.params.id), 'Checkout started.', 201);
+  }
+
+  async verifyInvoicePaymentCheckout(req: Request<{ id: string; paymentId: string }>, res: Response): Promise<void> {
+    sendSuccess(res, await serviceFor(req).verifyInvoicePaymentCheckout(memberId(req), req.params.id, req.params.paymentId, req.body));
+  }
 }
 
 export const memberPortalController = new MemberPortalController();
