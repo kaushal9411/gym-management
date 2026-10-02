@@ -30,6 +30,17 @@ echo "-- git fetch + reset --hard origin/main --"
 git fetch origin main
 git reset --hard origin/main
 
+# tenant-web/super-admin run as `next start`, which reads node_modules/
+# .next live on every request — rebuilding in place underneath them while
+# they're still serving traffic caused a real production incident (hundreds
+# of pm2 crash-restarts, CPU/swap thrashing). `fitcloud-api` is a single
+# pre-loaded compiled file (no live per-request disk reads), so it's never
+# affected and stays up the whole time. Stopping these two up front covers
+# `pnpm install` too, which rewrites the shared node_modules for every
+# workspace package before any individual app build even starts.
+echo "-- stopping tenant-web/super-admin for the install+build window --"
+pm2 stop fitcloud-tenant-web fitcloud-super-admin
+
 echo "-- pnpm install --"
 pnpm install
 
@@ -37,13 +48,17 @@ echo "-- prisma generate + migrate deploy (no-op if nothing changed) --"
 pnpm --filter @gym-saas/api run prisma:generate
 pnpm --filter @gym-saas/api exec prisma migrate deploy
 
-echo "-- building api/tenant-web/super-admin --"
+echo "-- building + restarting api --"
 pnpm --filter @gym-saas/api run build
-pnpm --filter @gym-saas/tenant-web run build
-pnpm --filter @gym-saas/super-admin run build
+pm2 restart fitcloud-api
 
-echo "-- restarting via pm2 --"
-pm2 restart fitcloud-api fitcloud-tenant-web fitcloud-super-admin
+echo "-- building + starting tenant-web --"
+pnpm --filter @gym-saas/tenant-web run build
+pm2 start fitcloud-tenant-web
+
+echo "-- building + starting super-admin --"
+pnpm --filter @gym-saas/super-admin run build
+pm2 start fitcloud-super-admin
 pm2 save
 REMOTE_SCRIPT
 
