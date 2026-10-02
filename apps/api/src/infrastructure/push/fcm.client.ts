@@ -49,10 +49,20 @@ class FcmClient {
   async sendToTokens(tokens: string[], payload: { title: string; body: string; data?: Record<string, string> }): Promise<PushSendResult> {
     if (!this.messaging || tokens.length === 0) return { deadTokens: [] };
 
+    // Data-only, deliberately — no `notification` block. This app is
+    // Android-only; with a `notification` block present, Android auto-
+    // displays a tray entry only while backgrounded and shows nothing at
+    // all while foreground, so a push was invisible whenever the app was
+    // actually open (confirmed live: the native receiver fired every time,
+    // nothing ever appeared). Sending data-only means the app's own
+    // `PushNotificationService#showPushNotification` (`flutter_local_
+    // notifications`, real channel, real sound) is the ONE path that ever
+    // constructs a notification — foreground and background look
+    // identical, and there's no risk of a double notification from Android
+    // auto-displaying its own on top of ours.
     const message: MulticastMessage = {
       tokens,
-      notification: { title: payload.title, body: payload.body },
-      data: payload.data,
+      data: { title: payload.title, body: payload.body, ...payload.data },
       android: { priority: 'high' },
     };
 

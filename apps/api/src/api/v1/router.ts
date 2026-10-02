@@ -26,6 +26,8 @@ import { adminTenantRouter } from '../../modules/admin-tenants/routes/admin-tena
 import { aiAssistantRouter } from '../../modules/ai-assistant/routes/ai-assistant.routes';
 import { announcementRouter } from '../../modules/announcements/routes/announcement.routes';
 import { attendanceRouter } from '../../modules/attendance/routes/attendance.routes';
+import { attendanceDeviceRouter } from '../../modules/attendance-devices/routes/attendance-device.routes';
+import { devicePunchRouter } from '../../modules/attendance-devices/routes/device-punch.routes';
 import { auditLogRouter } from '../../modules/audit-logs/routes/audit-log.routes';
 import { authRouter } from '../../modules/authentication/routes/auth.routes';
 import { billingRouter } from '../../modules/billing/routes/billing.routes';
@@ -145,6 +147,14 @@ v1Router.use('/support/tickets', ticketRouter);
 v1Router.use('/members', memberRouter);
 v1Router.use('/membership-plans', membershipPlanRouter);
 v1Router.use('/measurements', measurementRouter);
+// Mounted before the authenticated `/attendance-devices` CRUD router below —
+// this one has no `authenticateMiddleware` at all (a physical device/bridge
+// agent can't do an interactive login), same "no user JWT" reasoning as the
+// gateway webhooks above, just tenant-scoped via the normal subdomain
+// instead of a cross-tenant lookup (a gym's own hardware IS configured with
+// its own subdomain URL, unlike a payment gateway).
+v1Router.use('/attendance-devices/punches', devicePunchRouter);
+v1Router.use('/attendance-devices', attendanceDeviceRouter);
 v1Router.use('/attendance', attendanceRouter);
 v1Router.use('/exercises', exerciseRouter);
 v1Router.use('/workout-plans', workoutPlanRouter);

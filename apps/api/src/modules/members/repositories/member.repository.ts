@@ -201,6 +201,12 @@ export class MemberRepository {
     return member ? decryptMemberContact(member) : null;
   }
 
+  /** The device-enrolled numeric User ID a biometric punch reports — see `AttendanceDevice`'s doc comment. Scoped per-tenant, not per-branch, same as `biometricId`'s own uniqueness constraint. */
+  async findByBiometricId(tenantId: string, biometricId: string): Promise<MemberRow | null> {
+    const member = await this.db.member.findFirst({ where: { tenantId, biometricId, deletedAt: null }, include: MEMBER_INCLUDE });
+    return member ? decryptMemberContact(member) : null;
+  }
+
   async create(data: Prisma.MemberUncheckedCreateInput): Promise<MemberRow> {
     const member = await this.db.member.create({ data: encryptContact(data) });
     return (await this.findDetail(data.tenantId, member.id, { includeDeleted: true }))!;

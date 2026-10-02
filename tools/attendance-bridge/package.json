@@ -1,0 +1,26 @@
+{
+  "name": "fitcloud-attendance-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "On-prem agent that polls a LAN-connected fingerprint/biometric attendance reader and forwards punches to a FitCloud tenant's POST /attendance-devices/punches endpoint. Not part of the gym-management pnpm workspace — installed and run standalone on a PC/mini-PC at the gym, on the same network as the device.",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "inspect-device": "tsx scripts/inspect-device.ts",
+    "build": "tsc",
+    "service:install": "node scripts/install-service.js",
+    "service:uninstall": "node scripts/uninstall-service.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.0",
+    "node-zklib": "^1.3.0"
+  },
+  "optionalDependencies": {
+    "node-windows": "^1.0.0-beta.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

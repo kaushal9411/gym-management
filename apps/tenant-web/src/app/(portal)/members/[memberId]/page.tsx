@@ -78,6 +78,7 @@ interface FormState {
   allergies: string;
   fitnessGoals: string;
   notes: string;
+  biometricId: string;
   fatherNameOrAadhaar: string;
   maritalStatus: string;
   anniversary: string;
@@ -124,6 +125,7 @@ function toFormState(m: MemberDetail): FormState {
     allergies: m.allergies ?? '',
     fitnessGoals: m.fitnessGoals ?? '',
     notes: m.notes ?? '',
+    biometricId: m.biometricId ?? '',
     fatherNameOrAadhaar: m.fatherNameOrAadhaar ?? '',
     maritalStatus: m.maritalStatus ?? '',
     anniversary: m.anniversary ? m.anniversary.slice(0, 10) : '',
@@ -275,6 +277,7 @@ export default function MemberDetailPage() {
           allergies: form.allergies || null,
           fitnessGoals: form.fitnessGoals || null,
           notes: form.notes || null,
+          biometricId: form.biometricId || null,
           fatherNameOrAadhaar: form.fatherNameOrAadhaar || null,
           maritalStatus: (form.maritalStatus || null) as MaritalStatus | null,
           anniversary: form.anniversary || null,
@@ -1024,6 +1027,26 @@ export default function MemberDetailPage() {
         </CardHeader>
         <CardContent>
           <QrCodeDisplay memberId={memberId} qrCodeImageUrl={data.qrCodeImageUrl} canRegenerate={canUpdate} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Fingerprint check-in</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label htmlFor="biometricId">Biometric ID</Label>
+          <Input
+            id="biometricId"
+            value={form.biometricId}
+            disabled={!canUpdate}
+            onChange={(e) => set('biometricId', e.target.value)}
+            placeholder="e.g. 1001"
+          />
+          <p className="text-xs text-muted-foreground">
+            The User ID this member was enrolled with on a registered fingerprint reader — set it after enrolling their fingerprint on the physical device, under
+            Settings → Attendance Devices. Leave blank if this member doesn&apos;t use fingerprint check-in.
+          </p>
         </CardContent>
       </Card>
 

@@ -128,6 +128,7 @@ export const updateMemberSchema = z
     allergies: z.string().trim().max(2000).nullable().optional(),
     fitnessGoals: z.string().trim().max(2000).nullable().optional(),
     notes: z.string().trim().max(2000).nullable().optional(),
+    biometricId: z.string().trim().max(40).nullable().optional(),
     fatherNameOrAadhaar: z.string().trim().max(200).nullable().optional(),
     maritalStatus: maritalStatusSchema.nullable().optional(),
     anniversary: z.string().date().nullable().optional(),

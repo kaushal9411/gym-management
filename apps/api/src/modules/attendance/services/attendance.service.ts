@@ -23,7 +23,19 @@ import type {
 import { AttendanceRepository, type AttendanceRow } from '../repositories/attendance.repository';
 import { dateInTimezone, hourInTimezone } from '../utils/timezone.util';
 
-function toDto(row: AttendanceRow): AttendanceRecordDto {
+/** Shared with `attendance-devices`' punch service — a biometric punch must pass the exact same eligibility rule a QR/manual check-in does. */
+export function checkInEligibility(member: MemberRow): { canCheckIn: boolean; reason: string | null } {
+  if (member.status === 'FROZEN') return { canCheckIn: false, reason: 'Member is frozen and cannot check in.' };
+  if (member.status !== 'ACTIVE') return { canCheckIn: false, reason: 'Member is not active.' };
+  const activeMembership = member.memberships.find((m) => m.status === 'ACTIVE');
+  if (!activeMembership) return { canCheckIn: false, reason: 'Member has no active membership.' };
+  if (new Date(activeMembership.endDate) < new Date()) {
+    return { canCheckIn: false, reason: 'Membership has expired.' };
+  }
+  return { canCheckIn: true, reason: null };
+}
+
+export function toDto(row: AttendanceRow): AttendanceRecordDto {
   return {
     id: row.id,
     member: {
@@ -104,14 +116,7 @@ export class AttendanceService {
   }
 
   private eligibility(member: MemberRow): { canCheckIn: boolean; reason: string | null } {
-    if (member.status === 'FROZEN') return { canCheckIn: false, reason: 'Member is frozen and cannot check in.' };
-    if (member.status !== 'ACTIVE') return { canCheckIn: false, reason: 'Member is not active.' };
-    const activeMembership = member.memberships.find((m) => m.status === 'ACTIVE');
-    if (!activeMembership) return { canCheckIn: false, reason: 'Member has no active membership.' };
-    if (new Date(activeMembership.endDate) < new Date()) {
-      return { canCheckIn: false, reason: 'Membership has expired.' };
-    }
-    return { canCheckIn: true, reason: null };
+    return checkInEligibility(member);
   }
 
   private async assertBranchAccess(actorUserId: string, branchId: string): Promise<void> {

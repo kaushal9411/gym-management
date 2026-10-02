@@ -16,6 +16,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../repositories/reports_repository.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/notification_bell_icon.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../owner/presentation/widgets/dashboard_detail_sheet.dart';
 import '../../owner/presentation/widgets/kpi_card.dart';
@@ -101,6 +102,8 @@ class _ManagerDashboardViewState extends State<_ManagerDashboardView> {
                   ],
                 ),
               ),
+              const NotificationBellIcon(isStaff: true),
+              const SizedBox(width: 10),
               GestureDetector(
                 onTap: () => context.push(AppRoutes.myProfile),
                 child: UserAvatar(avatarUrl: avatarUrl, name: name),

@@ -50,6 +50,8 @@ export interface MemberListItemDto {
   joiningDate: string;
   createdAt: string;
   deletedAt: string | null;
+  /** Sum of this member's `MemberInvoice` rows still owed (`UNPAID`/`PARTIALLY_PAID`/`OVERDUE`) — `"0.00"` when nothing's outstanding. */
+  outstandingAmount: string;
 }
 
 export interface MembershipHistoryEntryDto {
@@ -118,6 +120,8 @@ export interface MemberDetailDto extends MemberListItemDto {
   notes: string | null;
   qrCodeToken: string;
   qrCodeImageUrl: string | null;
+  /** The device-enrolled numeric User ID a fingerprint reader reports on a punch — null until staff enrolls this member on a physical device and types the ID in. See `AttendanceDevice`'s schema doc comment. */
+  biometricId: string | null;
   // ── Extended personal info + Health Screening (Add Member wizard, Prompt 82) ──
   fatherNameOrAadhaar: string | null;
   maritalStatus: MaritalStatus | null;
@@ -260,6 +264,7 @@ export interface UpdateMemberInput {
   allergies?: string | null;
   fitnessGoals?: string | null;
   notes?: string | null;
+  biometricId?: string | null;
   fatherNameOrAadhaar?: string | null;
   maritalStatus?: MaritalStatus | null;
   anniversary?: string | null;

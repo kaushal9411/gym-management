@@ -117,6 +117,11 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'attendance:update', description: 'Correct an attendance record (times, notes, status)' },
   { key: 'attendance:delete', description: 'Soft-delete an attendance record' },
   { key: 'attendance:export', description: 'Export attendance history as CSV/Excel' },
+  // Attendance Devices (fingerprint/biometric reader integration) — a
+  // separate key from the `attendance:*` block above since registering a
+  // physical device and minting its API key is an owner/manager-level
+  // trust decision, distinct from day-to-day check-in/checkout.
+  { key: 'attendance-devices:manage', description: 'Register, rename, disable, and rotate keys for fingerprint/biometric attendance devices' },
 
   // Workout Management (Prompt 17) — granular keys distinct from the
   // pre-existing speculative `workout-plans:manage` catalog entry (left
@@ -225,6 +230,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'memberships:view', 'memberships:create', 'memberships:update', 'memberships:delete', 'memberships:restore',
     'memberships:assign', 'memberships:renew', 'memberships:upgrade', 'memberships:freeze',
     'attendance:view', 'attendance:checkin', 'attendance:checkout', 'attendance:update', 'attendance:delete', 'attendance:export',
+    'attendance-devices:manage',
     'workouts:view', 'workouts:create', 'workouts:update', 'workouts:delete', 'workouts:restore', 'workouts:assign', 'workouts:progress',
     'diets:view', 'diets:create', 'diets:update', 'diets:delete', 'diets:restore', 'diets:assign', 'diets:progress',
     'finance:view', 'finance:payment-create', 'finance:payment-refund', 'finance:invoice-view', 'finance:invoice-download',

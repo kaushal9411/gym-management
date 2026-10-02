@@ -3,18 +3,23 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../bloc/common/paginated_list_cubit.dart';
 import '../../../bloc/common/paginated_list_state.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/formatters.dart';
 import '../../../models/gym_member.dart';
+import '../../../repositories/attendance_repository.dart';
 import '../../../repositories/member_repository.dart';
 import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/user_avatar.dart';
 
 const _statusTones = {
   'ACTIVE': AppPillTone.success,
@@ -183,8 +188,10 @@ class _MembersScreenState extends State<MembersScreen> {
                         child: ListView.builder(
                           padding: const EdgeInsets.only(bottom: 90),
                           itemCount: items.length,
-                          itemBuilder: (context, i) =>
-                              _MemberCard(member: items[i]),
+                          itemBuilder: (context, i) => _MemberCard(
+                            member: items[i],
+                            onChanged: _cubit.load,
+                          ),
                         ),
                       ),
                   };
@@ -233,70 +240,408 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-class _MemberCard extends StatelessWidget {
-  const _MemberCard({required this.member});
+/// Rich roster card — mirrors web's `MemberListCard`: photo, ID, mobile,
+/// due amount, plan + expiry, and one-tap Call / WhatsApp / Renew / Punch In.
+/// Renew and Punch In hit the real endpoints and surface the backend's own
+/// rejection (e.g. "still active until …", "no active membership") rather
+/// than re-implementing eligibility here.
+class _MemberCard extends StatefulWidget {
+  const _MemberCard({required this.member, required this.onChanged});
 
   final GymMember member;
+  final VoidCallback onChanged;
+
+  @override
+  State<_MemberCard> createState() => _MemberCardState();
+}
+
+class _MemberCardState extends State<_MemberCard> {
+  bool _renewing = false;
+  bool _checkingIn = false;
+
+  GymMember get m => widget.member;
+
+  /// `9876543210` → `919876543210` — prepends India's code only for a bare
+  /// 10-digit local number (same rule as web's `toWhatsAppNumber`).
+  String _waNumber(String phone) {
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    return digits.length == 10 ? '91$digits' : digits;
+  }
+
+  Future<void> _open(Uri uri) async {
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) _toast('Could not open ${uri.scheme == 'tel' ? 'dialer' : 'WhatsApp'}');
+  }
+
+  void _toast(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _renew() async {
+    setState(() => _renewing = true);
+    try {
+      await getIt<MemberRepository>().renew(m.id);
+      if (!mounted) return;
+      _toast('Membership renewed.');
+      widget.onChanged();
+    } on ApiException catch (e) {
+      if (mounted) _toast(e.message);
+    } finally {
+      if (mounted) setState(() => _renewing = false);
+    }
+  }
+
+  Future<void> _punchIn() async {
+    setState(() => _checkingIn = true);
+    try {
+      await getIt<AttendanceRepository>()
+          .manualCheckIn(memberId: m.id, branchId: m.branch.id);
+      if (mounted) _toast('${m.name} checked in.');
+    } on ApiException catch (e) {
+      if (mounted) _toast(e.message);
+    } finally {
+      if (mounted) setState(() => _checkingIn = false);
+    }
+  }
+
+  String _fmtDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+
+  @override
+  Widget build(BuildContext context) {
+    final membership = m.currentMembership;
+    final hasPhone = m.phone != null && m.phone!.isNotEmpty;
+    final due = m.outstandingAmount;
+    final deleted = m.deletedAt != null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          onTap: () => context
+              .push(AppRoutes.memberDetail, extra: m.id)
+              .then((_) => widget.onChanged()),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        gradient: AppColors.staffGrad,
+                        shape: BoxShape.circle,
+                      ),
+                      child: UserAvatar(
+                        avatarUrl: m.profilePhotoUrl,
+                        name: m.name,
+                        size: 54,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  m.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppText.body(
+                                    size: 15,
+                                    weight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                              AppPill(
+                                label: deleted ? 'DELETED' : m.status,
+                                tone: deleted
+                                    ? AppPillTone.neutral
+                                    : _statusTones[m.status] ??
+                                        AppPillTone.neutral,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            m.memberId,
+                            style: AppText.body(
+                              size: 11,
+                              weight: FontWeight.w700,
+                              color: AppColors.staffPillFg,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface3.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          _InfoCell(
+                            icon: Icons.phone_iphone_rounded,
+                            label: 'Mobile',
+                            value: hasPhone ? m.phone! : '—',
+                          ),
+                          _InfoCell(
+                            icon: Icons.account_balance_wallet_rounded,
+                            label: 'Due amount',
+                            value:
+                                Formatters.currency(due),
+                            valueColor:
+                                due > 0 ? AppColors.danger : AppColors.success,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          _InfoCell(
+                            icon: Icons.card_membership_rounded,
+                            label: 'Plan',
+                            value: membership?.planName ?? 'No plan',
+                          ),
+                          _InfoCell(
+                            icon: Icons.event_rounded,
+                            label: membership != null &&
+                                    membership.status != 'ACTIVE'
+                                ? 'Expiry · ${membership.status.toLowerCase()}'
+                                : 'Plan expiry',
+                            value: membership != null
+                                ? _fmtDate(membership.endDate)
+                                : '—',
+                            valueColor: membership != null &&
+                                    membership.endDate.isBefore(DateTime.now())
+                                ? AppColors.danger
+                                : AppColors.memberB,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _ActionButton(
+                      icon: Icons.call_rounded,
+                      label: 'Call',
+                      color: AppColors.staffA,
+                      onTap: hasPhone
+                          ? () => _open(Uri(scheme: 'tel', path: m.phone))
+                          : null,
+                    ),
+                    _ActionButton(
+                      icon: Icons.chat_rounded,
+                      label: 'WhatsApp',
+                      color: AppColors.success,
+                      onTap: hasPhone
+                          ? () => _open(
+                                Uri.parse(
+                                  'https://wa.me/${_waNumber(m.phone!)}',
+                                ),
+                              )
+                          : null,
+                    ),
+                    if (!deleted && membership != null)
+                      _ActionButton(
+                        icon: Icons.autorenew_rounded,
+                        label: _renewing ? '…' : 'Renew',
+                        color: AppColors.staffB,
+                        onTap: _renewing ? null : _renew,
+                      ),
+                    if (!deleted) ...[
+                      const SizedBox(width: 6),
+                      Expanded(
+                        flex: 2,
+                        child: _PunchInButton(
+                          loading: _checkingIn,
+                          onTap: _checkingIn ? null : _punchIn,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoCell extends StatelessWidget {
+  const _InfoCell({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 15, color: AppColors.inkFaint),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: AppText.body(size: 10, color: AppColors.inkFaint),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.body(
+                    size: 13,
+                    weight: FontWeight.w700,
+                    color: valueColor ?? AppColors.ink,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Opacity(
+          opacity: enabled ? 1 : 0.35,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.16),
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(icon, size: 17, color: color),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: AppText.body(size: 11, weight: FontWeight.w700),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PunchInButton extends StatelessWidget {
+  const _PunchInButton({required this.loading, required this.onTap});
+
+  final bool loading;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        onTap: () => context.push(AppRoutes.memberDetail, extra: member.id),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(14),
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Ink(
+          height: 40,
           decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(AppRadii.card),
-            border: Border.all(color: AppColors.line),
+            gradient: AppColors.memberGrad,
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: const BoxDecoration(
-                  color: AppColors.staffSoft,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  member.name.isEmpty ? '?' : member.name[0].toUpperCase(),
-                  style: AppText.body(
-                    size: 13,
-                    weight: FontWeight.w800,
-                    color: AppColors.staffPillFg,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      member.name,
-                      style: AppText.body(size: 13, weight: FontWeight.w700),
+          child: Center(
+            child: loading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.memberOnGrad,
                     ),
-                    Text(
-                      '${member.memberId} · ${member.currentMembership?.planName ?? 'No plan'}',
-                      style: AppText.body(
-                        size: 11,
-                        color: AppColors.inkFaint,
-                        weight: FontWeight.w600,
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.fingerprint_rounded,
+                        size: 17,
+                        color: AppColors.memberOnGrad,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              AppPill(
-                label: member.status,
-                tone: _statusTones[member.status] ?? AppPillTone.neutral,
-              ),
-            ],
+                      const SizedBox(width: 6),
+                      Text(
+                        'Punch In',
+                        style: AppText.body(
+                          size: 13,
+                          weight: FontWeight.w800,
+                          color: AppColors.memberOnGrad,
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ),
       ),

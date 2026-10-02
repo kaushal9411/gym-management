@@ -3,24 +3,22 @@
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, MoreHorizontal, Upload, UserPlus, Users } from 'lucide-react';
+import { AlertTriangle, Download, Upload, UserPlus, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination } from '@/components/ui/pagination';
 import { SearchBar } from '@/components/ui/search-bar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
-import { MemberStatusBadge } from '@/features/members/components/member-status-badge';
+import { type MemberCardAction, MemberListCard } from '@/features/members/components/member-list-card';
 import { toMemberError, useBulkImportMembers, useBulkMemberAction, useMemberList, useMemberStatusAction } from '@/features/members/hooks/use-members';
 import { memberService } from '@/features/members/services/member.service';
-import type { ListMembersParams, MemberBulkImportRow, MemberListItem, MemberStatus } from '@/features/members/types';
+import type { ListMembersParams, MemberBulkImportRow, MemberStatus } from '@/features/members/types';
 import { useStaffList } from '@/features/staff/hooks/use-staff';
 import { cn } from '@/lib/utils';
 
@@ -98,28 +96,11 @@ export default function MembersListPage() {
   const canExport = hasPermission('members:export');
   const canImport = hasPermission('members:import');
   const canAssignMembership = hasPermission('memberships:assign');
+  const canRenew = hasPermission('memberships:renew');
+  const canCheckIn = hasPermission('attendance:checkin');
 
   const data = members.data;
   const items = data?.items ?? [];
-
-  const toggleSort = (column: SortableColumn) => {
-    if (sortBy === column) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else {
-      setSortBy(column);
-      setSortDir('asc');
-    }
-  };
-
-  const sortIcon = (column: SortableColumn) => {
-    if (sortBy !== column) return <ArrowUpDown className="size-3.5 text-muted-foreground" />;
-    return sortDir === 'asc' ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />;
-  };
-
-  const sortableHeader = (label: string, column: SortableColumn) => (
-    <button type="button" className="flex items-center gap-1 font-medium hover:text-foreground" onClick={() => toggleSort(column)}>
-      {label} {sortIcon(column)}
-    </button>
-  );
 
   // Header branch switch re-scopes the whole list — back to page 1 like any other filter change.
   React.useEffect(() => {
@@ -197,106 +178,7 @@ export default function MembersListPage() {
       return next;
     });
 
-  const columns: DataTableColumn<MemberListItem>[] = [
-    {
-      key: 'select',
-      header: <Checkbox checked={allSelected} onCheckedChange={(checked) => toggleSelectAll(checked === true)} aria-label="Select all" />,
-      className: 'w-8',
-      render: (m) => (
-        <Checkbox checked={selected.has(m.id)} onCheckedChange={(checked) => toggleSelectOne(m.id, checked === true)} aria-label={`Select ${m.name}`} />
-      ),
-    },
-    {
-      key: 'member',
-      header: sortableHeader('Member', 'name'),
-      render: (m) => (
-        <Link href={`/members/${m.id}`} className="flex items-center gap-2.5 hover:underline">
-          <Avatar className="size-8">
-            {m.profilePhotoUrl ? <AvatarImage src={m.profilePhotoUrl} alt="" /> : null}
-            <AvatarFallback className="text-xs">
-              {m.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <span>
-            <span className="block font-medium">{m.name}</span>
-            <span className="block text-xs text-muted-foreground">{m.email ?? m.phone ?? '—'}</span>
-          </span>
-        </Link>
-      ),
-    },
-    { key: 'memberId', header: sortableHeader('Member ID', 'memberId'), render: (m) => m.memberId || '—' },
-    { key: 'branch', header: 'Branch', render: (m) => m.branch.name },
-    { key: 'trainer', header: 'Trainer', render: (m) => m.trainer?.name ?? '—' },
-    {
-      key: 'plan',
-      header: 'Membership',
-      render: (m) =>
-        m.currentMembership ? (
-          <Link href={`/members/${m.id}#membership`} className="hover:underline">
-            {m.currentMembership.planName} <Badge variant="secondary">{m.currentMembership.status}</Badge>
-          </Link>
-        ) : canAssignMembership && !m.deletedAt ? (
-          <Button variant="link" size="sm" className="h-auto p-0 text-muted-foreground" asChild>
-            <Link href={`/members/${m.id}#membership`}>Assign membership</Link>
-          </Button>
-        ) : (
-          <span className="text-muted-foreground">No active plan</span>
-        ),
-    },
-    { key: 'status', header: 'Status', render: (m) => <MemberStatusBadge status={m.status} deleted={!!m.deletedAt} /> },
-    {
-      key: 'joiningDate',
-      header: sortableHeader('Joining date', 'joiningDate'),
-      render: (m) => new Date(m.joiningDate).toLocaleDateString(),
-    },
-    {
-      key: 'actions',
-      header: '',
-      className: 'w-10',
-      render: (m) =>
-        canManage || canDelete || canRestore || canAssignMembership ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${m.name}`}>
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href={`/members/${m.id}`}>View / edit</Link>
-              </DropdownMenuItem>
-              {canAssignMembership && !m.deletedAt && !m.currentMembership ? (
-                <DropdownMenuItem asChild>
-                  <Link href={`/members/${m.id}#membership`}>Assign membership</Link>
-                </DropdownMenuItem>
-              ) : null}
-              {m.deletedAt ? (
-                canRestore ? (
-                  <DropdownMenuItem onClick={() => setConfirmAction({ kind: 'single', action: 'restore', ids: [m.id] })}>
-                    Restore
-                  </DropdownMenuItem>
-                ) : null
-              ) : canManage ? (
-                m.status === 'ACTIVE' ? (
-                  <DropdownMenuItem onClick={() => setConfirmAction({ kind: 'single', action: 'deactivate', ids: [m.id] })}>
-                    Deactivate
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem onClick={() => setConfirmAction({ kind: 'single', action: 'activate', ids: [m.id] })}>
-                    Activate
-                  </DropdownMenuItem>
-                )
-              ) : null}
-              {!m.deletedAt && canDelete ? (
-                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmAction({ kind: 'single', action: 'delete', ids: [m.id] })}>
-                  Delete
-                </DropdownMenuItem>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null,
-    },
-  ];
+  const handleCardAction = (id: string, action: MemberCardAction) => setConfirmAction({ kind: 'single', action, ids: [id] });
 
   return (
     <div className="space-y-5">
@@ -390,6 +272,24 @@ export default function MembersListPage() {
             </option>
           ))}
         </select>
+        <select
+          className={selectClassName}
+          value={`${sortBy}:${sortDir}`}
+          onChange={(e) => {
+            const [nextSortBy, nextSortDir] = e.target.value.split(':') as [SortableColumn, 'asc' | 'desc'];
+            setSortBy(nextSortBy);
+            setSortDir(nextSortDir);
+          }}
+          aria-label="Sort by"
+        >
+          <option value="createdAt:desc">Newest first</option>
+          <option value="createdAt:asc">Oldest first</option>
+          <option value="name:asc">Name (A–Z)</option>
+          <option value="name:desc">Name (Z–A)</option>
+          <option value="memberId:asc">Member ID (A–Z)</option>
+          <option value="joiningDate:desc">Joining date (newest)</option>
+          <option value="joiningDate:asc">Joining date (oldest)</option>
+        </select>
       </div>
 
       {selected.size > 0 && (canManage || canDelete) ? (
@@ -416,16 +316,58 @@ export default function MembersListPage() {
         </div>
       ) : null}
 
-      <DataTable columns={columns} rows={items} rowKey={(m) => m.id} rowClassName={(m) => (m.deletedAt ? 'bg-destructive/5' : undefined)} loading={members.isPending} error={members.error} onRetry={() => members.refetch()} emptyMessage="No members match these filters." />
+      {(canManage || canDelete || canRestore) && items.length > 0 ? (
+        <label className="flex w-fit items-center gap-2 text-sm text-muted-foreground">
+          <Checkbox checked={allSelected} onCheckedChange={(checked) => toggleSelectAll(checked === true)} aria-label="Select all" />
+          Select all on this page
+        </label>
+      ) : null}
+
+      {members.error ? (
+        <EmptyState
+          icon={AlertTriangle}
+          title="Couldn't load this data"
+          description={members.error instanceof Error ? members.error.message : 'Something went wrong loading this data.'}
+          className="border-destructive/30"
+          action={
+            <Button variant="outline" size="sm" onClick={() => members.refetch()}>
+              Retry
+            </Button>
+          }
+        />
+      ) : members.isPending ? (
+        <div className="space-y-3">
+          <Skeleton className="h-44 w-full" />
+          <Skeleton className="h-44 w-full" />
+          <Skeleton className="h-44 w-full" />
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={Users}
+          title={!search && !status ? 'Add your first member to get started.' : 'No members match these filters.'}
+        />
+      ) : (
+        <div className="space-y-3">
+          {items.map((m) => (
+            <MemberListCard
+              key={m.id}
+              member={m}
+              selected={selected.has(m.id)}
+              onToggleSelect={(checked) => toggleSelectOne(m.id, checked)}
+              canManage={canManage}
+              canDelete={canDelete}
+              canRestore={canRestore}
+              canAssignMembership={canAssignMembership}
+              canRenew={canRenew}
+              canCheckIn={canCheckIn}
+              onRequestAction={(action) => handleCardAction(m.id, action)}
+            />
+          ))}
+        </div>
+      )}
 
       {data ? (
         <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
-      ) : null}
-
-      {!members.isPending && (data?.total ?? 0) === 0 && !search && !status ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Users className="size-4" /> Add your first member to get started.
-        </p>
       ) : null}
 
       <ConfirmDialog

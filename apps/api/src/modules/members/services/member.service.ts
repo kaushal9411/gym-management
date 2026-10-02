@@ -44,7 +44,7 @@ import { MembershipRepository } from '../repositories/membership.repository';
 import { PtSessionLogRepository } from '../repositories/pt-session-log.repository';
 import { addDuration } from '../utils/duration.util';
 
-function toListItem(member: MemberRow): MemberListItemDto {
+function toListItem(member: MemberRow, outstandingAmount = '0.00'): MemberListItemDto {
   // Falls back to a PENDING (future-dated) membership when there's no ACTIVE
   // one, so staff still see what's coming up rather than a blank "no plan"
   // — the two are mutually exclusive per member (assignMembership blocks a
@@ -78,11 +78,12 @@ function toListItem(member: MemberRow): MemberListItemDto {
     joiningDate: member.joiningDate.toISOString(),
     createdAt: member.createdAt.toISOString(),
     deletedAt: member.deletedAt?.toISOString() ?? null,
+    outstandingAmount,
   };
 }
 
-function toDetail(member: MemberRow, planUsage: PlanUsageDto | null): MemberDetailDto {
-  const listItem = toListItem(member);
+function toDetail(member: MemberRow, planUsage: PlanUsageDto | null, outstandingAmount = '0.00'): MemberDetailDto {
+  const listItem = toListItem(member, outstandingAmount);
   const activeMembership = member.memberships.find((m) => m.status === 'ACTIVE');
   const canCheckIn = member.status === 'ACTIVE' && !!activeMembership && new Date(activeMembership.endDate) >= new Date();
   return {
@@ -107,6 +108,7 @@ function toDetail(member: MemberRow, planUsage: PlanUsageDto | null): MemberDeta
     notes: member.notes,
     qrCodeToken: member.qrCodeToken,
     qrCodeImageUrl: member.qrCodeImageUrl,
+    biometricId: member.biometricId,
     fatherNameOrAadhaar: member.fatherNameOrAadhaar,
     maritalStatus: member.maritalStatus,
     anniversary: member.anniversary?.toISOString() ?? null,
@@ -185,8 +187,9 @@ export class MemberService {
   async list(query: ListMembersQuery, actorUserId: string) {
     const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
     const { items, total } = await this.members.list(this.tenantId, query, restrictToBranchIds);
+    const outstandingByMember = await this.buildOutstandingAmounts(items.map((m) => m.id));
     return {
-      items: items.map(toListItem),
+      items: items.map((m) => toListItem(m, outstandingByMember.get(m.id) ?? '0.00')),
       total,
       page: query.page,
       limit: query.limit,
@@ -196,7 +199,8 @@ export class MemberService {
 
   async getById(id: string, actorUserId: string): Promise<MemberDetailDto> {
     const member = await this.mustFind(id, actorUserId);
-    return toDetail(member, await this.buildPlanUsage(member));
+    const outstandingByMember = await this.buildOutstandingAmounts([member.id]);
+    return toDetail(member, await this.buildPlanUsage(member), outstandingByMember.get(member.id) ?? '0.00');
   }
 
   /**
@@ -210,7 +214,8 @@ export class MemberService {
   async getOwnProfile(id: string): Promise<MemberDetailDto> {
     const member = await this.members.findDetail(this.tenantId, id);
     if (!member) throw new NotFoundError('Member not found.');
-    return toDetail(member, await this.buildPlanUsage(member));
+    const outstandingByMember = await this.buildOutstandingAmounts([member.id]);
+    return toDetail(member, await this.buildPlanUsage(member), outstandingByMember.get(member.id) ?? '0.00');
   }
 
   async create(input: CreateMemberInput, actor: IamActor): Promise<MemberDetailDto> {
@@ -292,6 +297,7 @@ export class MemberService {
     if (input.email && input.email !== existing.email) await this.assertEmailAvailable(input.email);
     if (input.phone && input.phone !== existing.phone) await this.assertPhoneAvailable(input.phone);
     if (input.referredByMemberId) await this.assertReferredMemberValid(input.referredByMemberId, id);
+    if (input.biometricId && input.biometricId !== existing.biometricId) await this.assertBiometricIdAvailable(input.biometricId);
     const memberCode =
       input.memberId && input.memberId !== existing.memberId
         ? await this.assertMemberCodeAvailable(input.memberId)
@@ -325,6 +331,7 @@ export class MemberService {
       allergies: input.allergies,
       fitnessGoals: input.fitnessGoals,
       notes: input.notes,
+      biometricId: input.biometricId,
       fatherNameOrAadhaar: input.fatherNameOrAadhaar,
       maritalStatus: input.maritalStatus,
       anniversary: input.anniversary === null ? null : input.anniversary ? new Date(input.anniversary) : undefined,
@@ -891,6 +898,25 @@ export class MemberService {
   }
 
   /**
+   * One grouped query for a whole page of members (not N+1 per member) —
+   * sums each member's still-owed `MemberInvoice` rows (`UNPAID`/
+   * `PARTIALLY_PAID`/`OVERDUE`). `MemberInvoice` lives in the finance
+   * module's schema, but per this codebase's established precedent
+   * (`ReportsService#getKpis` queries `memberInvoice`/`income` directly the
+   * same way), a service reaches across modules via the shared
+   * tenant-scoped `this.db` rather than importing finance's own repository.
+   */
+  private async buildOutstandingAmounts(memberIds: string[]): Promise<Map<string, string>> {
+    if (memberIds.length === 0) return new Map();
+    const rows = await this.db.memberInvoice.groupBy({
+      by: ['memberId'],
+      where: { tenantId: this.tenantId, memberId: { in: memberIds }, status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] } },
+      _sum: { totalAmount: true },
+    });
+    return new Map(rows.map((r) => [r.memberId, (r._sum.totalAmount ?? 0).toString()]));
+  }
+
+  /**
    * `null` when there's no active membership — nothing to measure usage
    * against. `0`/`null` quotas are read as "not configured on this plan,"
    * same convention as every enforcement check above (see `PlanUsageDto`'s
@@ -954,6 +980,11 @@ export class MemberService {
     const existing = await this.members.findByMemberId(this.tenantId, memberId);
     if (existing) throw new ConflictError(ErrorCode.CONFLICT, 'This Member ID is already in use.');
     return memberId;
+  }
+
+  private async assertBiometricIdAvailable(biometricId: string): Promise<void> {
+    const existing = await this.members.findByBiometricId(this.tenantId, biometricId);
+    if (existing) throw new ConflictError(ErrorCode.CONFLICT, 'This Biometric ID is already enrolled to another member.');
   }
 
   private async assertBranchExists(branchId: string): Promise<void> {

@@ -9,6 +9,7 @@ import '../../../models/member_portal_profile.dart';
 import '../../../models/member_visit.dart';
 import '../../../repositories/member_portal_repository.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/notification_bell_icon.dart';
 
 /// Design frame "4. Dashboard". The design's "Renew membership" CTA (and
 /// its "4a. Renew — Confirm & pay" screen) are **not** built: `/portal/*`
@@ -135,6 +136,8 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
                   ],
                 ),
               ),
+              const NotificationBellIcon(isStaff: false),
+              const SizedBox(width: 10),
               Container(
                 width: 38,
                 height: 38,

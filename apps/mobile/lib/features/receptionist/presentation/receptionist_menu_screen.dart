@@ -8,6 +8,7 @@ import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/menu_entry.dart';
+import '../../../shared/widgets/notification_bell_icon.dart';
 import '../../../shared/widgets/user_avatar.dart';
 
 /// Section order mirrors web's `NAV_ITEMS` macro order (People/Programs/
@@ -176,6 +177,8 @@ class ReceptionistMenuScreen extends StatelessWidget {
                 ],
               ),
             ),
+            const NotificationBellIcon(isStaff: true),
+            const SizedBox(width: 10),
             GestureDetector(
               onTap: () => context.push(AppRoutes.myProfile),
               child: UserAvatar(avatarUrl: avatarUrl, name: name),

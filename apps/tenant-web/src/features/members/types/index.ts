@@ -65,6 +65,8 @@ export interface MemberListItem {
   joiningDate: string;
   createdAt: string;
   deletedAt: string | null;
+  /** Sum of this member's still-owed invoices (`UNPAID`/`PARTIALLY_PAID`/`OVERDUE`) — `"0.00"` when nothing's outstanding. */
+  outstandingAmount: string;
 }
 
 export interface MembershipHistoryEntry {
@@ -139,6 +141,7 @@ export interface MemberDetail extends MemberListItem {
   notes: string | null;
   qrCodeToken: string;
   qrCodeImageUrl: string | null;
+  biometricId: string | null;
   fatherNameOrAadhaar: string | null;
   maritalStatus: MaritalStatus | null;
   anniversary: string | null;
@@ -256,6 +259,7 @@ export interface UpdateMemberPayload {
   allergies?: string | null;
   fitnessGoals?: string | null;
   notes?: string | null;
+  biometricId?: string | null;
   fatherNameOrAadhaar?: string | null;
   maritalStatus?: MaritalStatus | null;
   anniversary?: string | null;

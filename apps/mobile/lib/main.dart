@@ -37,7 +37,6 @@ class FitCloudApp extends StatelessWidget {
           return MaterialApp.router(
             title: 'FitCloud',
             debugShowCheckedModeBanner: false,
-            scaffoldMessengerKey: pushService.scaffoldMessengerKey,
             theme: AppTheme.dark,
             darkTheme: AppTheme.dark,
             themeMode: ThemeMode.dark,

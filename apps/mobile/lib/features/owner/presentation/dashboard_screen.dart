@@ -13,6 +13,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/notification_bell_icon.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../reports/presentation/widgets/report_filter_bar.dart';
 import 'widgets/dashboard_detail_sheet.dart';
@@ -72,6 +73,8 @@ class _DashboardView extends StatelessWidget {
                   ],
                 ),
               ),
+              const NotificationBellIcon(isStaff: true),
+              const SizedBox(width: 10),
               GestureDetector(
                 onTap: () => context.push(AppRoutes.myProfile),
                 child: UserAvatar(avatarUrl: avatarUrl, name: name),

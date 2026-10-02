@@ -7,7 +7,6 @@ import '../../../../core/routing/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radii.dart';
 import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/utils/app_currency.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../models/attendance_summary.dart';
 import '../../../../models/expiring_membership_row.dart';
@@ -493,7 +492,7 @@ class _MonthlyRevenueDetailState extends State<_MonthlyRevenueDetail> {
                 title: Text(entry.description ?? entry.category.label, style: AppText.body(weight: FontWeight.w700)),
                 subtitle: Text(_fmtDate(entry.incomeDate), style: AppText.body(size: 12, color: AppColors.inkFaint)),
                 trailing: Text(
-                  '${AppCurrency.symbol}${Formatters.currency(entry.amount)}',
+                  Formatters.currency(entry.amount),
                   style: AppText.body(size: 13, weight: FontWeight.w700, color: AppColors.success),
                 ),
               );
@@ -585,7 +584,7 @@ class _OutstandingPaymentsDetailState extends State<_OutstandingPaymentsDetail> 
                   style: AppText.body(size: 12, color: _statusColor(inv.status)),
                 ),
                 trailing: Text(
-                  '${AppCurrency.symbol}${Formatters.currency(inv.totalAmount)}',
+                  Formatters.currency(inv.totalAmount),
                   style: AppText.body(size: 13, weight: FontWeight.w700),
                 ),
               );

@@ -169,6 +169,7 @@ class GymMember {
     required this.currentMembership,
     required this.joiningDate,
     required this.createdAt,
+    this.outstandingAmount = 0,
     required this.deletedAt,
     this.qrCodeToken,
     this.qrCodeImageUrl,
@@ -216,6 +217,10 @@ class GymMember {
   /// counts off this field (`DashboardService#getKpis`), so the detail
   /// sheet filters on it too, to stay consistent with the number shown.
   final DateTime createdAt;
+
+  /// Sum of this member's still-owed invoices (`UNPAID`/`PARTIALLY_PAID`/
+  /// `OVERDUE`) — `0` when nothing's outstanding.
+  final double outstandingAmount;
 
   /// Non-null means soft-deleted — the header's Delete/Restore action pair
   /// keys off this, same convention as `StaffMember`.
@@ -281,6 +286,8 @@ class GymMember {
               ),
         joiningDate: DateTime.parse(json['joiningDate'] as String),
         createdAt: DateTime.parse(json['createdAt'] as String),
+        outstandingAmount:
+            double.tryParse(json['outstandingAmount'] as String? ?? '') ?? 0,
         deletedAt: json['deletedAt'] == null
             ? null
             : DateTime.parse(json['deletedAt'] as String),

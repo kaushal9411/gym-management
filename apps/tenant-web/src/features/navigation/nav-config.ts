@@ -22,6 +22,7 @@ import {
   Settings,
   Store,
   Ruler,
+  Fingerprint,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -82,6 +83,15 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/attendance/history',
     icon: CalendarCheck,
     permission: 'attendance:view',
+    featureFlag: 'attendance',
+    section: 'Programs',
+  },
+  {
+    key: 'attendance-devices',
+    label: 'Attendance Devices',
+    href: '/attendance-devices',
+    icon: Fingerprint,
+    permission: 'attendance-devices:manage',
     featureFlag: 'attendance',
     section: 'Programs',
   },

@@ -229,6 +229,7 @@ model Tenant {
   memberDocuments       MemberDocument[]
   bodyMeasurements      BodyMeasurement[]
   attendances           Attendance[]
+  attendanceDevices     AttendanceDevice[]
   exercises             Exercise[]
   workoutPlans          WorkoutPlan[]
   workoutPlanExercises  WorkoutPlanExercise[]
@@ -906,6 +907,14 @@ model Member {
   /// looks members up by this, never by the human-editable memberId.
   qrCodeToken                 String           @unique @map("qr_code_token")
   qrCodeImageUrl              String?          @map("qr_code_image_url")
+  /// The device-enrolled numeric User ID a fingerprint reader reports on a
+  /// punch — staff types this in once after physically enrolling the
+  /// member's fingerprint on the unit itself (see `AttendanceDevice`'s doc
+  /// comment). Same "opaque external identifier directly on Member" shape as
+  /// `qrCodeToken`, just nullable since most members never get enrolled on a
+  /// device. Scoped per-tenant, not per-branch, since the same value would
+  /// otherwise need re-use handling across a multi-branch tenant's devices.
+  biometricId                 String?          @map("biometric_id") @db.VarChar(40)
   createdAt                   DateTime         @default(now()) @map("created_at")
   updatedAt                   DateTime         @updatedAt @map("updated_at")
   deletedAt                   DateTime?        @map("deleted_at")
@@ -934,6 +943,7 @@ model Member {
   notifications    MemberNotification[]
 
   @@unique([tenantId, memberId])
+  @@unique([tenantId, biometricId])
   @@index([tenantId, status])
   @@index([tenantId, branchId])
   /// Covers the default "browse all members" sort (createdAt desc) — the
@@ -1263,6 +1273,50 @@ model Attendance {
   /// trendBetween), which filter tenantId+branchId+attendanceDate together.
   @@index([tenantId, branchId, attendanceDate])
   @@map("attendance_records")
+}
+
+/// Informational only — never changes how a punch is processed, just shown
+/// in the device list UI so staff can tell devices apart at a glance.
+enum AttendanceDeviceVendor {
+  ZKTECO
+  ESSL
+  GENERIC
+  OTHER
+
+  @@map("attendance_device_vendor")
+}
+
+/// A registered physical attendance reader (fingerprint/biometric/NFC/RFID
+/// unit). The device itself never authenticates as a tenant user — it (or a
+/// local bridge agent polling it over the LAN, since most budget biometric
+/// units aren't internet-routable) calls `POST /attendance-devices/punches`
+/// with `apiKeyHash`'s plaintext counterpart in the `X-Device-Key` header,
+/// the same opaque-token-plus-SHA-256-hash shape as refresh tokens
+/// (`core/security/token.util.ts`) — chosen over bcrypt specifically because
+/// the punch endpoint must look the key up (not just verify a provided
+/// hash), and SHA-256 is deterministic where bcrypt isn't. `Member.biometricId`
+/// is the matching half: the device-enrolled numeric User ID, typed in once
+/// by staff after physically enrolling a member's fingerprint on the unit.
+/// No fingerprint template ever reaches this schema — only on-device
+/// matching results (a User ID + a timestamp) do.
+model AttendanceDevice {
+  id          String                 @id @default(uuid()) @db.Uuid
+  tenantId    String                 @map("tenant_id") @db.Uuid
+  branchId    String                 @map("branch_id") @db.Uuid
+  name        String                 @db.VarChar(120)
+  vendor      AttendanceDeviceVendor @default(GENERIC)
+  apiKeyHash  String                 @unique @map("api_key_hash")
+  lastSeenAt  DateTime?              @map("last_seen_at")
+  isActive    Boolean                @default(true) @map("is_active")
+  createdAt   DateTime               @default(now()) @map("created_at")
+  updatedAt   DateTime               @updatedAt @map("updated_at")
+  deletedAt   DateTime?              @map("deleted_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, branchId])
+  @@map("attendance_devices")
 }
 
 // ── Class/session booking (Prompt 39) ──────────────────────────────────────
@@ -2509,6 +2563,7 @@ model Branch {
   userBranches        UserBranch[]
   members             Member[]
   attendances         Attendance[]
+  attendanceDevices   AttendanceDevice[]
   invoices            MemberInvoice[]
   payments            MemberPayment[]
   incomeEntries       Income[]

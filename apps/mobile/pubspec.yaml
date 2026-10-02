@@ -21,6 +21,12 @@ dependencies:
   # State management
   flutter_bloc: ^8.1.6
 
+  # Explicit system-tray notification + sound for FCM pushes, foreground and
+  # background alike — Android doesn't auto-show anything while the app is
+  # open (by design, every app), so we post it ourselves instead of relying
+  # on inconsistent OS auto-display.
+  flutter_local_notifications: ^19.4.2
+
   # Secure session storage
   flutter_secure_storage: ^9.2.2
 

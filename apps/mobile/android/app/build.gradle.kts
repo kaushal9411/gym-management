@@ -1,5 +1,6 @@
 import java.io.FileInputStream
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
@@ -30,10 +31,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
+        // Required by flutter_local_notifications (uses java.time APIs on
+        // API levels below 26 via desugaring).
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {
@@ -77,6 +77,19 @@ android {
     }
 }
 
+// AGP 9's new DSL dropped `android.kotlinOptions` — the Kotlin Gradle
+// Plugin's own top-level extension replaces it (same JVM target as
+// `compileOptions` above).
+kotlin {
+    compilerOptions {
+        jvmTarget = JvmTarget.JVM_17
+    }
+}
+
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
