@@ -4,23 +4,22 @@ import * as React from 'react';
 import Link from 'next/link';
 import { Plus, Ruler } from 'lucide-react';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
 import { EmptyState } from '@/components/ui/empty-state';
-import { SearchBar } from '@/components/ui/search-bar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
+import { MeasuredMemberCard } from '@/features/measurements/components/measured-member-card';
+import { MeasurementsHero } from '@/features/measurements/components/measurements-hero';
+import { MeasurementsInsights, MeasurementsKpis } from '@/features/measurements/components/measurements-overview';
+import { MeasurementsToolbar } from '@/features/measurements/components/measurements-toolbar';
 import { useMeasuredMembers } from '@/features/measurements/hooks/use-measurements';
-import type { MeasuredMember } from '@/features/measurements/types';
-import { summarizeMeasurement } from '@/features/measurements/utils';
 
 /**
  * Entry point into the per-member body-measurement history. Deliberately
  * NOT the full member roster — this lists only members who already have at
  * least one measurement recorded (`GET /measurements/members`, distinct
- * from the full `useMemberList`), each row showing their latest reading and
+ * from the full `useMemberList`), each card showing their latest reading and
  * total entry count, and links to `/measurements/[memberId]` — a focused
  * page showing just that member's measurement history (name/avatar for
  * context + the same `MemberMeasurementsCard` the full Member Detail page
@@ -35,90 +34,46 @@ export default function MeasurementsPage() {
   const canCreate = hasPermission('measurements:create');
   const { currentBranchId } = useCurrentBranch();
   const [search, setSearch] = React.useState('');
+  const [view, setView] = React.useState<'grid' | 'list'>('grid');
 
   const measuredMembers = useMeasuredMembers();
 
+  const allRows = measuredMembers.data ?? [];
+  const branchFiltered = currentBranchId ? allRows.filter((r) => r.member.branch.id === currentBranchId) : allRows;
   const rows = React.useMemo(() => {
-    const all = measuredMembers.data ?? [];
-    const branchFiltered = currentBranchId ? all.filter((r) => r.member.branch.id === currentBranchId) : all;
     const q = search.trim().toLowerCase();
     if (!q) return branchFiltered;
     return branchFiltered.filter((r) => r.member.name.toLowerCase().includes(q) || r.member.memberId.toLowerCase().includes(q));
-  }, [measuredMembers.data, currentBranchId, search]);
-
-  const columns: DataTableColumn<MeasuredMember>[] = [
-    {
-      key: 'member',
-      header: 'Member',
-      render: (r) => (
-        <Link href={`/measurements/${r.member.id}`} className="flex items-center gap-2.5 hover:underline">
-          <Avatar className="size-8">
-            {r.member.profilePhotoUrl ? <AvatarImage src={r.member.profilePhotoUrl} alt="" /> : null}
-            <AvatarFallback className="text-xs">
-              {r.member.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <span>
-            <span className="block font-medium">{r.member.name}</span>
-            <span className="block text-xs text-muted-foreground">{r.member.memberId || '—'}</span>
-          </span>
-        </Link>
-      ),
-    },
-    { key: 'branch', header: 'Branch', render: (r) => r.member.branch.name },
-    { key: 'trainer', header: 'Trainer', render: (r) => r.member.trainer?.name ?? '—' },
-    {
-      key: 'latest',
-      header: 'Latest reading',
-      render: (r) => (
-        <span>
-          <span className="block text-sm">{summarizeMeasurement(r.latest)}</span>
-          <span className="block text-xs text-muted-foreground">{new Date(r.latest.recordedAt).toLocaleDateString()}</span>
-        </span>
-      ),
-    },
-    { key: 'count', header: 'Entries', render: (r) => <Badge variant="secondary">{r.count}</Badge> },
-    {
-      key: 'actions',
-      header: '',
-      className: 'w-10',
-      render: (r) => (
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/measurements/${r.member.id}`}>View / edit</Link>
-        </Button>
-      ),
-    },
-  ];
+  }, [branchFiltered, search]);
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <div
-            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
-            style={{
-              backgroundColor: 'color-mix(in oklch, var(--primary) 16%, transparent)',
-              color: 'var(--primary)',
-              boxShadow: '0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent)',
-            }}
-          >
-            <Ruler className="size-5" aria-hidden />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Body Measurements</h1>
-            <p className="text-muted-foreground">Members with a recorded measurement history.</p>
-          </div>
-        </div>
-        {canCreate ? (
-          <Button size="sm" asChild>
-            <Link href="/measurements/new">
-              <Plus className="size-4" /> Record measurement
-            </Link>
-          </Button>
-        ) : null}
-      </div>
+    <div className="w-full space-y-5">
+      <MeasurementsHero
+        total={branchFiltered.length}
+        members={branchFiltered}
+        actions={
+          canCreate ? (
+            <Button size="sm" asChild data-solid className="border-0 bg-white text-indigo-700 shadow-lg hover:bg-white/90">
+              <Link href="/measurements/new">
+                <Plus className="size-4" /> Record measurement
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
-      {!measuredMembers.isPending && (measuredMembers.data?.length ?? 0) === 0 ? (
+      {measuredMembers.error ? (
+        <EmptyState
+          title="Couldn't load this data"
+          description={measuredMembers.error instanceof Error ? measuredMembers.error.message : 'Something went wrong loading this data.'}
+          className="border-destructive/30"
+          action={
+            <Button variant="outline" size="sm" onClick={() => measuredMembers.refetch()}>
+              Retry
+            </Button>
+          }
+        />
+      ) : !measuredMembers.isPending && branchFiltered.length === 0 ? (
         <EmptyState
           icon={Ruler}
           title="No measurements recorded yet"
@@ -135,22 +90,27 @@ export default function MeasurementsPage() {
         />
       ) : (
         <>
-          <SearchBar
-            containerClassName="max-w-xs"
-            placeholder="Search name or member ID…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <MeasurementsKpis members={branchFiltered} loading={measuredMembers.isPending} />
 
-          <DataTable
-            columns={columns}
-            rows={rows}
-            rowKey={(r) => r.member.id}
-            loading={measuredMembers.isPending}
-            error={measuredMembers.error}
-            onRetry={() => measuredMembers.refetch()}
-            emptyMessage="No members match this search."
-          />
+          <MeasurementsInsights members={branchFiltered} loading={measuredMembers.isPending} />
+
+          <MeasurementsToolbar search={search} onSearch={setSearch} view={view} onView={setView} />
+
+          {measuredMembers.isPending ? (
+            <div className={view === 'grid' ? 'grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4' : 'space-y-3'}>
+              {Array.from({ length: view === 'grid' ? 6 : 4 }).map((_, i) => (
+                <Skeleton key={i} className={view === 'grid' ? 'h-[280px] w-full rounded-3xl' : 'h-20 w-full rounded-2xl'} />
+              ))}
+            </div>
+          ) : rows.length === 0 ? (
+            <EmptyState icon={Ruler} title="No members match this search." />
+          ) : (
+            <div className={view === 'grid' ? 'grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4' : 'space-y-2.5'}>
+              {rows.map((r, i) => (
+                <MeasuredMemberCard key={r.member.id} row={r} index={i} variant={view} />
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>

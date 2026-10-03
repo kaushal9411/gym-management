@@ -1,8 +1,11 @@
 'use client';
 
+import { Apple } from 'lucide-react';
+
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PanelCard } from '@/features/members/components/detail/detail-ui';
 import { TrainerSelect } from '@/features/members/components/trainer-select';
 import { cn } from '@/lib/utils';
 
@@ -43,7 +46,7 @@ export function DietPlanFormFields({ value, onChange, disabled }: DietPlanFormFi
   const set = <K extends keyof DietPlanFormState>(key: K, next: DietPlanFormState[K]) => onChange({ ...value, [key]: next });
 
   return (
-    <div className="space-y-4">
+    <PanelCard icon={Apple} accent="primary" title="Plan information" delay={0}>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="planName" required>Plan name</Label>
@@ -110,6 +113,6 @@ export function DietPlanFormFields({ value, onChange, disabled }: DietPlanFormFi
         <Checkbox id="planIsActive" checked={value.isActive} disabled={disabled} onCheckedChange={(c) => set('isActive', c === true)} />
         Active (visible for assignment)
       </label>
-    </div>
+    </PanelCard>
   );
 }

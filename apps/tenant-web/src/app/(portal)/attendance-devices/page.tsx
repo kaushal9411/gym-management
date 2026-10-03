@@ -1,33 +1,24 @@
 'use client';
 
 import * as React from 'react';
-import { Fingerprint, KeyRound, MoreHorizontal, Plus } from 'lucide-react';
+import { Fingerprint, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
-import { AttendanceDeviceStatusBadge, AttendanceDeviceVendorBadge } from '@/features/attendance-device/components/attendance-device-badges';
+import { AttendanceDeviceCard, type DeviceCardAction } from '@/features/attendance-device/components/attendance-device-card';
+import { AttendanceDevicesHero } from '@/features/attendance-device/components/attendance-devices-hero';
+import { AttendanceDevicesInsights, AttendanceDevicesKpis } from '@/features/attendance-device/components/attendance-devices-overview';
+import { AttendanceDevicesToolbar } from '@/features/attendance-device/components/attendance-devices-toolbar';
 import { RegenerateKeyDialog } from '@/features/attendance-device/components/regenerate-key-dialog';
 import { RegisterDeviceDialog } from '@/features/attendance-device/components/register-device-dialog';
 import { toAttendanceDeviceError, useAttendanceDevices, useDeleteAttendanceDevice, useUpdateAttendanceDevice } from '@/features/attendance-device/hooks/use-attendance-devices';
 import type { AttendanceDevice } from '@/features/attendance-device/types';
 
 type StatusAction = 'activate' | 'deactivate' | 'delete';
-
-function formatLastSeen(lastSeenAt: string | null): string {
-  if (!lastSeenAt) return 'Never synced';
-  const diffMs = Date.now() - new Date(lastSeenAt).getTime();
-  const minutes = Math.round(diffMs / 60_000);
-  if (minutes < 1) return 'Synced just now';
-  if (minutes < 60) return `Synced ${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `Synced ${hours}h ago`;
-  const days = Math.round(hours / 24);
-  return days <= 3 ? `Synced ${days}d ago` : `Last synced ${new Date(lastSeenAt).toLocaleDateString()}`;
-}
 
 export default function AttendanceDevicesPage() {
   const { hasPermission } = usePermissions();
@@ -37,9 +28,20 @@ export default function AttendanceDevicesPage() {
   const updateDevice = useUpdateAttendanceDevice();
   const deleteDevice = useDeleteAttendanceDevice();
 
+  const [search, setSearch] = React.useState('');
+  const [isActiveFilter, setIsActiveFilter] = React.useState<'true' | 'false' | ''>('');
+  const [view, setView] = React.useState<'grid' | 'list'>('grid');
   const [registerOpen, setRegisterOpen] = React.useState(false);
   const [keyDevice, setKeyDevice] = React.useState<AttendanceDevice | null>(null);
   const [confirmAction, setConfirmAction] = React.useState<{ action: StatusAction; device: AttendanceDevice } | null>(null);
+
+  const allItems = devices.data ?? [];
+  const items = allItems.filter((d) => {
+    if (isActiveFilter !== '' && String(d.isActive) !== isActiveFilter) return false;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return d.name.toLowerCase().includes(q) || d.branchName.toLowerCase().includes(q);
+  });
 
   const runAction = () => {
     if (!confirmAction) return;
@@ -61,78 +63,27 @@ export default function AttendanceDevicesPage() {
     setConfirmAction(null);
   };
 
-  const columns: DataTableColumn<AttendanceDevice>[] = [
-    {
-      key: 'name',
-      header: 'Device',
-      render: (d) => (
-        <div>
-          <span className="flex items-center gap-1.5 font-medium">{d.name}</span>
-          <span className="block text-xs text-muted-foreground">{d.branchName}</span>
-        </div>
-      ),
-    },
-    { key: 'vendor', header: 'Vendor', render: (d) => <AttendanceDeviceVendorBadge vendor={d.vendor} /> },
-    { key: 'status', header: 'Status', render: (d) => <AttendanceDeviceStatusBadge isActive={d.isActive} /> },
-    { key: 'lastSeen', header: 'Sync', render: (d) => <span className="text-sm text-muted-foreground">{formatLastSeen(d.lastSeenAt)}</span> },
-    {
-      key: 'actions',
-      header: '',
-      className: 'w-10',
-      render: (d) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${d.name}`}>
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {canManage ? (
-              <>
-                <DropdownMenuItem onClick={() => setKeyDevice(d)}>
-                  <KeyRound className="size-4" /> Regenerate key
-                </DropdownMenuItem>
-                {d.isActive ? (
-                  <DropdownMenuItem onClick={() => setConfirmAction({ action: 'deactivate', device: d })}>Disable</DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem onClick={() => setConfirmAction({ action: 'activate', device: d })}>Activate</DropdownMenuItem>
-                )}
-                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmAction({ action: 'delete', device: d })}>
-                  Remove
-                </DropdownMenuItem>
-              </>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ];
+  const handleCardAction = (device: AttendanceDevice, action: DeviceCardAction) => {
+    if (action === 'regenerate-key') {
+      setKeyDevice(device);
+      return;
+    }
+    setConfirmAction({ action, device });
+  };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <span
-            className="flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-11"
-            style={{
-              backgroundColor: 'color-mix(in oklch, var(--primary) 16%, transparent)',
-              color: 'var(--primary)',
-              boxShadow: '0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent)',
-            }}
-          >
-            <Fingerprint className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Attendance Devices</h1>
-            <p className="text-muted-foreground">Fingerprint/biometric readers that check members in automatically.</p>
-          </div>
-        </div>
-        {canManage ? (
-          <Button size="sm" onClick={() => setRegisterOpen(true)}>
-            <Plus className="size-4" /> Register device
-          </Button>
-        ) : null}
-      </div>
+    <div className="w-full space-y-5">
+      <AttendanceDevicesHero
+        total={allItems.length}
+        devices={allItems}
+        actions={
+          canManage ? (
+            <Button size="sm" data-solid className="border-0 bg-white text-indigo-700 shadow-lg hover:bg-white/90" onClick={() => setRegisterOpen(true)}>
+              <Plus className="size-4" /> Register device
+            </Button>
+          ) : null
+        }
+      />
 
       <p className="max-w-3xl text-sm text-muted-foreground">
         After registering a device here, enroll each member&apos;s fingerprint on the physical unit and enter the matching ID in their profile&apos;s
@@ -140,15 +91,38 @@ export default function AttendanceDevicesPage() {
         <code>tools/attendance-bridge</code> in the project, or your device&apos;s own cloud-push setup if it supports one.
       </p>
 
-      <DataTable
-        columns={columns}
-        rows={devices.data ?? []}
-        rowKey={(d) => d.id}
-        loading={devices.isPending}
-        error={devices.error}
-        onRetry={() => devices.refetch()}
-        emptyMessage="No attendance devices registered yet."
-      />
+      <AttendanceDevicesKpis devices={allItems} loading={devices.isPending} isActiveFilter={isActiveFilter} onStatus={setIsActiveFilter} />
+
+      <AttendanceDevicesInsights devices={allItems} loading={devices.isPending} />
+
+      <AttendanceDevicesToolbar search={search} onSearch={setSearch} status={isActiveFilter} onStatus={setIsActiveFilter} view={view} onView={setView} />
+
+      {devices.error ? (
+        <EmptyState
+          title="Couldn't load this data"
+          description={devices.error instanceof Error ? devices.error.message : 'Something went wrong loading this data.'}
+          className="border-destructive/30"
+          action={
+            <Button variant="outline" size="sm" onClick={() => devices.refetch()}>
+              Retry
+            </Button>
+          }
+        />
+      ) : devices.isPending ? (
+        <div className={view === 'grid' ? 'grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4' : 'space-y-3'}>
+          {Array.from({ length: view === 'grid' ? 3 : 3 }).map((_, i) => (
+            <Skeleton key={i} className={view === 'grid' ? 'h-[220px] w-full rounded-3xl' : 'h-20 w-full rounded-2xl'} />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState icon={Fingerprint} title={!search && !isActiveFilter ? 'Register your first attendance device to get started.' : 'No devices match these filters.'} />
+      ) : (
+        <div className={view === 'grid' ? 'grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4' : 'space-y-2.5'}>
+          {items.map((d, i) => (
+            <AttendanceDeviceCard key={d.id} device={d} index={i} variant={view} canManage={canManage} onRequestAction={(action) => handleCardAction(d, action)} />
+          ))}
+        </div>
+      )}
 
       <RegisterDeviceDialog open={registerOpen} onOpenChange={setRegisterOpen} />
       <RegenerateKeyDialog device={keyDevice} onOpenChange={(open) => !open && setKeyDevice(null)} />

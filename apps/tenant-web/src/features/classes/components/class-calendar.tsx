@@ -6,8 +6,11 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { type Accent, accentVar, tint } from '@/features/members/components/detail/detail-ui';
 import { cn } from '@/lib/utils';
 import type { ClassSession } from '../types';
+
+const DAY_ACCENTS: Accent[] = ['destructive', 'primary', 'violet', 'aqua', 'warning', 'success', 'primary'];
 
 function toDateKey(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -89,17 +92,25 @@ export function ClassCalendar({ weekStart, onWeekChange, sessions, loading, onSe
       </div>
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-7">
-        {days.map((day) => {
+        {days.map((day, dayIndex) => {
           const key = toDateKey(day);
           const daySessions = sessionsByDay.get(key) ?? [];
           const isToday = key === today;
+          const accent = DAY_ACCENTS[dayIndex]!;
           return (
-            <div key={key} className={cn('rounded-xl border p-2', isToday && 'border-primary/50 bg-primary/5')}>
-              <div className="mb-2 flex items-baseline justify-between px-1">
-                <span className="text-xs font-semibold text-foreground/90">{dayFormatter.format(day)}</span>
+            <div
+              key={key}
+              className="overflow-hidden rounded-xl border"
+              style={{ borderColor: isToday ? accentVar(accent) : tint(accent, 18), boxShadow: isToday ? `0 0 0 2px ${tint(accent, 30)}` : undefined }}
+            >
+              <div
+                className="flex items-baseline justify-between px-2.5 py-1.5"
+                style={{ backgroundImage: `linear-gradient(100deg, ${tint(accent, isToday ? 24 : 13)}, transparent 85%)` }}
+              >
+                <span className="text-xs font-bold" style={{ color: isToday ? accentVar(accent) : undefined }}>{dayFormatter.format(day)}</span>
                 <span className="text-xs text-muted-foreground">{dateFormatter.format(day)}</span>
               </div>
-              <div className="space-y-1.5 sm:min-h-24">
+              <div className="space-y-1.5 bg-card p-2 sm:min-h-24">
                 {loading ? (
                   <p className="px-1 text-xs text-muted-foreground">…</p>
                 ) : daySessions.length === 0 ? (
@@ -121,16 +132,23 @@ export function ClassCalendar({ weekStart, onWeekChange, sessions, loading, onSe
                           }
                         }}
                         className={cn(
-                          'space-y-1 rounded-lg border p-2 text-xs shadow-none transition-colors',
-                          onSessionClick && 'cursor-pointer hover:border-primary/40 hover:bg-muted/40',
-                          highlighted && 'border-primary bg-primary/10',
+                          'space-y-1 rounded-lg border p-2 text-xs shadow-none transition-all',
+                          onSessionClick && 'cursor-pointer hover:-translate-y-0.5 hover:shadow-sm',
                           session.status === 'CANCELLED' && 'opacity-50',
                         )}
+                        style={
+                          highlighted
+                            ? { backgroundColor: tint('primary', 14), borderColor: accentVar('primary') }
+                            : { backgroundColor: tint(accent, 6), borderColor: tint(accent, 16) }
+                        }
                       >
-                        <p className="font-medium leading-tight">{session.groupClass.name}</p>
+                        <p className="font-semibold leading-tight">{session.groupClass.name}</p>
                         <p className="text-muted-foreground">{session.startTime}–{session.endTime}</p>
                         <div className="flex items-center justify-between gap-1 pt-0.5">
-                          <Badge variant={full ? 'outline' : 'secondary'} className="text-[10px]">
+                          <Badge
+                            className="border-0 text-[10px] font-bold text-white"
+                            style={{ backgroundImage: full ? 'linear-gradient(120deg, var(--warning), var(--chart-5))' : `linear-gradient(120deg, ${accentVar(accent)}, var(--chart-7))` }}
+                          >
                             {session.bookedCount}/{session.capacity}
                           </Badge>
                           {session.status !== 'SCHEDULED' ? (

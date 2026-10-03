@@ -3,26 +3,21 @@
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowUp, ArrowUpDown, CalendarDays, CalendarRange, MoreHorizontal, Plus } from 'lucide-react';
+import { CalendarDays, CalendarRange, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
-import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination } from '@/components/ui/pagination';
-import { SearchBar } from '@/components/ui/search-bar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { ClassCard, type ClassCardAction } from '@/features/classes/components/class-card';
+import { ClassesHero } from '@/features/classes/components/classes-hero';
+import { ClassesInsights, ClassesKpis } from '@/features/classes/components/classes-overview';
+import { ClassesToolbar } from '@/features/classes/components/classes-toolbar';
 import { toClassError, useClassList, useClassStatusAction } from '@/features/classes/hooks/use-classes';
 import type { GroupClass, ListGroupClassesParams } from '@/features/classes/types';
-import { cn } from '@/lib/utils';
-
-const selectClassName = cn(
-  'h-9 rounded-lg border border-input bg-background px-2.5 text-sm shadow-xs transition-all duration-150',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
-);
 
 type SortableColumn = NonNullable<ListGroupClassesParams['sortBy']>;
 type StatusAction = 'delete' | 'restore';
@@ -39,6 +34,7 @@ export default function ClassesPage() {
   const [page, setPage] = React.useState(1);
   const [sortBy, setSortBy] = React.useState<SortableColumn>('name');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
+  const [view, setView] = React.useState<'grid' | 'list'>('grid');
   const [confirmAction, setConfirmAction] = React.useState<{ action: StatusAction; groupClass: GroupClass } | null>(null);
 
   const classes = useClassList({
@@ -50,27 +46,16 @@ export default function ClassesPage() {
     sortBy,
     sortDir,
   });
+  // Separate, unfiltered fetch (classes are few per tenant, so one generous-limit call is
+  // enough) — feeds the hero/KPI tiles/insights so those always reflect every class, not
+  // whatever search/status filter the list below is under.
+  const allClasses = useClassList({ page: 1, limit: 100, includeDeleted: true });
+
   const statusAction = useClassStatusAction();
 
   const data = classes.data;
   const items = data?.items ?? [];
-
-  const toggleSort = (column: SortableColumn) => {
-    if (sortBy === column) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else {
-      setSortBy(column);
-      setSortDir('asc');
-    }
-  };
-  const sortIcon = (column: SortableColumn) => {
-    if (sortBy !== column) return <ArrowUpDown className="size-3.5 text-muted-foreground" />;
-    return sortDir === 'asc' ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />;
-  };
-  const sortableHeader = (label: string, column: SortableColumn) => (
-    <button type="button" className="flex items-center gap-1 font-medium hover:text-foreground" onClick={() => toggleSort(column)}>
-      {label} {sortIcon(column)}
-    </button>
-  );
+  const allItems = allClasses.data?.items ?? [];
 
   const runStatusAction = () => {
     if (!confirmAction) return;
@@ -84,122 +69,100 @@ export default function ClassesPage() {
     setConfirmAction(null);
   };
 
-  const columns: DataTableColumn<GroupClass>[] = [
-    {
-      key: 'name',
-      header: sortableHeader('Class', 'name'),
-      render: (c) => (
-        <Link href={`/classes/${c.id}`} className="hover:underline">
-          <span className="block font-medium">{c.name}</span>
-          <span className="block text-xs text-muted-foreground">{c.branch.name}</span>
-        </Link>
-      ),
-    },
-    { key: 'trainer', header: 'Trainer', render: (c) => c.trainer?.name ?? '—' },
-    { key: 'capacity', header: 'Capacity', render: (c) => c.capacity },
-    { key: 'duration', header: 'Duration', render: (c) => `${c.durationMinutes}m` },
-    { key: 'schedule', header: 'Weekly slots', render: (c) => (c.schedule.length > 0 ? `${c.schedule.length} slot(s)` : 'Not scheduled') },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (c) =>
-        c.deletedAt ? (
-          <DeletedBadge />
-        ) : (
-          <Badge variant={c.isActive ? 'secondary' : 'outline'}>{c.isActive ? 'Active' : 'Inactive'}</Badge>
-        ),
-    },
-    {
-      key: 'actions',
-      header: '',
-      className: 'w-10',
-      render: (c) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${c.name}`}>
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <Link href={`/classes/${c.id}`}>View / edit</Link>
-            </DropdownMenuItem>
-            {c.deletedAt ? (
-              canRestore ? (
-                <DropdownMenuItem onClick={() => setConfirmAction({ action: 'restore', groupClass: c })}>Restore</DropdownMenuItem>
-              ) : null
-            ) : canDelete ? (
-              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmAction({ action: 'delete', groupClass: c })}>
-                Delete
-              </DropdownMenuItem>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ];
+  const handleCardAction = (groupClass: GroupClass, action: ClassCardAction) => {
+    setConfirmAction({ action, groupClass });
+  };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <div
-            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
-            style={{
-              backgroundColor: 'color-mix(in oklch, var(--chart-3) 16%, transparent)',
-              color: 'var(--chart-3)',
-              boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-3) 18%, transparent)',
-            }}
-          >
-            <CalendarRange className="size-5" aria-hidden />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Classes</h1>
-            <p className="text-muted-foreground">Recurring group classes, weekly schedules, and session capacity.</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/classes/calendar">
-              <CalendarDays className="size-4" /> Calendar
-            </Link>
-          </Button>
-          {canCreate ? (
-            <Button size="sm" asChild>
-              <Link href="/classes/new">
-                <Plus className="size-4" /> New class
+    <div className="w-full space-y-5">
+      <ClassesHero
+        total={allClasses.data?.total ?? 0}
+        classes={allItems}
+        actions={
+          <>
+            <Button variant="secondary" size="sm" asChild>
+              <Link href="/classes/calendar">
+                <CalendarDays className="size-4" /> Calendar
               </Link>
             </Button>
-          ) : null}
-        </div>
-      </div>
+            {canCreate ? (
+              <Button size="sm" asChild data-solid className="border-0 bg-white text-indigo-700 shadow-lg hover:bg-white/90">
+                <Link href="/classes/new">
+                  <Plus className="size-4" /> New class
+                </Link>
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchBar
-          containerClassName="max-w-xs"
-          placeholder="Search class name…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
+      <ClassesKpis
+        classes={allItems}
+        loading={allClasses.isPending}
+        isActiveFilter={isActiveFilter}
+        onStatus={(v) => {
+          setIsActiveFilter(v);
+          setPage(1);
+        }}
+      />
+
+      <ClassesInsights classes={allItems} loading={allClasses.isPending} />
+
+      <ClassesToolbar
+        search={search}
+        onSearch={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
+        status={isActiveFilter}
+        onStatus={(v) => {
+          setIsActiveFilter(v);
+          setPage(1);
+        }}
+        sort={`${sortBy}:${sortDir}`}
+        onSort={(v) => {
+          const [by, dir] = v.split(':') as [SortableColumn, 'asc' | 'desc'];
+          setSortBy(by);
+          setSortDir(dir);
+        }}
+        view={view}
+        onView={setView}
+      />
+
+      {classes.error ? (
+        <EmptyState
+          title="Couldn't load this data"
+          description={classes.error instanceof Error ? classes.error.message : 'Something went wrong loading this data.'}
+          className="border-destructive/30"
+          action={
+            <Button variant="outline" size="sm" onClick={() => classes.refetch()}>
+              Retry
+            </Button>
+          }
         />
-        <select
-          className={selectClassName}
-          value={isActiveFilter}
-          onChange={(e) => {
-            setIsActiveFilter(e.target.value as 'true' | 'false' | '');
-            setPage(1);
-          }}
-          aria-label="Filter by status"
-        >
-          <option value="">All statuses</option>
-          <option value="true">Active</option>
-          <option value="false">Inactive</option>
-        </select>
-      </div>
-
-      <DataTable columns={columns} rows={items} rowKey={(c) => c.id} rowClassName={(c) => (c.deletedAt ? 'bg-destructive/5' : undefined)} loading={classes.isPending} error={classes.error} onRetry={() => classes.refetch()} emptyMessage="No classes match these filters." />
+      ) : classes.isPending ? (
+        <div className={view === 'grid' ? 'grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4' : 'space-y-3'}>
+          {Array.from({ length: view === 'grid' ? 6 : 4 }).map((_, i) => (
+            <Skeleton key={i} className={view === 'grid' ? 'h-[260px] w-full rounded-3xl' : 'h-20 w-full rounded-2xl'} />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState icon={CalendarRange} title={!search && !isActiveFilter ? 'Create your first class to get started.' : 'No classes match these filters.'} />
+      ) : (
+        <div className={view === 'grid' ? 'grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4' : 'space-y-2.5'}>
+          {items.map((c, i) => (
+            <ClassCard
+              key={c.id}
+              groupClass={c}
+              index={i}
+              variant={view}
+              canDelete={canDelete}
+              canRestore={canRestore}
+              onRequestAction={(action) => handleCardAction(c, action)}
+            />
+          ))}
+        </div>
+      )}
 
       {data ? (
         <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />

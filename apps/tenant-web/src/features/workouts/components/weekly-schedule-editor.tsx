@@ -4,9 +4,20 @@ import * as React from 'react';
 import { GripVertical, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { type Accent, accentVar, tint } from '@/features/members/components/detail/detail-ui';
 import { cn } from '@/lib/utils';
 import type { Exercise, PlanExercise, PlanExerciseInput, WeekDay } from '../types';
 import { WEEK_DAYS } from '../types';
+
+const DAY_ACCENTS: Record<WeekDay, Accent> = {
+  MONDAY: 'primary',
+  TUESDAY: 'violet',
+  WEDNESDAY: 'aqua',
+  THURSDAY: 'warning',
+  FRIDAY: 'success',
+  SATURDAY: 'destructive',
+  SUNDAY: 'primary',
+};
 
 const selectClassName = cn(
   'h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm shadow-xs transition-all duration-150',
@@ -136,58 +147,72 @@ export function WeeklyScheduleEditor({ initialExercises, exerciseOptions, disabl
             ))}
           </select>
         </div>
-        <Button type="button" size="sm" disabled={disabled || !addExerciseId} onClick={addExercise}>
+        <Button
+          type="button"
+          size="sm"
+          disabled={disabled || !addExerciseId}
+          onClick={addExercise}
+          className="border-0 text-white shadow-md disabled:opacity-50"
+          style={{ backgroundImage: 'linear-gradient(120deg, var(--primary), var(--chart-7))' }}
+        >
           Add to schedule
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
         {WEEK_DAYS.map((day) => {
           const dayItems = items.filter((i) => i.dayOfWeek === day);
+          const accent = DAY_ACCENTS[day];
           return (
-            <div key={day} className="rounded-xl border bg-card p-3.5 shadow-xs">
-              <h4 className="mb-2.5 flex items-center gap-1.5 text-sm font-semibold text-foreground/90">
-                <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: 'var(--chart-2)' }} aria-hidden="true" />
+            <div key={day} className="overflow-hidden rounded-2xl border shadow-xs" style={{ borderColor: tint(accent, 20) }}>
+              <h4
+                className="flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-semibold text-foreground/90"
+                style={{ backgroundImage: `linear-gradient(100deg, ${tint(accent, 15)}, transparent 85%)` }}
+              >
+                <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: accentVar(accent) }} aria-hidden="true" />
                 {DAY_LABELS[day]}
               </h4>
-              {dayItems.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Rest day / no exercises.</p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {dayItems.map((item) => (
-                    <li
-                      key={item.key}
-                      draggable={!disabled}
-                      onDragStart={() => {
-                        dragKey.current = item.key;
-                      }}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => handleDrop(day, item.key)}
-                      className="flex items-center justify-between gap-2 rounded-lg border bg-muted/40 px-2.5 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-muted/60"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <GripVertical className="size-3.5 shrink-0 cursor-grab text-muted-foreground" aria-hidden="true" />
-                        {item.exerciseName}
-                        {item.sets || item.repetitions ? (
-                          <span className="text-xs text-muted-foreground">
-                            ({item.sets ?? '—'}×{item.repetitions ?? '—'})
-                          </span>
+              <div className="space-y-1.5 bg-card p-3">
+                {dayItems.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Rest day / no exercises.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {dayItems.map((item) => (
+                      <li
+                        key={item.key}
+                        draggable={!disabled}
+                        onDragStart={() => {
+                          dragKey.current = item.key;
+                        }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={() => handleDrop(day, item.key)}
+                        className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-sm transition-colors hover:shadow-sm"
+                        style={{ backgroundColor: tint(accent, 7), borderColor: tint(accent, 16) }}
+                      >
+                        <span className="flex min-w-0 items-center gap-1.5">
+                          <GripVertical className="size-3.5 shrink-0 cursor-grab text-muted-foreground" aria-hidden="true" />
+                          <span className="truncate">{item.exerciseName}</span>
+                          {item.sets || item.repetitions ? (
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              ({item.sets ?? '—'}×{item.repetitions ?? '—'})
+                            </span>
+                          ) : null}
+                        </span>
+                        {!disabled ? (
+                          <button
+                            type="button"
+                            aria-label={`Remove ${item.exerciseName} from ${DAY_LABELS[day]}`}
+                            className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => removeItem(item.key)}
+                          >
+                            <X className="size-3.5" />
+                          </button>
                         ) : null}
-                      </span>
-                      {!disabled ? (
-                        <button
-                          type="button"
-                          aria-label={`Remove ${item.exerciseName} from ${DAY_LABELS[day]}`}
-                          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                          onClick={() => removeItem(item.key)}
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           );
         })}

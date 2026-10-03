@@ -1,8 +1,11 @@
 'use client';
 
+import { Dumbbell } from 'lucide-react';
+
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PanelCard } from '@/features/members/components/detail/detail-ui';
 import { TrainerSelect } from '@/features/members/components/trainer-select';
 import { cn } from '@/lib/utils';
 import type { WorkoutLevel } from '../types';
@@ -49,7 +52,7 @@ export function WorkoutPlanFormFields({ value, onChange, disabled }: WorkoutPlan
   const set = <K extends keyof WorkoutPlanFormState>(key: K, next: WorkoutPlanFormState[K]) => onChange({ ...value, [key]: next });
 
   return (
-    <div className="space-y-4">
+    <PanelCard icon={Dumbbell} accent="primary" title="Plan information" delay={0}>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="planName" required>Plan name</Label>
@@ -113,6 +116,6 @@ export function WorkoutPlanFormFields({ value, onChange, disabled }: WorkoutPlan
         <Checkbox id="planIsActive" checked={value.isActive} disabled={disabled} onCheckedChange={(c) => set('isActive', c === true)} />
         Active (visible for assignment)
       </label>
-    </div>
+    </PanelCard>
   );
 }

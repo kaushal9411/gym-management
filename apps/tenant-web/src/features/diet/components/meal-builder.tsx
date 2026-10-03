@@ -4,9 +4,20 @@ import * as React from 'react';
 import { X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { type Accent, accentVar, tint } from '@/features/members/components/detail/detail-ui';
 import { cn } from '@/lib/utils';
 import type { Food, MealType, PlanMeal, PlanMealInput } from '../types';
 import { MEAL_TYPES } from '../types';
+
+const MEAL_ACCENTS: Record<MealType, Accent> = {
+  BREAKFAST: 'warning',
+  MORNING_SNACK: 'aqua',
+  LUNCH: 'primary',
+  EVENING_SNACK: 'aqua',
+  DINNER: 'violet',
+  PRE_WORKOUT: 'success',
+  POST_WORKOUT: 'destructive',
+};
 
 const selectClassName = cn(
   'h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm shadow-xs transition-all duration-150',
@@ -128,43 +139,60 @@ export function MealBuilder({ initialMeals, foodOptions, disabled, onChange }: M
             onChange={(e) => setAddQuantity(e.target.value)}
           />
         </div>
-        <Button type="button" size="sm" disabled={disabled || !addFoodId} onClick={addFood}>
+        <Button
+          type="button"
+          size="sm"
+          disabled={disabled || !addFoodId}
+          onClick={addFood}
+          className="border-0 text-white shadow-md disabled:opacity-50"
+          style={{ backgroundImage: 'linear-gradient(120deg, var(--primary), var(--chart-7))' }}
+        >
           Add to meal
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
         {MEAL_TYPES.map((mealType) => {
           const mealItems = items.filter((i) => i.mealType === mealType);
+          const accent = MEAL_ACCENTS[mealType];
           return (
-            <div key={mealType} className="rounded-xl border bg-card p-3.5 shadow-xs">
-              <h4 className="mb-2.5 flex items-center gap-1.5 text-sm font-semibold text-foreground/90">
-                <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: 'var(--success)' }} aria-hidden="true" />
+            <div key={mealType} className="overflow-hidden rounded-2xl border shadow-xs" style={{ borderColor: tint(accent, 20) }}>
+              <h4
+                className="flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-semibold text-foreground/90"
+                style={{ backgroundImage: `linear-gradient(100deg, ${tint(accent, 15)}, transparent 85%)` }}
+              >
+                <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: accentVar(accent) }} aria-hidden="true" />
                 {MEAL_LABELS[mealType]}
               </h4>
-              {mealItems.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No foods added.</p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {mealItems.map((item) => (
-                    <li key={item.key} className="flex items-center justify-between gap-2 rounded-lg border bg-muted/40 px-2.5 py-2 text-sm transition-colors hover:bg-muted/60">
-                      <span>
-                        {item.foodName} <span className="text-xs text-muted-foreground">×{item.quantity}</span>
-                      </span>
-                      {!disabled ? (
-                        <button
-                          type="button"
-                          aria-label={`Remove ${item.foodName} from ${MEAL_LABELS[mealType]}`}
-                          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                          onClick={() => removeItem(item.key)}
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <div className="space-y-1.5 bg-card p-3">
+                {mealItems.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No foods added.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {mealItems.map((item) => (
+                      <li
+                        key={item.key}
+                        className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-sm"
+                        style={{ backgroundColor: tint(accent, 7), borderColor: tint(accent, 16) }}
+                      >
+                        <span className="min-w-0 truncate">
+                          {item.foodName} <span className="text-xs text-muted-foreground">×{item.quantity}</span>
+                        </span>
+                        {!disabled ? (
+                          <button
+                            type="button"
+                            aria-label={`Remove ${item.foodName} from ${MEAL_LABELS[mealType]}`}
+                            className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => removeItem(item.key)}
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           );
         })}

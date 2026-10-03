@@ -7,12 +7,10 @@ import { ArrowLeft, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
-import { DeletedBadge } from '@/components/ui/deleted-badge';
-import { BranchDefaultBadge, BranchStatusBadge } from '@/features/branch/components/branch-badges';
+import { BranchDetailHero } from '@/features/branch/components/branch-detail-hero';
 import { BranchFormFields, DEFAULT_BRANCH_FORM_STATE, type BranchFormState } from '@/features/branch/components/branch-form-fields';
 import {
   toBranchError,
@@ -59,6 +57,7 @@ function toNumberOrUndefined(value: string): number | undefined {
   return value.trim() === '' ? undefined : Number(value);
 }
 
+/** Same hero + PanelCard-sections shell as the Member/Staff detail pages — every field/handler/mutation below is exactly as before, only the wrapping layout changed. */
 export default function BranchDetailPage() {
   const params = useParams<{ branchId: string }>();
   const { hasPermission } = usePermissions();
@@ -87,9 +86,10 @@ export default function BranchDetailPage() {
 
   if (branch.isPending || !form) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="w-full space-y-4">
         <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-44 w-full rounded-3xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     );
   }
@@ -149,64 +149,51 @@ export default function BranchDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="w-full space-y-5">
       <Button variant="ghost" size="sm" asChild>
         <Link href="/branches">
           <ArrowLeft className="size-4" /> Back to branches
         </Link>
       </Button>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            {data.name} <BranchDefaultBadge isDefault={data.isDefault} />
-          </h1>
-          <p className="text-muted-foreground">
-            {data.branchCode} · {data.memberCount} member(s) · {data.staffCount} staff assigned
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {data.deletedAt ? <DeletedBadge /> : <BranchStatusBadge isActive={data.isActive} />}
-          {canUpdate && !data.isDefault && data.isActive && !data.deletedAt ? (
-            <Button variant="outline" size="sm" onClick={() => setConfirmSetDefault(true)}>
-              <Star className="size-4" /> Set as default
-            </Button>
-          ) : null}
-          {data.deletedAt ? (
-            canRestore ? (
-              <Button variant="success" size="sm" onClick={() => setConfirmStatusAction('restore')}>
-                Restore
+      <BranchDetailHero
+        data={data}
+        actions={
+          <>
+            {canUpdate && !data.isDefault && data.isActive && !data.deletedAt ? (
+              <Button variant="secondary" size="sm" onClick={() => setConfirmSetDefault(true)}>
+                <Star className="size-4" /> Set as default
               </Button>
-            ) : null
-          ) : canActivate ? (
-            data.isActive ? (
-              <Button variant="outline" size="sm" onClick={() => setConfirmStatusAction('deactivate')}>
-                Deactivate
+            ) : null}
+            {data.deletedAt ? (
+              canRestore ? (
+                <Button variant="secondary" size="sm" onClick={() => setConfirmStatusAction('restore')}>
+                  Restore
+                </Button>
+              ) : null
+            ) : canActivate ? (
+              data.isActive ? (
+                <Button variant="secondary" size="sm" onClick={() => setConfirmStatusAction('deactivate')}>
+                  Deactivate
+                </Button>
+              ) : (
+                <Button variant="secondary" size="sm" onClick={() => setConfirmStatusAction('activate')}>
+                  Activate
+                </Button>
+              )
+            ) : null}
+            {!data.deletedAt && canDelete ? (
+              <Button variant="destructive" size="sm" onClick={() => setConfirmStatusAction('delete')}>
+                Delete
               </Button>
-            ) : (
-              <Button variant="success" size="sm" onClick={() => setConfirmStatusAction('activate')}>
-                Activate
-              </Button>
-            )
-          ) : null}
-          {!data.deletedAt && canDelete ? (
-            <Button variant="destructive" size="sm" onClick={() => setConfirmStatusAction('delete')}>
-              Delete
-            </Button>
-          ) : null}
-        </div>
-      </div>
+            ) : null}
+          </>
+        }
+      />
 
       {canUpdate ? <UnsavedChangesBar isDirty={isDirty} saving={updateBranch.isPending} onSave={handleSave} onCancel={handleCancel} /> : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Branch details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <BranchFormFields value={form} onChange={setForm} disabled={!canUpdate} isEditing />
-        </CardContent>
-      </Card>
+      <BranchFormFields value={form} onChange={setForm} disabled={!canUpdate} isEditing />
 
       <ConfirmDialog
         open={confirmStatusAction !== null}

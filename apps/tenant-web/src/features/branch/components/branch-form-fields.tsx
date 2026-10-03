@@ -1,8 +1,11 @@
 'use client';
 
+import { Building2, Clock, MapPin, Settings, Tent } from 'lucide-react';
+
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PanelCard } from '@/features/members/components/detail/detail-ui';
 import { BusinessHoursEditor } from '@/features/gym-settings/components/business-hours-editor';
 import type { BusinessHours } from '@/features/gym-settings/types';
 import { HolidaysEditor } from './holidays-editor';
@@ -64,13 +67,13 @@ interface BranchFormFieldsProps {
   isEditing?: boolean;
 }
 
+/** Same `PanelCard`-per-section shape as the Add Staff page — every field/handler is exactly as before, only the wrapping markup changed. */
 export function BranchFormFields({ value, onChange, disabled, isEditing }: BranchFormFieldsProps) {
   const set = <K extends keyof BranchFormState>(key: K, fieldValue: BranchFormState[K]) => onChange({ ...value, [key]: fieldValue });
 
   return (
-    <div className="space-y-8">
-      <section className="space-y-4">
-        <h3 className="text-sm font-medium text-muted-foreground">Branch Information</h3>
+    <div className="space-y-4">
+      <PanelCard icon={Building2} accent="primary" title="Branch information" delay={0}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="branchName" required>Branch Name</Label>
@@ -103,10 +106,9 @@ export function BranchFormFields({ value, onChange, disabled, isEditing }: Branc
             <Input id="branchTimezone" value={value.timezone} disabled={disabled} placeholder="e.g. America/New_York" onChange={(e) => set('timezone', e.target.value)} />
           </div>
         </div>
-      </section>
+      </PanelCard>
 
-      <section className="space-y-4">
-        <h3 className="text-sm font-medium text-muted-foreground">Address</h3>
+      <PanelCard icon={MapPin} accent="warning" title="Address" delay={0.05}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2 sm:col-span-2">
             <Label htmlFor="branchAddress1">Address Line 1</Label>
@@ -141,50 +143,49 @@ export function BranchFormFields({ value, onChange, disabled, isEditing }: Branc
             <Input id="branchLongitude" type="number" step="0.000001" value={value.longitude} disabled={disabled} onChange={(e) => set('longitude', e.target.value)} />
           </div>
         </div>
-      </section>
+      </PanelCard>
 
-      <section className="space-y-4">
-        <h3 className="text-sm font-medium text-muted-foreground">Operating Hours</h3>
+      <PanelCard icon={Clock} accent="aqua" title="Operating hours" delay={0.1}>
         <BusinessHoursEditor value={value.operatingHours} onChange={(v) => set('operatingHours', v)} disabled={disabled} />
-      </section>
+      </PanelCard>
 
-      <section className="space-y-4">
-        <h3 className="text-sm font-medium text-muted-foreground">Holidays</h3>
+      <PanelCard icon={Tent} accent="violet" title="Holidays" delay={0.15}>
         <HolidaysEditor value={value.holidays} onChange={(v) => set('holidays', v)} disabled={disabled} />
-      </section>
+      </PanelCard>
 
-      <section className="space-y-4">
-        <h3 className="text-sm font-medium text-muted-foreground">Branch Settings</h3>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="branchCapacity">Capacity</Label>
-            <Input id="branchCapacity" type="number" min={0} value={value.capacity} disabled={disabled} onChange={(e) => set('capacity', e.target.value)} />
+      <PanelCard icon={Settings} accent="success" title="Branch settings" delay={0.2}>
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="branchCapacity">Capacity</Label>
+              <Input id="branchCapacity" type="number" min={0} value={value.capacity} disabled={disabled} onChange={(e) => set('capacity', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="branchMaxMembers">Maximum Members</Label>
+              <Input id="branchMaxMembers" type="number" min={0} value={value.maxMembers} disabled={disabled} onChange={(e) => set('maxMembers', e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="branchMaxStaff">Maximum Staff</Label>
+              <Input id="branchMaxStaff" type="number" min={0} value={value.maxStaff} disabled={disabled} onChange={(e) => set('maxStaff', e.target.value)} />
+            </div>
           </div>
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox id="branchAllowCheckIn" checked={value.allowCheckIn} disabled={disabled} onCheckedChange={(v) => set('allowCheckIn', v === true)} />
+            Allow Check-in
+          </label>
           <div className="space-y-2">
-            <Label htmlFor="branchMaxMembers">Maximum Members</Label>
-            <Input id="branchMaxMembers" type="number" min={0} value={value.maxMembers} disabled={disabled} onChange={(e) => set('maxMembers', e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="branchMaxStaff">Maximum Staff</Label>
-            <Input id="branchMaxStaff" type="number" min={0} value={value.maxStaff} disabled={disabled} onChange={(e) => set('maxStaff', e.target.value)} />
+            <Label htmlFor="branchNotes">Notes</Label>
+            <textarea
+              id="branchNotes"
+              value={value.notes}
+              disabled={disabled}
+              onChange={(e) => set('notes', e.target.value)}
+              rows={3}
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50"
+            />
           </div>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox id="branchAllowCheckIn" checked={value.allowCheckIn} disabled={disabled} onCheckedChange={(v) => set('allowCheckIn', v === true)} />
-          Allow Check-in
-        </label>
-        <div className="space-y-2">
-          <Label htmlFor="branchNotes">Notes</Label>
-          <textarea
-            id="branchNotes"
-            value={value.notes}
-            disabled={disabled}
-            onChange={(e) => set('notes', e.target.value)}
-            rows={3}
-            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50"
-          />
-        </div>
-      </section>
+      </PanelCard>
     </div>
   );
 }

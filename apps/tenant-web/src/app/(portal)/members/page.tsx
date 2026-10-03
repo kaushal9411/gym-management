@@ -278,7 +278,7 @@ export default function MembersListPage() {
           }
         />
       ) : members.isPending ? (
-        <div className={view === 'grid' ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'space-y-3'}>
+        <div className={view === 'grid' ? 'grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4' : 'space-y-3'}>
           {Array.from({ length: view === 'grid' ? 8 : 5 }).map((_, i) => (
             <Skeleton key={i} className={view === 'grid' ? 'h-[420px] w-full rounded-3xl' : 'h-20 w-full rounded-2xl'} />
           ))}
@@ -286,7 +286,7 @@ export default function MembersListPage() {
       ) : items.length === 0 ? (
         <EmptyState icon={Users} title={!search && !status ? 'Add your first member to get started.' : 'No members match these filters.'} />
       ) : (
-        <div className={view === 'grid' ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'space-y-2.5'}>
+        <div className={view === 'grid' ? 'grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4' : 'space-y-2.5'}>
           {items.map((m, i) => (
             <MemberCard
               key={m.id}

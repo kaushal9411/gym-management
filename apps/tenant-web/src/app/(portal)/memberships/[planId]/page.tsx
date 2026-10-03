@@ -6,14 +6,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
-import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { UnsavedChangesBar } from '@/features/gym-settings/components/unsaved-changes-bar';
+import { MembershipPlanDetailHero } from '@/features/members/components/membership-plan-detail-hero';
 import { DEFAULT_PLAN_FORM_STATE, PlanFormFields, type PlanFormState } from '@/features/members/components/plan-form-fields';
 import {
   toMemberError,
@@ -23,6 +21,7 @@ import {
   useUpdateMembershipPlan,
 } from '@/features/members/hooks/use-members';
 import type { MembershipPlan } from '@/features/members/types';
+import { useCurrencySymbol } from '@/lib/currency';
 
 type StatusActionKind = 'activate' | 'deactivate' | 'restore' | 'delete';
 
@@ -55,11 +54,13 @@ function toNumberOrUndefined(value: string): number | undefined {
   return value.trim() === '' ? undefined : Number(value);
 }
 
+/** Same hero + PanelCard-sections shell as the Branch detail page — every field/handler/mutation below is exactly as before, only the wrapping layout changed. */
 export default function MembershipPlanDetailPage() {
   const params = useParams<{ planId: string }>();
   const router = useRouter();
   const { hasPermission } = usePermissions();
   const planId = params.planId;
+  const currencySymbol = useCurrencySymbol();
 
   const plan = useMembershipPlanDetail(planId);
   const updatePlan = useUpdateMembershipPlan();
@@ -80,9 +81,10 @@ export default function MembershipPlanDetailPage() {
 
   if (plan.isPending || !form) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
+      <div className="w-full space-y-4">
         <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-44 w-full rounded-3xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     );
   }
@@ -153,66 +155,52 @@ export default function MembershipPlanDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="w-full space-y-5">
       <Button variant="ghost" size="sm" asChild>
         <Link href="/memberships">
           <ArrowLeft className="size-4" /> Back to membership plans
         </Link>
       </Button>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{data.name}</h1>
-          <p className="text-muted-foreground">
-            {data.planCode} · {data.memberCount} member(s) on this plan
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {data.deletedAt ? (
-            <DeletedBadge />
-          ) : (
-            <Badge variant={data.isActive ? 'secondary' : 'outline'}>{data.isActive ? 'Active' : 'Inactive'}</Badge>
-          )}
-          {canCreate ? (
-            <Button variant="outline" size="sm" disabled={duplicatePlan.isPending} onClick={handleDuplicate}>
-              <Copy className="size-4" /> Duplicate
-            </Button>
-          ) : null}
-          {data.deletedAt ? (
-            canRestore ? (
-              <Button size="sm" onClick={() => setConfirmStatusAction('restore')}>
-                Restore
+      <MembershipPlanDetailHero
+        data={data}
+        currencySymbol={currencySymbol}
+        actions={
+          <>
+            {canCreate ? (
+              <Button variant="secondary" size="sm" disabled={duplicatePlan.isPending} onClick={handleDuplicate}>
+                <Copy className="size-4" /> Duplicate
               </Button>
-            ) : null
-          ) : canUpdate ? (
-            data.isActive ? (
-              <Button variant="outline" size="sm" onClick={() => setConfirmStatusAction('deactivate')}>
-                Deactivate
+            ) : null}
+            {data.deletedAt ? (
+              canRestore ? (
+                <Button variant="secondary" size="sm" onClick={() => setConfirmStatusAction('restore')}>
+                  Restore
+                </Button>
+              ) : null
+            ) : canUpdate ? (
+              data.isActive ? (
+                <Button variant="secondary" size="sm" onClick={() => setConfirmStatusAction('deactivate')}>
+                  Deactivate
+                </Button>
+              ) : (
+                <Button variant="secondary" size="sm" onClick={() => setConfirmStatusAction('activate')}>
+                  Activate
+                </Button>
+              )
+            ) : null}
+            {!data.deletedAt && canDelete ? (
+              <Button variant="destructive" size="sm" onClick={() => setConfirmStatusAction('delete')}>
+                Delete
               </Button>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => setConfirmStatusAction('activate')}>
-                Activate
-              </Button>
-            )
-          ) : null}
-          {!data.deletedAt && canDelete ? (
-            <Button variant="destructive" size="sm" onClick={() => setConfirmStatusAction('delete')}>
-              Delete
-            </Button>
-          ) : null}
-        </div>
-      </div>
+            ) : null}
+          </>
+        }
+      />
 
       {canUpdate ? <UnsavedChangesBar isDirty={isDirty} saving={updatePlan.isPending} onSave={handleSave} onCancel={handleCancel} /> : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Plan details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <PlanFormFields value={form} onChange={setForm} disabled={!canUpdate} />
-        </CardContent>
-      </Card>
+      <PlanFormFields value={form} onChange={setForm} disabled={!canUpdate} />
 
       <ConfirmDialog
         open={confirmStatusAction !== null}

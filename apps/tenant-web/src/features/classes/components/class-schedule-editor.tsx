@@ -4,9 +4,20 @@ import * as React from 'react';
 import { X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { type Accent, accentVar, tint } from '@/features/members/components/detail/detail-ui';
 import { cn } from '@/lib/utils';
 import type { ScheduleSlot, WeekDay } from '../types';
 import { WEEK_DAYS } from '../types';
+
+const DAY_ACCENTS: Record<WeekDay, Accent> = {
+  MONDAY: 'primary',
+  TUESDAY: 'violet',
+  WEDNESDAY: 'aqua',
+  THURSDAY: 'warning',
+  FRIDAY: 'success',
+  SATURDAY: 'destructive',
+  SUNDAY: 'primary',
+};
 
 const timeInputClassName = cn(
   'h-9 w-full rounded-lg border border-input bg-background px-2.5 text-sm shadow-xs transition-all duration-150',
@@ -79,44 +90,58 @@ export function ClassScheduleEditor({ initialSlots, disabled, onChange }: ClassS
           </label>
           <input id="scheduleAddTime" type="time" className={timeInputClassName} value={addTime} disabled={disabled} onChange={(e) => setAddTime(e.target.value)} />
         </div>
-        <Button type="button" size="sm" disabled={disabled} onClick={addSlot}>
+        <Button
+          type="button"
+          size="sm"
+          disabled={disabled}
+          onClick={addSlot}
+          className="border-0 text-white shadow-md disabled:opacity-50"
+          style={{ backgroundImage: 'linear-gradient(120deg, var(--primary), var(--chart-7))' }}
+        >
           Add slot
         </Button>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3.5">
         {WEEK_DAYS.map((day) => {
           const dayTimes = slots.filter((s) => s.dayOfWeek === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
+          const accent = DAY_ACCENTS[day];
           return (
-            <div key={day} className="rounded-xl border bg-card p-3.5 shadow-xs">
-              <h4 className="mb-2.5 flex items-center gap-1.5 text-sm font-semibold text-foreground/90">
-                <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: 'var(--chart-2)' }} aria-hidden="true" />
+            <div key={day} className="overflow-hidden rounded-2xl border shadow-xs" style={{ borderColor: tint(accent, 20) }}>
+              <h4
+                className="flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-semibold text-foreground/90"
+                style={{ backgroundImage: `linear-gradient(100deg, ${tint(accent, 15)}, transparent 85%)` }}
+              >
+                <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: accentVar(accent) }} aria-hidden="true" />
                 {DAY_LABELS[day]}
               </h4>
-              {dayTimes.length === 0 ? (
-                <p className="text-xs text-muted-foreground">No session on this day.</p>
-              ) : (
-                <ul className="space-y-1.5">
-                  {dayTimes.map((slot) => (
-                    <li
-                      key={slot.startTime}
-                      className="flex items-center justify-between gap-2 rounded-lg border bg-muted/40 px-2.5 py-2 text-sm"
-                    >
-                      <span>{slot.startTime}</span>
-                      {!disabled ? (
-                        <button
-                          type="button"
-                          aria-label={`Remove ${DAY_LABELS[day]} ${slot.startTime} slot`}
-                          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                          onClick={() => removeSlot(day, slot.startTime)}
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <div className="space-y-1.5 bg-card p-3">
+                {dayTimes.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No session on this day.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {dayTimes.map((slot) => (
+                      <li
+                        key={slot.startTime}
+                        className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-sm"
+                        style={{ backgroundColor: tint(accent, 7), borderColor: tint(accent, 16) }}
+                      >
+                        <span>{slot.startTime}</span>
+                        {!disabled ? (
+                          <button
+                            type="button"
+                            aria-label={`Remove ${DAY_LABELS[day]} ${slot.startTime} slot`}
+                            className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                            onClick={() => removeSlot(day, slot.startTime)}
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           );
         })}

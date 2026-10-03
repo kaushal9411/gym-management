@@ -111,29 +111,29 @@ export function MemberCard({ member: m, index, variant, selected, onToggleSelect
 
   const actions = (
     <div className="flex flex-wrap gap-2">
-      <Button variant="outline" size="sm" className="min-w-0 flex-1" disabled={!m.phone} asChild>
+      <Button variant="outline" size="sm" className="min-w-[112px] flex-1" disabled={!m.phone} asChild>
         <a href={m.phone ? `tel:${m.phone}` : undefined} aria-disabled={!m.phone}>
           <Phone className="size-3.5" /> Call
         </a>
       </Button>
-      <Button variant="outline" size="sm" className="min-w-0 flex-1" disabled={!m.phone} asChild>
+      <Button variant="outline" size="sm" className="min-w-[112px] flex-1" disabled={!m.phone} asChild>
         <a href={m.phone ? `https://wa.me/${toWhatsAppNumber(m.phone)}` : undefined} target="_blank" rel="noopener noreferrer" aria-disabled={!m.phone}>
           <MessageCircle className="size-3.5" /> WhatsApp
         </a>
       </Button>
       {outstanding > 0 && !m.deletedAt ? (
-        <Button variant="outline" size="sm" className="min-w-0 flex-1 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive" asChild>
+        <Button variant="outline" size="sm" className="min-w-[112px] flex-1 border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive" asChild>
           <Link href={`/members/${m.id}`}>
             <Wallet className="size-3.5" /> Pay link
           </Link>
         </Button>
       ) : canRenew && !m.deletedAt && cm ? (
-        <Button variant="outline" size="sm" className="min-w-0 flex-1" disabled={renewMembership.isPending} onClick={handleRenew}>
+        <Button variant="outline" size="sm" className="min-w-[112px] flex-1" disabled={renewMembership.isPending} onClick={handleRenew}>
           <RefreshCw className="size-3.5" /> {renewMembership.isPending ? 'Renewing…' : 'Renew'}
         </Button>
       ) : null}
       {canCheckIn && !m.deletedAt ? (
-        <Button size="sm" className="min-w-0 flex-1 border-0 text-white shadow-md" style={{ backgroundImage: 'linear-gradient(120deg, var(--primary), var(--chart-7))' }} disabled={manualCheckIn.isPending} onClick={handlePunchIn}>
+        <Button size="sm" className="min-w-[112px] flex-1 border-0 text-white shadow-md" style={{ backgroundImage: 'linear-gradient(120deg, var(--primary), var(--chart-7))' }} disabled={manualCheckIn.isPending} onClick={handlePunchIn}>
           <UserCheck className="size-3.5" /> {manualCheckIn.isPending ? 'Checking in…' : 'Punch in'}
         </Button>
       ) : null}

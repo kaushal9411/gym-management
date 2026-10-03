@@ -3,7 +3,8 @@
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, CalendarCheck, Download, MoreHorizontal } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Download, DoorOpen, LogIn, LogOut, MoreHorizontal, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -14,18 +15,18 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Pagination } from '@/components/ui/pagination';
-import { SearchBar } from '@/components/ui/search-bar';
 import { AttendanceMethodBadge, AttendanceStatusBadge } from '@/features/attendance/components/attendance-badges';
-import { toAttendanceError, useAttendanceList, useDeleteAttendance, useUpdateAttendance } from '@/features/attendance/hooks/use-attendance';
+import { toAttendanceError, useAttendanceList, useAttendanceSummary, useDeleteAttendance, useUpdateAttendance } from '@/features/attendance/hooks/use-attendance';
 import { attendanceService } from '@/features/attendance/services/attendance.service';
 import type { AttendanceMethod, AttendanceRecord, AttendanceStatus, ListAttendanceParams } from '@/features/attendance/types';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
+import { accentVar, CountUp, type Accent } from '@/features/members/components/detail/detail-ui';
 import { BranchSelect } from '@/features/members/components/branch-select';
 import { cn } from '@/lib/utils';
 
 const selectClassName = cn(
-  'h-9 rounded-lg border border-input bg-background px-2.5 text-sm shadow-xs transition-all duration-150',
+  'h-10 rounded-xl border border-input bg-background px-2.5 text-sm shadow-xs transition-all duration-150',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
 );
 
@@ -33,6 +34,9 @@ type SortableColumn = NonNullable<ListAttendanceParams['sortBy']>;
 
 interface EditState {
   id: string;
+  memberName: string;
+  memberCode: string;
+  checkInTime: string;
   checkOutTime: string;
   notes: string;
   status: AttendanceStatus;
@@ -43,6 +47,16 @@ function toLocalInputValue(iso: string | null): string {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function GlanceChip({ icon: Icon, label, value, accent }: { icon: typeof LogIn; label: string; value: number; accent: Accent }) {
+  return (
+    <span className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-sm shadow-xs" style={{ borderColor: `color-mix(in oklch, ${accentVar(accent)} 22%, transparent)` }}>
+      <Icon className="size-3.5" style={{ color: accentVar(accent) }} aria-hidden />
+      <b className="tabular-nums" style={{ color: accentVar(accent) }}><CountUp value={value} /></b>
+      <span className="text-muted-foreground">{label}</span>
+    </span>
+  );
 }
 
 export default function AttendanceHistoryPage() {
@@ -85,6 +99,8 @@ export default function AttendanceHistoryPage() {
     sortDir,
   };
   const records = useAttendanceList(params);
+  // Today's headline figures, for the glance strip — reuses the same summary endpoint the dashboard uses.
+  const glance = useAttendanceSummary({ branchId: branchId || undefined });
   const updateAttendance = useUpdateAttendance();
   const deleteAttendance = useDeleteAttendance();
 
@@ -192,7 +208,15 @@ export default function AttendanceHistoryPage() {
               {canUpdate ? (
                 <DropdownMenuItem
                   onClick={() =>
-                    setEditState({ id: r.id, checkOutTime: toLocalInputValue(r.checkOutTime), notes: r.notes ?? '', status: r.status })
+                    setEditState({
+                      id: r.id,
+                      memberName: r.member.name,
+                      memberCode: r.member.memberId,
+                      checkInTime: r.checkInTime,
+                      checkOutTime: toLocalInputValue(r.checkOutTime),
+                      notes: r.notes ?? '',
+                      status: r.status,
+                    })
                   }
                 >
                   Edit
@@ -210,52 +234,60 @@ export default function AttendanceHistoryPage() {
   ];
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <div
-            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
-            style={{
-              backgroundColor: 'color-mix(in oklch, var(--success) 16%, transparent)',
-              color: 'var(--success)',
-              boxShadow: '0 0 0 1px color-mix(in oklch, var(--success) 18%, transparent)',
-            }}
-          >
-            <CalendarCheck className="size-5" aria-hidden />
-          </div>
-          <div>
-            <Button variant="ghost" size="sm" asChild className="-ml-2 mb-1">
-              <Link href="/attendance">
-                <ArrowLeft className="size-4" /> Back to attendance
-              </Link>
-            </Button>
-            <h1 className="text-2xl font-semibold tracking-tight">Attendance history</h1>
-            <p className="text-muted-foreground">Every check-in and check-out, searchable and filterable.</p>
-          </div>
+    <div className="w-full space-y-5">
+      <Button variant="ghost" size="sm" asChild>
+        <Link href="/attendance">
+          <ArrowLeft className="size-4" /> Back to attendance
+        </Link>
+      </Button>
+
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="relative grid gap-4 overflow-hidden rounded-3xl p-6 text-white shadow-lg lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:px-7"
+        style={{ backgroundImage: 'radial-gradient(900px 320px at 88% -30%, color-mix(in oklch, #c026d3 75%, transparent), transparent 60%), linear-gradient(115deg, #4338ca, #7c3aed 62%, #c026d3)' }}
+      >
+        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-60" style={{ backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,.06) 0 1px, transparent 1px 14px)' }} />
+        <div className="relative min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-white/80">Log</p>
+          <h1 className="mt-0.5 text-3xl font-extrabold tracking-tight sm:text-4xl">Attendance history</h1>
+          <p className="mt-1 text-white/85">Every check-in and check-out, searchable and filterable.</p>
         </div>
         {canExport ? (
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => void exportAs('csv')}>
+          <div className="relative flex flex-wrap items-center gap-2 [&_button]:border-white/30 [&_button]:bg-white/15 [&_button]:text-white [&_button:hover]:bg-white/25">
+            <Button variant="secondary" size="sm" onClick={() => void exportAs('csv')}>
               <Download className="size-4" /> Export CSV
             </Button>
-            <Button variant="outline" size="sm" onClick={() => void exportAs('excel')}>
+            <Button variant="secondary" size="sm" onClick={() => void exportAs('excel')}>
               <Download className="size-4" /> Export Excel
             </Button>
           </div>
         ) : null}
+      </motion.section>
+
+      <div className="flex flex-wrap items-center gap-2.5">
+        <GlanceChip icon={LogIn} label="checked in today" value={glance.data?.totalCheckInsToday ?? 0} accent="success" />
+        <GlanceChip icon={LogOut} label="checked out today" value={glance.data?.totalCheckOutsToday ?? 0} accent="aqua" />
+        <GlanceChip icon={DoorOpen} label="inside right now" value={glance.data?.currentlyInside ?? 0} accent="primary" />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchBar
-          containerClassName="max-w-xs"
-          placeholder="Search member name or ID…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-        <div className="w-48">
+      <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2.5 rounded-2xl border bg-card/90 p-2.5 shadow-sm backdrop-blur">
+        <label className="flex h-10 min-w-[200px] flex-1 items-center gap-2 rounded-xl border bg-background px-3 transition-all focus-within:border-primary focus-within:ring-4 focus-within:ring-primary/15">
+          <Search className="size-4 text-muted-foreground" aria-hidden />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search member name or ID…"
+            aria-label="Search attendance"
+            className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          />
+        </label>
+        <div className="w-44">
           <BranchSelect
             value={branchId}
             onChange={(v) => {
@@ -296,7 +328,7 @@ export default function AttendanceHistoryPage() {
         </select>
         <Input
           type="date"
-          className="h-9 w-40"
+          className="h-10 w-40 rounded-xl"
           aria-label="From date"
           value={dateFrom}
           onChange={(e) => {
@@ -306,7 +338,7 @@ export default function AttendanceHistoryPage() {
         />
         <Input
           type="date"
-          className="h-9 w-40"
+          className="h-10 w-40 rounded-xl"
           aria-label="To date"
           value={dateTo}
           onChange={(e) => {
@@ -316,58 +348,88 @@ export default function AttendanceHistoryPage() {
         />
       </div>
 
-      <DataTable columns={columns} rows={items} rowKey={(r) => r.id} loading={records.isPending} error={records.error} onRetry={() => records.refetch()} emptyMessage="No attendance records match these filters." />
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.1 }}>
+        <DataTable columns={columns} rows={items} rowKey={(r) => r.id} loading={records.isPending} error={records.error} onRetry={() => records.refetch()} emptyMessage="No attendance records match these filters." />
+      </motion.div>
 
       {data ? (
         <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
       ) : null}
 
       <Dialog open={!!editState} onOpenChange={(open) => !open && setEditState(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit attendance record</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-md gap-0 overflow-hidden p-0">
           {editState ? (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="editCheckOutTime">Check-out time</Label>
-                <Input
-                  id="editCheckOutTime"
-                  type="datetime-local"
-                  value={editState.checkOutTime}
-                  onChange={(e) => setEditState({ ...editState, checkOutTime: e.target.value })}
-                />
+            <>
+              <div
+                className="relative overflow-hidden p-5 text-white"
+                style={{ backgroundImage: 'linear-gradient(115deg, #4338ca, #7c3aed 62%, #c026d3)' }}
+              >
+                <div aria-hidden className="pointer-events-none absolute inset-0 opacity-60" style={{ backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,.06) 0 1px, transparent 1px 14px)' }} />
+                <DialogHeader className="relative">
+                  <DialogTitle className="text-white">Edit attendance record</DialogTitle>
+                </DialogHeader>
+                <div className="relative mt-3 flex items-center gap-3">
+                  <span
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full text-[12px] font-extrabold text-white"
+                    style={{ backgroundImage: 'linear-gradient(135deg, var(--chart-3), var(--chart-7))' }}
+                  >
+                    {editState.memberName.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{editState.memberName}</p>
+                    <p className="truncate text-xs text-white/80">
+                      {editState.memberCode} · Checked in {new Date(editState.checkInTime).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="editStatus">Status</Label>
-                <select
-                  id="editStatus"
-                  className={cn(selectClassName, 'w-full')}
-                  value={editState.status}
-                  onChange={(e) => setEditState({ ...editState, status: e.target.value as AttendanceStatus })}
-                >
-                  <option value="CHECKED_IN">Checked in</option>
-                  <option value="CHECKED_OUT">Checked out</option>
-                </select>
+
+              <div className="space-y-4 p-5">
+                <div className="space-y-2">
+                  <Label htmlFor="editCheckOutTime">Check-out time</Label>
+                  <Input
+                    id="editCheckOutTime"
+                    type="datetime-local"
+                    value={editState.checkOutTime}
+                    onChange={(e) => setEditState({ ...editState, checkOutTime: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editStatus">Status</Label>
+                  <select
+                    id="editStatus"
+                    className={cn(selectClassName, 'w-full')}
+                    value={editState.status}
+                    onChange={(e) => setEditState({ ...editState, status: e.target.value as AttendanceStatus })}
+                  >
+                    <option value="CHECKED_IN">Checked in</option>
+                    <option value="CHECKED_OUT">Checked out</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editNotes">Notes</Label>
+                  <textarea
+                    id="editNotes"
+                    className="flex min-h-20 w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring"
+                    value={editState.notes}
+                    onChange={(e) => setEditState({ ...editState, notes: e.target.value })}
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setEditState(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    disabled={updateAttendance.isPending}
+                    onClick={saveEdit}
+                    className="border-0 text-white shadow-md"
+                    style={{ backgroundImage: 'linear-gradient(120deg, var(--success), var(--chart-3))' }}
+                  >
+                    {updateAttendance.isPending ? 'Saving…' : 'Save changes'}
+                  </Button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="editNotes">Notes</Label>
-                <textarea
-                  id="editNotes"
-                  className="flex min-h-20 w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring"
-                  value={editState.notes}
-                  onChange={(e) => setEditState({ ...editState, notes: e.target.value })}
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setEditState(null)}>
-                  Cancel
-                </Button>
-                <Button disabled={updateAttendance.isPending} onClick={saveEdit}>
-                  {updateAttendance.isPending ? 'Saving…' : 'Save changes'}
-                </Button>
-              </div>
-            </div>
+            </>
           ) : null}
         </DialogContent>
       </Dialog>

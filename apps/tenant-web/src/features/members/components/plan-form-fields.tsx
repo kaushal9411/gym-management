@@ -1,8 +1,11 @@
 'use client';
 
+import { IdCard, ListChecks } from 'lucide-react';
+
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PanelCard } from '@/features/members/components/detail/detail-ui';
 import { cn } from '@/lib/utils';
 import type { DurationType } from '../types';
 
@@ -76,9 +79,8 @@ export function PlanFormFields({ value, onChange, disabled, hidePlanCode }: Plan
   const set = <K extends keyof PlanFormState>(key: K, next: PlanFormState[K]) => onChange({ ...value, [key]: next });
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-4">
-        <h3 className="text-sm font-medium">Plan information</h3>
+    <div className="space-y-4">
+      <PanelCard icon={IdCard} accent="primary" title="Plan information" delay={0}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="planName" required>Plan name</Label>
@@ -157,10 +159,9 @@ export function PlanFormFields({ value, onChange, disabled, hidePlanCode }: Plan
             onChange={(e) => set('notes', e.target.value)}
           />
         </div>
-      </section>
+      </PanelCard>
 
-      <section className="space-y-4">
-        <h3 className="text-sm font-medium">Plan features</h3>
+      <PanelCard icon={ListChecks} accent="violet" title="Plan features" delay={0.05}>
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-2">
             <Label htmlFor="planPtSessions">PT sessions included</Label>
@@ -206,7 +207,7 @@ export function PlanFormFields({ value, onChange, disabled, hidePlanCode }: Plan
             />
           </div>
         ) : null}
-      </section>
+      </PanelCard>
     </div>
   );
 }

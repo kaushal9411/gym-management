@@ -3,15 +3,17 @@
 import * as React from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { ArrowLeft, QrCode } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ArrowLeft, QrCode, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SectionLoader } from '@/components/ui/section-loader';
-import { toAttendanceError, useCheckIn, useCheckOut, useManualCheckIn, useManualCheckOut, useValidateQrCode } from '@/features/attendance/hooks/use-attendance';
+import { toAttendanceError, useCheckIn, useCheckOut, useManualCheckIn, useManualCheckOut, useTodayAttendance, useValidateQrCode } from '@/features/attendance/hooks/use-attendance';
+import { ActivityFeedPanel } from '@/features/attendance/components/attendance-overview';
 import { MemberActionCard } from '@/features/attendance/components/member-action-card';
 import { MemberCheckinSearch } from '@/features/attendance/components/member-checkin-search';
+import { PanelCard } from '@/features/members/components/detail/detail-ui';
 import { extractQrToken } from '@/features/attendance/utils/qr-token';
 import type { MemberListItem } from '@/features/members/types';
 
@@ -66,28 +68,23 @@ function QrCheckInPanel() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Scan QR code</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <QrScanner onDecoded={handleDecoded} disabled={validateQr.isPending} />
-        {result?.member ? (
-          <MemberActionCard
-            name={result.member.name}
-            memberId={result.member.memberId}
-            profilePhotoUrl={result.member.profilePhotoUrl}
-            eligible={result.valid}
-            reason={result.valid ? null : result.reason}
-            actionLabel={result.alreadyCheckedIn ? 'Check out' : 'Check in'}
-            onAction={handleAction}
-            busy={busy}
-          />
-        ) : result && !result.member ? (
-          <p className="text-sm text-destructive">{result.reason ?? 'QR code not recognized.'}</p>
-        ) : null}
-      </CardContent>
-    </Card>
+    <PanelCard icon={QrCode} accent="primary" title="Scan QR code" delay={0.05}>
+      <QrScanner onDecoded={handleDecoded} disabled={validateQr.isPending} />
+      {result?.member ? (
+        <MemberActionCard
+          name={result.member.name}
+          memberId={result.member.memberId}
+          profilePhotoUrl={result.member.profilePhotoUrl}
+          eligible={result.valid}
+          reason={result.valid ? null : result.reason}
+          actionLabel={result.alreadyCheckedIn ? 'Check out' : 'Check in'}
+          onAction={handleAction}
+          busy={busy}
+        />
+      ) : result && !result.member ? (
+        <p className="text-sm text-destructive">{result.reason ?? 'QR code not recognized.'}</p>
+      ) : null}
+    </PanelCard>
   );
 }
 
@@ -139,65 +136,62 @@ function ManualCheckInPanel() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Manual member search</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <MemberCheckinSearch onSelect={setSelected} />
-        {selected ? (
-          <div className="space-y-2">
-            <MemberActionCard
-              name={selected.name}
-              memberId={selected.memberId}
-              profilePhotoUrl={selected.profilePhotoUrl}
-              eligible={eligible}
-              reason={reason}
-              actionLabel="Check in"
-              onAction={handleCheckIn}
-              busy={busy}
-            />
-            <p className="text-xs text-muted-foreground">
-              Already inside?{' '}
-              <button type="button" className="underline underline-offset-2 disabled:opacity-50" disabled={busy} onClick={handleCheckOut}>
-                Check out instead
-              </button>
-            </p>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+    <PanelCard icon={Search} accent="violet" title="Manual member search" delay={0.1}>
+      <MemberCheckinSearch onSelect={setSelected} />
+      {selected ? (
+        <div className="space-y-2">
+          <MemberActionCard
+            name={selected.name}
+            memberId={selected.memberId}
+            profilePhotoUrl={selected.profilePhotoUrl}
+            eligible={eligible}
+            reason={reason}
+            actionLabel="Check in"
+            onAction={handleCheckIn}
+            busy={busy}
+          />
+          <p className="text-xs text-muted-foreground">
+            Already inside?{' '}
+            <button type="button" className="underline underline-offset-2 disabled:opacity-50" disabled={busy} onClick={handleCheckOut}>
+              Check out instead
+            </button>
+          </p>
+        </div>
+      ) : null}
+    </PanelCard>
   );
 }
 
 export default function AttendanceCheckInPage() {
+  const today = useTodayAttendance();
+
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="w-full space-y-5">
       <Button variant="ghost" size="sm" asChild>
         <Link href="/attendance">
           <ArrowLeft className="size-4" /> Back to attendance
         </Link>
       </Button>
-      <div className="flex items-center gap-3.5">
-        <div
-          className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
-          style={{
-            backgroundColor: 'color-mix(in oklch, var(--success) 16%, transparent)',
-            color: 'var(--success)',
-            boxShadow: '0 0 0 1px color-mix(in oklch, var(--success) 18%, transparent)',
-          }}
-        >
-          <QrCode className="size-5" aria-hidden />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Check in / Check out</h1>
-          <p className="text-muted-foreground">Scan a member&apos;s QR code, or search for them manually.</p>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="relative overflow-hidden rounded-3xl p-6 text-white shadow-lg sm:px-7"
+        style={{ backgroundImage: 'radial-gradient(900px 320px at 88% -30%, color-mix(in oklch, #c026d3 75%, transparent), transparent 60%), linear-gradient(115deg, #4338ca, #7c3aed 62%, #c026d3)' }}
+      >
+        <div aria-hidden className="pointer-events-none absolute inset-0 opacity-60" style={{ backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,.06) 0 1px, transparent 1px 14px)' }} />
+        <div className="relative">
+          <p className="text-[11px] font-bold uppercase tracking-widest text-white/80">Live</p>
+          <h1 className="mt-0.5 text-3xl font-extrabold tracking-tight sm:text-4xl">Check in / Check out</h1>
+          <p className="mt-1 text-white/85">Scan a member&apos;s QR code, or search for them manually.</p>
+        </div>
+      </motion.section>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px]">
         <QrCheckInPanel />
         <ManualCheckInPanel />
+        <ActivityFeedPanel records={today.data} loading={today.isPending} />
       </div>
     </div>
   );

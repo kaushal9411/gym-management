@@ -3,13 +3,10 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Copy } from 'lucide-react';
+import { ArrowLeft, Copy, ListChecks, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
-import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +20,7 @@ import {
   DietPlanFormFields,
   type DietPlanFormState,
 } from '@/features/diet/components/diet-plan-form-fields';
+import { DietPlanDetailHero } from '@/features/diet/components/diet-plan-detail-hero';
 import { MealBuilder } from '@/features/diet/components/meal-builder';
 import {
   toDietError,
@@ -35,6 +33,7 @@ import {
   useUpdateDietPlan,
 } from '@/features/diet/hooks/use-diet';
 import type { DietPlanDetail, PlanMealInput } from '@/features/diet/types';
+import { PanelCard } from '@/features/members/components/detail/detail-ui';
 
 type StatusActionKind = 'activate' | 'deactivate' | 'restore' | 'delete';
 
@@ -51,6 +50,7 @@ function toFormState(plan: DietPlanDetail): DietPlanFormState {
   };
 }
 
+/** Same hero + PanelCard-sections shell as the Workout Plan/Branch detail pages — every field/handler/mutation below is exactly as before, only the wrapping layout changed. */
 export default function DietPlanDetailPage() {
   const params = useParams<{ planId: string }>();
   const router = useRouter();
@@ -84,9 +84,10 @@ export default function DietPlanDetailPage() {
 
   if (plan.isPending || !form) {
     return (
-      <div className="mx-auto max-w-4xl space-y-4">
+      <div className="w-full space-y-4">
         <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-44 w-full rounded-3xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     );
   }
@@ -172,114 +173,101 @@ export default function DietPlanDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
+    <div className="w-full space-y-5">
       <Button variant="ghost" size="sm" asChild>
         <Link href="/diet-plans">
           <ArrowLeft className="size-4" /> Back to diet plans
         </Link>
       </Button>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{data.name}</h1>
-          <p className="text-muted-foreground">
-            {data.durationDays}d{data.dailyCalories ? ` · ${data.dailyCalories} kcal/day` : ''} · {data.activeMemberCount} active member(s)
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {data.deletedAt ? (
-            <DeletedBadge />
-          ) : (
-            <Badge variant={data.isActive ? 'secondary' : 'outline'}>{data.isActive ? 'Active' : 'Inactive'}</Badge>
-          )}
-          {canCreate ? (
-            <Button variant="outline" size="sm" disabled={duplicatePlan.isPending} onClick={handleDuplicate}>
-              <Copy className="size-4" /> Duplicate
-            </Button>
-          ) : null}
-          {data.deletedAt ? (
-            canRestore ? (
-              <Button size="sm" onClick={() => setConfirmStatusAction('restore')}>
-                Restore
+      <DietPlanDetailHero
+        data={data}
+        actions={
+          <>
+            {canCreate ? (
+              <Button variant="secondary" size="sm" disabled={duplicatePlan.isPending} onClick={handleDuplicate}>
+                <Copy className="size-4" /> Duplicate
               </Button>
-            ) : null
-          ) : canUpdate ? (
-            data.isActive ? (
-              <Button variant="outline" size="sm" onClick={() => setConfirmStatusAction('deactivate')}>
-                Deactivate
+            ) : null}
+            {data.deletedAt ? (
+              canRestore ? (
+                <Button variant="secondary" size="sm" onClick={() => setConfirmStatusAction('restore')}>
+                  Restore
+                </Button>
+              ) : null
+            ) : canUpdate ? (
+              data.isActive ? (
+                <Button variant="secondary" size="sm" onClick={() => setConfirmStatusAction('deactivate')}>
+                  Deactivate
+                </Button>
+              ) : (
+                <Button variant="secondary" size="sm" onClick={() => setConfirmStatusAction('activate')}>
+                  Activate
+                </Button>
+              )
+            ) : null}
+            {!data.deletedAt && canDelete ? (
+              <Button variant="destructive" size="sm" onClick={() => setConfirmStatusAction('delete')}>
+                Delete
               </Button>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => setConfirmStatusAction('activate')}>
-                Activate
-              </Button>
-            )
-          ) : null}
-          {!data.deletedAt && canDelete ? (
-            <Button variant="destructive" size="sm" onClick={() => setConfirmStatusAction('delete')}>
-              Delete
-            </Button>
-          ) : null}
-        </div>
-      </div>
+            ) : null}
+          </>
+        }
+      />
 
       {canUpdate ? <UnsavedChangesBar isDirty={isDirty} saving={updatePlan.isPending} onSave={handleSave} onCancel={handleCancel} /> : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Plan details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DietPlanFormFields value={form} onChange={setForm} disabled={!canUpdate} />
-        </CardContent>
-      </Card>
+      <DietPlanFormFields value={form} onChange={setForm} disabled={!canUpdate} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Meal builder</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <MealBuilder
-            initialMeals={data.meals}
-            foodOptions={foods.data ?? []}
-            disabled={!canUpdate}
-            onChange={(next, dirty) => {
-              setBuilderMeals(next);
-              setMealsDirty(dirty);
-            }}
-          />
-          {canUpdate ? (
-            <Button size="sm" disabled={!mealsDirty || setMeals.isPending} onClick={handleSaveMeals}>
-              {setMeals.isPending ? 'Saving…' : 'Save meal builder'}
-            </Button>
-          ) : null}
-        </CardContent>
-      </Card>
+      <PanelCard icon={ListChecks} accent="violet" title="Meal builder" delay={0.05}>
+        <MealBuilder
+          initialMeals={data.meals}
+          foodOptions={foods.data ?? []}
+          disabled={!canUpdate}
+          onChange={(next, dirty) => {
+            setBuilderMeals(next);
+            setMealsDirty(dirty);
+          }}
+        />
+        {canUpdate ? (
+          <Button
+            size="sm"
+            disabled={!mealsDirty || setMeals.isPending}
+            onClick={handleSaveMeals}
+            className="border-0 text-white shadow-md disabled:opacity-50"
+            style={{ backgroundImage: 'linear-gradient(120deg, var(--success), var(--chart-3))' }}
+          >
+            {setMeals.isPending ? 'Saving…' : 'Save meal builder'}
+          </Button>
+        ) : null}
+      </PanelCard>
 
       {canAssign && !data.deletedAt && data.isActive ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Assign to a member</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <MemberCheckinSearch onSelect={setAssignMember} placeholder="Search member by name, email, or member ID…" />
-            {assignMember ? (
-              <div className="flex flex-wrap items-end gap-2">
-                <span className="text-sm">
-                  Assigning to <span className="font-medium">{assignMember.name}</span>
-                </span>
-                <div className="space-y-1">
-                  <Label htmlFor="assignStartDate" className="text-xs">
-                    Start date
-                  </Label>
-                  <Input id="assignStartDate" type="date" className="h-9" value={assignStartDate} onChange={(e) => setAssignStartDate(e.target.value)} />
-                </div>
-                <Button size="sm" disabled={assignPlan.isPending} onClick={handleAssign}>
-                  {assignPlan.isPending ? 'Assigning…' : 'Assign plan'}
-                </Button>
+        <PanelCard icon={UserPlus} accent="aqua" title="Assign to a member" delay={0.1}>
+          <MemberCheckinSearch onSelect={setAssignMember} placeholder="Search member by name, email, or member ID…" />
+          {assignMember ? (
+            <div className="flex flex-wrap items-end gap-2">
+              <span className="text-sm">
+                Assigning to <span className="font-medium">{assignMember.name}</span>
+              </span>
+              <div className="space-y-1">
+                <Label htmlFor="assignStartDate" className="text-xs">
+                  Start date
+                </Label>
+                <Input id="assignStartDate" type="date" className="h-9" value={assignStartDate} onChange={(e) => setAssignStartDate(e.target.value)} />
               </div>
-            ) : null}
-          </CardContent>
-        </Card>
+              <Button
+                size="sm"
+                disabled={assignPlan.isPending}
+                onClick={handleAssign}
+                className="border-0 text-white shadow-md disabled:opacity-50"
+                style={{ backgroundImage: 'linear-gradient(120deg, var(--primary), var(--chart-7))' }}
+              >
+                {assignPlan.isPending ? 'Assigning…' : 'Assign plan'}
+              </Button>
+            </div>
+          ) : null}
+        </PanelCard>
       ) : null}
 
       <ConfirmDialog

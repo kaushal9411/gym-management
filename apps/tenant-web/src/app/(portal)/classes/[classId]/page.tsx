@@ -3,16 +3,14 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ListChecks, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
-import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { ClassDetailHero } from '@/features/classes/components/class-detail-hero';
 import { ClassScheduleEditor } from '@/features/classes/components/class-schedule-editor';
 import { DEFAULT_GROUP_CLASS_FORM_STATE, GroupClassFormFields, type GroupClassFormState } from '@/features/classes/components/group-class-form-fields';
 import {
@@ -24,6 +22,7 @@ import {
   useUpdateClass,
 } from '@/features/classes/hooks/use-classes';
 import type { GroupClass, ScheduleSlot } from '@/features/classes/types';
+import { PanelCard } from '@/features/members/components/detail/detail-ui';
 import { UnsavedChangesBar } from '@/features/gym-settings/components/unsaved-changes-bar';
 
 type StatusActionKind = 'delete' | 'restore';
@@ -40,6 +39,7 @@ function toFormState(groupClass: GroupClass): GroupClassFormState {
   };
 }
 
+/** Same hero + PanelCard-sections shell as the Workout Plan/Branch detail pages — every field/handler/mutation below is exactly as before, only the wrapping layout changed. */
 export default function ClassDetailPage() {
   const params = useParams<{ classId: string }>();
   const { hasPermission } = usePermissions();
@@ -66,9 +66,10 @@ export default function ClassDetailPage() {
 
   if (groupClass.isPending || !form) {
     return (
-      <div className="mx-auto max-w-4xl space-y-4">
+      <div className="w-full space-y-4">
         <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-44 w-full rounded-3xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     );
   }
@@ -136,77 +137,72 @@ export default function ClassDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
+    <div className="w-full space-y-5">
       <Button variant="ghost" size="sm" asChild>
         <Link href="/classes">
           <ArrowLeft className="size-4" /> Back to classes
         </Link>
       </Button>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{data.name}</h1>
-          <p className="text-muted-foreground">{data.branch.name}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {data.deletedAt ? (
-            <DeletedBadge />
-          ) : (
-            <Badge variant={data.isActive ? 'secondary' : 'outline'}>{data.isActive ? 'Active' : 'Inactive'}</Badge>
-          )}
-          {data.deletedAt ? (
-            canRestore ? (
-              <Button size="sm" onClick={() => setConfirmStatusAction('restore')}>
-                Restore
+      <ClassDetailHero
+        data={data}
+        actions={
+          <>
+            {data.deletedAt ? (
+              canRestore ? (
+                <Button variant="secondary" size="sm" onClick={() => setConfirmStatusAction('restore')}>
+                  Restore
+                </Button>
+              ) : null
+            ) : canDelete ? (
+              <Button variant="destructive" size="sm" onClick={() => setConfirmStatusAction('delete')}>
+                Delete
               </Button>
-            ) : null
-          ) : canDelete ? (
-            <Button variant="destructive" size="sm" onClick={() => setConfirmStatusAction('delete')}>
-              Delete
-            </Button>
-          ) : null}
-        </div>
-      </div>
+            ) : null}
+          </>
+        }
+      />
 
       {canUpdate ? <UnsavedChangesBar isDirty={isDirty} saving={updateClass.isPending} onSave={handleSave} onCancel={handleCancel} /> : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Class details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <GroupClassFormFields value={form} onChange={setForm} disabled={!canUpdate} />
-        </CardContent>
-      </Card>
+      <GroupClassFormFields value={form} onChange={setForm} disabled={!canUpdate} />
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <CardTitle className="text-base">Weekly schedule</CardTitle>
-          {canUpdate ? (
+      <PanelCard
+        icon={ListChecks}
+        accent="violet"
+        title="Weekly schedule"
+        delay={0.05}
+        right={
+          canUpdate ? (
             <Button variant="outline" size="sm" disabled={generateSessions.isPending} onClick={handleGenerate}>
               <RefreshCw className="size-3.5" /> {generateSessions.isPending ? 'Generating…' : 'Regenerate sessions now'}
             </Button>
-          ) : null}
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-xs text-muted-foreground">
-            A recurring template — the scheduler expands it into dated, bookable sessions for a rolling 4-week window every night.
-          </p>
-          <ClassScheduleEditor
-            initialSlots={data.schedule}
-            disabled={!canUpdate}
-            onChange={(next, dirty) => {
-              setScheduleSlots(next);
-              setScheduleDirty(dirty);
-            }}
-          />
-          {canUpdate ? (
-            <Button size="sm" disabled={!scheduleDirty || setSchedule.isPending} onClick={handleSaveSchedule}>
-              {setSchedule.isPending ? 'Saving…' : 'Save weekly schedule'}
-            </Button>
-          ) : null}
-        </CardContent>
-      </Card>
+          ) : null
+        }
+      >
+        <p className="text-xs text-muted-foreground">
+          A recurring template — the scheduler expands it into dated, bookable sessions for a rolling 4-week window every night.
+        </p>
+        <ClassScheduleEditor
+          initialSlots={data.schedule}
+          disabled={!canUpdate}
+          onChange={(next, dirty) => {
+            setScheduleSlots(next);
+            setScheduleDirty(dirty);
+          }}
+        />
+        {canUpdate ? (
+          <Button
+            size="sm"
+            disabled={!scheduleDirty || setSchedule.isPending}
+            onClick={handleSaveSchedule}
+            className="border-0 text-white shadow-md disabled:opacity-50"
+            style={{ backgroundImage: 'linear-gradient(120deg, var(--success), var(--chart-3))' }}
+          >
+            {setSchedule.isPending ? 'Saving…' : 'Save weekly schedule'}
+          </Button>
+        ) : null}
+      </PanelCard>
 
       <ConfirmDialog
         open={confirmStatusAction !== null}

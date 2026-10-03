@@ -37,27 +37,31 @@ export function BusinessHoursEditor({ value, onChange, disabled }: BusinessHours
           <div
             key={key}
             className={cn(
-              'grid grid-cols-[100px_1fr_auto_1fr_auto] items-center gap-3 rounded-lg border border-transparent px-2.5 py-2 transition-colors duration-150',
+              'flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-transparent px-2.5 py-2 transition-colors duration-150 sm:grid sm:grid-cols-[100px_1fr_auto_1fr_auto]',
               day.closed ? 'bg-muted/30' : 'hover:bg-accent/40 hover:border-border',
             )}
           >
-            <Label className="text-sm font-medium">{label}</Label>
-            <Input
-              type="time"
-              aria-label={`${label} opening time`}
-              value={day.open ?? ''}
-              disabled={disabled || day.closed}
-              onChange={(e) => update(key, { open: e.target.value })}
-            />
-            <span className="text-xs text-muted-foreground">to</span>
-            <Input
-              type="time"
-              aria-label={`${label} closing time`}
-              value={day.close ?? ''}
-              disabled={disabled || day.closed}
-              onChange={(e) => update(key, { close: e.target.value })}
-            />
-            <span className="flex items-center gap-2">
+            <Label className="w-full text-sm font-medium sm:w-auto">{label}</Label>
+            <div className="flex min-w-0 flex-1 items-center gap-3 sm:contents">
+              <Input
+                type="time"
+                aria-label={`${label} opening time`}
+                value={day.open ?? ''}
+                disabled={disabled || day.closed}
+                onChange={(e) => update(key, { open: e.target.value })}
+                className="min-w-0 flex-1 sm:flex-initial"
+              />
+              <span className="shrink-0 text-xs text-muted-foreground">to</span>
+              <Input
+                type="time"
+                aria-label={`${label} closing time`}
+                value={day.close ?? ''}
+                disabled={disabled || day.closed}
+                onChange={(e) => update(key, { close: e.target.value })}
+                className="min-w-0 flex-1 sm:flex-initial"
+              />
+            </div>
+            <span className="flex shrink-0 items-center gap-2">
               <Checkbox
                 id={`closed-${key}`}
                 checked={day.closed}

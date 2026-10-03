@@ -3,13 +3,10 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Copy } from 'lucide-react';
+import { ArrowLeft, Copy, ListChecks, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
-import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,12 +14,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { UnsavedChangesBar } from '@/features/gym-settings/components/unsaved-changes-bar';
 import { MemberCheckinSearch } from '@/features/attendance/components/member-checkin-search';
+import { PanelCard } from '@/features/members/components/detail/detail-ui';
 import type { MemberListItem } from '@/features/members/types';
 import {
   DEFAULT_WORKOUT_PLAN_FORM_STATE,
   WorkoutPlanFormFields,
   type WorkoutPlanFormState,
 } from '@/features/workouts/components/workout-plan-form-fields';
+import { WorkoutPlanDetailHero } from '@/features/workouts/components/workout-plan-detail-hero';
 import { WeeklyScheduleEditor } from '@/features/workouts/components/weekly-schedule-editor';
 import {
   toWorkoutError,
@@ -51,6 +50,7 @@ function toFormState(plan: WorkoutPlanDetail): WorkoutPlanFormState {
   };
 }
 
+/** Same hero + PanelCard-sections shell as the Branch/Membership detail pages — every field/handler/mutation below is exactly as before, only the wrapping layout changed. */
 export default function WorkoutPlanDetailPage() {
   const params = useParams<{ planId: string }>();
   const router = useRouter();
@@ -84,9 +84,10 @@ export default function WorkoutPlanDetailPage() {
 
   if (plan.isPending || !form) {
     return (
-      <div className="mx-auto max-w-4xl space-y-4">
+      <div className="w-full space-y-4">
         <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-44 w-full rounded-3xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     );
   }
@@ -172,114 +173,101 @@ export default function WorkoutPlanDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
+    <div className="w-full space-y-5">
       <Button variant="ghost" size="sm" asChild>
         <Link href="/workout-plans">
           <ArrowLeft className="size-4" /> Back to workout plans
         </Link>
       </Button>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{data.name}</h1>
-          <p className="text-muted-foreground">
-            {data.durationWeeks}w · {data.activeMemberCount} active member(s)
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {data.deletedAt ? (
-            <DeletedBadge />
-          ) : (
-            <Badge variant={data.isActive ? 'secondary' : 'outline'}>{data.isActive ? 'Active' : 'Inactive'}</Badge>
-          )}
-          {canCreate ? (
-            <Button variant="outline" size="sm" disabled={duplicatePlan.isPending} onClick={handleDuplicate}>
-              <Copy className="size-4" /> Duplicate
-            </Button>
-          ) : null}
-          {data.deletedAt ? (
-            canRestore ? (
-              <Button size="sm" onClick={() => setConfirmStatusAction('restore')}>
-                Restore
+      <WorkoutPlanDetailHero
+        data={data}
+        actions={
+          <>
+            {canCreate ? (
+              <Button variant="secondary" size="sm" disabled={duplicatePlan.isPending} onClick={handleDuplicate}>
+                <Copy className="size-4" /> Duplicate
               </Button>
-            ) : null
-          ) : canUpdate ? (
-            data.isActive ? (
-              <Button variant="outline" size="sm" onClick={() => setConfirmStatusAction('deactivate')}>
-                Deactivate
+            ) : null}
+            {data.deletedAt ? (
+              canRestore ? (
+                <Button variant="secondary" size="sm" onClick={() => setConfirmStatusAction('restore')}>
+                  Restore
+                </Button>
+              ) : null
+            ) : canUpdate ? (
+              data.isActive ? (
+                <Button variant="secondary" size="sm" onClick={() => setConfirmStatusAction('deactivate')}>
+                  Deactivate
+                </Button>
+              ) : (
+                <Button variant="secondary" size="sm" onClick={() => setConfirmStatusAction('activate')}>
+                  Activate
+                </Button>
+              )
+            ) : null}
+            {!data.deletedAt && canDelete ? (
+              <Button variant="destructive" size="sm" onClick={() => setConfirmStatusAction('delete')}>
+                Delete
               </Button>
-            ) : (
-              <Button variant="outline" size="sm" onClick={() => setConfirmStatusAction('activate')}>
-                Activate
-              </Button>
-            )
-          ) : null}
-          {!data.deletedAt && canDelete ? (
-            <Button variant="destructive" size="sm" onClick={() => setConfirmStatusAction('delete')}>
-              Delete
-            </Button>
-          ) : null}
-        </div>
-      </div>
+            ) : null}
+          </>
+        }
+      />
 
       {canUpdate ? <UnsavedChangesBar isDirty={isDirty} saving={updatePlan.isPending} onSave={handleSave} onCancel={handleCancel} /> : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Plan details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <WorkoutPlanFormFields value={form} onChange={setForm} disabled={!canUpdate} />
-        </CardContent>
-      </Card>
+      <WorkoutPlanFormFields value={form} onChange={setForm} disabled={!canUpdate} />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Weekly schedule</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <WeeklyScheduleEditor
-            initialExercises={data.exercises}
-            exerciseOptions={exercises.data ?? []}
-            disabled={!canUpdate}
-            onChange={(next, dirty) => {
-              setScheduleExercises(next);
-              setScheduleDirty(dirty);
-            }}
-          />
-          {canUpdate ? (
-            <Button size="sm" disabled={!scheduleDirty || setExercises.isPending} onClick={handleSaveSchedule}>
-              {setExercises.isPending ? 'Saving…' : 'Save weekly schedule'}
-            </Button>
-          ) : null}
-        </CardContent>
-      </Card>
+      <PanelCard icon={ListChecks} accent="violet" title="Weekly schedule" delay={0.05}>
+        <WeeklyScheduleEditor
+          initialExercises={data.exercises}
+          exerciseOptions={exercises.data ?? []}
+          disabled={!canUpdate}
+          onChange={(next, dirty) => {
+            setScheduleExercises(next);
+            setScheduleDirty(dirty);
+          }}
+        />
+        {canUpdate ? (
+          <Button
+            size="sm"
+            disabled={!scheduleDirty || setExercises.isPending}
+            onClick={handleSaveSchedule}
+            className="border-0 text-white shadow-md disabled:opacity-50"
+            style={{ backgroundImage: 'linear-gradient(120deg, var(--success), var(--chart-3))' }}
+          >
+            {setExercises.isPending ? 'Saving…' : 'Save weekly schedule'}
+          </Button>
+        ) : null}
+      </PanelCard>
 
       {canAssign && !data.deletedAt && data.isActive ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Assign to a member</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <MemberCheckinSearch onSelect={setAssignMember} placeholder="Search member by name, email, or member ID…" />
-            {assignMember ? (
-              <div className="flex flex-wrap items-end gap-2">
-                <span className="text-sm">
-                  Assigning to <span className="font-medium">{assignMember.name}</span>
-                </span>
-                <div className="space-y-1">
-                  <Label htmlFor="assignStartDate" className="text-xs">
-                    Start date
-                  </Label>
-                  <Input id="assignStartDate" type="date" className="h-9" value={assignStartDate} onChange={(e) => setAssignStartDate(e.target.value)} />
-                </div>
-                <Button size="sm" disabled={assignPlan.isPending} onClick={handleAssign}>
-                  {assignPlan.isPending ? 'Assigning…' : 'Assign plan'}
-                </Button>
+        <PanelCard icon={UserPlus} accent="aqua" title="Assign to a member" delay={0.1}>
+          <MemberCheckinSearch onSelect={setAssignMember} placeholder="Search member by name, email, or member ID…" />
+          {assignMember ? (
+            <div className="flex flex-wrap items-end gap-2">
+              <span className="text-sm">
+                Assigning to <span className="font-medium">{assignMember.name}</span>
+              </span>
+              <div className="space-y-1">
+                <Label htmlFor="assignStartDate" className="text-xs">
+                  Start date
+                </Label>
+                <Input id="assignStartDate" type="date" className="h-9" value={assignStartDate} onChange={(e) => setAssignStartDate(e.target.value)} />
               </div>
-            ) : null}
-          </CardContent>
-        </Card>
+              <Button
+                size="sm"
+                disabled={assignPlan.isPending}
+                onClick={handleAssign}
+                className="border-0 text-white shadow-md disabled:opacity-50"
+                style={{ backgroundImage: 'linear-gradient(120deg, var(--primary), var(--chart-7))' }}
+              >
+                {assignPlan.isPending ? 'Assigning…' : 'Assign plan'}
+              </Button>
+            </div>
+          ) : null}
+        </PanelCard>
       ) : null}
 
       <ConfirmDialog

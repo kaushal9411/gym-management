@@ -3,28 +3,23 @@
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
-import { Apple, ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, MoreHorizontal, Plus } from 'lucide-react';
+import { Apple, ArrowLeft, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
-import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination } from '@/components/ui/pagination';
-import { SearchBar } from '@/components/ui/search-bar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { DEFAULT_FOOD_FORM_STATE, FoodFormFields, type FoodFormState } from '@/features/diet/components/food-form-fields';
+import { FoodCard, type FoodCardAction } from '@/features/diet/components/food-card';
+import { FoodsHero } from '@/features/diet/components/foods-hero';
+import { FoodsInsights, FoodsKpis } from '@/features/diet/components/foods-overview';
+import { FoodsToolbar } from '@/features/diet/components/foods-toolbar';
 import { toDietError, useCreateFood, useFoodList, useFoodStatusAction, useUpdateFood } from '@/features/diet/hooks/use-diet';
 import type { Food, ListFoodsParams } from '@/features/diet/types';
-import { cn } from '@/lib/utils';
-
-const selectClassName = cn(
-  'h-9 rounded-lg border border-input bg-background px-2.5 text-sm shadow-xs transition-all duration-150',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
-);
 
 type SortableColumn = NonNullable<ListFoodsParams['sortBy']>;
 
@@ -58,38 +53,36 @@ export default function FoodLibraryPage() {
 
   const [search, setSearch] = React.useState('');
   const debouncedSearch = useDebouncedValue(search, 300);
+  const [isActiveFilter, setIsActiveFilter] = React.useState<'true' | 'false' | ''>('');
   const [page, setPage] = React.useState(1);
   const [sortBy, setSortBy] = React.useState<SortableColumn>('name');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
+  const [view, setView] = React.useState<'grid' | 'list'>('grid');
   const [editing, setEditing] = React.useState<Food | 'new' | null>(null);
   const [form, setForm] = React.useState<FoodFormState>(DEFAULT_FOOD_FORM_STATE);
   const [formError, setFormError] = React.useState<string | null>(null);
   const [confirmAction, setConfirmAction] = React.useState<{ action: 'delete' | 'restore'; food: Food } | null>(null);
 
-  const foods = useFoodList({ page, limit: 20, search: debouncedSearch || undefined, includeDeleted: true, sortBy, sortDir });
+  const foods = useFoodList({
+    page,
+    limit: 20,
+    search: debouncedSearch || undefined,
+    isActive: isActiveFilter === '' ? undefined : isActiveFilter === 'true',
+    includeDeleted: true,
+    sortBy,
+    sortDir,
+  });
+  // Separate, unfiltered fetch (generous limit) — feeds the hero/KPI tiles/insights so
+  // those always reflect the whole library, not whatever filter the list below is under.
+  const allFoods = useFoodList({ page: 1, limit: 100, includeDeleted: true });
+
   const createFood = useCreateFood();
   const updateFood = useUpdateFood();
   const statusAction = useFoodStatusAction();
 
   const data = foods.data;
   const items = data?.items ?? [];
-
-  const toggleSort = (column: SortableColumn) => {
-    if (sortBy === column) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else {
-      setSortBy(column);
-      setSortDir('asc');
-    }
-  };
-  const sortIcon = (column: SortableColumn) => {
-    if (sortBy !== column) return <ArrowUpDown className="size-3.5 text-muted-foreground" />;
-    return sortDir === 'asc' ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />;
-  };
-  const sortableHeader = (label: string, column: SortableColumn) => (
-    <button type="button" className="flex items-center gap-1 font-medium hover:text-foreground" onClick={() => toggleSort(column)}>
-      {label} {sortIcon(column)}
-    </button>
-  );
+  const allItems = allFoods.data?.items ?? [];
 
   const openCreate = () => {
     setForm(DEFAULT_FOOD_FORM_STATE);
@@ -158,119 +151,132 @@ export default function FoodLibraryPage() {
     setConfirmAction(null);
   };
 
-  const columns: DataTableColumn<Food>[] = [
-    {
-      key: 'name',
-      header: sortableHeader('Food', 'name'),
-      render: (f) => (
-        <button type="button" className="text-left hover:underline" onClick={() => openEdit(f)}>
-          <span className="block font-medium">{f.name}</span>
-          <span className="block text-xs text-muted-foreground">{f.servingSize ?? '—'}</span>
-        </button>
-      ),
-    },
-    { key: 'category', header: sortableHeader('Category', 'category'), render: (f) => f.category ?? '—' },
-    { key: 'calories', header: 'Calories', render: (f) => (f.calories ?? '—') },
-    { key: 'protein', header: 'Protein (g)', render: (f) => f.protein ?? '—' },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (f) =>
-        f.deletedAt ? (
-          <DeletedBadge />
-        ) : (
-          <Badge variant={f.isActive ? 'secondary' : 'outline'}>{f.isActive ? 'Active' : 'Inactive'}</Badge>
-        ),
-    },
-    {
-      key: 'actions',
-      header: '',
-      className: 'w-10',
-      render: (f) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${f.name}`}>
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {canUpdate ? <DropdownMenuItem onClick={() => openEdit(f)}>Edit</DropdownMenuItem> : null}
-            {f.deletedAt ? (
-              canRestore ? (
-                <DropdownMenuItem onClick={() => setConfirmAction({ action: 'restore', food: f })}>Restore</DropdownMenuItem>
-              ) : null
-            ) : canDelete ? (
-              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmAction({ action: 'delete', food: f })}>
-                Delete
-              </DropdownMenuItem>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ];
+  const handleCardAction = (food: Food, action: FoodCardAction) => {
+    if (action === 'edit') {
+      openEdit(food);
+      return;
+    }
+    setConfirmAction({ action, food });
+  };
 
   return (
-    <div className="space-y-5">
+    <div className="w-full space-y-5">
       <Button variant="ghost" size="sm" asChild>
         <Link href="/diet-plans">
           <ArrowLeft className="size-4" /> Back to diet plans
         </Link>
       </Button>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <div
-            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
-            style={{
-              backgroundColor: 'color-mix(in oklch, var(--success) 16%, transparent)',
-              color: 'var(--success)',
-              boxShadow: '0 0 0 1px color-mix(in oklch, var(--success) 18%, transparent)',
-            }}
-          >
-            <Apple className="size-5" aria-hidden />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Food Library</h1>
-            <p className="text-muted-foreground">Reusable foods for building diet plans.</p>
-          </div>
-        </div>
-        {canCreate ? (
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="size-4" /> Add food
-          </Button>
-        ) : null}
-      </div>
+      <FoodsHero
+        total={allFoods.data?.total ?? 0}
+        foods={allItems}
+        actions={
+          canCreate ? (
+            <Button size="sm" data-solid className="border-0 bg-white text-indigo-700 shadow-lg hover:bg-white/90" onClick={openCreate}>
+              <Plus className="size-4" /> Add food
+            </Button>
+          ) : null
+        }
+      />
 
-      <SearchBar
-        containerClassName="max-w-xs"
-        placeholder="Search name, category…"
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
+      <FoodsKpis
+        foods={allItems}
+        loading={allFoods.isPending}
+        isActiveFilter={isActiveFilter}
+        onStatus={(v) => {
+          setIsActiveFilter(v);
           setPage(1);
         }}
       />
 
-      <DataTable columns={columns} rows={items} rowKey={(f) => f.id} rowClassName={(f) => (f.deletedAt ? 'bg-destructive/5' : undefined)} loading={foods.isPending} error={foods.error} onRetry={() => foods.refetch()} emptyMessage="No foods match these filters." />
+      <FoodsInsights foods={allItems} loading={allFoods.isPending} />
 
-      {data ? (
-        <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
-      ) : null}
+      <FoodsToolbar
+        search={search}
+        onSearch={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
+        status={isActiveFilter}
+        onStatus={(v) => {
+          setIsActiveFilter(v);
+          setPage(1);
+        }}
+        sort={`${sortBy}:${sortDir}`}
+        onSort={(v) => {
+          const [by, dir] = v.split(':') as [SortableColumn, 'asc' | 'desc'];
+          setSortBy(by);
+          setSortDir(dir);
+        }}
+        view={view}
+        onView={setView}
+      />
+
+      {foods.error ? (
+        <EmptyState
+          title="Couldn't load this data"
+          description={foods.error instanceof Error ? foods.error.message : 'Something went wrong loading this data.'}
+          className="border-destructive/30"
+          action={
+            <Button variant="outline" size="sm" onClick={() => foods.refetch()}>
+              Retry
+            </Button>
+          }
+        />
+      ) : foods.isPending ? (
+        <div className={view === 'grid' ? 'grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4' : 'space-y-3'}>
+          {Array.from({ length: view === 'grid' ? 6 : 4 }).map((_, i) => (
+            <Skeleton key={i} className={view === 'grid' ? 'h-[280px] w-full rounded-3xl' : 'h-20 w-full rounded-2xl'} />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState icon={Apple} title={!search && !isActiveFilter ? 'Add your first food to get started.' : 'No foods match these filters.'} />
+      ) : (
+        <div className={view === 'grid' ? 'grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4' : 'space-y-2.5'}>
+          {items.map((f, i) => (
+            <FoodCard
+              key={f.id}
+              food={f}
+              index={i}
+              variant={view}
+              canUpdate={canUpdate}
+              canDelete={canDelete}
+              canRestore={canRestore}
+              onRequestAction={(action) => handleCardAction(f, action)}
+            />
+          ))}
+        </div>
+      )}
+
+      {data ? <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} /> : null}
 
       <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editing === 'new' ? 'Add food' : `Edit ${editing?.name ?? ''}`}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={submitForm} className="space-y-4">
+        <DialogContent className="max-h-[85vh] max-w-2xl gap-0 overflow-y-auto p-0">
+          <div className="relative overflow-hidden p-5 text-white" style={{ backgroundImage: 'linear-gradient(115deg, #4338ca, #7c3aed 62%, #c026d3)' }}>
+            <div aria-hidden className="pointer-events-none absolute inset-0 opacity-60" style={{ backgroundImage: 'repeating-linear-gradient(135deg, rgba(255,255,255,.06) 0 1px, transparent 1px 14px)' }} />
+            <div className="relative flex items-center gap-3">
+              <span className="grid size-10 shrink-0 place-items-center rounded-full border border-white/30 bg-white/15">
+                <Apple className="size-5" aria-hidden />
+              </span>
+              <DialogHeader className="min-w-0 text-left">
+                <DialogTitle className="text-white">{editing === 'new' ? 'Add food' : `Edit ${editing?.name ?? ''}`}</DialogTitle>
+                <DialogDescription className="text-white/80">Reusable across any diet plan&apos;s meal builder.</DialogDescription>
+              </DialogHeader>
+            </div>
+          </div>
+          <form onSubmit={submitForm} className="space-y-4 p-5">
             {formError ? (
               <p role="alert" className="text-sm text-destructive">
                 {formError}
               </p>
             ) : null}
             <FoodFormFields value={form} onChange={setForm} disabled={createFood.isPending || updateFood.isPending} />
-            <Button type="submit" className="w-full" disabled={createFood.isPending || updateFood.isPending}>
+            <Button
+              type="submit"
+              className="w-full border-0 text-white shadow-md"
+              style={{ backgroundImage: 'linear-gradient(120deg, var(--success), var(--chart-3))' }}
+              disabled={createFood.isPending || updateFood.isPending}
+            >
               {createFood.isPending || updateFood.isPending ? 'Saving…' : editing === 'new' ? 'Add food' : 'Save changes'}
             </Button>
           </form>

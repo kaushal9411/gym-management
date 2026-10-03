@@ -1,9 +1,12 @@
 'use client';
 
+import { CalendarRange } from 'lucide-react';
+
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BranchSelect } from '@/features/members/components/branch-select';
+import { PanelCard } from '@/features/members/components/detail/detail-ui';
 import { TrainerSelect } from '@/features/members/components/trainer-select';
 import { cn } from '@/lib/utils';
 
@@ -42,7 +45,7 @@ export function GroupClassFormFields({ value, onChange, disabled }: GroupClassFo
   const set = <K extends keyof GroupClassFormState>(key: K, next: GroupClassFormState[K]) => onChange({ ...value, [key]: next });
 
   return (
-    <div className="space-y-4">
+    <PanelCard icon={CalendarRange} accent="primary" title="Class information" delay={0}>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="className" required>Class name</Label>
@@ -98,6 +101,6 @@ export function GroupClassFormFields({ value, onChange, disabled }: GroupClassFo
         <Checkbox id="classIsActive" checked={value.isActive} disabled={disabled} onCheckedChange={(c) => set('isActive', c === true)} />
         Active (included in session generation)
       </label>
-    </div>
+    </PanelCard>
   );
 }

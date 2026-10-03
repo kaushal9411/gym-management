@@ -3,19 +3,20 @@
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowDown, ArrowUp, ArrowUpDown, Copy, IdCard, MoreHorizontal, Plus } from 'lucide-react';
+import { IdCard, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
-import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination } from '@/components/ui/pagination';
-import { SearchBar } from '@/components/ui/search-bar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useBranches, useCurrentBranch } from '@/features/branch/hooks/use-branches';
+import { MembershipPlanCard, type PlanCardAction } from '@/features/members/components/membership-plan-card';
+import { MembershipsHero } from '@/features/members/components/memberships-hero';
+import { MembershipsInsights, MembershipsKpis } from '@/features/members/components/memberships-overview';
+import { MembershipsToolbar } from '@/features/members/components/memberships-toolbar';
 import {
   toMemberError,
   useDuplicateMembershipPlan,
@@ -23,14 +24,7 @@ import {
   useMembershipPlanStatusAction,
 } from '@/features/members/hooks/use-members';
 import type { ListMembershipPlansParams, MembershipPlan } from '@/features/members/types';
-import { computePlanPrice } from '@/features/members/utils/plan-pricing';
 import { useCurrencySymbol } from '@/lib/currency';
-import { cn } from '@/lib/utils';
-
-const selectClassName = cn(
-  'h-9 rounded-lg border border-input bg-background px-2.5 text-sm shadow-xs transition-all duration-150',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
-);
 
 type SortableColumn = NonNullable<ListMembershipPlansParams['sortBy']>;
 type StatusAction = 'activate' | 'deactivate' | 'restore' | 'delete';
@@ -55,6 +49,7 @@ export default function MembershipPlansPage() {
   const [page, setPage] = React.useState(1);
   const [sortBy, setSortBy] = React.useState<SortableColumn>('displayOrder');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('asc');
+  const [view, setView] = React.useState<'grid' | 'list'>('grid');
   const [confirmAction, setConfirmAction] = React.useState<{ action: StatusAction; plan: MembershipPlan } | null>(null);
 
   // Header branch switch re-scopes the whole list — back to page 1 like any other filter change.
@@ -72,28 +67,17 @@ export default function MembershipPlansPage() {
     sortBy,
     sortDir,
   });
+  // Separate, unfiltered fetch (plans are few per tenant, so one generous-limit call
+  // is enough) — feeds the hero/KPI tiles/insights so those always reflect every
+  // plan, not whatever search/status filter the list below is under.
+  const allPlans = useMembershipPlanList({ page: 1, limit: 100, includeDeleted: true });
+
   const statusAction = useMembershipPlanStatusAction();
   const duplicatePlan = useDuplicateMembershipPlan();
 
   const data = plans.data;
   const items = data?.items ?? [];
-
-  const toggleSort = (column: SortableColumn) => {
-    if (sortBy === column) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else {
-      setSortBy(column);
-      setSortDir('asc');
-    }
-  };
-  const sortIcon = (column: SortableColumn) => {
-    if (sortBy !== column) return <ArrowUpDown className="size-3.5 text-muted-foreground" />;
-    return sortDir === 'asc' ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />;
-  };
-  const sortableHeader = (label: string, column: SortableColumn) => (
-    <button type="button" className="flex items-center gap-1 font-medium hover:text-foreground" onClick={() => toggleSort(column)}>
-      {label} {sortIcon(column)}
-    </button>
-  );
+  const allItems = allPlans.data?.items ?? [];
 
   const runStatusAction = () => {
     if (!confirmAction) return;
@@ -114,154 +98,103 @@ export default function MembershipPlansPage() {
     });
   };
 
-  const columns: DataTableColumn<MembershipPlan>[] = [
-    {
-      key: 'name',
-      header: sortableHeader('Plan', 'name'),
-      render: (p) => (
-        <Link href={`/memberships/${p.id}`} className="hover:underline">
-          <span className="block font-medium">{p.name}</span>
-          <span className="block text-xs text-muted-foreground">{p.category ?? '—'}</span>
-        </Link>
-      ),
-    },
-    { key: 'planCode', header: sortableHeader('Plan Code', 'planCode'), render: (p) => p.planCode },
-    {
-      key: 'branches',
-      header: 'Branches',
-      render: (p) =>
-        p.gymAccessAllBranches
-          ? 'All'
-          : (p.accessBranchIds ?? []).map((id) => branchNameById.get(id) ?? id).join(', ') || '—',
-    },
-    { key: 'duration', header: 'Duration', render: (p) => `${p.durationValue} ${p.durationType.toLowerCase()}` },
-    {
-      key: 'price',
-      header: sortableHeader('Price', 'price'),
-      render: (p) => {
-        const { basePrice, finalPrice } = computePlanPrice(p);
-        const hasAdjustment = Math.abs(finalPrice - basePrice) >= 0.005;
-        return (
-          <div>
-            <span>{currencySymbol}{finalPrice.toFixed(2)}</span>
-            {hasAdjustment ? (
-              <span className="block text-xs text-muted-foreground">Base {currencySymbol}{basePrice.toFixed(2)}</span>
-            ) : null}
-          </div>
-        );
-      },
-    },
-    { key: 'members', header: 'Members', render: (p) => p.memberCount },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (p) =>
-        p.deletedAt ? (
-          <DeletedBadge />
-        ) : (
-          <Badge variant={p.isActive ? 'secondary' : 'outline'}>{p.isActive ? 'Active' : 'Inactive'}</Badge>
-        ),
-    },
-    {
-      key: 'actions',
-      header: '',
-      className: 'w-10',
-      render: (p) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${p.name}`}>
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <Link href={`/memberships/${p.id}`}>View / edit</Link>
-            </DropdownMenuItem>
-            {canCreate ? (
-              <DropdownMenuItem onClick={() => handleDuplicate(p)}>
-                <Copy className="size-4" /> Duplicate
-              </DropdownMenuItem>
-            ) : null}
-            {p.deletedAt ? (
-              canRestore ? (
-                <DropdownMenuItem onClick={() => setConfirmAction({ action: 'restore', plan: p })}>Restore</DropdownMenuItem>
-              ) : null
-            ) : canUpdate ? (
-              p.isActive ? (
-                <DropdownMenuItem onClick={() => setConfirmAction({ action: 'deactivate', plan: p })}>Deactivate</DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem onClick={() => setConfirmAction({ action: 'activate', plan: p })}>Activate</DropdownMenuItem>
-              )
-            ) : null}
-            {!p.deletedAt && canDelete ? (
-              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmAction({ action: 'delete', plan: p })}>
-                Delete
-              </DropdownMenuItem>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ];
+  const handleCardAction = (plan: MembershipPlan, action: PlanCardAction) => {
+    if (action === 'duplicate') {
+      handleDuplicate(plan);
+      return;
+    }
+    setConfirmAction({ action, plan });
+  };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <div
-            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
-            style={{
-              backgroundColor: 'color-mix(in oklch, var(--chart-7) 16%, transparent)',
-              color: 'var(--chart-7)',
-              boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-7) 18%, transparent)',
-            }}
-          >
-            <IdCard className="size-5" aria-hidden />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Membership Plans</h1>
-            <p className="text-muted-foreground">The plan catalog members are assigned to (e.g. &quot;3-Month Cardio&quot;, &quot;Annual Gold&quot;).</p>
-          </div>
-        </div>
-        {canCreate ? (
-          <Button size="sm" asChild>
-            <Link href="/memberships/new">
-              <Plus className="size-4" /> New plan
-            </Link>
-          </Button>
-        ) : null}
-      </div>
+    <div className="w-full space-y-5">
+      <MembershipsHero
+        total={allPlans.data?.total ?? 0}
+        plans={allItems}
+        actions={
+          canCreate ? (
+            <Button size="sm" asChild data-solid className="border-0 bg-white text-indigo-700 shadow-lg hover:bg-white/90">
+              <Link href="/memberships/new">
+                <Plus className="size-4" /> New plan
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchBar
-          containerClassName="max-w-xs"
-          placeholder="Search name, plan code, description…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
+      <MembershipsKpis
+        plans={allItems}
+        loading={allPlans.isPending}
+        isActiveFilter={isActiveFilter}
+        onStatus={(v) => {
+          setIsActiveFilter(v);
+          setPage(1);
+        }}
+      />
+
+      <MembershipsInsights plans={allItems} loading={allPlans.isPending} />
+
+      <MembershipsToolbar
+        search={search}
+        onSearch={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
+        status={isActiveFilter}
+        onStatus={(v) => {
+          setIsActiveFilter(v);
+          setPage(1);
+        }}
+        sort={`${sortBy}:${sortDir}`}
+        onSort={(v) => {
+          const [by, dir] = v.split(':') as [SortableColumn, 'asc' | 'desc'];
+          setSortBy(by);
+          setSortDir(dir);
+        }}
+        view={view}
+        onView={setView}
+      />
+
+      {plans.error ? (
+        <EmptyState
+          title="Couldn't load this data"
+          description={plans.error instanceof Error ? plans.error.message : 'Something went wrong loading this data.'}
+          className="border-destructive/30"
+          action={
+            <Button variant="outline" size="sm" onClick={() => plans.refetch()}>
+              Retry
+            </Button>
+          }
         />
-        <select
-          className={selectClassName}
-          value={isActiveFilter}
-          onChange={(e) => {
-            setIsActiveFilter(e.target.value as 'true' | 'false' | '');
-            setPage(1);
-          }}
-          aria-label="Filter by status"
-        >
-          <option value="">All statuses</option>
-          <option value="true">Active</option>
-          <option value="false">Inactive</option>
-        </select>
-      </div>
+      ) : plans.isPending ? (
+        <div className={view === 'grid' ? 'grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4' : 'space-y-3'}>
+          {Array.from({ length: view === 'grid' ? 6 : 4 }).map((_, i) => (
+            <Skeleton key={i} className={view === 'grid' ? 'h-[300px] w-full rounded-3xl' : 'h-20 w-full rounded-2xl'} />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState icon={IdCard} title={!search && !isActiveFilter ? 'Add your first membership plan to get started.' : 'No membership plans match these filters.'} />
+      ) : (
+        <div className={view === 'grid' ? 'grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4' : 'space-y-2.5'}>
+          {items.map((p, i) => (
+            <MembershipPlanCard
+              key={p.id}
+              plan={p}
+              index={i}
+              variant={view}
+              currencySymbol={currencySymbol}
+              branchNameById={branchNameById}
+              canCreate={canCreate}
+              canUpdate={canUpdate}
+              canDelete={canDelete}
+              canRestore={canRestore}
+              onRequestAction={(action) => handleCardAction(p, action)}
+            />
+          ))}
+        </div>
+      )}
 
-      <DataTable columns={columns} rows={items} rowKey={(p) => p.id} rowClassName={(p) => (p.deletedAt ? 'bg-destructive/5' : undefined)} loading={plans.isPending} error={plans.error} onRetry={() => plans.refetch()} emptyMessage="No membership plans match these filters." />
-
-      {data ? (
-        <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
-      ) : null}
+      {data ? <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} /> : null}
 
       <ConfirmDialog
         open={!!confirmAction}

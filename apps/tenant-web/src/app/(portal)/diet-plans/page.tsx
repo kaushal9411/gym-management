@@ -3,26 +3,21 @@
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
-import { Apple, ArrowDown, ArrowUp, ArrowUpDown, Copy, MoreHorizontal, Plus } from 'lucide-react';
+import { Apple, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
-import { DeletedBadge } from '@/components/ui/deleted-badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination } from '@/components/ui/pagination';
-import { SearchBar } from '@/components/ui/search-bar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { DietPlanCard, type DietPlanCardAction } from '@/features/diet/components/diet-plan-card';
+import { DietPlansHero } from '@/features/diet/components/diet-plans-hero';
+import { DietPlansInsights, DietPlansKpis } from '@/features/diet/components/diet-plans-overview';
+import { DietPlansToolbar } from '@/features/diet/components/diet-plans-toolbar';
 import { toDietError, useDietPlanList, useDietPlanStatusAction, useDuplicateDietPlan } from '@/features/diet/hooks/use-diet';
 import type { DietPlanListItem, ListDietPlansParams } from '@/features/diet/types';
-import { cn } from '@/lib/utils';
-
-const selectClassName = cn(
-  'h-9 rounded-lg border border-input bg-background px-2.5 text-sm shadow-xs transition-all duration-150',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
-);
 
 type SortableColumn = NonNullable<ListDietPlansParams['sortBy']>;
 type StatusAction = 'activate' | 'deactivate' | 'restore' | 'delete';
@@ -40,6 +35,7 @@ export default function DietPlansPage() {
   const [page, setPage] = React.useState(1);
   const [sortBy, setSortBy] = React.useState<SortableColumn>('createdAt');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
+  const [view, setView] = React.useState<'grid' | 'list'>('grid');
   const [confirmAction, setConfirmAction] = React.useState<{ action: StatusAction; plan: DietPlanListItem } | null>(null);
 
   const plans = useDietPlanList({
@@ -51,28 +47,17 @@ export default function DietPlansPage() {
     sortBy,
     sortDir,
   });
+  // Separate, unfiltered fetch (plans are few per tenant, so one generous-limit call is
+  // enough) — feeds the hero/KPI tiles/insights so those always reflect every plan, not
+  // whatever search/status filter the list below is under.
+  const allPlans = useDietPlanList({ page: 1, limit: 100, includeDeleted: true });
+
   const statusAction = useDietPlanStatusAction();
   const duplicatePlan = useDuplicateDietPlan();
 
   const data = plans.data;
   const items = data?.items ?? [];
-
-  const toggleSort = (column: SortableColumn) => {
-    if (sortBy === column) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
-    else {
-      setSortBy(column);
-      setSortDir('asc');
-    }
-  };
-  const sortIcon = (column: SortableColumn) => {
-    if (sortBy !== column) return <ArrowUpDown className="size-3.5 text-muted-foreground" />;
-    return sortDir === 'asc' ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />;
-  };
-  const sortableHeader = (label: string, column: SortableColumn) => (
-    <button type="button" className="flex items-center gap-1 font-medium hover:text-foreground" onClick={() => toggleSort(column)}>
-      {label} {sortIcon(column)}
-    </button>
-  );
+  const allItems = allPlans.data?.items ?? [];
 
   const runStatusAction = () => {
     if (!confirmAction) return;
@@ -93,134 +78,106 @@ export default function DietPlansPage() {
     });
   };
 
-  const columns: DataTableColumn<DietPlanListItem>[] = [
-    {
-      key: 'name',
-      header: sortableHeader('Plan', 'name'),
-      render: (p) => (
-        <Link href={`/diet-plans/${p.id}`} className="hover:underline">
-          <span className="block font-medium">{p.name}</span>
-          <span className="block text-xs text-muted-foreground">{p.goal ?? '—'}</span>
-        </Link>
-      ),
-    },
-    { key: 'calories', header: 'Daily calories', render: (p) => (p.dailyCalories ? `${p.dailyCalories} kcal` : '—') },
-    { key: 'duration', header: sortableHeader('Duration', 'durationDays'), render: (p) => `${p.durationDays}d` },
-    { key: 'trainer', header: 'Trainer', render: (p) => p.trainer?.name ?? '—' },
-    { key: 'members', header: 'Active members', render: (p) => p.activeMemberCount },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (p) =>
-        p.deletedAt ? (
-          <DeletedBadge />
-        ) : (
-          <Badge variant={p.isActive ? 'secondary' : 'outline'}>{p.isActive ? 'Active' : 'Inactive'}</Badge>
-        ),
-    },
-    {
-      key: 'actions',
-      header: '',
-      className: 'w-10',
-      render: (p) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${p.name}`}>
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <Link href={`/diet-plans/${p.id}`}>View / edit</Link>
-            </DropdownMenuItem>
-            {canCreate ? (
-              <DropdownMenuItem onClick={() => handleDuplicate(p)}>
-                <Copy className="size-4" /> Duplicate
-              </DropdownMenuItem>
-            ) : null}
-            {p.deletedAt ? (
-              canRestore ? (
-                <DropdownMenuItem onClick={() => setConfirmAction({ action: 'restore', plan: p })}>Restore</DropdownMenuItem>
-              ) : null
-            ) : canUpdate ? (
-              p.isActive ? (
-                <DropdownMenuItem onClick={() => setConfirmAction({ action: 'deactivate', plan: p })}>Deactivate</DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem onClick={() => setConfirmAction({ action: 'activate', plan: p })}>Activate</DropdownMenuItem>
-              )
-            ) : null}
-            {!p.deletedAt && canDelete ? (
-              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmAction({ action: 'delete', plan: p })}>
-                Delete
-              </DropdownMenuItem>
-            ) : null}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ];
+  const handleCardAction = (plan: DietPlanListItem, action: DietPlanCardAction) => {
+    if (action === 'duplicate') {
+      handleDuplicate(plan);
+      return;
+    }
+    setConfirmAction({ action, plan });
+  };
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <div
-            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
-            style={{
-              backgroundColor: 'color-mix(in oklch, var(--success) 16%, transparent)',
-              color: 'var(--success)',
-              boxShadow: '0 0 0 1px color-mix(in oklch, var(--success) 18%, transparent)',
-            }}
-          >
-            <Apple className="size-5" aria-hidden />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Diet Plans</h1>
-            <p className="text-muted-foreground">Meal plans, nutrition templates, and member diet assignments.</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/diet-plans/foods">
-              <Apple className="size-4" /> Food library
-            </Link>
-          </Button>
-          {canCreate ? (
-            <Button size="sm" asChild>
-              <Link href="/diet-plans/new">
-                <Plus className="size-4" /> New plan
+    <div className="w-full space-y-5">
+      <DietPlansHero
+        total={allPlans.data?.total ?? 0}
+        plans={allItems}
+        actions={
+          <>
+            <Button variant="secondary" size="sm" asChild>
+              <Link href="/diet-plans/foods">
+                <Apple className="size-4" /> Food library
               </Link>
             </Button>
-          ) : null}
-        </div>
-      </div>
+            {canCreate ? (
+              <Button size="sm" asChild data-solid className="border-0 bg-white text-indigo-700 shadow-lg hover:bg-white/90">
+                <Link href="/diet-plans/new">
+                  <Plus className="size-4" /> New plan
+                </Link>
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchBar
-          containerClassName="max-w-xs"
-          placeholder="Search name, goal, description…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
+      <DietPlansKpis
+        plans={allItems}
+        loading={allPlans.isPending}
+        isActiveFilter={isActiveFilter}
+        onStatus={(v) => {
+          setIsActiveFilter(v);
+          setPage(1);
+        }}
+      />
+
+      <DietPlansInsights plans={allItems} loading={allPlans.isPending} />
+
+      <DietPlansToolbar
+        search={search}
+        onSearch={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
+        status={isActiveFilter}
+        onStatus={(v) => {
+          setIsActiveFilter(v);
+          setPage(1);
+        }}
+        sort={`${sortBy}:${sortDir}`}
+        onSort={(v) => {
+          const [by, dir] = v.split(':') as [SortableColumn, 'asc' | 'desc'];
+          setSortBy(by);
+          setSortDir(dir);
+        }}
+        view={view}
+        onView={setView}
+      />
+
+      {plans.error ? (
+        <EmptyState
+          title="Couldn't load this data"
+          description={plans.error instanceof Error ? plans.error.message : 'Something went wrong loading this data.'}
+          className="border-destructive/30"
+          action={
+            <Button variant="outline" size="sm" onClick={() => plans.refetch()}>
+              Retry
+            </Button>
+          }
         />
-        <select
-          className={selectClassName}
-          value={isActiveFilter}
-          onChange={(e) => {
-            setIsActiveFilter(e.target.value as 'true' | 'false' | '');
-            setPage(1);
-          }}
-          aria-label="Filter by status"
-        >
-          <option value="">All statuses</option>
-          <option value="true">Active</option>
-          <option value="false">Inactive</option>
-        </select>
-      </div>
-
-      <DataTable columns={columns} rows={items} rowKey={(p) => p.id} rowClassName={(p) => (p.deletedAt ? 'bg-destructive/5' : undefined)} loading={plans.isPending} error={plans.error} onRetry={() => plans.refetch()} emptyMessage="No diet plans match these filters." />
+      ) : plans.isPending ? (
+        <div className={view === 'grid' ? 'grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4' : 'space-y-3'}>
+          {Array.from({ length: view === 'grid' ? 6 : 4 }).map((_, i) => (
+            <Skeleton key={i} className={view === 'grid' ? 'h-[300px] w-full rounded-3xl' : 'h-20 w-full rounded-2xl'} />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState icon={Apple} title={!search && !isActiveFilter ? 'Create your first diet plan to get started.' : 'No diet plans match these filters.'} />
+      ) : (
+        <div className={view === 'grid' ? 'grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4' : 'space-y-2.5'}>
+          {items.map((p, i) => (
+            <DietPlanCard
+              key={p.id}
+              plan={p}
+              index={i}
+              variant={view}
+              canCreate={canCreate}
+              canUpdate={canUpdate}
+              canDelete={canDelete}
+              canRestore={canRestore}
+              onRequestAction={(action) => handleCardAction(p, action)}
+            />
+          ))}
+        </div>
+      )}
 
       {data ? (
         <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
