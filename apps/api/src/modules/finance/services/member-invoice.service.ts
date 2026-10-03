@@ -145,6 +145,24 @@ export class MemberInvoiceService {
     });
   }
 
+  /** The auto-managed unpaid remainder of a membership's price — called only by `MemberBalanceService`. */
+  async createBalanceInvoice(input: { memberId: string; branchId: string; membershipId: string; planName: string; amount: number }): Promise<MemberInvoiceDetailRow> {
+    return this.createInvoiceRow({
+      memberId: input.memberId,
+      branchId: input.branchId,
+      membershipId: input.membershipId,
+      invoiceDate: new Date(),
+      items: [{ description: `Balance due — ${input.planName}`, quantity: 1, unitPrice: input.amount }],
+      taxAmount: 0,
+      discountAmount: 0,
+      status: 'UNPAID',
+    });
+  }
+
+  async settleBalanceWithReceipt(id: string, input: { items: InvoiceItemInput[]; taxAmount: number; discountAmount: number }): Promise<void> {
+    await this.invoices.settleWithReceipt(this.tenantId, id, input.items, input.taxAmount, input.discountAmount);
+  }
+
   async markStatus(id: string, status: MemberInvoiceDetailRow['status']): Promise<void> {
     await this.invoices.setStatus(id, status);
   }
@@ -286,6 +304,7 @@ export class MemberInvoiceService {
     taxAmount: number;
     discountAmount: number;
     notes?: string;
+    membershipId?: string;
     status?: 'UNPAID' | 'PAID';
   }): Promise<MemberInvoiceDetailRow> {
     const settings = await this.invoiceSettings.find(this.tenantId);
@@ -303,6 +322,7 @@ export class MemberInvoiceService {
         invoiceNumber,
         memberId: input.memberId,
         branchId: input.branchId,
+        membershipId: input.membershipId,
         invoiceDate: input.invoiceDate,
         dueDate,
         subtotal,

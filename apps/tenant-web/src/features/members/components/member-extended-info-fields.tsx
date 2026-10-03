@@ -30,7 +30,7 @@ export const DEFAULT_MEMBER_EXTENDED_INFO_FORM_STATE: MemberExtendedInfoFormStat
   foodPreference: '',
 };
 
-const MARITAL_STATUS_LABELS: Record<MaritalStatus, string> = {
+export const MARITAL_STATUS_LABELS: Record<MaritalStatus, string> = {
   SINGLE: 'Single',
   MARRIED: 'Married',
   DIVORCED: 'Divorced',
@@ -38,7 +38,7 @@ const MARITAL_STATUS_LABELS: Record<MaritalStatus, string> = {
   PREFER_NOT_TO_SAY: 'Prefer not to say',
 };
 
-const GOAL_LABELS: Record<FitnessGoal, string> = {
+export const GOAL_LABELS: Record<FitnessGoal, string> = {
   WEIGHT_LOSS: 'Weight loss',
   WEIGHT_GAIN: 'Weight gain',
   MUSCLE_BUILDING: 'Muscle building',
@@ -48,7 +48,7 @@ const GOAL_LABELS: Record<FitnessGoal, string> = {
   OTHER: 'Other',
 };
 
-const BODY_TYPE_LABELS: Record<BodyType, string> = {
+export const BODY_TYPE_LABELS: Record<BodyType, string> = {
   ECTOMORPH: 'Ectomorph (lean)',
   MESOMORPH: 'Mesomorph (athletic)',
   ENDOMORPH: 'Endomorph (heavier build)',
@@ -56,7 +56,7 @@ const BODY_TYPE_LABELS: Record<BodyType, string> = {
   UNKNOWN: 'Unknown',
 };
 
-const FOOD_PREFERENCE_LABELS: Record<FoodPreference, string> = {
+export const FOOD_PREFERENCE_LABELS: Record<FoodPreference, string> = {
   VEGETARIAN: 'Vegetarian',
   NON_VEGETARIAN: 'Non-vegetarian',
   VEGAN: 'Vegan',

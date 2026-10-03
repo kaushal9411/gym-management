@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { Dumbbell } from 'lucide-react';
+import { IconChip, cardHeaderStyle } from '@/features/members/components/detail/detail-ui';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -72,8 +74,11 @@ export function MemberWorkoutCard({ memberId }: MemberWorkoutCardProps) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Workout</CardTitle>
+      <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('violet')}>
+        <CardTitle className="flex items-center gap-3 text-base">
+          <IconChip icon={Dumbbell} accent="violet" />
+          Workout
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {data.isPending ? (

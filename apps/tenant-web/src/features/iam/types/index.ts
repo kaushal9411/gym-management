@@ -38,8 +38,28 @@ export interface UserListItem {
   allBranches: boolean;
   branches: UserBranchAccess[];
   lastLoginAt: string | null;
+  mfaEnabled: boolean;
   createdAt: string;
   deletedAt: string | null;
+}
+
+export interface UserStatsPerson {
+  id: string;
+  name: string;
+  detail: string;
+}
+
+export interface UserStats {
+  total: number;
+  byStatus: Record<UserStatus, number>;
+  mfaEnabled: number;
+  signedInThisWeek: number;
+  pendingInvitations: number;
+  byRole: Array<{ name: string; count: number }>;
+  lastSignIn: { today: number; thisWeek: number; thisMonth: number; older: number; never: number };
+  locked: UserStatsPerson[];
+  pendingVerification: UserStatsPerson[];
+  dormant: UserStatsPerson[];
 }
 
 export interface PermissionOverride {

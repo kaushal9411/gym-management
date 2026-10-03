@@ -94,12 +94,15 @@ export class DashboardService {
       }),
     ]);
 
+    const settings = await this.db.tenantSettings.findUnique({ where: { tenantId: this.tenantId }, select: { currencySymbol: true } });
+    const currencySymbol = settings?.currencySymbol ?? '₹';
+
     const activities: RecentActivityDto[] = [
       ...payments.map((p) => ({
         type: 'PAYMENT' as const,
         id: p.id,
         label: `${p.member.firstName} ${p.member.lastName}`.trim(),
-        detail: `${p.status === 'SUCCESS' ? 'Paid' : p.status} $${p.finalAmount.toString()} (${p.paymentNumber})`,
+        detail: `${p.status === 'SUCCESS' ? 'Paid' : p.status} ${currencySymbol}${p.finalAmount.toString()} (${p.paymentNumber})`,
         occurredAt: p.createdAt.toISOString(),
       })),
       ...checkIns.map((a) => ({

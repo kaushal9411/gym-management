@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import { unreadCountIncremented } from '@/features/notifications/store/notification-slice';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
@@ -39,7 +40,21 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     socket.on('attendance:checkin', handleAttendanceEvent);
     socket.on('attendance:checkout', handleAttendanceEvent);
 
+    // A payment changed state (webhook, status check, or a staff entry in another tab): refresh every money figure on screen.
+    const handlePaymentUpdated = (event: { memberName?: string; status?: string; amount?: number }) => {
+      for (const key of ['payments', 'invoices', 'finance', 'members', 'reports', 'income']) {
+        void queryClient.invalidateQueries({ queryKey: [key] });
+      }
+      if (event.status === 'SUCCESS') {
+        toast.success(`Payment received${event.memberName ? ` from ${event.memberName}` : ''}${event.amount ? ` (${event.amount.toLocaleString()})` : ''}.`);
+      } else if (event.status === 'FAILED') {
+        toast.error(`A payment${event.memberName ? ` from ${event.memberName}` : ''} failed.`);
+      }
+    };
+    socket.on('payment:updated', handlePaymentUpdated);
+
     return () => {
+      socket.off('payment:updated', handlePaymentUpdated);
       socket.off('notification:new', handleNewNotification);
       socket.off('attendance:checkin', handleAttendanceEvent);
       socket.off('attendance:checkout', handleAttendanceEvent);

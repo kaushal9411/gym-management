@@ -24,8 +24,28 @@ export interface UserListItemDto {
   allBranches: boolean;
   branches: UserBranchSummary[];
   lastLoginAt: string | null;
+  mfaEnabled: boolean;
   createdAt: string;
   deletedAt: string | null;
+}
+
+export interface UserStatsPersonDto {
+  id: string;
+  name: string;
+  detail: string;
+}
+
+export interface UserStatsDto {
+  total: number;
+  byStatus: Record<'ACTIVE' | 'PENDING_VERIFICATION' | 'LOCKED' | 'SUSPENDED' | 'DEACTIVATED', number>;
+  mfaEnabled: number;
+  signedInThisWeek: number;
+  pendingInvitations: number;
+  byRole: Array<{ name: string; count: number }>;
+  lastSignIn: { today: number; thisWeek: number; thisMonth: number; older: number; never: number };
+  locked: UserStatsPersonDto[];
+  pendingVerification: UserStatsPersonDto[];
+  dormant: UserStatsPersonDto[];
 }
 
 export interface UserPermissionOverrideDto {

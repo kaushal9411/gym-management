@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 import { ConflictError, NotFoundError, ValidationError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
+import { emitToTenant } from '../../../infrastructure/realtime/socket-server';
 import { assertBranchAccess, getBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
@@ -22,6 +23,7 @@ import type {
 } from '../dto/finance.dto';
 import { MemberPaymentRepository, type MemberPaymentDetailRow, type MemberPaymentListRow } from '../repositories/member-payment.repository';
 
+import { MemberBalanceService } from './member-balance.service';
 import { MemberInvoiceService } from './member-invoice.service';
 import { createPaymentLink, fetchPaymentLink, notifyPaymentLink } from './razorpay-gateway.service';
 
@@ -136,6 +138,7 @@ export class MemberPaymentService {
     if (status === 'SUCCESS') {
       await this.onPaymentSucceeded(payment, member, branchId);
     } else if (status === 'FAILED') {
+      this.emitPaymentUpdated(member.id, `${member.firstName} ${member.lastName}`.trim(), 'FAILED');
       await notifyPaymentFailed(this.tenantId, {
         memberId: member.id,
         memberName: `${member.firstName} ${member.lastName}`.trim(),
@@ -315,7 +318,8 @@ export class MemberPaymentService {
       await this.audit(actor, 'member_payment.payment_link_failed', id);
       const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: payment.member.id } }));
       if (member) {
-        await notifyPaymentFailed(this.tenantId, {
+        this.emitPaymentUpdated(member.id, `${member.firstName} ${member.lastName}`.trim(), 'FAILED');
+      await notifyPaymentFailed(this.tenantId, {
           memberId: member.id,
           memberName: `${member.firstName} ${member.lastName}`.trim(),
           amount: Number(payment.finalAmount).toFixed(2),
@@ -350,7 +354,8 @@ export class MemberPaymentService {
       await this.payments.update(paymentId, { status: 'FAILED' });
       const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: payment.member.id } }));
       if (member) {
-        await notifyPaymentFailed(this.tenantId, {
+        this.emitPaymentUpdated(member.id, `${member.firstName} ${member.lastName}`.trim(), 'FAILED');
+      await notifyPaymentFailed(this.tenantId, {
           memberId: member.id,
           memberName: `${member.firstName} ${member.lastName}`.trim(),
           amount: Number(payment.finalAmount).toFixed(2),
@@ -455,6 +460,11 @@ export class MemberPaymentService {
     return payment;
   }
 
+  /** Pushes the change to every open staff tab of this tenant so dashboards, lists and the member page refresh without polling. */
+  private emitPaymentUpdated(memberId: string, memberName: string, status: 'SUCCESS' | 'FAILED', amount?: number): void {
+    emitToTenant(this.tenantId, 'payment:updated', { memberId, memberName, status, amount });
+  }
+
   private async resolveBranchRestriction(actorUserId: string): Promise<string[] | undefined> {
     const access = await getBranchAccess(this.tenantId, actorUserId);
     return access.allBranches ? undefined : access.branchIds;
@@ -472,26 +482,39 @@ export class MemberPaymentService {
     member: { firstName: string; lastName: string; email: string | null },
     branchId: string,
   ): Promise<void> {
+    const balance = new MemberBalanceService(this.tenantId);
     if (!payment.invoiceId) {
-      const invoice = await this.invoiceService.generateForPayment({
-        memberId: payment.member.id,
-        branchId,
-        items: [
-          {
-            description: payment.membership ? `Membership payment — ${payment.membership.plan.name}` : 'Membership payment',
-            quantity: 1,
-            unitPrice: Number(payment.amount),
-          },
-        ],
-        // Threaded through from the Payment row itself (not re-derived from
-        // the plan) so `subtotal - discountAmount + taxAmount` always equals
-        // `Payment.finalAmount` exactly, by construction — see
-        // `MemberInvoiceService#generateForPayment`'s doc comment.
-        taxAmount: Number(payment.tax),
-        discountAmount: Number(payment.discount),
-        paymentDate: payment.paymentDate,
-      });
-      await this.payments.update(payment.id, { invoiceId: invoice.id });
+      const items = [
+        {
+          description: payment.membership ? `Membership payment — ${payment.membership.plan.name}` : 'Membership payment',
+          quantity: 1,
+          unitPrice: Number(payment.amount),
+        },
+      ];
+      // Threaded through from the Payment row itself (not re-derived from
+      // the plan) so `subtotal - discountAmount + taxAmount` always equals
+      // `Payment.finalAmount` exactly, by construction — see
+      // `MemberInvoiceService#generateForPayment`'s doc comment.
+      const taxAmount = Number(payment.tax);
+      const discountAmount = Number(payment.discount);
+      // A payment that covers the membership's whole open "Balance due"
+      // invoice becomes that invoice's itemized receipt instead of leaving a
+      // second PAID invoice for the same money next to it.
+      const openBalance = payment.membership ? await balance.findOpenBalanceInvoice(payment.membership.id) : null;
+      if (openBalance && Number(payment.finalAmount) >= Number(openBalance.totalAmount) - 0.01) {
+        await this.invoiceService.settleBalanceWithReceipt(openBalance.id, { items, taxAmount, discountAmount });
+        await this.payments.update(payment.id, { invoiceId: openBalance.id });
+      } else {
+        const invoice = await this.invoiceService.generateForPayment({
+          memberId: payment.member.id,
+          branchId,
+          items,
+          taxAmount,
+          discountAmount,
+          paymentDate: payment.paymentDate,
+        });
+        await this.payments.update(payment.id, { invoiceId: invoice.id });
+      }
     } else {
       await this.invoiceService.markStatus(payment.invoiceId, 'PAID');
     }
@@ -502,6 +525,7 @@ export class MemberPaymentService {
     // daily `startDate <= now` sweep. No-op if the member has no PENDING
     // membership (the normal case).
     await this.activatePendingMembershipIfAny(payment.member.id);
+    if (payment.membership) await balance.reconcile(payment.membership.id);
 
     const existingIncome = await this.db.income.findFirst({ where: { tenantId: this.tenantId, sourcePaymentId: payment.id } });
     if (!existingIncome) {
@@ -522,7 +546,9 @@ export class MemberPaymentService {
     const totalPaid = payment.membership
       ? await this.payments.sumSuccessForMembership(this.tenantId, payment.membership.id)
       : Number(payment.finalAmount);
-    const dueAmount = payment.membership ? Math.max(Number(payment.membership.priceAtAssignment) - totalPaid, 0) : 0;
+    const openAfter = payment.membership ? await balance.findOpenBalanceInvoice(payment.membership.id) : null;
+    const dueAmount = openAfter ? Number(openAfter.totalAmount) : 0;
+    this.emitPaymentUpdated(payment.member.id, `${member.firstName} ${member.lastName}`.trim(), 'SUCCESS', Number(payment.finalAmount));
 
     await notifyPaymentReceived(this.tenantId, {
       memberId: payment.member.id,

@@ -1,35 +1,31 @@
 'use client';
 
-import { useEffect, type ReactNode } from 'react';
+import { useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Banknote, Building2, CreditCard, FileText, Info, Smartphone, Wallet, type LucideIcon } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { cn } from '@/lib/utils';
 import { useCurrencySymbol } from '@/lib/currency';
 import type { MemberPaymentMethod } from '@/features/finance/types';
-import { useAssignablePlans } from '../../hooks/use-members';
-import { computePlanPrice } from '../../utils/plan-pricing';
+import { type Accent, PanelCard, accentVar, formatMoney, tint } from '../detail/detail-ui';
 import type { MemberExtendedInfoFormState } from '../member-extended-info-fields';
 import type { MemberProgramFormState } from '../member-program-fields';
-import type { WizardCorePersonalState, WizardPaymentState } from './types';
+import type { WizardPaymentState } from './types';
+import { useWizardPricing } from './use-wizard-pricing';
+import { Notice } from './wizard-ui';
 
-const selectClassName = cn(
-  'h-10 w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50',
-);
-
-const METHOD_LABELS: Record<MemberPaymentMethod, string> = {
-  CASH: 'By Cash',
-  UPI: 'By UPI',
-  CREDIT_CARD: 'By Credit Card',
-  DEBIT_CARD: 'By Debit Card',
-  BANK_TRANSFER: 'By Bank Transfer',
-  CHEQUE: 'By Cheque',
-  ONLINE_GATEWAY: 'By Online Gateway',
-};
+const METHODS: Array<{ value: MemberPaymentMethod; label: string; icon: LucideIcon; accent: Accent }> = [
+  { value: 'CASH', label: 'Cash', icon: Banknote, accent: 'success' },
+  { value: 'UPI', label: 'UPI', icon: Smartphone, accent: 'primary' },
+  { value: 'CREDIT_CARD', label: 'Credit card', icon: CreditCard, accent: 'violet' },
+  { value: 'DEBIT_CARD', label: 'Debit card', icon: CreditCard, accent: 'aqua' },
+  { value: 'BANK_TRANSFER', label: 'Bank transfer', icon: Building2, accent: 'warning' },
+  { value: 'CHEQUE', label: 'Cheque', icon: FileText, accent: 'destructive' },
+  { value: 'ONLINE_GATEWAY', label: 'Online gateway', icon: Wallet, accent: 'primary' },
+];
 
 interface StepPaymentSummaryProps {
-  core: WizardCorePersonalState;
   extended: MemberExtendedInfoFormState;
   program: MemberProgramFormState;
   payment: WizardPaymentState;
@@ -37,33 +33,9 @@ interface StepPaymentSummaryProps {
   disabled?: boolean;
 }
 
-function row(label: string, value: ReactNode) {
-  return (
-    <div className="flex items-center justify-between border-b py-2.5 text-sm last:border-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium">{value}</span>
-    </div>
-  );
-}
-
-export function StepPaymentSummary({ core, extended, program, payment, onPaymentChange, disabled }: StepPaymentSummaryProps) {
-  const currencySymbol = useCurrencySymbol();
-  const plans = useAssignablePlans();
-  const selectedPlan = plans.data?.find((p) => p.id === program.planId) ?? null;
-
-  const priceBreakdown = selectedPlan ? computePlanPrice(selectedPlan) : null;
-  const programBasePrice = priceBreakdown?.basePrice ?? 0;
-  const planDiscountAmount = priceBreakdown?.discountAmount ?? 0;
-  const planTaxAmount = priceBreakdown?.taxAmount ?? 0;
-  const planJoiningFee = priceBreakdown?.joiningFee ?? 0;
-  const programAmount = priceBreakdown?.finalPrice ?? 0;
-  const registrationFee = Number(extended.registrationFee || 0);
-  const discount = Number(payment.discount || 0);
-  const paymentReceived = Number(payment.amount || 0);
-  const totalDue = programAmount + planJoiningFee + registrationFee - discount;
-  const pendingAmount = Math.max(totalDue - paymentReceived, 0);
-  const amountExceedsTotalDue = paymentReceived > totalDue + 0.005;
-
+export function StepPaymentSummary({ extended, program, payment, onPaymentChange, disabled }: StepPaymentSummaryProps) {
+  const symbol = useCurrencySymbol();
+  const p = useWizardPricing(extended, program, payment);
   const set = <K extends keyof WizardPaymentState>(key: K, next: WizardPaymentState[K]) => onPaymentChange({ ...payment, [key]: next });
 
   // Prefills "Payment received" with the computed total once a plan is picked — the
@@ -71,84 +43,96 @@ export function StepPaymentSummary({ core, extended, program, payment, onPayment
   // partial payment. Only fires while the field is untouched so it never clobbers
   // a manual edit.
   useEffect(() => {
-    if (selectedPlan && payment.amount === '' && totalDue > 0) {
-      onPaymentChange({ ...payment, amount: totalDue.toFixed(2) });
+    if (p.selectedPlan && payment.amount === '' && p.totalDue > 0) {
+      onPaymentChange({ ...payment, amount: p.totalDue.toFixed(2) });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to totalDue settling after a plan pick, not every payment/onPaymentChange identity change
-  }, [selectedPlan, totalDue]);
+  }, [p.selectedPlan, p.totalDue]);
+
+  const quick = [
+    { label: `Full ${formatMoney(symbol, Math.max(p.totalDue, 0))}`, value: Math.max(p.totalDue, 0).toFixed(2), show: p.totalDue > 0 },
+    { label: 'Half', value: (Math.max(p.totalDue, 0) / 2).toFixed(2), show: p.totalDue > 0 },
+    { label: 'Pay later', value: '0', show: true },
+  ];
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-lg border p-4">
-        <h3 className="mb-2 text-sm font-medium">Proforma Invoice</h3>
-        {row('Name', `${core.firstName} ${core.lastName}`.trim() || '—')}
-        {row('Mobile no.', core.phone || '—')}
-        {row('E-mail id', core.email || '—')}
-        {row('Goal', extended.goal || '—')}
-        {row('Program joined', selectedPlan?.name ?? 'No program selected')}
-        {selectedPlan ? row('Duration', `${selectedPlan.durationValue} ${selectedPlan.durationType.toLowerCase()}`) : null}
-        {row('Plan price', `${currencySymbol}${programBasePrice.toFixed(2)}`)}
-        {planDiscountAmount > 0 ? row(`Plan discount (${selectedPlan?.discountPercentage}%)`, `-${currencySymbol}${planDiscountAmount.toFixed(2)}`) : null}
-        {planTaxAmount > 0 ? row(`Tax (${selectedPlan?.taxPercentage}%)`, `${currencySymbol}${planTaxAmount.toFixed(2)}`) : null}
-        {planJoiningFee > 0 ? row('Plan registration fee', `${currencySymbol}${planJoiningFee.toFixed(2)}`) : null}
-        {row('Program amount', `${currencySymbol}${(programAmount + planJoiningFee).toFixed(2)}`)}
-        {registrationFee > 0 ? row('Registration fee', `${currencySymbol}${registrationFee.toFixed(2)}`) : null}
-        {row('Date of joining', core.joiningDate || '—')}
-        {row('Discount allowed', `${currencySymbol}${discount.toFixed(2)}`)}
-        {row('Total due', <span className="font-semibold">{currencySymbol}{totalDue.toFixed(2)}</span>)}
-        {row('Total payment received', `${currencySymbol}${paymentReceived.toFixed(2)}`)}
-        {row('Pending amount', <span className={pendingAmount > 0 ? 'text-destructive' : 'text-emerald-600'}>{currencySymbol}{pendingAmount.toFixed(2)}</span>)}
-      </section>
+    <div className="space-y-5">
+      <PanelCard icon={Banknote} accent="success" title="Payment" delay={0}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="paymentReceived">Payment received</Label>
+            <Input
+              id="paymentReceived"
+              type="number"
+              min={0}
+              max={p.totalDue > 0 ? p.totalDue.toFixed(2) : undefined}
+              step="0.01"
+              value={payment.amount}
+              disabled={disabled}
+              aria-invalid={p.amountExceedsTotalDue || undefined}
+              onChange={(e) => set('amount', e.target.value)}
+            />
+            {p.amountExceedsTotalDue ? (
+              <p role="alert" className="text-xs text-destructive">
+                Cannot exceed the total due of {symbol}{p.totalDue.toFixed(2)}.
+              </p>
+            ) : null}
+            <div className="flex flex-wrap gap-2 pt-1">
+              {quick.filter((q) => q.show).map((q) => (
+                <button
+                  key={q.label}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => set('amount', q.value)}
+                  className="rounded-full border px-3 py-1 text-xs font-semibold transition-colors hover:border-[var(--success)] hover:bg-[color-mix(in_oklch,var(--success)_12%,transparent)]"
+                >
+                  {q.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="discountAllowed">Discount allowed</Label>
+            <Input id="discountAllowed" type="number" min={0} step="0.01" value={payment.discount} disabled={disabled} onChange={(e) => set('discount', e.target.value)} />
+          </div>
+        </div>
 
-      <section className="grid gap-4 sm:grid-cols-3">
         <div className="space-y-2">
-          <Label htmlFor="paymentReceived">Payment received</Label>
-          <Input
-            id="paymentReceived"
-            type="number"
-            min={0}
-            max={totalDue > 0 ? totalDue.toFixed(2) : undefined}
-            step="0.01"
-            value={payment.amount}
-            disabled={disabled}
-            aria-invalid={amountExceedsTotalDue}
-            onChange={(e) => set('amount', e.target.value)}
-          />
-          {amountExceedsTotalDue ? (
-            <p role="alert" className="text-xs text-destructive">
-              Cannot exceed the total due of {currencySymbol}{totalDue.toFixed(2)}.
+          <p className="text-[13px] font-semibold">Transaction mode</p>
+          <div role="group" aria-label="Transaction mode" className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            {METHODS.map((m) => {
+              const on = payment.method === m.value;
+              return (
+                <motion.button
+                  key={m.value}
+                  type="button"
+                  disabled={disabled}
+                  aria-pressed={on}
+                  whileHover={{ y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => set('method', m.value)}
+                  className="flex flex-col items-center gap-1.5 rounded-2xl border-2 px-2 py-3 text-[12.5px] font-bold transition-colors disabled:opacity-50"
+                  style={on ? { borderColor: accentVar(m.accent), backgroundColor: tint(m.accent, 11), color: accentVar(m.accent) } : undefined}
+                >
+                  <span className="grid size-9 place-items-center rounded-xl" style={{ backgroundColor: tint(m.accent, 16), color: accentVar(m.accent) }}>
+                    <m.icon className="size-[18px]" aria-hidden />
+                  </span>
+                  {m.label}
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+
+        {p.pendingAmount > 0 && p.selectedPlan ? (
+          <Notice tone="warning">
+            <Info className="mt-0.5 size-4 shrink-0" style={{ color: 'var(--warning)' }} aria-hidden />
+            <p>
+              <b>{formatMoney(symbol, p.pendingAmount)} will stay pending.</b> It shows as a balance due on the member&apos;s page, where you can send a payment link.
             </p>
-          ) : null}
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="discountAllowed">Discount allowed</Label>
-          <Input
-            id="discountAllowed"
-            type="number"
-            min={0}
-            step="0.01"
-            value={payment.discount}
-            disabled={disabled}
-            onChange={(e) => set('discount', e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="transactionMode">Transaction mode</Label>
-          <select
-            id="transactionMode"
-            className={selectClassName}
-            value={payment.method}
-            disabled={disabled}
-            onChange={(e) => set('method', e.target.value)}
-          >
-            {(Object.keys(METHOD_LABELS) as MemberPaymentMethod[]).map((k) => (
-              <option key={k} value={k}>
-                {METHOD_LABELS[k]}
-              </option>
-            ))}
-          </select>
-        </div>
-      </section>
+          </Notice>
+        ) : null}
+      </PanelCard>
     </div>
   );
 }

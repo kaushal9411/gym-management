@@ -17,6 +17,7 @@ import type {
   UpdateProfilePayload,
   UpdateUserPayload,
   UserDetail,
+  UserStats,
   UserListItem,
 } from '../types';
 
@@ -35,6 +36,11 @@ class IamService {
   // ── Users ───────────────────────────────────────────────────────────────
   async listUsers(params: ListUsersParams): Promise<Paginated<UserListItem>> {
     const res = await apiClient.get<ApiEnvelope<Paginated<UserListItem>>>('/users', { params });
+    return res.data.data;
+  }
+
+  async getUserStats(branchId?: string): Promise<UserStats> {
+    const res = await apiClient.get<ApiEnvelope<UserStats>>('/users/stats', { params: { branchId } });
     return res.data.data;
   }
 

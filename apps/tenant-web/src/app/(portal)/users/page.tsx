@@ -4,42 +4,31 @@ import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { useSubmitHandler } from '@/hooks/use-submit-handler';
 import * as React from 'react';
 import Link from 'next/link';
-import { Download, MoreHorizontal, Upload, UserCog, UserPlus, Users } from 'lucide-react';
+import { AlertTriangle, Download, Upload, UserPlus, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { Button } from '@/components/ui/button';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination } from '@/components/ui/pagination';
-import { SearchBar } from '@/components/ui/search-bar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
-import { IamNav } from '@/features/iam/components/iam-nav';
+import { IamHero } from '@/features/iam/components/iam-hero';
 import { InviteDialog } from '@/features/iam/components/invite-dialog';
-import { UserStatusBadge } from '@/features/iam/components/status-badge';
+import { UserCard } from '@/features/iam/components/user-card';
+import { UsersInsights, UsersKpis } from '@/features/iam/components/users-overview';
+import { UsersToolbar } from '@/features/iam/components/users-toolbar';
 import { iamService } from '@/features/iam/services/iam.service';
 import {
   toIamError,
   useBulkImportUsers,
   useRoles,
+  useUserStats,
   useUserStatusAction,
   useUsers,
 } from '@/features/iam/hooks/use-iam';
 import type { UserListItem, UserStatus } from '@/features/iam/types';
-import { cn } from '@/lib/utils';
-
-const selectClassName = cn(
-  'h-9 rounded-lg border border-input bg-background px-2 text-sm shadow-xs',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
-);
 
 /** Minimal CSV parser for the import sheet: header row `name,email,phone,roleName,password`. */
 function parseCsv(text: string): Array<{ name: string; email: string; phone?: string; roleName?: string; password?: string }> {
@@ -70,6 +59,7 @@ export default function UsersPage() {
   const [status, setStatus] = React.useState<UserStatus | ''>('');
   const [roleId, setRoleId] = React.useState('');
   const [page, setPage] = React.useState(1);
+  const [view, setView] = React.useState<'grid' | 'list'>('grid');
 
   const users = useUsers({
     page,
@@ -86,6 +76,7 @@ export default function UsersPage() {
     setPage(1);
   }, [currentBranchId]);
   const roles = useRoles();
+  const stats = useUserStats(currentBranchId ?? undefined);
   const statusAction = useUserStatusAction();
   const bulkImport = useBulkImportUsers();
   const importInputRef = React.useRef<HTMLInputElement>(null);
@@ -133,199 +124,112 @@ export default function UsersPage() {
     });
   };
 
-  const columns: DataTableColumn<UserListItem>[] = [
-    {
-      key: 'user',
-      header: 'User',
-      render: (u) => (
-        <Link href={`/users/${u.id}`} className="flex items-center gap-2.5 hover:underline">
-          <Avatar className="size-8">
-            {u.avatarUrl ? <AvatarImage src={u.avatarUrl} alt="" /> : null}
-            <AvatarFallback className="text-xs">
-              {u.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <span>
-            <span className="block font-medium">{u.name}</span>
-            <span className="block text-xs text-muted-foreground">{u.email}</span>
-          </span>
-        </Link>
-      ),
-    },
-    {
-      key: 'roles',
-      header: 'Roles',
-      render: (u) => (
-        <span className="flex flex-wrap gap-1">
-          {u.roles.map((r) => (
-            <Badge key={r.id} variant={r.isSystem ? 'secondary' : 'outline'}>{r.name}</Badge>
-          ))}
-        </span>
-      ),
-    },
-    {
-      key: 'branches',
-      header: 'Branches',
-      render: (u) => (u.allBranches ? 'All' : u.branches.map((b) => b.branchName).join(', ') || '—'),
-    },
-    { key: 'status', header: 'Status', render: (u) => <UserStatusBadge status={u.status} deleted={!!u.deletedAt} /> },
-    {
-      key: 'lastLogin',
-      header: 'Last login',
-      render: (u) => (u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString() : 'Never'),
-    },
-    {
-      key: 'actions',
-      header: '',
-      className: 'w-10',
-      render: (u) =>
-        canManage ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${u.name}`}>
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href={`/users/${u.id}`}>View / edit</Link>
-              </DropdownMenuItem>
-              {u.deletedAt || u.status === 'SUSPENDED' || u.status === 'DEACTIVATED' ? (
-                <DropdownMenuItem onClick={() => runAction(u, 'restore')}>Restore</DropdownMenuItem>
-              ) : (
-                <>
-                  <DropdownMenuItem onClick={() => runAction(u, 'suspend')}>Suspend</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => runAction(u, 'deactivate')}>Deactivate</DropdownMenuItem>
-                </>
-              )}
-              {!u.deletedAt ? (
-                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => runAction(u, 'delete')}>
-                  Delete
-                </DropdownMenuItem>
-              ) : null}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null,
-    },
-  ];
-
   const data = users.data;
+  const items = data?.items ?? [];
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <span
-            className="flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-11"
-            style={{
-              backgroundColor: 'color-mix(in oklch, var(--primary) 16%, transparent)',
-              color: 'var(--primary)',
-              boxShadow: '0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent)',
-            }}
-          >
-            <UserCog className="size-5" aria-hidden />
-          </span>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Staff &amp; Access</h1>
-            <p className="text-muted-foreground">Manage your team, their roles, and what they can do.</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {hasPermission('users:export') ? (
-            <LoadingButton variant="outline" size="sm" loading={exporting} loadingText="Exporting…" onClick={() => void exportCsv()}>
-              <Download className="size-4" /> Export
-            </LoadingButton>
-          ) : null}
-          {canManage ? (
-            <>
-              <Button variant="outline" size="sm" disabled={bulkImport.isPending} onClick={() => importInputRef.current?.click()}>
-                <Upload className="size-4" /> {bulkImport.isPending ? 'Importing…' : 'Import'}
+    <div className="w-full space-y-5">
+      <IamHero
+        title="Staff & Access"
+        subtitle="Manage your team, their roles, and what they can do."
+        actions={
+          <>
+            {hasPermission('users:export') ? (
+              <LoadingButton variant="outline" size="sm" loading={exporting} loadingText="Exporting…" onClick={() => void exportCsv()}>
+                <Download className="size-4" /> Export
+              </LoadingButton>
+            ) : null}
+            {canManage ? (
+              <>
+                <Button variant="outline" size="sm" disabled={bulkImport.isPending} onClick={() => importInputRef.current?.click()}>
+                  <Upload className="size-4" /> {bulkImport.isPending ? 'Importing…' : 'Import'}
+                </Button>
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(e) => {
+                    void handleImportFile(e.target.files?.[0]);
+                    e.target.value = '';
+                  }}
+                />
+              </>
+            ) : null}
+            {hasPermission('users:invite') ? <InviteDialog /> : null}
+            {canManage ? (
+              <Button size="sm" asChild data-solid className="border-0 bg-white text-indigo-700 shadow-lg hover:bg-white/90">
+                <Link href="/users/new">
+                  <UserPlus className="size-4" /> New user
+                </Link>
               </Button>
-              <input
-                ref={importInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={(e) => {
-                  void handleImportFile(e.target.files?.[0]);
-                  e.target.value = '';
-                }}
-              />
-            </>
-          ) : null}
-          {hasPermission('users:invite') ? <InviteDialog /> : null}
-          {canManage ? (
-            <Button size="sm" asChild>
-              <Link href="/users/new">
-                <UserPlus className="size-4" /> New user
-              </Link>
-            </Button>
-          ) : null}
-        </div>
-      </div>
-
-      <IamNav />
-
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchBar
-          containerClassName="max-w-xs"
-          placeholder="Search name, email, phone…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-        <select
-          className={selectClassName}
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as UserStatus | '');
-            setPage(1);
-          }}
-          aria-label="Filter by status"
-        >
-          <option value="">All statuses</option>
-          {(['ACTIVE', 'PENDING_VERIFICATION', 'LOCKED', 'SUSPENDED', 'DEACTIVATED'] as const).map((s) => (
-            <option key={s} value={s}>{s.replace('_', ' ')}</option>
-          ))}
-        </select>
-        <select
-          className={selectClassName}
-          value={roleId}
-          onChange={(e) => {
-            setRoleId(e.target.value);
-            setPage(1);
-          }}
-          aria-label="Filter by role"
-        >
-          <option value="">All roles</option>
-          {(roles.data ?? []).map((r) => (
-            <option key={r.id} value={r.id}>{r.name}</option>
-          ))}
-        </select>
-      </div>
-
-      <DataTable
-        columns={columns}
-        rows={data?.items ?? []}
-        rowKey={(u) => u.id}
-        rowClassName={(u) => (u.deletedAt ? 'bg-destructive/5' : undefined)}
-        loading={users.isPending}
-        error={users.error}
-        onRetry={() => users.refetch()}
-        emptyMessage="No users match these filters."
+            ) : null}
+          </>
+        }
       />
 
-      {data ? (
-        <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
-      ) : null}
+      <UsersKpis
+        stats={stats.data}
+        loading={stats.isPending}
+        status={status}
+        onStatus={(s) => {
+          setStatus(s);
+          setPage(1);
+        }}
+      />
+      <UsersInsights stats={stats.data} loading={stats.isPending} />
 
-      {!users.isPending && (data?.total ?? 0) === 0 && !search && !status && !roleId ? (
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Users className="size-4" /> Invite your first staff member to get started.
-        </p>
-      ) : null}
+      <UsersToolbar
+        search={search}
+        onSearch={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
+        status={status}
+        onStatus={(s) => {
+          setStatus(s);
+          setPage(1);
+        }}
+        stats={stats.data}
+        roleId={roleId}
+        onRole={(v) => {
+          setRoleId(v);
+          setPage(1);
+        }}
+        roles={roles.data ?? []}
+        view={view}
+        onView={setView}
+      />
+
+      {users.error ? (
+        <EmptyState
+          icon={AlertTriangle}
+          title="Couldn't load this data"
+          description={users.error instanceof Error ? users.error.message : 'Something went wrong loading this data.'}
+          className="border-destructive/30"
+          action={
+            <Button variant="outline" size="sm" onClick={() => users.refetch()}>
+              Retry
+            </Button>
+          }
+        />
+      ) : users.isPending ? (
+        <div className={view === 'grid' ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'space-y-3'}>
+          {Array.from({ length: view === 'grid' ? 8 : 5 }).map((_, i) => (
+            <Skeleton key={i} className={view === 'grid' ? 'h-[300px] w-full rounded-3xl' : 'h-20 w-full rounded-2xl'} />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <EmptyState icon={Users} title={!search && !status && !roleId ? 'Invite your first staff member to get started.' : 'No users match these filters.'} />
+      ) : (
+        <div className={view === 'grid' ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'space-y-2.5'}>
+          {items.map((u, i) => (
+            <UserCard key={u.id} user={u} index={i} variant={view} canManage={canManage} onAction={(action) => runAction(u, action)} />
+          ))}
+        </div>
+      )}
+
+      {data ? <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} /> : null}
     </div>
   );
 }

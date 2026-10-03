@@ -36,6 +36,11 @@ export class MemberController {
     sendSuccess(res, await serviceFor(req).list(req.query as unknown as ListMembersQuery, req.auth!.sub));
   }
 
+  async stats(req: Request, res: Response): Promise<void> {
+    const { branchId } = req.query as { branchId?: string };
+    sendSuccess(res, await serviceFor(req).getStats(req.auth!.sub, branchId));
+  }
+
   async getById(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await serviceFor(req).getById(req.params.id!, req.auth!.sub));
   }

@@ -88,6 +88,39 @@ export class MemberInvoiceRepository {
     return (await this.findById(data.tenantId, invoice.id))!;
   }
 
+  /** Rewrites a balance invoice to a new remaining amount (single line item, no tax/discount) and reopens it as UNPAID. */
+  async resizeBalance(tenantId: string, id: string, amount: number): Promise<void> {
+    await this.db.memberInvoiceItem.updateMany({ where: { tenantId, invoiceId: id }, data: { unitPrice: amount, amount, quantity: 1 } });
+    await this.db.memberInvoice.update({ where: { id }, data: { subtotal: amount, totalAmount: amount, taxAmount: 0, discountAmount: 0, status: 'UNPAID' } });
+  }
+
+  /** Turns an open balance invoice into the itemized receipt for the payment that covers it, marked PAID. */
+  async settleWithReceipt(
+    tenantId: string,
+    id: string,
+    items: InvoiceItemInput[],
+    taxAmount: number,
+    discountAmount: number,
+  ): Promise<void> {
+    const subtotal = items.reduce((sum, item) => sum + (item.quantity ?? 1) * item.unitPrice, 0);
+    await this.db.memberInvoiceItem.deleteMany({ where: { tenantId, invoiceId: id } });
+    await this.db.memberInvoiceItem.createMany({
+      data: items.map((item, i) => ({
+        tenantId,
+        invoiceId: id,
+        description: item.description,
+        quantity: item.quantity ?? 1,
+        unitPrice: item.unitPrice,
+        amount: (item.quantity ?? 1) * item.unitPrice,
+        sortOrder: i,
+      })),
+    });
+    await this.db.memberInvoice.update({
+      where: { id },
+      data: { subtotal, taxAmount, discountAmount, totalAmount: Math.max(subtotal - discountAmount + taxAmount, 0), status: 'PAID' },
+    });
+  }
+
   async setStatus(id: string, status: Prisma.MemberInvoiceUncheckedUpdateInput['status']): Promise<void> {
     await this.db.memberInvoice.update({ where: { id }, data: { status } });
   }

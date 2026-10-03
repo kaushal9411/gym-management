@@ -44,7 +44,7 @@ const csp = [
   // per-tenant allow-list is practical) — a mislabeled image can't execute
   // script even so, and every upload is now magic-byte-verified server-side
   // (see core/storage/file-signature.util.ts), so this is a low-risk relaxation.
-  `img-src 'self' data: blob: https: http://localhost:9000`,
+  `img-src 'self' data: blob: https: http://localhost:9000 ${apiOrigin}`,
   "font-src 'self' data:",
   `connect-src 'self' ${apiOrigin} ${apiWsOrigin} https://api.razorpay.com https://lumberjack.razorpay.com`,
   "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",

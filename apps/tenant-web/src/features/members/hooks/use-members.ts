@@ -38,6 +38,10 @@ export function useMemberList(params: ListMembersParams) {
   return useQuery({ queryKey: ['members', 'list', params], queryFn: () => memberService.list(params), staleTime: 60_000 });
 }
 
+export function useMemberStats(branchId?: string) {
+  return useQuery({ queryKey: ['members', 'stats', branchId ?? null], queryFn: () => memberService.getStats(branchId), staleTime: 60_000 });
+}
+
 export function useMemberDetail(id: string | null) {
   return useQuery({
     queryKey: ['members', 'detail', id],
@@ -86,6 +90,14 @@ export function useLogGuestVisit() {
   return useMutation({
     mutationFn: ({ id, guestName }: { id: string; guestName?: string }) => memberService.logGuestVisit(id, guestName),
     onSuccess: invalidate,
+  });
+}
+
+export function useGuestVisits(id: string | null) {
+  return useQuery({
+    queryKey: ['members', 'guest-visits', id],
+    queryFn: () => memberService.listGuestVisits(id!),
+    enabled: id !== null,
   });
 }
 

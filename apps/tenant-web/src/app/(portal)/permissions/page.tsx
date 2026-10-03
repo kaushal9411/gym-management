@@ -2,62 +2,48 @@
 
 import * as React from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Check, Lock } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Check, KeyRound } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { IamNav } from '@/features/iam/components/iam-nav';
+import { IamHero } from '@/features/iam/components/iam-hero';
 import { usePermissionMatrix, usePermissionRegistry } from '@/features/iam/hooks/use-iam';
+import { type Accent, PanelCard, accentVar, tint } from '@/features/members/components/detail/detail-ui';
 import { cn } from '@/lib/utils';
 
 const MATRIX_ROW_HEIGHT = 41;
+const ROLE_DOT: Accent[] = ['destructive', 'primary', 'aqua', 'violet', 'success', 'warning'];
 const MATRIX_VIEWPORT_HEIGHT = 600;
 
 export default function PermissionsPage() {
   const [tab, setTab] = React.useState<'registry' | 'matrix'>('registry');
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center gap-3.5">
-        <span
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-11"
-          style={{
-            backgroundColor: 'color-mix(in oklch, var(--chart-3) 16%, transparent)',
-            color: 'var(--chart-3)',
-            boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-3) 18%, transparent)',
-          }}
-        >
-          <Lock className="size-5" aria-hidden />
-        </span>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Permissions</h1>
-          <p className="text-muted-foreground">The central registry every module authorizes against.</p>
-        </div>
-      </div>
+    <div className="w-full space-y-5">
+      <IamHero title="Permissions" subtitle="The central registry every module authorizes against." />
 
-      <IamNav />
-
-      <div className="inline-flex rounded-md border p-0.5">
+      <div className="inline-flex rounded-xl border bg-muted/50 p-0.5" role="group" aria-label="Permissions view">
         {(['registry', 'matrix'] as const).map((t) => (
           <button
             key={t}
             type="button"
+            aria-pressed={tab === t}
             onClick={() => setTab(t)}
-            className={cn(
-              'rounded px-3 py-1.5 text-sm font-medium capitalize transition-colors',
-              tab === t ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent',
-            )}
+            className={cn('rounded-[10px] px-5 py-1.5 text-sm font-bold capitalize transition-all', tab === t ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground')}
           >
             {t}
           </button>
         ))}
       </div>
 
-      {tab === 'registry' ? <Registry /> : <Matrix />}
+      <motion.div key={tab} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.3 }}>
+        {tab === 'registry' ? <Registry /> : <Matrix />}
+      </motion.div>
     </div>
   );
 }
+
+const GROUP_TONES: Accent[] = ['primary', 'aqua', 'success', 'violet', 'warning', 'destructive'];
 
 function Registry() {
   const registry = usePermissionRegistry();
@@ -65,22 +51,29 @@ function Registry() {
   if (!registry.data) return null;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      {registry.data.groups.map((group) => (
-        <Card key={group.resource}>
-          <CardHeader>
-            <CardTitle className="text-base capitalize">{group.resource.replace(/-/g, ' ')}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {group.permissions.map((p) => (
-              <div key={p.key} className="flex items-baseline gap-2 text-sm">
-                <Badge variant="outline" className="shrink-0 font-mono text-xs font-normal">{p.key}</Badge>
-                <span className="text-muted-foreground">{p.description}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      ))}
+    <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+      {registry.data.groups.map((group, gi) => {
+        const tone = GROUP_TONES[gi % GROUP_TONES.length]!;
+        return (
+          <PanelCard
+            key={group.resource}
+            icon={KeyRound}
+            accent={tone}
+            title={group.resource.replace(/-/g, ' ')}
+            delay={Math.min(gi * 0.04, 0.4)}
+            right={<span className="rounded-full px-2.5 py-0.5 text-[11px] font-bold tabular-nums" style={{ backgroundColor: tint(tone, 14), color: accentVar(tone) }}>{group.permissions.length}</span>}
+          >
+            <div className="-my-1.5">
+              {group.permissions.map((p) => (
+                <div key={p.key} className="flex items-baseline gap-2 border-b border-dashed py-1.5 text-[12.5px] last:border-0">
+                  <code className="shrink-0 rounded-lg px-2 py-0.5 font-mono text-[11.5px]" style={{ backgroundColor: tint(tone, 12), color: accentVar(tone) }}>{p.key}</code>
+                  <span className="text-muted-foreground">{p.description}</span>
+                </div>
+              ))}
+            </div>
+          </PanelCard>
+        );
+      })}
     </div>
   );
 }
@@ -113,11 +106,11 @@ function Matrix() {
   const bottomPad = virtualizer.getTotalSize() - (virtualRows[virtualRows.length - 1]?.end ?? 0);
 
   return (
-    <div ref={scrollRef} className="overflow-auto rounded-lg border" style={{ maxHeight: MATRIX_VIEWPORT_HEIGHT }}>
+    <div ref={scrollRef} className="overflow-auto rounded-2xl border bg-card shadow-xs" style={{ maxHeight: MATRIX_VIEWPORT_HEIGHT }}>
       <table className="w-full text-sm">
-        <thead className="sticky top-0 z-10 border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="sticky top-0 z-10 border-b bg-[color-mix(in_oklch,var(--primary)_9%,var(--card))] text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
-            <th className="sticky left-0 bg-muted/40 px-4 py-2.5 text-left font-medium">Permission</th>
+            <th className="sticky left-0 bg-[color-mix(in_oklch,var(--primary)_9%,var(--card))] px-4 py-2.5 text-left font-medium">Permission</th>
             {roles.map((role) => (
               <th key={role.id} className="whitespace-nowrap px-3 py-2.5 text-center font-medium">
                 {role.name}
@@ -132,11 +125,13 @@ function Matrix() {
             const permission = permissions[virtualRow.index]!;
             return (
               <tr key={permission.key} className="hover:bg-accent/40">
-                <td className="sticky left-0 bg-background px-4 py-2 font-mono text-xs">{permission.key}</td>
+                <td className="sticky left-0 bg-card px-4 py-2 font-mono text-xs">{permission.key}</td>
                 {roles.map((role, i) => (
                   <td key={role.id} className="px-3 py-2 text-center">
                     {roleSets[i]!.has(permission.key) ? (
-                      <Check className="mx-auto size-4 text-emerald-600 dark:text-emerald-400" aria-label={`${role.name} has ${permission.key}`} />
+                      <span className="mx-auto grid size-5 place-items-center rounded-full text-white" style={{ backgroundColor: accentVar(ROLE_DOT[i % ROLE_DOT.length]!), boxShadow: `0 0 0 4px ${tint(ROLE_DOT[i % ROLE_DOT.length]!, 18)}` }}>
+                        <Check className="size-3" strokeWidth={3} aria-label={`${role.name} has ${permission.key}`} />
+                      </span>
                     ) : (
                       <span className="text-muted-foreground/40" aria-hidden>—</span>
                     )}

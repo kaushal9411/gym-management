@@ -8,6 +8,7 @@ import {
   bulkImportSchema,
   createUserSchema,
   listUsersQuerySchema,
+  userStatsQuerySchema,
   setBranchesSchema,
   setPermissionOverridesSchema,
   setRolesSchema,
@@ -65,6 +66,14 @@ userRouter.post(
  *     responses:
  *       200: { description: CSV file }
  */
+/** @openapi { "/users/stats": { get: { tags: [Users], summary: "Counts and short lists for the Staff and Access report panels", security: [{bearerAuth: []}], responses: { 200: { description: UserStatsDto } } } } } */
+userRouter.get(
+  '/stats',
+  requirePermission('users:read'),
+  validate({ query: userStatsQuerySchema }),
+  asyncHandler(userController.stats.bind(userController)),
+);
+
 userRouter.get('/export', requirePermission('users:export'), asyncHandler(userController.exportCsv.bind(userController)));
 
 /**

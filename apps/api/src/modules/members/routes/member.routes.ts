@@ -14,6 +14,7 @@ import {
   extendMembershipSchema,
   freezeMembershipSchema,
   listMembersQuerySchema,
+  memberStatsQuerySchema,
   logGuestVisitSchema,
   logPtSessionSchema,
   memberBulkImportSchema,
@@ -64,6 +65,14 @@ memberRouter.post(
   requirePermission('members:create'),
   validate({ body: createMemberSchema }),
   asyncHandler(memberController.create.bind(memberController)),
+);
+
+/** @openapi { "/members/stats": { get: { tags: [Members], summary: "Counts and short lists for the Members page report panels (status mix, plans, joinings, needs-attention lists)", security: [{bearerAuth: []}], responses: { 200: { description: MemberStatsDto } } } } } */
+memberRouter.get(
+  '/stats',
+  requirePermission('members:view'),
+  validate({ query: memberStatsQuerySchema }),
+  asyncHandler(memberController.stats.bind(memberController)),
 );
 
 /** @openapi { "/members/export": { get: { tags: [Members], summary: Download the member list as CSV, security: [{bearerAuth: []}], responses: { 200: { description: CSV file } } } } } */

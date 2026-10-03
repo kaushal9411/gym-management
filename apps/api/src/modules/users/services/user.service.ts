@@ -16,6 +16,7 @@ import type {
   UpdateUserInput,
   UserDetailDto,
   UserListItemDto,
+  UserStatsDto,
 } from '../dto/user.dto';
 import {
   UserManagementRepository,
@@ -45,12 +46,14 @@ function toListItem(user: UserWithAccess): UserListItemDto {
       expiresAt: ub.expiresAt?.toISOString() ?? null,
     })),
     lastLoginAt: user.lastLoginAt?.toISOString() ?? null,
+    mfaEnabled: user.mfaEnabled,
     createdAt: user.createdAt.toISOString(),
     deletedAt: user.deletedAt?.toISOString() ?? null,
   };
 }
 
 export class UserService {
+  private readonly db: ReturnType<typeof getTenantScopedClient>;
   private readonly repository: UserManagementRepository;
   private readonly roleManagement: RoleManagementRepository;
   private readonly authRoleRepository: RoleRepository;
@@ -59,6 +62,7 @@ export class UserService {
 
   constructor(private readonly tenantId: string) {
     const db = getTenantScopedClient(tenantId);
+    this.db = db;
     this.repository = new UserManagementRepository(db);
     this.roleManagement = new RoleManagementRepository(db);
     this.authRoleRepository = new RoleRepository(db);
@@ -74,6 +78,64 @@ export class UserService {
       page: query.page,
       limit: query.limit,
       totalPages: Math.ceil(total / query.limit),
+    };
+  }
+
+  /** Counts and short lists behind the Staff & Access page's report panels. `branchId` mirrors the list filter: users with access to that branch, plus all-branch users. */
+  async getStats(branchId?: string): Promise<UserStatsDto> {
+    const users = await this.db.user.findMany({
+      where: {
+        tenantId: this.tenantId,
+        deletedAt: null,
+        ...(branchId ? { OR: [{ allBranches: true }, { userBranches: { some: { branchId } } }] } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        mfaEnabled: true,
+        lastLoginAt: true,
+        createdAt: true,
+        userRoles: { select: { role: { select: { name: true } } } },
+      },
+    });
+    const pendingInvitations = await this.db.userInvitation.count({ where: { tenantId: this.tenantId, status: 'PENDING' } });
+
+    const now = Date.now();
+    const days = (d: Date) => Math.floor((now - d.getTime()) / 86_400_000);
+    const byStatus = { ACTIVE: 0, PENDING_VERIFICATION: 0, LOCKED: 0, SUSPENDED: 0, DEACTIVATED: 0 };
+    const roleCounts = new Map<string, number>();
+    const lastSignIn = { today: 0, thisWeek: 0, thisMonth: 0, older: 0, never: 0 };
+    for (const u of users) {
+      byStatus[u.status] += 1;
+      for (const ur of u.userRoles) roleCounts.set(ur.role.name, (roleCounts.get(ur.role.name) ?? 0) + 1);
+      if (!u.lastLoginAt) lastSignIn.never += 1;
+      else {
+        const d = days(u.lastLoginAt);
+        if (d < 1) lastSignIn.today += 1;
+        else if (d < 7) lastSignIn.thisWeek += 1;
+        else if (d < 30) lastSignIn.thisMonth += 1;
+        else lastSignIn.older += 1;
+      }
+    }
+
+    return {
+      total: users.length,
+      byStatus,
+      mfaEnabled: users.filter((u) => u.mfaEnabled).length,
+      signedInThisWeek: lastSignIn.today + lastSignIn.thisWeek,
+      pendingInvitations,
+      byRole: [...roleCounts].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
+      lastSignIn,
+      locked: users.filter((u) => u.status === 'LOCKED').slice(0, 5).map((u) => ({ id: u.id, name: u.name, detail: 'Too many failed sign-ins' })),
+      pendingVerification: users
+        .filter((u) => u.status === 'PENDING_VERIFICATION')
+        .slice(0, 5)
+        .map((u) => ({ id: u.id, name: u.name, detail: days(u.createdAt) === 0 ? 'Created today' : `Created ${days(u.createdAt)} days ago` })),
+      dormant: users
+        .filter((u) => u.status === 'ACTIVE' && (!u.lastLoginAt || days(u.lastLoginAt) >= 30))
+        .slice(0, 5)
+        .map((u) => ({ id: u.id, name: u.name, detail: u.lastLoginAt ? `Last sign-in ${days(u.lastLoginAt)} days ago` : 'Never signed in' })),
     };
   }
 

@@ -351,6 +351,24 @@ Both Payment Link flows above — `AdminTenantBillingService` (platform billing,
 
 **Verified live** against the running local stack (not a mock): created a real PENDING Payment+OPEN Invoice for an ACTIVE-subscription tenant, POSTed a genuine HMAC-signed `payment_link.paid` webhook body at the endpoint, confirmed Payment→SUCCEEDED/Invoice→PAID/Subscription reactivated with a fresh billing period, and confirmed both the subscription-activated and invoice emails landed in Mailpit (a few seconds of BullMQ queue latency, not instant, but delivered). Confirmed a forged signature 400s. Full typecheck/eslint(0 warnings)/vitest (288/288) clean.
 
+## Balance-due invoices & `payment:updated` (Prompt 105)
+
+- `MemberInvoice.membershipId` is set ONLY on the auto-managed "Balance due" invoice (one open one per membership); receipt and manual invoices leave it null. `finance/services/member-balance.service.ts#MemberBalanceService` owns it: `reconcile(membershipId)` / `reconcileForMember(memberId)` converge it to `plan final price − SUCCESS payments` (final price = `priceAtAssignment` → plan discount% → plan tax%; fees are not part of it). Called from `MemberService` (assign / renew / upgrade / downgrade / cancel) and the end of `MemberPaymentService#onPaymentSucceeded`. CANCELLED/SUPERSEDED memberships void their open balance; EXPIRED ones keep it.
+- In `onPaymentSucceeded`, a payment with no `invoiceId` whose `finalAmount` covers the open balance invoice settles THAT invoice (itemized, PAID) via `settleBalanceWithReceipt`; otherwise it gets its own PAID receipt as before and the balance invoice is resized afterwards. Do not bypass this by creating invoices for membership money elsewhere — every invoice-based total (dashboard KPI `outstandingPayments`, finance dashboard, `/invoices`, member `outstandingAmount`, portal Pay now) depends on the balance invoice being the single record of what is still owed.
+- The payment-receipt email's `dueAmount` reads the open balance invoice, not `priceAtAssignment − paid`.
+- Backfill existing data once after deploy: `pnpm exec tsx scripts/reconcile-balance-invoices.ts` (idempotent; ends with `process.exit` because the Redis/queue handles otherwise keep it alive).
+- Realtime: `MemberPaymentService#emitPaymentUpdated` → `emitToTenant(tenantId, 'payment:updated', { memberId, memberName, status: 'SUCCESS' | 'FAILED', amount? })` on every success/failure path (staff entry, Razorpay webhook via `applyWebhookOutcome`, verify-status). tenant-web's `RealtimeProvider` invalidates the money-related query families on it. Mobile has no Socket.IO client.
+
+## Members list reports (Prompt 107)
+
+- `GET /members/stats?branchId=` (permission `members:view`, registered before `/:id`) → `MemberStatsDto`: totals by status, new this month, expiring in 30 days, members with dues (count + sum of open invoices), checked in today, plan mix (active memberships, top 5 + "No plan"), gender, "heard about us", joinings for the last 6 months, and three short people lists (not visited in 14 days, expiring within 7 days, highest dues). Built in `MemberService#getStats`; scope = caller's branch access ∩ optional `branchId`. Amounts of dues come from open `MemberInvoice` rows, so the Prompt 105 balance invoices are included.
+- `GET /members` items gained `lastCheckInAt` and `visitsThisMonth` (`MemberService#buildActivity`, two grouped `attendance` queries per page). `toListItem` defaults them to `null`/`0` for detail/portal callers.
+
+## Staff stats (Prompt 109)
+
+- `GET /users/stats?branchId=` (permission `users:read`, same gate as `GET /users`) → `UserStatsDto`: total and per-status counts, 2FA-enabled count, signed-in-this-week, pending invitations, people per role, last-sign-in buckets (today / this week / this month / older / never) and short lists for locked, pending-verification and dormant (30+ days) accounts. Built in `UserService#getStats`; soft-deleted users are excluded; `branchId` keeps users with access to that branch plus all-branch users (same as the list filter).
+- `UserListItemDto` gained `mfaEnabled`.
+
 ## Reports & Analytics (Prompt 20)
 
 New `modules/reports/` — four routers (`dashboard.routes.ts` at `/reports/dashboard`, `reports.routes.ts` at `/reports`, `scheduled-report.routes.ts` at `/reports/scheduled`, `analytics.routes.ts` at `/analytics`), same routes→controller→service→repository shape as every other module. Mount order in `router.ts` matters: the two specific `/reports/dashboard` and `/reports/scheduled` routers must be mounted BEFORE the general `/reports` router (which treats its own path segment as `:reportType`), or the general router would swallow their requests first.

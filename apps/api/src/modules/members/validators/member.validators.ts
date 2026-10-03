@@ -43,6 +43,8 @@ const fitnessGoalSchema = z.enum([
 ]);
 const awarenessSourceSchema = z.enum(['SOCIAL_MEDIA', 'FRIEND_REFERRAL', 'WALK_IN', 'ADVERTISEMENT', 'ONLINE_SEARCH', 'OTHER']);
 
+export const memberStatsQuerySchema = z.object({ branchId: z.string().uuid().optional() });
+
 export const listMembersQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),

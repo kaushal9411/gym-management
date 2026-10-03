@@ -13,6 +13,7 @@ import type {
   MemberBulkImportResult,
   MemberBulkImportRow,
   MemberDetail,
+  MemberStats,
   MemberDocument,
   MemberDocumentType,
   MemberGdprExport,
@@ -147,6 +148,11 @@ class MemberService {
 
   async logGuestVisit(id: string, guestName?: string): Promise<GuestVisit> {
     const res = await apiClient.post<ApiEnvelope<GuestVisit>>(`/members/${id}/guest-visits`, { guestName });
+    return res.data.data;
+  }
+
+  async getStats(branchId?: string): Promise<MemberStats> {
+    const res = await apiClient.get<ApiEnvelope<MemberStats>>('/members/stats', { params: { branchId } });
     return res.data.data;
   }
 

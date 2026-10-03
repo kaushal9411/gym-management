@@ -1,10 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Ruler } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { IconChip, cardHeaderStyle } from '@/features/members/components/detail/detail-ui';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { toMeasurementError, useCreateMeasurement, useDeleteMeasurement, useMemberMeasurements, useUpdateMeasurement } from '../hooks/use-measurements';
@@ -79,8 +80,11 @@ export function MemberMeasurementsCard({ memberId }: MemberMeasurementsCardProps
 
   return (
     <Card id="measurements" data-testid="measurements-card">
-      <CardHeader>
-        <CardTitle className="text-base">Body measurements</CardTitle>
+      <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('aqua')}>
+        <CardTitle className="flex items-center gap-3 text-base">
+          <IconChip icon={Ruler} accent="aqua" />
+          Body measurements
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {measurements.isPending ? (

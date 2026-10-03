@@ -13,6 +13,8 @@ const branchAssignmentSchema = z.object({
   expiresAt: z.string().datetime().optional(),
 });
 
+export const userStatsQuerySchema = z.object({ branchId: z.string().uuid().optional() });
+
 export const listUsersQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),

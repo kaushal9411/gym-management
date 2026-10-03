@@ -2,10 +2,12 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import { AnimatePresence, motion } from 'framer-motion';
+import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { useBranches } from '@/features/branch/hooks/use-branches';
 import { toFinanceError, useCreatePayment } from '@/features/finance/hooks/use-finance';
 import type { MemberPaymentMethod } from '@/features/finance/types';
 import { DEFAULT_MEMBER_EXTENDED_INFO_FORM_STATE, type MemberExtendedInfoFormState } from '../member-extended-info-fields';
@@ -17,7 +19,8 @@ import { StepHealthScreening } from './step-health-screening';
 import { StepPaymentSummary } from './step-payment-summary';
 import { StepPersonalInfo } from './step-personal-info';
 import { composeDateOfBirth, defaultWizardCorePersonalState, defaultWizardPaymentState, type WizardCorePersonalState, type WizardPaymentState } from './types';
-import { WizardProgress } from './wizard-progress';
+import { WizardAside } from './wizard-aside';
+import { WizardHero } from './wizard-progress';
 
 export function AddMemberWizard() {
   const router = useRouter();
@@ -33,26 +36,26 @@ export function AddMemberWizard() {
   const [health, setHealth] = React.useState<MemberHealthFormState>(DEFAULT_MEMBER_HEALTH_FORM_STATE);
   const [payment, setPayment] = React.useState<WizardPaymentState>(defaultWizardPaymentState());
   const [error, setError] = React.useState<string | null>(null);
+  const [showErrors, setShowErrors] = React.useState(false);
+  const branches = useBranches();
 
   const submitting = createMember.isPending || assignMembership.isPending || createPayment.isPending;
 
   function goNext() {
     setError(null);
     if (step === 1) {
-      if (!core.firstName.trim() || !core.lastName.trim()) {
-        setError('Enter the member’s full name.');
-        return;
-      }
-      if (!core.phone.trim() && !core.email.trim()) {
-        setError('Enter a phone number or email address.');
-        return;
-      }
-      if (!core.branchId) {
-        setError('Select a branch.');
-        return;
-      }
-      if (!core.joiningDate) {
-        setError('Select a date of joining.');
+      const problem = !core.firstName.trim() || !core.lastName.trim()
+        ? 'Enter the member’s full name.'
+        : !core.phone.trim() && !core.email.trim()
+          ? 'Enter a phone number or email address.'
+          : !core.branchId
+            ? 'Select a branch.'
+            : !core.joiningDate
+              ? 'Select a date of joining.'
+              : null;
+      if (problem) {
+        setShowErrors(true);
+        setError(problem);
         return;
       }
     }
@@ -187,35 +190,63 @@ export function AddMemberWizard() {
     router.push(`/members/${memberId}`);
   }
 
+  const branchName = branches.data?.find((b) => b.id === core.branchId)?.name;
+
   return (
-    <Card>
-      <CardContent className="space-y-6 pt-6">
-        <WizardProgress current={step} />
-        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+    <div className="space-y-5">
+      <WizardHero
+        current={step}
+        onStepClick={(n) => {
+          setError(null);
+          setStep(n);
+        }}
+      />
 
-        {step === 1 ? (
-          <StepPersonalInfo core={core} onCoreChange={setCore} extended={extended} onExtendedChange={setExtended} program={program} onProgramChange={setProgram} disabled={submitting} />
-        ) : step === 2 ? (
-          <StepHealthScreening value={health} onChange={setHealth} disabled={submitting} />
-        ) : (
-          <StepPaymentSummary core={core} extended={extended} program={program} payment={payment} onPaymentChange={setPayment} disabled={submitting} />
-        )}
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="min-w-0 space-y-4">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={step}
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="space-y-5"
+            >
+              {error ? (
+                <motion.p role="alert" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm font-medium text-destructive">
+                  {error}
+                </motion.p>
+              ) : null}
 
-        <div className="flex justify-between border-t pt-4">
-          <Button type="button" variant="outline" disabled={step === 1 || submitting} onClick={goBack}>
-            Back
-          </Button>
-          {step < 3 ? (
-            <Button type="button" onClick={goNext} disabled={submitting}>
-              Next
+              {step === 1 ? (
+                <StepPersonalInfo core={core} onCoreChange={setCore} extended={extended} onExtendedChange={setExtended} program={program} onProgramChange={setProgram} showErrors={showErrors} disabled={submitting} />
+              ) : step === 2 ? (
+                <StepHealthScreening value={health} onChange={setHealth} disabled={submitting} />
+              ) : (
+                <StepPaymentSummary extended={extended} program={program} payment={payment} onPaymentChange={setPayment} disabled={submitting} />
+              )}
+            </motion.div>
+          </AnimatePresence>
+
+          <div className="sticky bottom-3 z-10 flex justify-between gap-3 rounded-2xl border bg-card/95 p-3.5 shadow-lg backdrop-blur">
+            <Button type="button" variant="outline" disabled={step === 1 || submitting} onClick={goBack}>
+              <ArrowLeft className="size-4" /> Back
             </Button>
-          ) : (
-            <Button type="button" onClick={handleFinalSubmit} disabled={submitting}>
-              {submitting ? 'Saving…' : 'Save'}
-            </Button>
-          )}
+            {step < 3 ? (
+              <Button type="button" onClick={goNext} disabled={submitting} className="border-0 text-white shadow-md" style={{ backgroundImage: 'linear-gradient(120deg, var(--primary), var(--chart-7))' }}>
+                Next <ArrowRight className="size-4" />
+              </Button>
+            ) : (
+              <Button type="button" onClick={handleFinalSubmit} disabled={submitting} className="border-0 text-white shadow-md" style={{ backgroundImage: 'linear-gradient(120deg, var(--success), var(--chart-3))' }}>
+                <Check className="size-4" /> {submitting ? 'Saving…' : 'Create member'}
+              </Button>
+            )}
+          </div>
         </div>
-      </CardContent>
-    </Card>
+
+        <WizardAside core={core} extended={extended} program={program} payment={payment} branchName={branchName} />
+      </div>
+    </div>
   );
 }

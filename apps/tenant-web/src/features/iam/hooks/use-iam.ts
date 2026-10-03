@@ -24,6 +24,15 @@ export function useUsers(params: ListUsersParams) {
   return useQuery({ queryKey: ['iam', 'users', params], queryFn: () => iamService.listUsers(params) });
 }
 
+export function useUserStats(branchId?: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['iam', 'users', 'stats', branchId ?? null],
+    queryFn: () => iamService.getUserStats(branchId),
+    staleTime: 60_000,
+    enabled: options?.enabled ?? true,
+  });
+}
+
 export function useUser(userId: string | null) {
   return useQuery({
     queryKey: ['iam', 'users', 'detail', userId],
@@ -112,8 +121,8 @@ export function useBulkImportUsers() {
 
 // ── Roles ─────────────────────────────────────────────────────────────────
 
-export function useRoles() {
-  return useQuery({ queryKey: ['iam', 'roles'], queryFn: () => iamService.listRoles() });
+export function useRoles(options?: { enabled?: boolean }) {
+  return useQuery({ queryKey: ['iam', 'roles'], queryFn: () => iamService.listRoles(), enabled: options?.enabled ?? true });
 }
 
 export function useRole(roleId: string | null) {
@@ -170,11 +179,12 @@ export function useCloneRole() {
 
 // ── Permissions ───────────────────────────────────────────────────────────
 
-export function usePermissionRegistry() {
+export function usePermissionRegistry(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['iam', 'permissions', 'registry'],
     queryFn: () => iamService.getPermissionRegistry(),
     staleTime: 5 * 60_000,
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -193,7 +203,10 @@ export function useCreateInvitation() {
   return useMutation({
     mutationFn: (payload: { email: string; roleId: string; branchIds?: string[] }) =>
       iamService.createInvitation(payload),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['iam', 'invitations'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['iam', 'invitations'] });
+      void queryClient.invalidateQueries({ queryKey: ['iam', 'users', 'stats'] });
+    },
   });
 }
 
@@ -204,7 +217,10 @@ export function useInvitationAction() {
       if (action === 'resend') await iamService.resendInvitation(invitationId);
       else await iamService.revokeInvitation(invitationId);
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['iam', 'invitations'] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['iam', 'invitations'] });
+      void queryClient.invalidateQueries({ queryKey: ['iam', 'users', 'stats'] });
+    },
   });
 }
 

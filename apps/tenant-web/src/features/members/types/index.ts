@@ -67,6 +67,33 @@ export interface MemberListItem {
   deletedAt: string | null;
   /** Sum of this member's still-owed invoices (`UNPAID`/`PARTIALLY_PAID`/`OVERDUE`) — `"0.00"` when nothing's outstanding. */
   outstandingAmount: string;
+  /** Most recent check-in (ISO), `null` if never. Filled by the list endpoint only. */
+  lastCheckInAt: string | null;
+  /** Check-ins since the 1st of this month. Filled by the list endpoint only. */
+  visitsThisMonth: number;
+}
+
+export interface MemberStatsPerson {
+  id: string;
+  name: string;
+  memberId: string;
+  detail: string;
+}
+
+export interface MemberStats {
+  total: number;
+  byStatus: { ACTIVE: number; INACTIVE: number; FROZEN: number };
+  newThisMonth: number;
+  expiringIn30Days: number;
+  withDues: { count: number; amount: string };
+  checkedInToday: number;
+  plans: Array<{ name: string; count: number }>;
+  gender: Array<{ label: string; count: number }>;
+  source: Array<{ label: string; count: number }>;
+  joinedByMonth: Array<{ month: string; count: number }>;
+  notVisited14Days: MemberStatsPerson[];
+  expiringThisWeek: MemberStatsPerson[];
+  highestDues: MemberStatsPerson[];
 }
 
 export interface MembershipHistoryEntry {

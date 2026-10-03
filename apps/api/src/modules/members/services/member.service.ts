@@ -9,6 +9,7 @@ import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrast
 import { assertBranchAccess, getBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
+import { MemberBalanceService } from '../../finance/services/member-balance.service';
 import { MemberAuthService } from '../../member-auth/services/member-auth.service';
 import { notifyMembershipAssigned, notifyMembershipRenewed, notifyNewMemberRegistration } from '../../tenant-notifications/services/notification-trigger.service';
 import {
@@ -29,6 +30,7 @@ import {
   type MemberDetailDto,
   type MemberDocumentDto,
   type MemberListItemDto,
+  type MemberStatsDto,
   type PlanUsageDto,
   type PtSessionLogDto,
   type RenewMembershipInput,
@@ -90,7 +92,11 @@ export async function performRenewal(
   });
 }
 
-function toListItem(member: MemberRow, outstandingAmount = '0.00'): MemberListItemDto {
+function toListItem(
+  member: MemberRow,
+  outstandingAmount = '0.00',
+  activity: { lastCheckInAt: string | null; visitsThisMonth: number } = { lastCheckInAt: null, visitsThisMonth: 0 },
+): MemberListItemDto {
   // Falls back to a PENDING (future-dated) membership when there's no ACTIVE
   // one, so staff still see what's coming up rather than a blank "no plan"
   // — the two are mutually exclusive per member (assignMembership blocks a
@@ -125,6 +131,8 @@ function toListItem(member: MemberRow, outstandingAmount = '0.00'): MemberListIt
     createdAt: member.createdAt.toISOString(),
     deletedAt: member.deletedAt?.toISOString() ?? null,
     outstandingAmount,
+    lastCheckInAt: activity.lastCheckInAt,
+    visitsThisMonth: activity.visitsThisMonth,
   };
 }
 
@@ -234,12 +242,112 @@ export class MemberService {
     const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
     const { items, total } = await this.members.list(this.tenantId, query, restrictToBranchIds);
     const outstandingByMember = await this.buildOutstandingAmounts(items.map((m) => m.id));
+    const activityByMember = await this.buildActivity(items.map((m) => m.id));
     return {
-      items: items.map((m) => toListItem(m, outstandingByMember.get(m.id) ?? '0.00')),
+      items: items.map((m) => toListItem(m, outstandingByMember.get(m.id) ?? '0.00', activityByMember.get(m.id))),
       total,
       page: query.page,
       limit: query.limit,
       totalPages: Math.ceil(total / query.limit),
+    };
+  }
+
+  /** Counts and short lists behind the Members page's report panels. Honors the caller's branch access plus an optional single-branch filter. */
+  async getStats(actorUserId: string, branchId?: string): Promise<MemberStatsDto> {
+    const restrict = await this.resolveBranchRestriction(actorUserId);
+    const branchWhere = branchId ? { branchId } : restrict ? { branchId: { in: restrict } } : {};
+    const memberWhere = { tenantId: this.tenantId, deletedAt: null, ...branchWhere };
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const todayStart = new Date(`${now.toISOString().slice(0, 10)}T00:00:00.000Z`);
+    const in7 = new Date(now.getTime() + 7 * 86_400_000);
+    const in30 = new Date(now.getTime() + 30 * 86_400_000);
+    const fourteenAgo = new Date(now.getTime() - 14 * 86_400_000);
+    const OPEN = ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] as const;
+
+    const [statusRows, newThisMonth, expiring30, dueRows, checkedInToday, planRows, genderRows, sourceRows, joined, expiringWeek, activeMembers] = await Promise.all([
+      this.db.member.groupBy({ by: ['status'], where: memberWhere, _count: { _all: true } }),
+      this.db.member.count({ where: { ...memberWhere, createdAt: { gte: monthStart } } }),
+      this.db.membership.count({ where: { tenantId: this.tenantId, status: 'ACTIVE', endDate: { gte: now, lte: in30 }, member: memberWhere } }),
+      this.db.memberInvoice.groupBy({
+        by: ['memberId'],
+        where: { tenantId: this.tenantId, status: { in: [...OPEN] }, member: memberWhere },
+        _sum: { totalAmount: true },
+      }),
+      this.db.attendance.count({ where: { tenantId: this.tenantId, deletedAt: null, attendanceDate: todayStart, member: memberWhere } }),
+      this.db.membership.groupBy({ by: ['planId'], where: { tenantId: this.tenantId, status: 'ACTIVE', member: memberWhere }, _count: { _all: true } }),
+      this.db.member.groupBy({ by: ['gender'], where: memberWhere, _count: { _all: true } }),
+      this.db.member.groupBy({ by: ['awarenessSource'], where: memberWhere, _count: { _all: true } }),
+      this.db.member.findMany({ where: { ...memberWhere, createdAt: { gte: sixMonthsAgo } }, select: { createdAt: true } }),
+      this.db.membership.findMany({
+        where: { tenantId: this.tenantId, status: 'ACTIVE', endDate: { gte: now, lte: in7 }, member: memberWhere },
+        orderBy: { endDate: 'asc' },
+        take: 5,
+        select: { endDate: true, member: { select: { id: true, memberId: true, firstName: true, lastName: true } } },
+      }),
+      this.db.member.findMany({ where: { ...memberWhere, status: 'ACTIVE', createdAt: { lt: fourteenAgo } }, select: { id: true, memberId: true, firstName: true, lastName: true } }),
+    ]);
+
+    const byStatus = { ACTIVE: 0, INACTIVE: 0, FROZEN: 0 };
+    for (const r of statusRows) byStatus[r.status] = r._count._all;
+
+    const planNames = new Map((await this.db.membershipPlan.findMany({ where: { tenantId: this.tenantId, id: { in: planRows.map((r) => r.planId) } }, select: { id: true, name: true } })).map((p) => [p.id, p.name]));
+    const plans = planRows.map((r) => ({ name: planNames.get(r.planId) ?? 'Plan', count: r._count._all })).sort((a, b) => b.count - a.count).slice(0, 5);
+    const withPlan = planRows.reduce((sum, r) => sum + r._count._all, 0);
+    if (byStatus.ACTIVE + byStatus.FROZEN + byStatus.INACTIVE - withPlan > 0) plans.push({ name: 'No plan', count: byStatus.ACTIVE + byStatus.FROZEN + byStatus.INACTIVE - withPlan });
+
+    const GENDER_LABELS: Record<string, string> = { MALE: 'Male', FEMALE: 'Female', OTHER: 'Other', PREFER_NOT_TO_SAY: 'Prefer not to say' };
+    const gender = genderRows.map((r) => ({ label: r.gender ? (GENDER_LABELS[r.gender] ?? r.gender) : 'Not set', count: r._count._all })).sort((a, b) => b.count - a.count);
+    const SOURCE_LABELS: Record<string, string> = { SOCIAL_MEDIA: 'Social media', FRIEND_REFERRAL: 'Friend', WALK_IN: 'Walk-in', ADVERTISEMENT: 'Advertisement', ONLINE_SEARCH: 'Online search', OTHER: 'Other' };
+    const source = sourceRows.filter((r) => r.awarenessSource).map((r) => ({ label: SOURCE_LABELS[r.awarenessSource!] ?? r.awarenessSource!, count: r._count._all })).sort((a, b) => b.count - a.count);
+
+    const joinedByMonth: Array<{ month: string; count: number }> = [];
+    for (let i = 5; i >= 0; i -= 1) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      joinedByMonth.push({ month: d.toLocaleString('en', { month: 'short' }), count: joined.filter((j) => j.createdAt.getFullYear() === d.getFullYear() && j.createdAt.getMonth() === d.getMonth()).length });
+    }
+
+    const name = (m: { firstName: string; lastName: string }) => `${m.firstName} ${m.lastName}`.trim();
+    const highest = [...dueRows].sort((a, b) => Number(b._sum.totalAmount ?? 0) - Number(a._sum.totalAmount ?? 0)).slice(0, 5);
+    const dueMembers = new Map((await this.db.member.findMany({ where: { tenantId: this.tenantId, id: { in: highest.map((r) => r.memberId) } }, select: { id: true, memberId: true, firstName: true, lastName: true } })).map((m) => [m.id, m]));
+
+    const lastVisits = activeMembers.length
+      ? await this.db.attendance.groupBy({ by: ['memberId'], where: { tenantId: this.tenantId, deletedAt: null, memberId: { in: activeMembers.map((m) => m.id) } }, _max: { checkInTime: true } })
+      : [];
+    const lastByMember = new Map(lastVisits.map((r) => [r.memberId, r._max.checkInTime]));
+    const notVisited = activeMembers
+      .map((m) => ({ m, last: lastByMember.get(m.id) ?? null }))
+      .filter((x) => !x.last || x.last < fourteenAgo)
+      .sort((a, b) => (a.last?.getTime() ?? 0) - (b.last?.getTime() ?? 0))
+      .slice(0, 5)
+      .map(({ m, last }) => ({ id: m.id, name: name(m), memberId: m.memberId, detail: last ? `Last visit ${Math.floor((now.getTime() - last.getTime()) / 86_400_000)} days ago` : 'Never visited' }));
+
+    return {
+      total: byStatus.ACTIVE + byStatus.INACTIVE + byStatus.FROZEN,
+      byStatus,
+      newThisMonth,
+      expiringIn30Days: expiring30,
+      withDues: { count: dueRows.length, amount: dueRows.reduce((sum, r) => sum + Number(r._sum.totalAmount ?? 0), 0).toFixed(2) },
+      checkedInToday,
+      plans,
+      gender,
+      source,
+      joinedByMonth,
+      notVisited14Days: notVisited,
+      expiringThisWeek: expiringWeek.map((e) => ({
+        id: e.member.id,
+        name: name(e.member),
+        memberId: e.member.memberId,
+        detail: (() => {
+          const days = Math.ceil((e.endDate.getTime() - now.getTime()) / 86_400_000);
+          return days <= 0 ? 'Ends today' : days === 1 ? 'Ends tomorrow' : `Ends in ${days} days`;
+        })(),
+      })),
+      highestDues: highest.map((r) => {
+        const m = dueMembers.get(r.memberId);
+        return { id: r.memberId, name: m ? name(m) : 'Member', memberId: m?.memberId ?? '', detail: Number(r._sum.totalAmount ?? 0).toFixed(2) };
+      }),
     };
   }
 
@@ -504,6 +612,7 @@ export class MemberService {
       autoRenew: input.autoRenew ?? false,
     });
     await this.audit(actor, 'member.membership_assigned', id);
+    await new MemberBalanceService(this.tenantId).reconcileForMember(id);
     await notifyMembershipAssigned(this.tenantId, {
       memberId: member.id,
       memberName: `${member.firstName} ${member.lastName}`.trim(),
@@ -525,6 +634,7 @@ export class MemberService {
 
     const renewed = await performRenewal(this.memberships, this.tenantId, id, current.id, plan, input.autoRenew ?? current.autoRenew);
     await this.audit(actor, 'member.membership_renewed', id);
+    await new MemberBalanceService(this.tenantId).reconcileForMember(id);
     await notifyMembershipRenewed(this.tenantId, {
       memberId: member.id,
       memberName: `${member.firstName} ${member.lastName}`.trim(),
@@ -566,6 +676,7 @@ export class MemberService {
       autoRenew: current.autoRenew,
     });
     await this.audit(actor, auditAction, id);
+    await new MemberBalanceService(this.tenantId).reconcileForMember(id);
     return this.getById(id, actor.userId);
   }
 
@@ -592,6 +703,7 @@ export class MemberService {
     }
     await this.memberships.cancel(current.id);
     await this.audit(actor, 'member.membership_cancelled', id);
+    await new MemberBalanceService(this.tenantId).reconcileForMember(id);
     return this.getById(id, actor.userId);
   }
 
@@ -941,6 +1053,20 @@ export class MemberService {
       _sum: { totalAmount: true },
     });
     return new Map(rows.map((r) => [r.memberId, (r._sum.totalAmount ?? 0).toString()]));
+  }
+
+  /** Last check-in + this-month visit count per member for one page of the list — two grouped queries, not N+1. */
+  private async buildActivity(memberIds: string[]): Promise<Map<string, { lastCheckInAt: string | null; visitsThisMonth: number }>> {
+    if (memberIds.length === 0) return new Map();
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const base = { tenantId: this.tenantId, deletedAt: null, memberId: { in: memberIds } };
+    const [last, month] = await Promise.all([
+      this.db.attendance.groupBy({ by: ['memberId'], where: base, _max: { checkInTime: true } }),
+      this.db.attendance.groupBy({ by: ['memberId'], where: { ...base, checkInTime: { gte: monthStart } }, _count: { _all: true } }),
+    ]);
+    const visits = new Map(month.map((r) => [r.memberId, r._count._all]));
+    return new Map(last.map((r) => [r.memberId, { lastCheckInAt: r._max.checkInTime?.toISOString() ?? null, visitsThisMonth: visits.get(r.memberId) ?? 0 }]));
   }
 
   /**

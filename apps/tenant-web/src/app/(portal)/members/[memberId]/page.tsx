@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, CalendarCheck, IdCard } from 'lucide-react';
+import { ArrowLeft, Building2, FileText, Fingerprint, Globe, HeartPulse, IdCard, MapPin, PhoneCall, QrCode, ShieldCheck, StickyNote, User, UserPlus, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -25,6 +25,16 @@ import { MemberExtendedInfoFields } from '@/features/members/components/member-e
 import { MemberHealthScreeningFields } from '@/features/members/components/member-health-screening-fields';
 import { FreezeHistoryTable, MembershipHistoryTable } from '@/features/members/components/membership-history-table';
 import { MembershipPlanSelect } from '@/features/members/components/membership-plan-select';
+import { IconChip, cardHeaderStyle } from '@/features/members/components/detail/detail-ui';
+import { MemberAttendancePanel } from '@/features/members/components/detail/member-attendance-panel';
+import { MemberGuestPanel } from '@/features/members/components/detail/member-guest-panel';
+import { MemberHero } from '@/features/members/components/detail/member-hero';
+import { MemberPaymentPanel } from '@/features/members/components/detail/member-payment-panel';
+import { MemberProgressCard } from '@/features/members/components/detail/member-progress-card';
+import { MemberStatTiles } from '@/features/members/components/detail/member-stat-tiles';
+import { MemberUsagePanel } from '@/features/members/components/detail/member-usage-panel';
+import { toFinanceError, useCreatePaymentLink } from '@/features/finance/hooks/use-finance';
+import { useCurrencySymbol } from '@/lib/currency';
 import { MemberWorkoutCard } from '@/features/workouts/components/member-workout-card';
 import { MemberDietCard } from '@/features/diet/components/member-diet-card';
 import { MemberMeasurementsCard } from '@/features/measurements/components/member-measurements-card';
@@ -183,6 +193,8 @@ export default function MemberDetailPage() {
   const manualCheckOut = useManualCheckOut();
   const logGuestVisit = useLogGuestVisit();
   const logPtSession = useLogPtSession();
+  const createPaymentLink = useCreatePaymentLink();
+  const currencySymbol = useCurrencySymbol();
 
   const canUpdate = hasPermission('members:update');
   const canDelete = hasPermission('members:delete');
@@ -195,12 +207,14 @@ export default function MemberDetailPage() {
   const canCheckIn = hasPermission('attendance:checkin');
   const canCheckOut = hasPermission('attendance:checkout');
   const canEraseData = hasPermission('members:erase-data');
+  const canSendLink = hasPermission('finance:payment-create');
 
   const [form, setForm] = React.useState<FormState | null>(null);
   const [confirmStatusAction, setConfirmStatusAction] = React.useState<StatusActionKind | null>(null);
   const [confirmFreeze, setConfirmFreeze] = React.useState(false);
   const [confirmCancel, setConfirmCancel] = React.useState(false);
   const [confirmErase, setConfirmErase] = React.useState(false);
+  const [confirmLink, setConfirmLink] = React.useState(false);
   const [branchId, setBranchId] = React.useState<string | null>(null);
   const [trainerId, setTrainerId] = React.useState<string | null>(null);
   const [assignPlanId, setAssignPlanId] = React.useState('');
@@ -454,27 +468,40 @@ export default function MemberDetailPage() {
     setConfirmCancel(false);
   };
 
+  const handleSendLink = () => {
+    createPaymentLink.mutate(
+      {
+        memberId,
+        membershipId: data.currentMembership?.id,
+        branchId: data.branch.id,
+        amount: Number(data.outstandingAmount),
+        notifyEmail: Boolean(data.email),
+        notifySms: Boolean(data.phone),
+      },
+      {
+        onSuccess: (result) => {
+          setConfirmLink(false);
+          toast.success(`Payment link sent. ${result.shortUrl}`);
+        },
+        onError: (err) => toast.error(toFinanceError(err).message),
+      },
+    );
+  };
+
   return (
-    <div className="mx-auto max-w-3xl space-y-5">
+    <div className="w-full space-y-5">
       <Button variant="ghost" size="sm" asChild>
         <Link href="/members">
           <ArrowLeft className="size-4" /> Back to members
         </Link>
       </Button>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Avatar className="size-12">
-            {data.profilePhotoUrl ? <AvatarImage src={data.profilePhotoUrl} alt="" /> : null}
-            <AvatarFallback>{data.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()}</AvatarFallback>
-          </Avatar>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{data.name}</h1>
-            <p className="text-muted-foreground">{data.memberId || 'No member ID'}</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <MemberStatusBadge status={data.status} deleted={!!data.deletedAt} />
+      <MemberHero
+        data={data}
+        canSendLink={canSendLink}
+        onSendLink={() => setConfirmLink(true)}
+        actions={
+          <>
           {data.deletedAt ? (
             canRestore ? (
               <Button size="sm" onClick={() => setConfirmStatusAction('restore')}>
@@ -512,14 +539,22 @@ export default function MemberDetailPage() {
               Delete
             </Button>
           ) : null}
-        </div>
-      </div>
+          </>
+        }
+      />
+
+      <MemberStatTiles data={data} />
 
       {canUpdate ? <UnsavedChangesBar isDirty={isDirty} saving={updateMember.isPending} onSave={handleSave} onCancel={handleCancel} /> : null}
 
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[320px_minmax(0,1fr)_370px]">
+        <div className="order-2 space-y-5 lg:order-none lg:col-start-1 lg:row-start-1 xl:col-start-2 [&>div]:overflow-hidden [&>div]:transition-shadow [&>div]:hover:shadow-md [&>div>div:first-child]:bg-gradient-to-r [&>div>div:first-child]:border-b [&>div>div:first-child]:from-primary/10 [&>div>div:first-child]:to-transparent [&>div>div:nth-child(2)]:pt-5">
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Profile photo</CardTitle>
+        <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('primary')}>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconChip icon={User} accent="primary" />
+            Profile photo
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <AvatarUpload name={data.name} value={form.profilePhotoUrl} onChange={(v) => set('profilePhotoUrl', v)} disabled={!canUpdate} />
@@ -527,8 +562,11 @@ export default function MemberDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Basic information</CardTitle>
+        <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('primary')}>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconChip icon={UserRound} accent="primary" />
+            Basic information
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -594,8 +632,11 @@ export default function MemberDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Additional details</CardTitle>
+        <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('violet')}>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconChip icon={UserPlus} accent="violet" />
+            Additional details
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <MemberExtendedInfoFields
@@ -615,8 +656,11 @@ export default function MemberDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Address</CardTitle>
+        <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('aqua')}>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconChip icon={MapPin} accent="aqua" />
+            Address
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -645,8 +689,11 @@ export default function MemberDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Emergency contact</CardTitle>
+        <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('destructive')}>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconChip icon={PhoneCall} accent="destructive" />
+            Emergency contact
+          </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-2">
@@ -665,8 +712,11 @@ export default function MemberDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Health &amp; fitness</CardTitle>
+        <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('success')}>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconChip icon={HeartPulse} accent="success" />
+            Health &amp; fitness
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -703,8 +753,11 @@ export default function MemberDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Health Screening</CardTitle>
+        <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('destructive')}>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconChip icon={ShieldCheck} accent="destructive" />
+            Health Screening
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <MemberHealthScreeningFields
@@ -734,8 +787,11 @@ export default function MemberDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Notes</CardTitle>
+        <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('warning')}>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconChip icon={StickyNote} accent="warning" />
+            Notes
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <textarea
@@ -749,8 +805,11 @@ export default function MemberDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Branch &amp; trainer</CardTitle>
+        <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('primary')}>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconChip icon={Building2} accent="primary" />
+            Branch &amp; trainer
+          </CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
@@ -775,14 +834,9 @@ export default function MemberDetailPage() {
       </Card>
 
       <Card id="membership">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <span
-              className="flex size-7 shrink-0 items-center justify-center rounded-full"
-              style={{ backgroundColor: 'color-mix(in oklch, var(--chart-7) 16%, transparent)', color: 'var(--chart-7)' }}
-            >
-              <IdCard className="size-3.5" aria-hidden />
-            </span>
+        <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('aqua')}>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconChip icon={IdCard} accent="aqua" />
             Membership
           </CardTitle>
         </CardHeader>
@@ -957,63 +1011,6 @@ export default function MemberDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <span
-              className="flex size-7 shrink-0 items-center justify-center rounded-full"
-              style={{ backgroundColor: 'color-mix(in oklch, var(--success) 16%, transparent)', color: 'var(--success)' }}
-            >
-              <CalendarCheck className="size-3.5" aria-hidden />
-            </span>
-            Attendance
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            {canCheckIn ? (
-              <Button size="sm" disabled={manualCheckIn.isPending} onClick={handleQuickCheckIn}>
-                {manualCheckIn.isPending ? 'Checking in…' : 'Check in'}
-              </Button>
-            ) : null}
-            {canCheckOut ? (
-              <Button size="sm" variant="outline" disabled={manualCheckOut.isPending} onClick={handleQuickCheckOut}>
-                {manualCheckOut.isPending ? 'Checking out…' : 'Check out'}
-              </Button>
-            ) : null}
-            {!data.canCheckIn ? <span className="text-sm text-muted-foreground">Not eligible to check in right now.</span> : null}
-          </div>
-
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-sm font-medium">Recent visits</h3>
-              <Link href="/attendance/history" className="text-sm text-muted-foreground hover:underline">
-                View full history
-              </Link>
-            </div>
-            {memberAttendance.isPending ? (
-              <p className="text-sm text-muted-foreground">Loading…</p>
-            ) : (memberAttendance.data?.items.length ?? 0) === 0 ? (
-              <p className="text-sm text-muted-foreground">No attendance recorded yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {memberAttendance.data!.items.map((record) => (
-                  <div key={record.id} className="flex items-center justify-between gap-2 border-b pb-2 text-sm last:border-0 last:pb-0">
-                    <span>
-                      {new Date(record.checkInTime).toLocaleString()}
-                      {record.checkOutTime ? ` – ${new Date(record.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <AttendanceMethodBadge method={record.method} />
-                      <AttendanceStatusBadge status={record.status} />
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       <MemberWorkoutCard memberId={memberId} />
 
@@ -1021,9 +1018,39 @@ export default function MemberDetailPage() {
 
       <MemberMeasurementsCard memberId={memberId} />
 
+        </div>
+
+        <div className="order-1 space-y-5 lg:order-none lg:col-start-2 lg:row-start-1 xl:col-start-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pb-2 [scrollbar-width:thin]">
+          <MemberAttendancePanel
+            memberId={memberId}
+            eligible={data.canCheckIn}
+            canCheckIn={canCheckIn}
+            canCheckOut={canCheckOut}
+            checkInPending={manualCheckIn.isPending}
+            checkOutPending={manualCheckOut.isPending}
+            onCheckIn={handleQuickCheckIn}
+            onCheckOut={handleQuickCheckOut}
+          />
+          <MemberPaymentPanel data={data} canSendLink={canSendLink} onSendLink={() => setConfirmLink(true)} />
+          <MemberGuestPanel
+            data={data}
+            canLog={canUpdate}
+            guestName={guestName}
+            onGuestNameChange={setGuestName}
+            logging={logGuestVisit.isPending}
+            onLog={handleLogGuestVisit}
+          />
+          <MemberUsagePanel data={data} />
+        </div>
+
+        <div className="order-3 grid gap-5 sm:grid-cols-2 lg:order-none lg:col-span-2 lg:grid-cols-3 xl:col-span-1 xl:col-start-1 xl:row-start-1 xl:grid-cols-1 xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-y-auto xl:pb-2 [scrollbar-width:thin] [&_.justify-between]:flex-col [&_.justify-between]:items-start [&>div]:overflow-hidden [&>div]:transition-shadow [&>div]:hover:shadow-md [&>div>div:first-child]:bg-gradient-to-r [&>div>div:first-child]:border-b [&>div>div:first-child]:from-primary/10 [&>div>div:first-child]:to-transparent [&>div>div:nth-child(2)]:pt-5">
+          <MemberProgressCard data={data} />
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">QR code</CardTitle>
+        <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('violet')}>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconChip icon={QrCode} accent="violet" />
+            QR code
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <QrCodeDisplay memberId={memberId} qrCodeImageUrl={data.qrCodeImageUrl} canRegenerate={canUpdate} />
@@ -1031,8 +1058,11 @@ export default function MemberDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Fingerprint check-in</CardTitle>
+        <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('destructive')}>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconChip icon={Fingerprint} accent="destructive" />
+            Fingerprint check-in
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           <Label htmlFor="biometricId">Biometric ID</Label>
@@ -1052,8 +1082,11 @@ export default function MemberDetailPage() {
 
       {canUpdate && (
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Member portal</CardTitle>
+          <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('aqua')}>
+            <CardTitle className="flex items-center gap-3 text-base">
+              <IconChip icon={Globe} accent="aqua" />
+              Member portal
+            </CardTitle>
           </CardHeader>
           <CardContent className="flex items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
@@ -1108,8 +1141,11 @@ export default function MemberDetailPage() {
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Documents</CardTitle>
+        <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('warning')}>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconChip icon={FileText} accent="warning" />
+            Documents
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <DocumentUpload memberId={memberId} disabled={!canUpdate} />
@@ -1117,8 +1153,11 @@ export default function MemberDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Data & privacy</CardTitle>
+        <CardHeader className="border-b px-5 py-3.5" style={cardHeaderStyle('destructive')}>
+          <CardTitle className="flex items-center gap-3 text-base">
+            <IconChip icon={ShieldCheck} accent="destructive" />
+            Data & privacy
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between gap-4">
@@ -1150,6 +1189,9 @@ export default function MemberDetailPage() {
         </CardContent>
       </Card>
 
+        </div>
+      </div>
+
       <ConfirmDialog
         open={confirmStatusAction !== null}
         onOpenChange={(open) => !open && setConfirmStatusAction(null)}
@@ -1177,6 +1219,16 @@ export default function MemberDetailPage() {
         destructive
         loading={cancelMembership.isPending}
         onConfirm={handleCancelMembership}
+      />
+
+      <ConfirmDialog
+        open={confirmLink}
+        onOpenChange={setConfirmLink}
+        title="Send payment link?"
+        description={`Sends ${data.name} a Razorpay payment link for ${currencySymbol}${Number(data.outstandingAmount).toLocaleString()} by ${[data.email ? 'email' : null, data.phone ? 'SMS' : null].filter(Boolean).join(' and ') || 'email/SMS'}.`}
+        confirmLabel="Send link"
+        loading={createPaymentLink.isPending}
+        onConfirm={handleSendLink}
       />
 
       <ConfirmDialog

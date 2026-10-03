@@ -52,6 +52,34 @@ export interface MemberListItemDto {
   deletedAt: string | null;
   /** Sum of this member's `MemberInvoice` rows still owed (`UNPAID`/`PARTIALLY_PAID`/`OVERDUE`) — `"0.00"` when nothing's outstanding. */
   outstandingAmount: string;
+  /** Most recent attendance check-in (ISO) — `null` if the member has never checked in. Filled on the list endpoint only. */
+  lastCheckInAt: string | null;
+  /** Attendance check-ins since the 1st of the current month. Filled on the list endpoint only (0 elsewhere). */
+  visitsThisMonth: number;
+}
+
+export interface MemberStatsPersonDto {
+  id: string;
+  name: string;
+  memberId: string;
+  /** What makes them appear: days since last visit, days until expiry, or the amount due. */
+  detail: string;
+}
+
+export interface MemberStatsDto {
+  total: number;
+  byStatus: { ACTIVE: number; INACTIVE: number; FROZEN: number };
+  newThisMonth: number;
+  expiringIn30Days: number;
+  withDues: { count: number; amount: string };
+  checkedInToday: number;
+  plans: Array<{ name: string; count: number }>;
+  gender: Array<{ label: string; count: number }>;
+  source: Array<{ label: string; count: number }>;
+  joinedByMonth: Array<{ month: string; count: number }>;
+  notVisited14Days: MemberStatsPersonDto[];
+  expiringThisWeek: MemberStatsPersonDto[];
+  highestDues: MemberStatsPersonDto[];
 }
 
 export interface MembershipHistoryEntryDto {

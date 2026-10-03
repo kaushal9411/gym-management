@@ -1071,6 +1071,7 @@ model Membership {
   plan          MembershipPlan     @relation(fields: [planId], references: [id], onDelete: Restrict)
   freezes       MembershipFreeze[]
   payments      MemberPayment[]
+  invoices      MemberInvoice[]
   guestVisits   GuestVisit[]
   ptSessionLogs PtSessionLog[]
 
@@ -1300,17 +1301,17 @@ enum AttendanceDeviceVendor {
 /// No fingerprint template ever reaches this schema — only on-device
 /// matching results (a User ID + a timestamp) do.
 model AttendanceDevice {
-  id          String                 @id @default(uuid()) @db.Uuid
-  tenantId    String                 @map("tenant_id") @db.Uuid
-  branchId    String                 @map("branch_id") @db.Uuid
-  name        String                 @db.VarChar(120)
-  vendor      AttendanceDeviceVendor @default(GENERIC)
-  apiKeyHash  String                 @unique @map("api_key_hash")
-  lastSeenAt  DateTime?              @map("last_seen_at")
-  isActive    Boolean                @default(true) @map("is_active")
-  createdAt   DateTime               @default(now()) @map("created_at")
-  updatedAt   DateTime               @updatedAt @map("updated_at")
-  deletedAt   DateTime?              @map("deleted_at")
+  id         String                 @id @default(uuid()) @db.Uuid
+  tenantId   String                 @map("tenant_id") @db.Uuid
+  branchId   String                 @map("branch_id") @db.Uuid
+  name       String                 @db.VarChar(120)
+  vendor     AttendanceDeviceVendor @default(GENERIC)
+  apiKeyHash String                 @unique @map("api_key_hash")
+  lastSeenAt DateTime?              @map("last_seen_at")
+  isActive   Boolean                @default(true) @map("is_active")
+  createdAt  DateTime               @default(now()) @map("created_at")
+  updatedAt  DateTime               @updatedAt @map("updated_at")
+  deletedAt  DateTime?              @map("deleted_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
@@ -1894,6 +1895,10 @@ model MemberInvoice {
   invoiceNumber  String              @map("invoice_number") @db.VarChar(30)
   memberId       String              @map("member_id") @db.Uuid
   branchId       String              @map("branch_id") @db.Uuid
+  /// Set only on the auto-managed "Balance due" invoice that carries the
+  /// unpaid remainder of a membership's price (see MemberBalanceService) —
+  /// receipt invoices and manual invoices leave it null.
+  membershipId   String?             @map("membership_id") @db.Uuid
   invoiceDate    DateTime            @map("invoice_date") @db.Date
   dueDate        DateTime            @map("due_date") @db.Date
   subtotal       Decimal             @db.Decimal(10, 2)
@@ -1905,14 +1910,16 @@ model MemberInvoice {
   createdAt      DateTime            @default(now()) @map("created_at")
   updatedAt      DateTime            @updatedAt @map("updated_at")
 
-  tenant   Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  member   Member              @relation(fields: [memberId], references: [id], onDelete: Restrict)
-  branch   Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  items    MemberInvoiceItem[]
-  payments MemberPayment[]
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member     Member              @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  branch     Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  membership Membership?         @relation(fields: [membershipId], references: [id], onDelete: SetNull)
+  items      MemberInvoiceItem[]
+  payments   MemberPayment[]
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId, memberId])
+  @@index([tenantId, membershipId])
   @@index([tenantId, status])
   /// Covers the branch-scoped outstanding-balance dashboard aggregate
   /// (`sumOutstanding`) and the branch-filtered invoice list, neither of

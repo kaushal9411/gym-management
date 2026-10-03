@@ -11,21 +11,17 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Pagination } from '@/components/ui/pagination';
-import { SearchBar } from '@/components/ui/search-bar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
-import { type MemberCardAction, MemberListCard } from '@/features/members/components/member-list-card';
-import { toMemberError, useBulkImportMembers, useBulkMemberAction, useMemberList, useMemberStatusAction } from '@/features/members/hooks/use-members';
+import { BulkBar } from '@/features/members/components/list/bulk-bar';
+import { MemberCard, type MemberCardAction } from '@/features/members/components/list/member-card';
+import { MembersHero, MembersInsights, MembersKpis } from '@/features/members/components/list/members-overview';
+import { MembersToolbar } from '@/features/members/components/list/members-toolbar';
+import { toMemberError, useBulkImportMembers, useBulkMemberAction, useMemberList, useMemberStats, useMemberStatusAction } from '@/features/members/hooks/use-members';
 import { memberService } from '@/features/members/services/member.service';
 import type { ListMembersParams, MemberBulkImportRow, MemberStatus } from '@/features/members/types';
 import { useStaffList } from '@/features/staff/hooks/use-staff';
-import { cn } from '@/lib/utils';
-
-const selectClassName = cn(
-  'h-9 rounded-lg border border-input bg-background px-2.5 text-sm shadow-xs transition-all duration-150',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
-);
 
 type SortableColumn = NonNullable<ListMembersParams['sortBy']>;
 type SingleStatusAction = 'activate' | 'deactivate' | 'restore' | 'delete';
@@ -66,6 +62,7 @@ export default function MembersListPage() {
   const trainers = useStaffList({ role: 'TRAINER', status: 'ACTIVE', limit: 100 });
   const [sortBy, setSortBy] = React.useState<SortableColumn>('createdAt');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
+  const [view, setView] = React.useState<'grid' | 'list'>('grid');
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [confirmAction, setConfirmAction] = React.useState<
     | { kind: 'single'; action: SingleStatusAction; ids: string[] }
@@ -180,141 +177,86 @@ export default function MembersListPage() {
 
   const handleCardAction = (id: string, action: MemberCardAction) => setConfirmAction({ kind: 'single', action, ids: [id] });
 
+  const stats = useMemberStats(currentBranchId ?? undefined);
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <div
-            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
-            style={{
-              backgroundColor: 'color-mix(in oklch, var(--primary) 16%, transparent)',
-              color: 'var(--primary)',
-              boxShadow: '0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent)',
-            }}
-          >
-            <Users className="size-5" aria-hidden />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
-            <p className="text-muted-foreground">Everyone training at your gym.</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {canExport ? (
-            <Button variant="outline" size="sm" onClick={() => void exportCsv()}>
-              <Download className="size-4" /> Export
-            </Button>
-          ) : null}
-          {canImport ? (
-            <>
-              <Button variant="outline" size="sm" disabled={bulkImport.isPending} onClick={() => importInputRef.current?.click()}>
-                <Upload className="size-4" /> {bulkImport.isPending ? 'Importing…' : 'Import'}
+    <div className="w-full space-y-5">
+      <MembersHero
+        total={stats.data?.total ?? data?.total ?? 0}
+        faces={items}
+        actions={
+          <>
+            {canExport ? (
+              <Button variant="outline" size="sm" onClick={() => void exportCsv()}>
+                <Download className="size-4" /> Export
               </Button>
-              <input
-                ref={importInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={(e) => {
-                  void handleImportFile(e.target.files?.[0]);
-                  e.target.value = '';
-                }}
-              />
-            </>
-          ) : null}
-          {canCreate ? (
-            <Button size="sm" asChild>
-              <Link href="/members/new">
-                <UserPlus className="size-4" /> Add member
-              </Link>
-            </Button>
-          ) : null}
-        </div>
-      </div>
+            ) : null}
+            {canImport ? (
+              <>
+                <Button variant="outline" size="sm" disabled={bulkImport.isPending} onClick={() => importInputRef.current?.click()}>
+                  <Upload className="size-4" /> {bulkImport.isPending ? 'Importing…' : 'Import'}
+                </Button>
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={(e) => {
+                    void handleImportFile(e.target.files?.[0]);
+                    e.target.value = '';
+                  }}
+                />
+              </>
+            ) : null}
+            {canCreate ? (
+              <Button size="sm" asChild className="border-0 bg-white text-indigo-700 shadow-lg hover:bg-white/90">
+                <Link href="/members/new">
+                  <UserPlus className="size-4" /> Add member
+                </Link>
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchBar
-          containerClassName="max-w-xs"
-          placeholder="Search name, member ID, or phone…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-        <select
-          className={selectClassName}
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as MemberStatus | '');
-            setPage(1);
-          }}
-          aria-label="Filter by status"
-        >
-          <option value="">All statuses</option>
-          <option value="ACTIVE">Active</option>
-          <option value="INACTIVE">Inactive</option>
-          <option value="FROZEN">Frozen</option>
-        </select>
-        <select
-          className={selectClassName}
-          value={trainerId}
-          onChange={(e) => {
-            setTrainerId(e.target.value);
-            setPage(1);
-          }}
-          aria-label="Filter by trainer"
-        >
-          <option value="">All trainers</option>
-          {(trainers.data?.items ?? []).map((trainer) => (
-            <option key={trainer.id} value={trainer.id}>
-              {trainer.name}
-            </option>
-          ))}
-        </select>
-        <select
-          className={selectClassName}
-          value={`${sortBy}:${sortDir}`}
-          onChange={(e) => {
-            const [nextSortBy, nextSortDir] = e.target.value.split(':') as [SortableColumn, 'asc' | 'desc'];
-            setSortBy(nextSortBy);
-            setSortDir(nextSortDir);
-          }}
-          aria-label="Sort by"
-        >
-          <option value="createdAt:desc">Newest first</option>
-          <option value="createdAt:asc">Oldest first</option>
-          <option value="name:asc">Name (A–Z)</option>
-          <option value="name:desc">Name (Z–A)</option>
-          <option value="memberId:asc">Member ID (A–Z)</option>
-          <option value="joiningDate:desc">Joining date (newest)</option>
-          <option value="joiningDate:asc">Joining date (oldest)</option>
-        </select>
-      </div>
+      <MembersKpis
+        stats={stats.data}
+        loading={stats.isPending}
+        status={status}
+        onStatus={(s) => {
+          setStatus(s);
+          setPage(1);
+        }}
+      />
+      <MembersInsights stats={stats.data} loading={stats.isPending} />
 
-      {selected.size > 0 && (canManage || canDelete) ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/40 p-2.5 text-sm">
-          <span className="font-medium">{selected.size} selected</span>
-          {canManage ? (
-            <>
-              <Button size="sm" variant="outline" onClick={() => setConfirmAction({ kind: 'bulk', action: 'activate', ids: [...selected] })}>
-                Bulk activate
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => setConfirmAction({ kind: 'bulk', action: 'deactivate', ids: [...selected] })}>
-                Bulk deactivate
-              </Button>
-            </>
-          ) : null}
-          {canDelete ? (
-            <Button size="sm" variant="destructive" onClick={() => setConfirmAction({ kind: 'bulk', action: 'delete', ids: [...selected] })}>
-              Bulk delete
-            </Button>
-          ) : null}
-          <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
-            Clear
-          </Button>
-        </div>
-      ) : null}
+      <MembersToolbar
+        search={search}
+        onSearch={(v) => {
+          setSearch(v);
+          setPage(1);
+        }}
+        status={status}
+        onStatus={(s) => {
+          setStatus(s);
+          setPage(1);
+        }}
+        stats={stats.data}
+        trainerId={trainerId}
+        onTrainer={(v) => {
+          setTrainerId(v);
+          setPage(1);
+        }}
+        trainers={(trainers.data?.items ?? []).map((t) => ({ id: t.id, name: t.name }))}
+        sort={`${sortBy}:${sortDir}`}
+        onSort={(v) => {
+          const [nextSortBy, nextSortDir] = v.split(':') as [SortableColumn, 'asc' | 'desc'];
+          setSortBy(nextSortBy);
+          setSortDir(nextSortDir);
+        }}
+        view={view}
+        onView={setView}
+      />
 
       {(canManage || canDelete || canRestore) && items.length > 0 ? (
         <label className="flex w-fit items-center gap-2 text-sm text-muted-foreground">
@@ -336,22 +278,21 @@ export default function MembersListPage() {
           }
         />
       ) : members.isPending ? (
-        <div className="space-y-3">
-          <Skeleton className="h-44 w-full" />
-          <Skeleton className="h-44 w-full" />
-          <Skeleton className="h-44 w-full" />
+        <div className={view === 'grid' ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'space-y-3'}>
+          {Array.from({ length: view === 'grid' ? 8 : 5 }).map((_, i) => (
+            <Skeleton key={i} className={view === 'grid' ? 'h-[420px] w-full rounded-3xl' : 'h-20 w-full rounded-2xl'} />
+          ))}
         </div>
       ) : items.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title={!search && !status ? 'Add your first member to get started.' : 'No members match these filters.'}
-        />
+        <EmptyState icon={Users} title={!search && !status ? 'Add your first member to get started.' : 'No members match these filters.'} />
       ) : (
-        <div className="space-y-3">
-          {items.map((m) => (
-            <MemberListCard
+        <div className={view === 'grid' ? 'grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' : 'space-y-2.5'}>
+          {items.map((m, i) => (
+            <MemberCard
               key={m.id}
               member={m}
+              index={i}
+              variant={view}
               selected={selected.has(m.id)}
               onToggleSelect={(checked) => toggleSelectOne(m.id, checked)}
               canManage={canManage}
@@ -366,9 +307,17 @@ export default function MembersListPage() {
         </div>
       )}
 
-      {data ? (
-        <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
-      ) : null}
+      {data ? <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} /> : null}
+
+      <BulkBar
+        count={selected.size}
+        canManage={canManage}
+        canDelete={canDelete}
+        onActivate={() => setConfirmAction({ kind: 'bulk', action: 'activate', ids: [...selected] })}
+        onDeactivate={() => setConfirmAction({ kind: 'bulk', action: 'deactivate', ids: [...selected] })}
+        onDelete={() => setConfirmAction({ kind: 'bulk', action: 'delete', ids: [...selected] })}
+        onClear={() => setSelected(new Set())}
+      />
 
       <ConfirmDialog
         open={!!confirmAction}

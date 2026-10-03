@@ -47,7 +47,7 @@ export const DEFAULT_MEMBER_HEALTH_FORM_STATE: MemberHealthFormState = {
   healthScreeningOtherDetails: '',
 };
 
-const AWARENESS_SOURCE_LABELS: Record<AwarenessSource, string> = {
+export const AWARENESS_SOURCE_LABELS: Record<AwarenessSource, string> = {
   SOCIAL_MEDIA: 'Social media',
   FRIEND_REFERRAL: 'Friend referral',
   WALK_IN: 'Walk-in',
@@ -56,7 +56,7 @@ const AWARENESS_SOURCE_LABELS: Record<AwarenessSource, string> = {
   OTHER: 'Other',
 };
 
-const BLOOD_GROUP_LABELS: Record<BloodGroup, string> = {
+export const BLOOD_GROUP_LABELS: Record<BloodGroup, string> = {
   A_POSITIVE: 'A+',
   A_NEGATIVE: 'A-',
   B_POSITIVE: 'B+',
@@ -68,7 +68,7 @@ const BLOOD_GROUP_LABELS: Record<BloodGroup, string> = {
   UNKNOWN: 'Unknown',
 };
 
-const QUESTIONS: Array<{ key: keyof MemberHealthFormState & string; label: string }> = [
+export const HEALTH_QUESTIONS: Array<{ key: keyof MemberHealthFormState & string; label: string }> = [
   { key: 'healthHeartCondition', label: 'Do you suffer from a heart condition or have ever had any form of heart disease, previously suffered a heart attack, or have a family history of heart disease?' },
   { key: 'healthPainDuringActivity', label: 'Do you experience any pain while undertaking physical activity or exercising?' },
   { key: 'healthDizzinessOrBalance', label: 'Have you ever experienced faintness, dizziness, shortness of breath, or experienced a loss of balance while undertaking physical activity or exercise?' },
@@ -93,7 +93,7 @@ export function MemberHealthScreeningFields({ value, onChange, disabled, hideBlo
   return (
     <div className="space-y-6">
       <div className="divide-y rounded-lg border">
-        {QUESTIONS.map((q) => (
+        {HEALTH_QUESTIONS.map((q) => (
           <div key={q.key} className="flex items-center justify-between gap-4 p-3">
             <p className="text-sm">{q.label}</p>
             <select

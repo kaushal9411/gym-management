@@ -11,6 +11,12 @@ export class UserController {
     sendSuccess(res, await service.list(req.query as unknown as ListUsersQuery));
   }
 
+  async stats(req: Request, res: Response): Promise<void> {
+    const service = new UserService(req.tenant!.id);
+    const { branchId } = req.query as { branchId?: string };
+    sendSuccess(res, await service.getStats(branchId));
+  }
+
   async getById(req: Request, res: Response): Promise<void> {
     const service = new UserService(req.tenant!.id);
     sendSuccess(res, await service.getById(req.params.userId!));
