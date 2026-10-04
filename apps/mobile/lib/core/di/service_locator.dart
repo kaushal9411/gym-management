@@ -5,6 +5,8 @@ import 'package:get_it/get_it.dart';
 import '../../bloc/branches/branch_list_cubit.dart';
 import '../../bloc/dashboard/dashboard_cubit.dart';
 import '../../bloc/finance/finance_summary_cubit.dart';
+import '../../bloc/finance/payments_analytics_cubit.dart';
+import '../../bloc/reports/reports_overview_cubit.dart';
 import '../../bloc/session/session_cubit.dart';
 import '../../repositories/analytics_repository.dart';
 import '../../repositories/announcement_repository.dart';
@@ -185,6 +187,12 @@ void setupServiceLocator() {
   getIt.registerFactory<BranchListCubit>(() => BranchListCubit(getIt()));
   getIt.registerFactory<FinanceSummaryCubit>(
     () => FinanceSummaryCubit(getIt(), getIt(), getIt(), getIt()),
+  );
+  getIt.registerFactory<PaymentsAnalyticsCubit>(
+    () => PaymentsAnalyticsCubit(getIt()),
+  );
+  getIt.registerFactory<ReportsOverviewCubit>(
+    () => ReportsOverviewCubit(getIt()),
   );
 
   getIt.registerLazySingleton<SessionCubit>(

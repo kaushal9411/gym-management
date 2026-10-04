@@ -5,7 +5,7 @@ import { authenticateMiddleware } from '../../authentication/middlewares/authent
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
 import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { reportsController } from '../controllers/reports.controller';
-import { exportQuerySchema, reportFiltersQuerySchema, reportTypeParamSchema } from '../validators/reports.validators';
+import { exportQuerySchema, overviewQuerySchema, reportFiltersQuerySchema, reportSummaryParamSchema, reportSummaryQuerySchema, reportTypeParamSchema } from '../validators/reports.validators';
 
 export const reportsRouter: Router = Router();
 
@@ -17,6 +17,9 @@ const asyncHandler =
 
 reportsRouter.use(authenticateMiddleware);
 reportsRouter.use(requireModuleEnabled('reports'));
+
+/** @openapi { "/reports/overview": { get: { tags: [Reports], summary: "Reports overview — KPIs with previous-period comparison, daily series, weekday/hourly attendance (UTC), member status, plans, payment methods, branches, top trainers, expiring buckets", security: [{bearerAuth: []}], parameters: [{name: dateFrom, in: query, schema: {type: string}}, {name: dateTo, in: query, schema: {type: string}}, {name: branchId, in: query, schema: {type: string}}], responses: { 200: { description: Overview payload } } } } } */
+reportsRouter.get('/overview', requirePermission('reports:view'), validate({ query: overviewQuerySchema }), asyncHandler(reportsController.overview.bind(reportsController)));
 
 /** @openapi { "/reports/membership": { get: { tags: [Reports], summary: "Membership Report — members with plan/status/dates", security: [{bearerAuth: []}], responses: { 200: { description: Paginated membership rows } } } } } */
 reportsRouter.get('/membership', requirePermission('reports:view'), validate({ query: reportFiltersQuerySchema }), asyncHandler(reportsController.membership.bind(reportsController)));
@@ -74,6 +77,14 @@ reportsRouter.get(
   requirePermission('reports:view'),
   validate({ query: reportFiltersQuerySchema }),
   asyncHandler(reportsController.activeVsInactive.bind(reportsController)),
+);
+
+/** @openapi { "/reports/{reportType}/summary": { get: { tags: [Reports], summary: "Generic KPI/breakdown/series summary for one of the 11 tabular report types (same filters as the list, no paging)", security: [{bearerAuth: []}], responses: { 200: { description: Report summary } } } } } */
+reportsRouter.get(
+  '/:reportType/summary',
+  requirePermission('reports:view'),
+  validate({ params: reportSummaryParamSchema, query: reportSummaryQuerySchema }),
+  asyncHandler(reportsController.summary.bind(reportsController)),
 );
 
 /** @openapi { "/reports/{reportType}/export": { get: { tags: [Reports], summary: "Export any report/analytics type as CSV, Excel, or PDF", security: [{bearerAuth: []}], responses: { 200: { description: "File download" } } } } } */

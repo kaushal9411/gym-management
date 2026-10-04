@@ -1,7 +1,10 @@
 import { ConflictError, NotFoundError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { sanitizeRichText } from '../../../core/security/html-sanitizer.util';
-import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
+import {
+  getTenantScopedClient,
+  type TenantScopedPrisma,
+} from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
 import { notifyAnnouncementPublished } from '../../tenant-notifications/services/notification-trigger.service';
@@ -12,7 +15,18 @@ import type {
   TenantAnnouncementDto,
   UpdateTenantAnnouncementInput,
 } from '../dto/tenant-announcement.dto';
-import { TenantAnnouncementRepository, type TenantAnnouncementRow } from '../repositories/tenant-announcement.repository';
+import {
+  TenantAnnouncementRepository,
+  type TenantAnnouncementRow,
+} from '../repositories/tenant-announcement.repository';
+import {
+  addDaysStr,
+  assembleAnnouncementStats,
+  expiringSoonWindow,
+  resolveRanges,
+  STATS_LIST_SIZE,
+  type AnnouncementStatsDto,
+} from '../utils/announcement-stats.util';
 
 /** Rich-text body is stored as HTML; the Notification Center feed item is plain text. */
 function stripHtml(html: string): string {
@@ -50,17 +64,68 @@ export class TenantAnnouncementService {
     this.auditLog = new AuditLogRepository(this.db);
   }
 
+  /**
+   * Dashboard analytics. `recent[].delivered/read` are always null: member notifications
+   * (`MemberNotification`) carry no `sourceNotificationId`/announcement link, so per-announcement
+   * delivery can't be derived without guessing by title/time.
+   */
+  async stats(dateFrom?: string, dateTo?: string): Promise<AnnouncementStatsDto> {
+    const { range, previousRange } = resolveRanges(dateFrom, dateTo);
+    const dayStart = (d: string) => new Date(`${d}T00:00:00.000Z`);
+    const toExclusive = dayStart(addDaysStr(range.to, 1));
+    const soon = expiringSoonWindow();
+    const t = this.tenantId;
+    const iso = (d: Date | null) => d?.toISOString() ?? null;
+    const [dayAudience, statusCounts, expiringSoon, byBranch, upcoming, expiring, recent] =
+      await Promise.all([
+        this.announcements.statsDayAudience(t, dayStart(previousRange.from), toExclusive),
+        this.announcements.statusCounts(t),
+        this.announcements.countExpiringSoon(t, soon.from, soon.to),
+        this.announcements.publishedByBranch(t, dayStart(range.from), toExclusive),
+        this.announcements.upcoming(t, STATS_LIST_SIZE),
+        this.announcements.expiring(t, STATS_LIST_SIZE),
+        this.announcements.recentPublished(t, STATS_LIST_SIZE),
+      ]);
+    return assembleAnnouncementStats({
+      range,
+      previousRange,
+      dayAudience,
+      statusCounts,
+      expiringSoon,
+      byBranch,
+      upcoming: upcoming.map((r) => ({ ...r, publishAt: iso(r.publishAt) })),
+      expiring: expiring.map((r) => ({ ...r, expiresAt: iso(r.expiresAt) })),
+      recent: recent.map((r) => ({ ...r, publishedAt: iso(r.publishedAt) })),
+    });
+  }
+
   async list(query: ListAnnouncementsQuery) {
     const skip = (query.page - 1) * query.limit;
-    const { total, items } = await this.announcements.list(this.tenantId, { status: query.status, skip, take: query.limit });
-    return { items: items.map(toDto), total, page: query.page, limit: query.limit, totalPages: Math.max(1, Math.ceil(total / query.limit)) };
+    const { total, counts, items } = await this.announcements.list(this.tenantId, {
+      status: query.status,
+      audience: query.audience,
+      search: query.search,
+      skip,
+      take: query.limit,
+    });
+    return {
+      items: items.map(toDto),
+      counts,
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.max(1, Math.ceil(total / query.limit)),
+    };
   }
 
   async getById(id: string): Promise<TenantAnnouncementDto> {
     return toDto(await this.mustFind(id));
   }
 
-  async create(input: CreateTenantAnnouncementInput, actor: IamActor): Promise<TenantAnnouncementDto> {
+  async create(
+    input: CreateTenantAnnouncementInput,
+    actor: IamActor,
+  ): Promise<TenantAnnouncementDto> {
     if (input.branchId) await this.assertBranchExists(input.branchId);
 
     const row = await this.announcements.create({
@@ -76,10 +141,17 @@ export class TenantAnnouncementService {
     return toDto(row);
   }
 
-  async update(id: string, input: UpdateTenantAnnouncementInput, actor: IamActor): Promise<TenantAnnouncementDto> {
+  async update(
+    id: string,
+    input: UpdateTenantAnnouncementInput,
+    actor: IamActor,
+  ): Promise<TenantAnnouncementDto> {
     const existing = await this.mustFind(id);
     if (existing.status === 'PUBLISHED' || existing.status === 'EXPIRED') {
-      throw new ConflictError(ErrorCode.CONFLICT, 'A published or expired announcement cannot be edited — delete it and create a new one instead.');
+      throw new ConflictError(
+        ErrorCode.CONFLICT,
+        'A published or expired announcement cannot be edited — delete it and create a new one instead.',
+      );
     }
     if (input.branchId) await this.assertBranchExists(input.branchId);
 
@@ -119,18 +191,27 @@ export class TenantAnnouncementService {
   }
 
   /** "Schedule Announcement" — sets a future auto-publish time; the Scheduler & Background Jobs module's `send-scheduled-announcements` job publishes it once due. */
-  async schedule(id: string, input: ScheduleAnnouncementInput, actor: IamActor): Promise<TenantAnnouncementDto> {
+  async schedule(
+    id: string,
+    input: ScheduleAnnouncementInput,
+    actor: IamActor,
+  ): Promise<TenantAnnouncementDto> {
     const existing = await this.mustFind(id);
     if (existing.status === 'PUBLISHED' || existing.status === 'EXPIRED') {
       throw new ConflictError(ErrorCode.CONFLICT, 'This announcement has already been published.');
     }
-    await this.announcements.update(id, { status: 'SCHEDULED', publishAt: new Date(input.publishAt) });
+    await this.announcements.update(id, {
+      status: 'SCHEDULED',
+      publishAt: new Date(input.publishAt),
+    });
     await this.audit(actor, 'tenant_announcement.scheduled', id);
     return this.getById(id);
   }
 
   private async assertBranchExists(branchId: string): Promise<void> {
-    const branch = await this.db.branch.findFirst({ where: { tenantId: this.tenantId, id: branchId } });
+    const branch = await this.db.branch.findFirst({
+      where: { tenantId: this.tenantId, id: branchId },
+    });
     if (!branch) throw new NotFoundError('Branch not found.');
   }
 

@@ -12,11 +12,20 @@ class MemberNotificationRepository {
 
   final Dio _dio;
 
-  Future<PaginatedResult<TenantNotification>> list({int page = 1}) async {
+  Future<PaginatedResult<TenantNotification>> list({
+    int page = 1,
+    bool unreadOnly = false,
+    String? category,
+  }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/portal/notifications',
-        queryParameters: {'page': page, 'limit': 20},
+        queryParameters: {
+          'page': page,
+          'limit': 20,
+          if (unreadOnly) 'unreadOnly': true,
+          if (category != null) 'category': category,
+        },
       );
       return PaginatedResult.fromJson(
         response.data!['data'] as Map<String, dynamic>,

@@ -140,9 +140,12 @@ class AppRoutes {
   static const memberInvoices = '/member/invoices';
   static const memberInvoiceDetail = '/member/invoices/detail';
   static const memberProfile = '/member/profile';
+  static const memberEditProfile = '/member/profile/edit';
   static const memberChangePassword = '/member/profile/change-password';
   static const memberDataExport = '/member/data-export';
   static const memberClassBooked = '/member/classes/booked';
   static const memberMeasurements = '/member/measurements';
   static const memberNotifications = '/member/notifications';
+  static const memberPayments = '/member/payments';
+  static const memberGymInfo = '/member/gym';
 }

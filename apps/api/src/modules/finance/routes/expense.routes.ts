@@ -5,7 +5,7 @@ import { authenticateMiddleware } from '../../authentication/middlewares/authent
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
 import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { expenseController } from '../controllers/expense.controller';
-import { createExpenseSchema, idParamSchema, listExpensesQuerySchema, updateExpenseSchema } from '../validators/finance.validators';
+import { createExpenseSchema, idParamSchema, ledgerAnalyticsQuerySchema, listExpensesQuerySchema, updateExpenseSchema } from '../validators/finance.validators';
 
 export const expenseRouter: Router = Router();
 
@@ -24,6 +24,14 @@ expenseRouter.get('/export', requirePermission('finance:view'), asyncHandler(exp
 /** @openapi { "/expenses/export/excel": { get: { tags: [Finance], summary: "Download filtered expenses as an Excel workbook", security: [{bearerAuth: []}], responses: { 200: { description: XLSX file } } } } } */
 expenseRouter.get('/export/excel', requirePermission('finance:view'), asyncHandler(expenseController.exportExcel.bind(expenseController)));
 
+/** @openapi { "/expenses/analytics": { get: { tags: [Finance], summary: "Expense analytics for a date range vs the preceding equal-length range (KPIs incl. net profit, daily series, categories, branches, top entries)", security: [{bearerAuth: []}], responses: { 200: { description: "{ range, previousRange, kpis, daily, categories, branches, topEntries }" } } } } } */
+expenseRouter.get(
+  '/analytics',
+  requirePermission('finance:view'),
+  validate({ query: ledgerAnalyticsQuerySchema }),
+  asyncHandler(expenseController.analytics.bind(expenseController)),
+);
+
 /**
  * @openapi
  * /expenses:
@@ -32,17 +40,12 @@ expenseRouter.get('/export/excel', requirePermission('finance:view'), asyncHandl
  *     summary: Paginated expense ledger with search + filters (category, branch, date range)
  *     security: [{ bearerAuth: [] }]
  *     responses:
- *       200: { description: "{ items, total, page, limit, totalPages }" }
+ *       200: { description: "{ items, total, page, limit, totalPages, summary:{total,count,average} }" }
  */
 expenseRouter.get('/', requirePermission('finance:view'), validate({ query: listExpensesQuerySchema }), asyncHandler(expenseController.list.bind(expenseController)));
 
 /** @openapi { "/expenses": { post: { tags: [Finance], summary: "Record an expense (optionally with a receipt data-URL)", security: [{bearerAuth: []}], responses: { 201: { description: Expense recorded } } } } } */
-expenseRouter.post(
-  '/',
-  requirePermission('finance:expense-manage'),
-  validate({ body: createExpenseSchema }),
-  asyncHandler(expenseController.create.bind(expenseController)),
-);
+expenseRouter.post('/', requirePermission('finance:expense-manage'), validate({ body: createExpenseSchema }), asyncHandler(expenseController.create.bind(expenseController)));
 
 /** @openapi { "/expenses/{id}": { get: { tags: [Finance], summary: "One expense's details", security: [{bearerAuth: []}], responses: { 200: { description: Expense } } } } } */
 expenseRouter.get('/:id', requirePermission('finance:view'), validate({ params: idParamSchema }), asyncHandler(expenseController.getById.bind(expenseController)));
@@ -56,9 +59,4 @@ expenseRouter.patch(
 );
 
 /** @openapi { "/expenses/{id}": { delete: { tags: [Finance], summary: "Soft-delete an expense", security: [{bearerAuth: []}], responses: { 200: { description: Expense deleted } } } } } */
-expenseRouter.delete(
-  '/:id',
-  requirePermission('finance:expense-manage'),
-  validate({ params: idParamSchema }),
-  asyncHandler(expenseController.softDelete.bind(expenseController)),
-);
+expenseRouter.delete('/:id', requirePermission('finance:expense-manage'), validate({ params: idParamSchema }), asyncHandler(expenseController.softDelete.bind(expenseController)));

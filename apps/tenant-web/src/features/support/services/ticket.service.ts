@@ -1,5 +1,5 @@
 import { apiClient } from '@/features/auth/services/api-client';
-import type { CreateTicketPayload, ListTicketsParams, Paginated, TicketDetail, TicketListItem } from '../types';
+import type { CreateTicketPayload, ListTicketsParams, TicketDetail, TicketListResponse, TicketStats, TicketStatsParams } from '../types';
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -8,8 +8,13 @@ interface ApiEnvelope<T> {
 }
 
 class TicketService {
-  async list(params: ListTicketsParams): Promise<Paginated<TicketListItem>> {
-    const res = await apiClient.get<ApiEnvelope<Paginated<TicketListItem>>>('/support/tickets', { params });
+  async list(params: ListTicketsParams): Promise<TicketListResponse> {
+    const res = await apiClient.get<ApiEnvelope<TicketListResponse>>('/support/tickets', { params });
+    return res.data.data;
+  }
+
+  async getStats(params: TicketStatsParams): Promise<TicketStats> {
+    const res = await apiClient.get<ApiEnvelope<TicketStats>>('/support/tickets/stats', { params });
     return res.data.data;
   }
 

@@ -5,8 +5,9 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../models/report_summary.dart';
 import '../../../models/branch_option.dart';
-import '../../../models/branch_performance_row.dart';
+import '../../../models/branch_comparison_row.dart';
 import '../../../models/revenue_trend_point.dart';
 import '../../../repositories/analytics_repository.dart';
 import '../../../repositories/branch_repository.dart';
@@ -15,6 +16,7 @@ import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../owner/presentation/widgets/revenue_sparkline.dart';
 import 'widgets/report_filter_bar.dart';
+import 'widgets/report_summary_header.dart';
 
 /// Design frame "9a. Revenue report" — 30-day trend (filterable by date
 /// range + branch) + per-branch breakdown (`/reports/branch-performance`,
@@ -30,7 +32,7 @@ class RevenueReportScreen extends StatefulWidget {
 
 class _RevenueReportScreenState extends State<RevenueReportScreen> {
   List<RevenueTrendPoint>? _trend;
-  List<BranchPerformanceRow>? _branchBreakdown;
+  List<BranchComparisonRow>? _branchBreakdown;
   List<BranchOption> _branchOptions = [];
   String? _error;
 
@@ -65,7 +67,7 @@ class _RevenueReportScreenState extends State<RevenueReportScreen> {
         to: _range.end,
         branchId: _branchId,
       );
-      final branchesFuture = getIt<ReportsRepository>().branchPerformance();
+      final branchesFuture = _branchRevenue();
       final trend = await trendFuture;
       final branches = await branchesFuture;
       if (!mounted) return;
@@ -76,6 +78,33 @@ class _RevenueReportScreenState extends State<RevenueReportScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
+    }
+  }
+
+  /// Per-branch revenue for the SELECTED date range
+  /// (`/analytics/branch-comparison` is date-aware; it needs
+  /// `analytics:view`). Falls back to the month-to-date
+  /// `/reports/branch-performance` figures if that permission is missing,
+  /// so the screen never fails just for this block. Tenant-wide on purpose
+  /// (the block compares branches, so the branch filter doesn't narrow it).
+  Future<List<BranchComparisonRow>> _branchRevenue() async {
+    try {
+      return await getIt<AnalyticsRepository>()
+          .branchComparison(from: _range.start, to: _range.end);
+    } on ApiException catch (e) {
+      if (e.statusCode != 403) rethrow;
+      final rows = await getIt<ReportsRepository>().branchPerformance();
+      return rows
+          .map(
+            (r) => BranchComparisonRow(
+              branchId: r.branchId,
+              branch: r.branch,
+              members: r.activeMembers,
+              revenue: r.monthlyRevenue,
+              attendance: r.monthlyAttendance,
+            ),
+          )
+          .toList();
     }
   }
 
@@ -126,6 +155,14 @@ class _RevenueReportScreenState extends State<RevenueReportScreen> {
                 onDateRangeTap: _pickDateRange,
               ),
             ),
+            ReportSummaryHeader(
+              type: 'revenue',
+              filters: ReportSummaryFilters(
+                from: _range.start,
+                to: _range.end,
+                branchId: _branchId,
+              ),
+            ),
             Expanded(
               child: _error != null
                   ? AppErrorView(message: _error!, onRetry: _load)
@@ -141,7 +178,7 @@ class _RevenueReportScreenState extends State<RevenueReportScreen> {
 
   Widget _buildContent(
     List<RevenueTrendPoint> trend,
-    List<BranchPerformanceRow> branches,
+    List<BranchComparisonRow> branches,
   ) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
@@ -177,7 +214,7 @@ class _RevenueReportScreenState extends State<RevenueReportScreen> {
                               AppText.body(size: 13, weight: FontWeight.w700),
                         ),
                         Text(
-                          Formatters.currency(b.monthlyRevenue),
+                          Formatters.currency(b.revenue),
                           style: AppText.tabular(
                             size: 13,
                             weight: FontWeight.w700,

@@ -14,6 +14,11 @@ export class TicketController {
     sendSuccess(res, await serviceFor(req).list(req.query as unknown as ListTicketsQuery));
   }
 
+  async stats(req: Request, res: Response): Promise<void> {
+    const { dateFrom, dateTo } = req.query as { dateFrom?: string; dateTo?: string };
+    sendSuccess(res, await serviceFor(req).stats(dateFrom, dateTo));
+  }
+
   async getById(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await serviceFor(req).getById(req.params.ticketId!));
   }

@@ -6,16 +6,21 @@ import 'package:go_router/go_router.dart';
 
 import '../../../bloc/common/paginated_list_cubit.dart';
 import '../../../bloc/common/paginated_list_state.dart';
+import '../../../bloc/session/session_cubit.dart';
+import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../models/invoice_analytics.dart';
 import '../../../models/member_invoice.dart';
 import '../../../repositories/invoice_repository.dart';
 import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/list_filters.dart';
+import 'widgets/invoice_insights_header.dart';
 
 const _statusTones = {
   'PAID': AppPillTone.success,
@@ -27,6 +32,15 @@ const _statusTones = {
 
 /// Not a literal design frame — the Receptionist Menu's "Invoices" tile
 /// ("Search & download"). Backs `GET /invoices`.
+///
+/// Above the list: the animated insights header
+/// (`GET /invoices/analytics`, hidden without `finance:invoice-view` or on
+/// 403 — see [InvoiceInsightsHeader] for drops vs web), status chips whose
+/// badges are the server's tenant-wide `counts` (the chip drives the SERVER
+/// `status` param), a debounced server-side search, and the `summary` of the
+/// whole filtered set. Period chips scope only the analytics, not the list.
+/// Pushed route, so it reloads on every visit. Tap-through to the detail
+/// screen is unchanged.
 class InvoicesScreen extends StatefulWidget {
   const InvoicesScreen({super.key});
 
@@ -35,36 +49,88 @@ class InvoicesScreen extends StatefulWidget {
 }
 
 class _InvoicesScreenState extends State<InvoicesScreen> {
-  final _searchController = TextEditingController();
-  Timer? _debounce;
-  late final _cubit = PaginatedListCubit<MemberInvoice>(
-    (page) => getIt<InvoiceRepository>()
-        .list(page: page, search: _searchController.text.trim()),
-  );
+  late final PaginatedListCubit<MemberInvoice> _list;
+  late final InvoiceStatsCubit _stats;
+  final ValueNotifier<InvoiceCounts?> _counts = ValueNotifier(null);
+  final ValueNotifier<InvoiceListSummary?> _summary = ValueNotifier(null);
+  String _status = '';
+  String _search = '';
+
+  bool get _canViewStats {
+    final session = context.read<SessionCubit>().state;
+    return session is SessionAuthenticatedStaff &&
+        session.user.hasPermission('finance:invoice-view');
+  }
 
   @override
   void initState() {
     super.initState();
-    _cubit.load();
+    final repo = getIt<InvoiceRepository>();
+    _list = PaginatedListCubit<MemberInvoice>((page) async {
+      final r = await repo.listWithSummary(
+        page: page,
+        search: _search,
+        status: _status.isEmpty ? null : _status,
+      );
+      if (r.counts != null) _counts.value = r.counts;
+      if (page == 1) _summary.value = r.summary;
+      return r.page;
+    })
+      ..load();
+    _stats = InvoiceStatsCubit(repo.analytics);
+    if (_canViewStats) {
+      unawaited(_stats.load());
+    } else {
+      _stats.hide();
+    }
   }
 
   @override
   void dispose() {
-    _debounce?.cancel();
-    _searchController.dispose();
-    _cubit.close();
+    _list.close();
+    _stats.close();
+    _counts.dispose();
+    _summary.dispose();
     super.dispose();
   }
 
-  void _onSearchChanged(String _) {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 400), _cubit.load);
+  Future<void> _refresh() async {
+    if (_canViewStats) unawaited(_stats.load());
+    await _list.load();
   }
+
+  void _setStatus(String v) {
+    if (v == _status) return;
+    setState(() => _status = v);
+    _list.load();
+  }
+
+  void _setSearch(String v) {
+    if (v == _search) return;
+    _search = v;
+    _list.load();
+  }
+
+  List<FilterChipOption<String>> _statusOptions(InvoiceCounts? c) => [
+        FilterChipOption('', 'All', count: c?.all),
+        FilterChipOption('UNPAID', 'Unpaid', count: c?.unpaid),
+        FilterChipOption(
+          'PARTIALLY_PAID',
+          'Partially paid',
+          count: c?.partiallyPaid,
+        ),
+        FilterChipOption('PAID', 'Paid', count: c?.paid),
+        FilterChipOption('OVERDUE', 'Overdue', count: c?.overdue),
+        FilterChipOption('CANCELLED', 'Cancelled', count: c?.cancelled),
+      ];
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider<PaginatedListCubit<MemberInvoice>>.value(
-      value: _cubit,
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<PaginatedListCubit<MemberInvoice>>.value(value: _list),
+        BlocProvider<InvoiceStatsCubit>.value(value: _stats),
+      ],
       child: Scaffold(
         backgroundColor: AppColors.bg,
         appBar: AppBar(
@@ -72,68 +138,121 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
           elevation: 0,
           title: const Text('Invoices'),
         ),
-        body: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: _searchController,
-                  onChanged: _onSearchChanged,
-                  style: AppText.body(size: 14, weight: FontWeight.w600),
-                  decoration: InputDecoration(
-                    hintText: 'Search by invoice # or member…',
-                    hintStyle:
-                        AppText.body(size: 14, color: AppColors.inkFaint),
-                    filled: true,
-                    fillColor: AppColors.surface2,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.field),
-                      borderSide: const BorderSide(color: AppColors.line),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(AppRadii.field),
-                      borderSide: const BorderSide(color: AppColors.line),
+        body: RefreshIndicator(
+          color: AppColors.staffB,
+          backgroundColor: AppColors.surface2,
+          onRefresh: _refresh,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              const SliverPadding(
+                padding: EdgeInsets.fromLTRB(18, 4, 18, 0),
+                sliver: SliverToBoxAdapter(child: InvoiceInsightsHeader()),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 0),
+                sliver: SliverToBoxAdapter(
+                  child: DebouncedSearchField(
+                    hint: 'Search by invoice # or member…',
+                    onChanged: _setSearch,
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(18, 10, 18, 8),
+                sliver: SliverToBoxAdapter(
+                  child: ValueListenableBuilder<InvoiceCounts?>(
+                    valueListenable: _counts,
+                    builder: (context, counts, _) => FilterChipsRow<String>(
+                      options: _statusOptions(counts),
+                      selected: _status,
+                      onSelected: _setStatus,
                     ),
                   ),
                 ),
-                const SizedBox(height: 12),
-                Expanded(
-                  child: BlocBuilder<PaginatedListCubit<MemberInvoice>,
-                      PaginatedListState<MemberInvoice>>(
-                    builder: (context, state) {
-                      return switch (state) {
-                        PaginatedListLoading() => const AppLoadingView(),
-                        PaginatedListError(:final message) => AppErrorView(
-                            message: message,
-                            onRetry: _cubit.load,
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+                sliver: SliverToBoxAdapter(
+                  child: ValueListenableBuilder<InvoiceListSummary?>(
+                    valueListenable: _summary,
+                    builder: (context, s, _) => s == null
+                        ? const SizedBox.shrink()
+                        : Text(
+                            'Matching ${s.count}: '
+                            '${Formatters.currency(s.invoiced)} invoiced · '
+                            '${Formatters.currency(s.collected)} collected · '
+                            '${Formatters.currency(s.outstanding)} outstanding',
+                            style: AppText.body(
+                              size: 11.5,
+                              color: AppColors.inkSoft,
+                              weight: FontWeight.w700,
+                            ),
                           ),
-                        PaginatedListLoaded(:final items) when items.isEmpty =>
-                          const AppEmptyState(
-                            icon: Icons.receipt_long_outlined,
-                            title: 'No invoices found',
-                          ),
-                        PaginatedListLoaded(:final items) => ListView.builder(
-                            padding: const EdgeInsets.only(bottom: 24),
-                            itemCount: items.length,
-                            itemBuilder: (context, i) =>
-                                _InvoiceCard(invoice: items[i]),
-                          ),
-                      };
-                    },
                   ),
                 ),
-              ],
-            ),
+              ),
+              _buildList(),
+            ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildList() {
+    return BlocBuilder<PaginatedListCubit<MemberInvoice>,
+        PaginatedListState<MemberInvoice>>(
+      builder: (context, state) => switch (state) {
+        PaginatedListLoading() => const SliverToBoxAdapter(
+            child: SizedBox(height: 220, child: AppLoadingView()),
+          ),
+        PaginatedListError(:final message) => SliverToBoxAdapter(
+            child: SizedBox(
+              height: 260,
+              child: AppErrorView(message: message, onRetry: _list.load),
+            ),
+          ),
+        PaginatedListLoaded(:final items) when items.isEmpty =>
+          const SliverToBoxAdapter(
+            child: SizedBox(
+              height: 260,
+              child: AppEmptyState(
+                icon: Icons.receipt_long_outlined,
+                title: 'No invoices found',
+              ),
+            ),
+          ),
+        PaginatedListLoaded(
+          :final items,
+          :final hasMore,
+          :final loadingMore,
+        ) =>
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+            sliver: SliverList.builder(
+              itemCount: items.length + (hasMore ? 1 : 0),
+              itemBuilder: (context, i) {
+                if (i >= items.length) {
+                  return Center(
+                    child: loadingMore
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: CircularProgressIndicator(
+                              color: AppColors.staffB,
+                            ),
+                          )
+                        : TextButton(
+                            onPressed: _list.loadMore,
+                            child: const Text('Load more'),
+                          ),
+                  );
+                }
+                return _InvoiceCard(invoice: items[i]);
+              },
+            ),
+          ),
+      },
     );
   }
 }

@@ -1,18 +1,24 @@
 import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
+import '../core/network/profile_failure.dart';
 import '../models/body_measurement.dart';
 import '../models/checkout_result.dart';
 import '../models/class_session.dart';
+import '../models/gym_info.dart';
 import '../models/diet_plan.dart';
 import '../models/member_booking.dart';
 import '../models/member_diet_assignment.dart';
 import '../models/member_invoice.dart';
+import '../models/member_invoice_detail.dart';
+import '../models/member_overview.dart';
 import '../models/member_portal_profile.dart';
+import '../models/member_self_profile.dart';
 import '../models/member_visit.dart';
 import '../models/member_workout_assignment.dart';
 import '../models/member_workout_progress.dart';
 import '../models/paginated_result.dart';
+import '../models/portal_payment.dart';
 
 /// The member plane's single API surface (`/portal/*`) — every route is
 /// gated by `memberAuthenticateMiddleware` and always scoped to the
@@ -120,6 +126,61 @@ class MemberPortalRepository {
       return MemberDietAssignment.fromJson(
         response.data!['data'] as Map<String, dynamic>,
       );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /portal/overview` — the aggregated Insights payload (dashboard).
+  Future<MemberOverview> overview() async {
+    try {
+      final response =
+          await _dio.get<Map<String, dynamic>>('/portal/overview');
+      return MemberOverview.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /portal/payments` — the member's own payments (limit up to 100).
+  Future<PaginatedResult<PortalPayment>> payments({
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/portal/payments',
+        queryParameters: {'page': page, 'limit': limit},
+      );
+      return PaginatedResult.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+        PortalPayment.fromJson,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /portal/invoices/:id` — items, linked payments, paid and balance.
+  Future<MemberInvoiceDetail> invoiceDetail(String id) async {
+    try {
+      final response =
+          await _dio.get<Map<String, dynamic>>('/portal/invoices/$id');
+      return MemberInvoiceDetail.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /portal/gym` — public-safe gym contact info and hours.
+  Future<GymInfo> gymInfo() async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>('/portal/gym');
+      return GymInfo.fromJson(response.data!['data'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -328,6 +389,74 @@ class MemberPortalRepository {
       throw _mapError(e);
     }
   }
+
+  // ── Self-service profile (`/portal/profile*`, member plane only) ───────
+
+  Future<MemberSelfProfile> selfProfile() async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>('/portal/profile');
+      return MemberSelfProfile.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _profileError(e);
+    }
+  }
+
+  /// Sends ONLY [changedFields] (flat keys; `null` clears an optional
+  /// field). Add `currentPassword` when the email changes. Returns the
+  /// updated profile.
+  Future<MemberSelfProfile> updateProfile(
+    Map<String, Object?> changedFields,
+  ) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/portal/profile',
+        data: changedFields,
+      );
+      return MemberSelfProfile.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _profileError(e);
+    }
+  }
+
+  /// [dataUrl] is `data:image/<png|jpeg|webp>;base64,...` (see
+  /// `buildPhotoDataUrl`). Returns the new absolute photo URL.
+  Future<String?> uploadPhoto(
+    String dataUrl, {
+    void Function(double fraction)? onProgress,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/portal/profile/photo',
+        data: {'image': dataUrl},
+        onSendProgress: onProgress == null
+            ? null
+            : (sent, total) {
+                if (total > 0) onProgress(sent / total);
+              },
+      );
+      final data = response.data!['data'];
+      return data is Map<String, dynamic>
+          ? data['profilePhotoUrl'] as String?
+          : null;
+    } on DioException catch (e) {
+      throw _profileError(e);
+    }
+  }
+
+  Future<void> removePhoto() async {
+    try {
+      await _dio.delete<Map<String, dynamic>>('/portal/profile/photo');
+    } on DioException catch (e) {
+      throw _profileError(e);
+    }
+  }
+
+  ProfileFailure _profileError(DioException e) =>
+      ProfileFailure.from(_mapError(e));
 
   ApiException _mapError(DioException e) {
     if (e.type == DioExceptionType.connectionError ||

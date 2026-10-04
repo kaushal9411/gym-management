@@ -7,6 +7,9 @@ import type {
   Paginated,
   RecentActivity,
   ReportFilters,
+  ReportSummary,
+  ReportsOverview,
+  ReportsOverviewParams,
   RevenueTrendPoint,
   ScheduledReport,
   TrendPoint,
@@ -33,6 +36,18 @@ class ReportsService {
 
   async getRecentActivities(branchId?: string): Promise<RecentActivity[]> {
     const res = await apiClient.get<ApiEnvelope<RecentActivity[]>>('/reports/dashboard/recent-activities', { params: { branchId } });
+    return res.data.data;
+  }
+
+  // ── Overview + summaries (redesign) ───────────────────────────────────
+
+  async getOverview(params: ReportsOverviewParams): Promise<ReportsOverview> {
+    const res = await apiClient.get<ApiEnvelope<ReportsOverview>>('/reports/overview', { params });
+    return res.data.data;
+  }
+
+  async getReportSummary(reportType: string, filters: ReportFilters): Promise<ReportSummary> {
+    const res = await apiClient.get<ApiEnvelope<ReportSummary>>(`/reports/${reportType}/summary`, { params: filters });
     return res.data.data;
   }
 
@@ -81,8 +96,8 @@ class ReportsService {
     return res.data.data;
   }
 
-  async branchComparison(branchId?: string): Promise<BranchComparisonRow[]> {
-    const res = await apiClient.get<ApiEnvelope<BranchComparisonRow[]>>('/analytics/branch-comparison', { params: { branchId } });
+  async branchComparison(branchId?: string, dateFrom?: string, dateTo?: string): Promise<BranchComparisonRow[]> {
+    const res = await apiClient.get<ApiEnvelope<BranchComparisonRow[]>>('/analytics/branch-comparison', { params: { branchId, dateFrom, dateTo } });
     return res.data.data;
   }
 

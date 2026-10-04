@@ -1,38 +1,25 @@
 'use client';
 
 import * as React from 'react';
-import { Download, Receipt } from 'lucide-react';
+import { CircleDollarSign, Download, FileText, Hash, Receipt } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FormAlert } from '@/features/auth/components/form-alert';
-import { BillingNav } from '@/features/billing/components/billing-nav';
+import { BillingHero } from '@/features/billing/components/billing-hero';
+import { EmptyBlock, formatDate, formatMoney, StatusPill, SummaryCard } from '@/features/billing/components/billing-ui';
 import { toBillingError, useInvoices } from '@/features/billing/hooks/use-billing';
 import { billingService } from '@/features/billing/services/billing.service';
-import { cn } from '@/lib/utils';
+import { Chip, PanelCard } from '@/features/finance/components/payments/payments-ui';
 
-const STATUS_STYLES: Record<string, string> = {
-  PAID: 'bg-success/10 text-success',
-  OPEN: 'bg-warning/15 text-warning-foreground',
-  DRAFT: 'bg-muted text-muted-foreground',
-  VOID: 'bg-muted text-muted-foreground',
-  UNCOLLECTIBLE: 'bg-destructive/10 text-destructive',
-};
-
-function formatMoney(amount: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
-  } catch {
-    return `${currency} ${amount}`;
-  }
-}
+const FILTERS = ['ALL', 'PAID', 'OPEN', 'DRAFT', 'VOID', 'UNCOLLECTIBLE'] as const;
+type Filter = (typeof FILTERS)[number];
 
 export default function InvoicesPage() {
   const { data: invoices, isLoading, isError, error } = useInvoices();
   const [downloadingId, setDownloadingId] = React.useState<string | null>(null);
+  const [filter, setFilter] = React.useState<Filter>('ALL');
 
   const handleDownload = async (invoiceId: string, invoiceNumber: string) => {
     setDownloadingId(invoiceId);
@@ -50,63 +37,92 @@ export default function InvoicesPage() {
     }
   };
 
+  const list = invoices ?? [];
+  const currency = list[0]?.currency ?? 'USD';
+  const billable = list.filter((i) => i.currency === currency && i.status !== 'VOID' && i.status !== 'DRAFT');
+  const totalInvoiced = billable.reduce((s, i) => s + i.total, 0);
+  // Outstanding = OPEN (issued, unpaid) invoices.
+  const open = billable.filter((i) => i.status === 'OPEN');
+  const outstanding = open.reduce((s, i) => s + i.total, 0);
+
+  const counts: Record<string, number> = { ALL: list.length };
+  for (const i of list) counts[i.status] = (counts[i.status] ?? 0) + 1;
+  const visible = list.filter((i) => filter === 'ALL' || i.status === filter);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3.5">
-        <div
-          className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
-          style={{
-            backgroundColor: 'color-mix(in oklch, var(--chart-3) 16%, transparent)',
-            color: 'var(--chart-3)',
-            boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-3) 18%, transparent)',
-          }}
-        >
-          <Receipt className="size-5" aria-hidden />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Billing & Subscription</h1>
-          <p className="text-muted-foreground">Manage your FitCloud plan, payment, and invoices.</p>
-        </div>
-      </div>
+      <BillingHero
+        subtitle="Download invoices for your FitCloud subscription."
+        statsLoading={isLoading}
+        stats={[
+          { value: list.length, label: 'Invoices' },
+          { value: formatMoney(outstanding, currency), label: 'Outstanding' },
+        ]}
+      />
 
-      <BillingNav />
-
-      {isLoading ? (
-        <div className="space-y-2">
-          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-16 rounded-xl" />)}
-        </div>
-      ) : isError ? (
+      {isError ? (
         <FormAlert variant="error" message={toBillingError(error).message} />
-      ) : !invoices || invoices.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No invoices yet — they appear here after your first charge.</p>
       ) : (
-        <div className="space-y-2">
-          {invoices.map((invoice) => (
-            <Card key={invoice.id}>
-              <CardContent className="flex items-center justify-between p-4">
-                <div>
-                  <p className="font-medium">{invoice.invoiceNumber}</p>
-                  <p className="text-xs text-muted-foreground">{new Date(invoice.createdAt).toLocaleDateString()}</p>
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <SummaryCard loading={isLoading} icon={<Hash />} label="Invoices" value={list.length} hint="All statuses" color="var(--chart-2)" />
+            <SummaryCard loading={isLoading} icon={<CircleDollarSign />} label="Total invoiced" value={formatMoney(totalInvoiced, currency)} hint="Excludes draft & void" color="var(--chart-1)" />
+            <SummaryCard loading={isLoading} icon={<FileText />} label="Outstanding" value={formatMoney(outstanding, currency)} hint={`${open.length} open`} color="var(--chart-3)" />
+          </div>
+
+          <PanelCard
+            title="Invoices"
+            action={
+              list.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {FILTERS.filter((f) => f === 'ALL' || counts[f]).map((f) => (
+                    <Chip key={f} small active={filter === f} onClick={() => setFilter(f)}>
+                      {f === 'ALL' ? 'All' : f.charAt(0) + f.slice(1).toLowerCase()} · {counts[f] ?? 0}
+                    </Chip>
+                  ))}
                 </div>
-                <div className="flex items-center gap-3">
-                  <Badge className={cn('border-transparent', STATUS_STYLES[invoice.status] ?? 'bg-muted text-muted-foreground')}>
-                    {invoice.status}
-                  </Badge>
-                  <span className="font-semibold">{formatMoney(invoice.total, invoice.currency)}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDownload(invoice.id, invoice.invoiceNumber)}
-                    disabled={downloadingId === invoice.id}
-                  >
-                    <Download className="size-4" />
-                    {downloadingId === invoice.id ? 'Downloading…' : 'Download'}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              ) : undefined
+            }
+          >
+            {isLoading ? (
+              <div className="space-y-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-12 rounded-xl" />)}</div>
+            ) : list.length === 0 ? (
+              <EmptyBlock icon={<Receipt />} title="No invoices yet">They appear here after your first charge.</EmptyBlock>
+            ) : visible.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">No invoices match this filter.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead>
+                    <tr className="border-b text-left text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      <th className="py-2.5 pr-3">Invoice</th>
+                      <th className="py-2.5 pr-3">Date</th>
+                      <th className="py-2.5 pr-3">Status</th>
+                      <th className="py-2.5 pr-3 text-right">Total</th>
+                      <th className="py-2.5 text-right"><span className="sr-only">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visible.map((invoice) => (
+                      <tr key={invoice.id} className="border-b last:border-0">
+                        <td className="py-3 pr-3 font-bold">{invoice.invoiceNumber}</td>
+                        <td className="py-3 pr-3 tabular-nums">{formatDate(invoice.createdAt)}</td>
+                        <td className="py-3 pr-3"><StatusPill status={invoice.status} /></td>
+                        <td className="py-3 pr-3 text-right font-bold tabular-nums">{formatMoney(invoice.total, invoice.currency, 2)}</td>
+                        <td className="py-3 text-right">
+                          <Button variant="outline" size="sm" onClick={() => handleDownload(invoice.id, invoice.invoiceNumber)} disabled={downloadingId === invoice.id}>
+                            <Download className="size-4" />
+                            {downloadingId === invoice.id ? 'Downloading…' : 'Download'}
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </PanelCard>
+        </>
       )}
     </div>
   );

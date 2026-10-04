@@ -1,16 +1,18 @@
 'use client';
 
 import * as React from 'react';
-import { SlidersHorizontal } from 'lucide-react';
+import { Bell, Mail, SlidersHorizontal, Globe2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
-import { GymSettingsNav } from '@/features/gym-settings/components/gym-settings-nav';
+import { BusinessPreview } from '@/features/gym-settings/components/previews';
+import { Field, SectionCard, SettingsLayout, StatusChip, selectClassName } from '@/features/gym-settings/components/settings-ui';
+import { SettingsHero } from '@/features/gym-settings/components/settings-hero';
+import { StaggerGroup } from '@/features/reports/components/ui';
 import { UnsavedChangesBar } from '@/features/gym-settings/components/unsaved-changes-bar';
 import {
   toGymSettingsError,
@@ -22,13 +24,6 @@ import {
   useUpdateTenantNotificationSettings,
 } from '@/features/gym-settings/hooks/use-gym-settings';
 import type { BusinessSettings, EmailSettings, MeasurementUnit, NotificationSettings } from '@/features/gym-settings/types';
-import { cn } from '@/lib/utils';
-
-const selectClassName = cn(
-  'flex h-10 w-full items-center rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
-  'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted/40',
-);
 
 type BusinessForm = Omit<BusinessSettings, 'updatedAt'>;
 
@@ -93,24 +88,25 @@ export default function BusinessSettingsPage() {
     }
   };
 
+  const channels: { id: 'emailNotificationsEnabled' | 'pushNotificationsEnabled' | 'smsNotificationsEnabled'; label: string; note?: string }[] = [
+    { id: 'emailNotificationsEnabled', label: 'Email notifications' },
+    { id: 'pushNotificationsEnabled', label: 'Push notifications' },
+    { id: 'smsNotificationsEnabled', label: 'SMS notifications', note: 'configuration only' },
+  ];
+
   return (
     <div className="space-y-5">
-      <div className="flex items-start gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
-          <SlidersHorizontal className="size-5" aria-hidden />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Business Settings</h1>
-          <p className="text-muted-foreground">Currency, timezone, formats, outbound email identity, and notification channels.</p>
-        </div>
-      </div>
-
-      <GymSettingsNav />
+      <SettingsHero
+        title="Business Settings"
+        subtitle="Currency, timezone, formats, outbound email identity, and notification channels."
+        icon={SlidersHorizontal}
+        stats={businessForm ? [{ label: 'Currency', value: businessForm.currency || '-' }] : undefined}
+      />
 
       {loading || !businessForm || !emailForm || !notificationForm ? (
         <div className="space-y-4">
-          <Skeleton className="h-56 w-full" />
-          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-56 w-full rounded-[20px]" />
+          <Skeleton className="h-32 w-full rounded-[20px]" />
         </div>
       ) : (
         <>
@@ -118,191 +114,91 @@ export default function BusinessSettingsPage() {
             <UnsavedChangesBar isDirty={isDirty} saving={saving} onSave={() => void handleSave()} onCancel={handleCancel} />
           ) : null}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Regional &amp; display</CardTitle>
-              <CardDescription>Currency, timezone, date/time formats, and units used across the portal.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="currency" required>Currency (ISO code)</Label>
-                  <Input
-                    id="currency"
-                    maxLength={3}
-                    value={businessForm.currency}
-                    disabled={!canManage}
-                    onChange={(e) => setBusinessForm({ ...businessForm, currency: e.target.value.toUpperCase() })}
-                  />
+          <SettingsLayout
+            aside={
+              <StaggerGroup className="space-y-5">
+                <BusinessPreview form={businessForm} />
+              </StaggerGroup>
+            }
+          >
+            <StaggerGroup className="space-y-5">
+              <SectionCard tone="operations" icon={Globe2} title="Regional & display" subtitle="Currency, timezone, date/time formats, and units used across the portal.">
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Field label="Currency (ISO code)" htmlFor="currency" required>
+                    <Input id="currency" maxLength={3} value={businessForm.currency} disabled={!canManage} onChange={(e) => setBusinessForm({ ...businessForm, currency: e.target.value.toUpperCase() })} />
+                  </Field>
+                  <Field label="Currency symbol" htmlFor="currencySymbol">
+                    <Input id="currencySymbol" maxLength={8} value={businessForm.currencySymbol} disabled={!canManage} onChange={(e) => setBusinessForm({ ...businessForm, currencySymbol: e.target.value })} />
+                  </Field>
+                  <Field label="Timezone" htmlFor="timezone" required>
+                    <Input id="timezone" placeholder="America/Los_Angeles" value={businessForm.timezone} disabled={!canManage} onChange={(e) => setBusinessForm({ ...businessForm, timezone: e.target.value })} />
+                  </Field>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="currencySymbol">Currency symbol</Label>
-                  <Input
-                    id="currencySymbol"
-                    maxLength={8}
-                    value={businessForm.currencySymbol}
-                    disabled={!canManage}
-                    onChange={(e) => setBusinessForm({ ...businessForm, currencySymbol: e.target.value })}
-                  />
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <Field label="Date format" htmlFor="dateFormat">
+                    <select id="dateFormat" className={selectClassName} value={businessForm.dateFormat} disabled={!canManage} onChange={(e) => setBusinessForm({ ...businessForm, dateFormat: e.target.value })}>
+                      <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                      <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                      <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                    </select>
+                  </Field>
+                  <Field label="Time format" htmlFor="timeFormat">
+                    <select id="timeFormat" className={selectClassName} value={businessForm.timeFormat} disabled={!canManage} onChange={(e) => setBusinessForm({ ...businessForm, timeFormat: e.target.value })}>
+                      <option value="12h">12-hour</option>
+                      <option value="24h">24-hour</option>
+                    </select>
+                  </Field>
+                  <Field label="Week starts on" htmlFor="weekStartDay">
+                    <select id="weekStartDay" className={selectClassName} value={businessForm.weekStartDay} disabled={!canManage} onChange={(e) => setBusinessForm({ ...businessForm, weekStartDay: Number(e.target.value) })}>
+                      {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, i) => (
+                        <option key={day} value={i}>
+                          {day}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Measurement unit" htmlFor="measurementUnit">
+                    <select id="measurementUnit" className={selectClassName} value={businessForm.measurementUnit} disabled={!canManage} onChange={(e) => setBusinessForm({ ...businessForm, measurementUnit: e.target.value as MeasurementUnit })}>
+                      <option value="METRIC">Metric (kg, cm)</option>
+                      <option value="IMPERIAL">Imperial (lb, in)</option>
+                    </select>
+                  </Field>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="timezone" required>Timezone</Label>
-                  <Input
-                    id="timezone"
-                    placeholder="America/Los_Angeles"
-                    value={businessForm.timezone}
-                    disabled={!canManage}
-                    onChange={(e) => setBusinessForm({ ...businessForm, timezone: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-4">
-                <div className="space-y-2">
-                  <Label htmlFor="dateFormat">Date format</Label>
-                  <select
-                    id="dateFormat"
-                    className={selectClassName}
-                    value={businessForm.dateFormat}
-                    disabled={!canManage}
-                    onChange={(e) => setBusinessForm({ ...businessForm, dateFormat: e.target.value })}
-                  >
-                    <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                    <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                    <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="timeFormat">Time format</Label>
-                  <select
-                    id="timeFormat"
-                    className={selectClassName}
-                    value={businessForm.timeFormat}
-                    disabled={!canManage}
-                    onChange={(e) => setBusinessForm({ ...businessForm, timeFormat: e.target.value })}
-                  >
-                    <option value="12h">12-hour</option>
-                    <option value="24h">24-hour</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="weekStartDay">Week starts on</Label>
-                  <select
-                    id="weekStartDay"
-                    className={selectClassName}
-                    value={businessForm.weekStartDay}
-                    disabled={!canManage}
-                    onChange={(e) => setBusinessForm({ ...businessForm, weekStartDay: Number(e.target.value) })}
-                  >
-                    {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day, i) => (
-                      <option key={day} value={i}>
-                        {day}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="measurementUnit">Measurement unit</Label>
-                  <select
-                    id="measurementUnit"
-                    className={selectClassName}
-                    value={businessForm.measurementUnit}
-                    disabled={!canManage}
-                    onChange={(e) => setBusinessForm({ ...businessForm, measurementUnit: e.target.value as MeasurementUnit })}
-                  >
-                    <option value="METRIC">Metric (kg, cm)</option>
-                    <option value="IMPERIAL">Imperial (lb, in)</option>
-                  </select>
-                </div>
-              </div>
-              <div className="space-y-2 sm:w-64">
-                <Label htmlFor="locale">Language</Label>
-                <Input
-                  id="locale"
-                  placeholder="en"
-                  value={businessForm.locale}
-                  disabled={!canManage}
-                  onChange={(e) => setBusinessForm({ ...businessForm, locale: e.target.value })}
-                />
-                <p className="text-xs text-muted-foreground">Future-ready — the portal UI is English-only today.</p>
-              </div>
-            </CardContent>
-          </Card>
+                <Field className="sm:w-64" label="Language" htmlFor="locale" hint="Future-ready — the portal UI is English-only today.">
+                  <Input id="locale" placeholder="en" value={businessForm.locale} disabled={!canManage} onChange={(e) => setBusinessForm({ ...businessForm, locale: e.target.value })} />
+                </Field>
+              </SectionCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Email settings</CardTitle>
-              <CardDescription>The sender identity used for outbound emails from your gym.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="emailFromName">From name</Label>
-                <Input
-                  id="emailFromName"
-                  value={emailForm.emailFromName ?? ''}
-                  disabled={!canManage}
-                  onChange={(e) => setEmailForm({ ...emailForm, emailFromName: e.target.value || null })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="emailFromAddress">From address</Label>
-                <Input
-                  id="emailFromAddress"
-                  type="email"
-                  value={emailForm.emailFromAddress ?? ''}
-                  disabled={!canManage}
-                  onChange={(e) => setEmailForm({ ...emailForm, emailFromAddress: e.target.value || null })}
-                />
-              </div>
-            </CardContent>
-          </Card>
+              <SectionCard tone="members" icon={Mail} title="Email settings" subtitle="The sender identity used for outbound emails from your gym.">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="From name" htmlFor="emailFromName">
+                    <Input id="emailFromName" value={emailForm.emailFromName ?? ''} disabled={!canManage} onChange={(e) => setEmailForm({ ...emailForm, emailFromName: e.target.value || null })} />
+                  </Field>
+                  <Field label="From address" htmlFor="emailFromAddress">
+                    <Input id="emailFromAddress" type="email" value={emailForm.emailFromAddress ?? ''} disabled={!canManage} onChange={(e) => setEmailForm({ ...emailForm, emailFromAddress: e.target.value || null })} />
+                  </Field>
+                </div>
+              </SectionCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Notification preferences</CardTitle>
-              <CardDescription>Tenant-wide channel defaults. SMS is configuration-only — no provider is connected yet.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="emailNotificationsEnabled"
-                  checked={notificationForm.emailNotificationsEnabled}
-                  disabled={!canManage}
-                  onCheckedChange={(checked) =>
-                    setNotificationForm({ ...notificationForm, emailNotificationsEnabled: checked === true })
-                  }
-                />
-                <Label htmlFor="emailNotificationsEnabled" className="cursor-pointer font-normal">
-                  Email notifications
-                </Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="pushNotificationsEnabled"
-                  checked={notificationForm.pushNotificationsEnabled}
-                  disabled={!canManage}
-                  onCheckedChange={(checked) =>
-                    setNotificationForm({ ...notificationForm, pushNotificationsEnabled: checked === true })
-                  }
-                />
-                <Label htmlFor="pushNotificationsEnabled" className="cursor-pointer font-normal">
-                  Push notifications
-                </Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="smsNotificationsEnabled"
-                  checked={notificationForm.smsNotificationsEnabled}
-                  disabled={!canManage}
-                  onCheckedChange={(checked) =>
-                    setNotificationForm({ ...notificationForm, smsNotificationsEnabled: checked === true })
-                  }
-                />
-                <Label htmlFor="smsNotificationsEnabled" className="cursor-pointer font-normal">
-                  SMS notifications <span className="text-xs text-muted-foreground">(configuration only)</span>
-                </Label>
-              </div>
-            </CardContent>
-          </Card>
+              <SectionCard tone="staff" icon={Bell} title="Notification preferences" subtitle="Tenant-wide channel defaults. SMS is configuration-only — no provider is connected yet.">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {channels.map((c) => {
+                    const on = notificationForm[c.id];
+                    return (
+                      <div key={c.id} className={`flex items-center gap-3 rounded-xl border p-3 transition-colors duration-200 ${on ? 'border-primary/40 bg-primary/5' : 'bg-muted/30'}`}>
+                        <Checkbox id={c.id} checked={on} disabled={!canManage} onCheckedChange={(checked) => setNotificationForm({ ...notificationForm, [c.id]: checked === true })} />
+                        <Label htmlFor={c.id} className="flex-1 cursor-pointer font-semibold">
+                          {c.label}
+                          {c.note ? <span className="block text-xs font-normal text-muted-foreground">({c.note})</span> : null}
+                        </Label>
+                        <StatusChip tone={on ? 'good' : 'muted'}>{on ? 'On' : 'Off'}</StatusChip>
+                      </div>
+                    );
+                  })}
+                </div>
+              </SectionCard>
+            </StaggerGroup>
+          </SettingsLayout>
         </>
       )}
     </div>

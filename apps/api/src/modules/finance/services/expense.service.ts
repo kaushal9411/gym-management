@@ -6,8 +6,11 @@ import { getTenantScopedClient } from '../../../infrastructure/database/tenant-s
 import { assertBranchAccess, getBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
-import type { CreateExpenseInput, ExpenseDto, ListExpensesQuery, UpdateExpenseInput } from '../dto/finance.dto';
+import type { CreateExpenseInput, ExpenseDto, ListExpensesQuery, UpdateExpenseInput, LedgerAnalyticsDto, LedgerSummaryDto } from '../dto/finance.dto';
 import { ExpenseRepository, type ExpenseRow } from '../repositories/expense.repository';
+import { IncomeRepository } from '../repositories/income.repository';
+import { assembleLedgerAnalytics } from '../utils/ledger-analytics.util';
+import { resolveRanges } from '../utils/payments-analytics.util';
 
 /** Receipts are financial records — private/ prefix, `receiptDataUrl` is a bare object key from creation on, presigned fresh on every read (same posture as MemberDocument). */
 async function toDto(row: ExpenseRow): Promise<ExpenseDto> {
@@ -33,18 +36,45 @@ function escapeCsv(value: string): string {
 
 export class ExpenseService {
   private readonly expenses: ExpenseRepository;
+  private readonly other: IncomeRepository;
   private readonly auditLog: AuditLogRepository;
 
   constructor(private readonly tenantId: string) {
     const db = getTenantScopedClient(tenantId);
     this.expenses = new ExpenseRepository(db);
+    this.other = new IncomeRepository(db);
     this.auditLog = new AuditLogRepository(db);
   }
 
   async list(query: ListExpensesQuery, actorUserId: string) {
     const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
-    const { items, total } = await this.expenses.list(this.tenantId, query, restrictToBranchIds);
-    return { items: await Promise.all(items.map(toDto)), total, page: query.page, limit: query.limit, totalPages: Math.max(1, Math.ceil(total / query.limit)) };
+    const [{ items, total }, agg] = await Promise.all([
+      this.expenses.list(this.tenantId, query, restrictToBranchIds),
+      this.expenses.summary(this.tenantId, query, restrictToBranchIds),
+    ]);
+    const summary: LedgerSummaryDto = {
+      total: agg.total.toFixed(2),
+      count: agg.count,
+      average: (agg.count > 0 ? agg.total / agg.count : 0).toFixed(2),
+    };
+    return {
+      items: await Promise.all(items.map(toDto)),
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.max(1, Math.ceil(total / query.limit)),
+      summary,
+    };
+  }
+
+  async analytics(query: { dateFrom?: string; dateTo?: string; branchId?: string }, actorUserId: string): Promise<LedgerAnalyticsDto> {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { range, previousRange } = resolveRanges(query.dateFrom, query.dateTo);
+    const [current, previous] = await Promise.all([
+      this.other.scopedTotal(this.tenantId, range, query.branchId, restrictToBranchIds),
+      this.other.scopedTotal(this.tenantId, previousRange, query.branchId, restrictToBranchIds),
+    ]);
+    return assembleLedgerAnalytics(await this.expenses.analyticsRaw(this.tenantId, range, previousRange, query.branchId, restrictToBranchIds, { current, previous }));
   }
 
   async getById(id: string, actorUserId: string): Promise<ExpenseDto> {
@@ -54,7 +84,11 @@ export class ExpenseService {
   async create(input: CreateExpenseInput, actor: IamActor): Promise<ExpenseDto> {
     if (input.branchId) await assertBranchAccess(this.tenantId, actor.userId, input.branchId);
     const receiptDataUrl = isDataUrl(input.receiptDataUrl)
-      ? await uploadDataUrl(input.receiptDataUrl, { keyPrefix: 'expense-receipts', visibility: 'private', accept: ['image', 'pdf'] })
+      ? await uploadDataUrl(input.receiptDataUrl, {
+          keyPrefix: 'expense-receipts',
+          visibility: 'private',
+          accept: ['image', 'pdf'],
+        })
       : input.receiptDataUrl;
     const expense = await this.expenses.create({
       tenantId: this.tenantId,
@@ -75,7 +109,11 @@ export class ExpenseService {
     await this.mustFind(id, actor.userId);
     if (input.branchId) await assertBranchAccess(this.tenantId, actor.userId, input.branchId);
     const receiptDataUrl = isDataUrl(input.receiptDataUrl)
-      ? await uploadDataUrl(input.receiptDataUrl, { keyPrefix: 'expense-receipts', visibility: 'private', accept: ['image', 'pdf'] })
+      ? await uploadDataUrl(input.receiptDataUrl, {
+          keyPrefix: 'expense-receipts',
+          visibility: 'private',
+          accept: ['image', 'pdf'],
+        })
       : input.receiptDataUrl;
     await this.expenses.update(id, {
       category: input.category,
@@ -100,19 +138,19 @@ export class ExpenseService {
     const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
     const { items } = await this.expenses.list(
       this.tenantId,
-      { page: 1, limit: 10_000, includeDeleted: false, sortBy: 'expenseDate', sortDir: 'desc', ...query },
+      {
+        page: 1,
+        limit: 10_000,
+        includeDeleted: false,
+        sortBy: 'expenseDate',
+        sortDir: 'desc',
+        ...query,
+      },
       restrictToBranchIds,
     );
     const header = 'Date,Category,Amount,Branch,Description,Receipt';
     const rows = items.map((row) =>
-      [
-        row.expenseDate.toISOString().slice(0, 10),
-        row.category,
-        row.amount.toString(),
-        row.branch?.name ?? '',
-        row.description ?? '',
-        row.receiptFileName ?? '',
-      ]
+      [row.expenseDate.toISOString().slice(0, 10), row.category, row.amount.toString(), row.branch?.name ?? '', row.description ?? '', row.receiptFileName ?? '']
         .map((v) => escapeCsv(String(v)))
         .join(','),
     );
@@ -123,7 +161,14 @@ export class ExpenseService {
     const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
     const { items } = await this.expenses.list(
       this.tenantId,
-      { page: 1, limit: 10_000, includeDeleted: false, sortBy: 'expenseDate', sortDir: 'desc', ...query },
+      {
+        page: 1,
+        limit: 10_000,
+        includeDeleted: false,
+        sortBy: 'expenseDate',
+        sortDir: 'desc',
+        ...query,
+      },
       restrictToBranchIds,
     );
     const workbook = new ExcelJS.Workbook();

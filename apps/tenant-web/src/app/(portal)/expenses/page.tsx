@@ -1,76 +1,66 @@
 'use client';
 
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
-import Link from 'next/link';
-import { Download, MoreHorizontal, Plus, TrendingDown, Upload } from 'lucide-react';
+import { Download, Plus, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import { Pagination } from '@/components/ui/pagination';
-import { SearchBar } from '@/components/ui/search-bar';
+import type { DataTableColumn } from '@/components/ui/data-table';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
-import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
-import { toFinanceError, useDeleteExpense, useExpenseList } from '@/features/finance/hooks/use-finance';
+import { LedgerBranchComparePanel } from '@/features/finance/components/ledger/branch-compare-panel';
+import { CategoryDonutPanel } from '@/features/finance/components/ledger/category-donut-panel';
+import { LedgerFiltersBar } from '@/features/finance/components/ledger/ledger-filters-bar';
+import { LedgerKpiStrip } from '@/features/finance/components/ledger/ledger-kpi-strip';
+import { DeleteRowMenu, LedgerTable, SortHeader } from '@/features/finance/components/ledger/ledger-table';
+import { EXPENSE_THEME } from '@/features/finance/components/ledger/ledger-theme';
+import { TopEntriesPanel } from '@/features/finance/components/ledger/top-entries-panel';
+import { TrendChartPanel } from '@/features/finance/components/ledger/trend-chart-panel';
+import { useLedgerControls } from '@/features/finance/components/ledger/use-ledger-controls';
+import { CategoryBadge, EXPENSE_CATEGORY_META } from '@/features/finance/components/finance-badges';
+import { HeroButton, PaymentsHero } from '@/features/finance/components/payments/payments-hero';
+import { periodNoun } from '@/features/finance/components/payments/payments-period';
+import { fmtDate } from '@/features/finance/components/payments/payments-ui';
+import { PeriodBar } from '@/features/finance/components/payments/period-bar';
+import { toFinanceError, useDeleteExpense, useExpenseAnalytics, useExpenseList } from '@/features/finance/hooks/use-finance';
 import { financeService } from '@/features/finance/services/finance.service';
 import type { Expense, ExpenseCategory, ListExpensesParams } from '@/features/finance/types';
+import { formatMoney } from '@/features/members/components/detail/detail-ui';
 import { useCurrencySymbol } from '@/lib/currency';
-import { cn } from '@/lib/utils';
 
-const selectClassName = cn(
-  'h-9 rounded-md border border-input bg-background px-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-);
-
-const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
-  RENT: 'Rent',
-  SALARY: 'Salary',
-  UTILITIES: 'Utilities',
-  EQUIPMENT: 'Equipment',
-  MAINTENANCE: 'Maintenance',
-  MARKETING: 'Marketing',
-  OFFICE_SUPPLIES: 'Office Supplies',
-  OTHER: 'Other',
-};
+const PAGE_SIZE = 20;
+const theme = EXPENSE_THEME;
 
 export default function ExpensesPage() {
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('finance:expense-manage');
-  const { currentBranchId } = useCurrentBranch();
-  const currencySymbol = useCurrencySymbol();
+  const canViewAnalytics = hasPermission('finance:view');
+  const sym = useCurrencySymbol();
+  const c = useLedgerControls();
 
-  const [search, setSearch] = React.useState('');
-  const debouncedSearch = useDebouncedValue(search, 300);
-  const [category, setCategory] = React.useState<ExpenseCategory | ''>('');
-  const [dateFrom, setDateFrom] = React.useState('');
-  const [dateTo, setDateTo] = React.useState('');
-  const [page, setPage] = React.useState(1);
   const [confirmDelete, setConfirmDelete] = React.useState<Expense | null>(null);
-
-  // Header branch switch re-scopes the whole list — back to page 1 like any other filter change.
-  React.useEffect(() => {
-    setPage(1);
-  }, [currentBranchId]);
-
-  const params: ListExpensesParams = {
-    page,
-    limit: 20,
-    search: debouncedSearch || undefined,
-    category: category || undefined,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-    branchId: currentBranchId ?? undefined,
-  };
-  const expenses = useExpenseList(params);
   const deleteExpense = useDeleteExpense();
 
-  const data = expenses.data;
-  const items = data?.items ?? [];
+  const dateFrom = c.rangeReady ? c.range.from : undefined;
+  const dateTo = c.rangeReady ? c.range.to : undefined;
+  const analytics = useExpenseAnalytics({ dateFrom, dateTo, branchId: c.branchId || undefined }, { enabled: canViewAnalytics });
+
+  const listParams: ListExpensesParams = {
+    page: c.page,
+    limit: PAGE_SIZE,
+    search: c.debouncedSearch || undefined,
+    category: (c.category || undefined) as ExpenseCategory | undefined,
+    dateFrom,
+    dateTo,
+    branchId: c.branchId || undefined,
+    sortBy: c.sortBy === 'date' ? 'expenseDate' : 'amount',
+    sortDir: c.sortDir,
+  };
+  const expenses = useExpenseList(listParams, { keepPrevious: true });
+  const exportParams = { ...listParams, page: undefined, limit: undefined } as Partial<ListExpensesParams>;
+
+  const a = analytics.data;
+  const aLoading = analytics.isPending;
+  const aError = analytics.isError && !a;
 
   const runDelete = () => {
     if (!confirmDelete) return;
@@ -81,115 +71,118 @@ export default function ExpensesPage() {
     setConfirmDelete(null);
   };
 
+  const sortProps = { sortBy: c.sortBy, sortDir: c.sortDir, onSort: c.toggleSort };
   const columns: DataTableColumn<Expense>[] = [
-    { key: 'date', header: 'Date', render: (e) => new Date(e.expenseDate).toLocaleDateString() },
-    { key: 'category', header: 'Category', render: (e) => <Badge variant="secondary">{CATEGORY_LABELS[e.category]}</Badge> },
-    { key: 'amount', header: 'Amount', render: (e) => `${currencySymbol}${e.amount}` },
-    { key: 'branch', header: 'Branch', render: (e) => e.branch?.name ?? '—' },
-    { key: 'description', header: 'Description', render: (e) => e.description ?? '—' },
+    { key: 'category', header: 'Category', render: (e) => <CategoryBadge category={e.category} meta={EXPENSE_CATEGORY_META} /> },
+    { key: 'amount', header: <SortHeader label="Amount" column="amount" right {...sortProps} />, className: 'text-right', render: (e) => <span className="font-extrabold tabular-nums">{formatMoney(sym, e.amount)}</span> },
+    { key: 'date', header: <SortHeader label="Date" column="date" {...sortProps} />, render: (e) => <span className="whitespace-nowrap">{fmtDate(e.expenseDate, { day: 'numeric', month: 'short', year: 'numeric' })}</span> },
+    { key: 'branch', header: 'Branch', render: (e) => e.branch?.name ?? <span className="text-muted-foreground">—</span> },
+    { key: 'description', header: 'Description', render: (e) => <span className="block max-w-[280px] truncate" title={e.description ?? undefined}>{e.description ?? '—'}</span> },
     {
       key: 'receipt',
       header: 'Receipt',
       render: (e) =>
         e.receiptDataUrl ? (
-          <a href={e.receiptDataUrl} download={e.receiptFileName ?? 'receipt'} className="text-sm hover:underline">
+          <a href={e.receiptDataUrl} download={e.receiptFileName ?? 'receipt'} className="text-sm font-semibold text-primary hover:underline">
             {e.receiptFileName ?? 'Download'}
           </a>
         ) : (
-          '—'
+          <span className="text-muted-foreground">—</span>
         ),
     },
+    { key: 'recordedBy', header: 'Recorded by', render: (e) => e.recordedBy?.name ?? <span className="text-muted-foreground">—</span> },
     {
       key: 'actions',
-      header: '',
-      className: 'w-10',
-      render: (e) =>
-        canManage ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-8" aria-label="Actions">
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmDelete(e)}>
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null,
+      header: <span className="sr-only">Actions</span>,
+      className: 'w-10 text-right',
+      render: (e) => (canManage ? <DeleteRowMenu label={e.description ?? 'expense'} onDelete={() => setConfirmDelete(e)} /> : null),
     },
   ];
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <div
-            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
-            style={{
-              backgroundColor: 'color-mix(in oklch, var(--warning) 16%, transparent)',
-              color: 'var(--warning)',
-              boxShadow: '0 0 0 1px color-mix(in oklch, var(--warning) 18%, transparent)',
-            }}
-          >
-            <TrendingDown className="size-5" aria-hidden />
+      <PaymentsHero
+        eyebrow="Finance"
+        title="Expenses"
+        subtitle="The gym's expense ledger — rent, salaries, utilities and more, compared against the previous period."
+        stats={
+          canViewAnalytics
+            ? [
+                { value: a ? formatMoney(sym, a.kpis.total.value) : '—', label: `spent ${periodNoun(c.period)}` },
+                { value: a ? a.kpis.count.value : '—', label: 'expenses' },
+                { value: a ? formatMoney(sym, a.kpis.average.value) : '—', label: 'average expense' },
+              ]
+            : undefined
+        }
+        statsLoading={aLoading}
+        actions={
+          <>
+            <HeroButton onClick={() => void financeService.exportExpensesCsv(exportParams)}>
+              <Upload className="size-4" /> CSV
+            </HeroButton>
+            <HeroButton onClick={() => void financeService.exportExpensesExcel(exportParams)}>
+              <Download className="size-4" /> Excel
+            </HeroButton>
+            {canManage ? (
+              <HeroButton href="/expenses/new" solid>
+                <Plus className="size-4" /> Add expense
+              </HeroButton>
+            ) : null}
+          </>
+        }
+      />
+
+      <PeriodBar
+        period={c.period}
+        onPeriod={c.changePeriod}
+        customFrom={c.custom.from}
+        customTo={c.custom.to}
+        onCustom={c.setDates}
+        branchId={c.branchId}
+        onBranch={c.changeBranch}
+        compare={c.compare}
+        onCompare={c.setCompare}
+      />
+
+      {canViewAnalytics ? (
+        <>
+          <LedgerKpiStrip analytics={a} loading={aLoading} error={aError} compare={c.compare} vsLabel={`vs ${c.previousLabel.toLowerCase()}`} theme={theme} />
+          <div className="flex flex-wrap gap-3.5">
+            <TrendChartPanel analytics={a} loading={aLoading} error={aError} theme={theme} compare={c.compare} previousLabel={c.previousLabel} />
+            <CategoryDonutPanel analytics={a} loading={aLoading} error={aError} theme={theme} compare={c.compare} />
           </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Expenses</h1>
-            <p className="text-muted-foreground">The gym&apos;s expense ledger — rent, salaries, utilities, and more.</p>
+          <div className="flex flex-wrap gap-3.5">
+            <LedgerBranchComparePanel analytics={a} loading={aLoading} error={aError} theme={theme} compare={c.compare} />
+            <TopEntriesPanel analytics={a} loading={aLoading} error={aError} theme={theme} />
           </div>
-        </div>
-        {canManage ? (
-          <Button size="sm" asChild>
-            <Link href="/expenses/new">
-              <Plus className="size-4" /> Add expense
-            </Link>
-          </Button>
-        ) : null}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchBar
-          containerClassName="max-w-xs"
-          placeholder="Search description…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-        <select
-          className={selectClassName}
-          value={category}
-          onChange={(e) => {
-            setCategory(e.target.value as ExpenseCategory | '');
-            setPage(1);
-          }}
-          aria-label="Filter by category"
-        >
-          <option value="">All categories</option>
-          {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <Input type="date" aria-label="From date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} />
-        <Input type="date" aria-label="To date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} />
-        <Button variant="outline" size="sm" onClick={() => void financeService.exportExpensesCsv(params)}>
-          <Upload className="size-4" /> CSV
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => void financeService.exportExpensesExcel(params)}>
-          <Download className="size-4" /> Excel
-        </Button>
-      </div>
-
-      <DataTable columns={columns} rows={items} rowKey={(e) => e.id} loading={expenses.isPending} error={expenses.error} onRetry={() => expenses.refetch()} emptyMessage="No expenses match these filters." />
-
-      {data ? (
-        <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
+        </>
       ) : null}
+
+      <LedgerFiltersBar
+        search={c.search}
+        onSearch={c.changeSearch}
+        dateFrom={c.range.from}
+        dateTo={c.range.to}
+        onDates={c.setDates}
+        categoryMeta={EXPENSE_CATEGORY_META}
+        category={c.category}
+        onCategory={c.changeCategory}
+        counts={a?.categories}
+        onReset={c.reset}
+      />
+
+      <LedgerTable
+        title="All expenses"
+        columns={columns}
+        data={expenses.data}
+        loading={expenses.isPending}
+        error={expenses.error}
+        onRetry={() => void expenses.refetch()}
+        page={c.page}
+        onPage={c.setPage}
+        pageSize={PAGE_SIZE}
+        emptyMessage="No expenses match these filters."
+      />
 
       <ConfirmDialog
         open={!!confirmDelete}

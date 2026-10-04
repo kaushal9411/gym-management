@@ -1,282 +1,67 @@
 'use client';
 
+import { Bell, KeyRound, MonitorSmartphone, Settings2, ShieldCheck, UserRound } from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import * as React from 'react';
-import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
-import { LogOut, MonitorSmartphone, ShieldCheck, Settings2 } from 'lucide-react';
-import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { cn } from '@/lib/utils';
-import { DisableTwoFactorDialog } from '@/features/auth/components/disable-two-factor-dialog';
-import { EnableTwoFactorDialog } from '@/features/auth/components/enable-two-factor-dialog';
-import { RegenerateBackupCodesDialog } from '@/features/auth/components/regenerate-backup-codes-dialog';
-import { useCurrentUser } from '@/features/auth/hooks/use-current-user';
-import { useLogoutAllDevices } from '@/features/auth/hooks/use-logout';
-import { ChangePasswordForm } from '@/features/auth/components/forms/change-password-form';
-import {
-  toIamError,
-  useActiveSessions,
-  useIamProfile,
-  useLoginHistory,
-  useRevokeSession,
-} from '@/features/iam/hooks/use-iam';
-import { useTenant } from '@/features/tenant/tenant-provider';
+import { AccountTab } from '@/features/account-settings/components/account-tab';
+import { NotificationsTab } from '@/features/account-settings/components/notifications-tab';
+import { PasswordTab } from '@/features/account-settings/components/password-tab';
+import { SecurityTab } from '@/features/account-settings/components/security-tab';
+import { SessionsTab } from '@/features/account-settings/components/sessions-tab';
+import { useIamProfile, useActiveSessions } from '@/features/iam/hooks/use-iam';
+import { ReportsHero } from '@/features/reports/components/ui';
 
 type SettingsTab = 'account' | 'password' | 'security' | 'notifications' | 'sessions';
 
-const TABS: Array<{ value: SettingsTab; label: string }> = [
-  { value: 'account', label: 'Account' },
-  { value: 'password', label: 'Password' },
-  { value: 'security', label: 'Security' },
-  { value: 'notifications', label: 'Notifications' },
-  { value: 'sessions', label: 'Sessions' },
+const TABS = [
+  { value: 'account', label: 'Account', icon: UserRound },
+  { value: 'password', label: 'Password', icon: KeyRound },
+  { value: 'security', label: 'Security', icon: ShieldCheck },
+  { value: 'notifications', label: 'Notifications', icon: Bell },
+  { value: 'sessions', label: 'Sessions', icon: MonitorSmartphone },
 ];
 
-const NOTIFICATION_PREFERENCES = [
-  { key: 'email-billing', label: 'Billing & subscription emails' },
-  { key: 'email-announcements', label: 'Platform announcements' },
-  { key: 'inapp-system', label: 'In-app system alerts' },
-] as const;
+const isTab = (v: string | null): v is SettingsTab => TABS.some((t) => t.value === v);
 
 export default function SettingsPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const requested = searchParams.get('tab');
-  const [tab, setTab] = React.useState<SettingsTab>(
-    requested === 'password' || requested === 'security' || requested === 'notifications' || requested === 'sessions' ? requested : 'account',
-  );
-
-  const user = useCurrentUser();
-  const tenant = useTenant();
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-start gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
-          <Settings2 className="size-5" aria-hidden />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Account Settings</h1>
-          <p className="text-muted-foreground">Manage your profile, password, and notification preferences.</p>
-        </div>
-      </div>
-
-      <Tabs value={tab} onValueChange={(value) => setTab(value as SettingsTab)}>
-        <TabsList>
-          {TABS.map((t) => (
-            <TabsTrigger key={t.value} value={t.value}>
-              {t.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        <TabsContent value="account">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Account details</CardTitle>
-              <CardDescription>Edit your name, email, and photo from the Profile page.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p><span className="text-muted-foreground">Name:</span> {user?.name}</p>
-              <p><span className="text-muted-foreground">Email:</span> {user?.email}</p>
-              <p><span className="text-muted-foreground">Role:</span> {user?.role}</p>
-              <p><span className="text-muted-foreground">Gym:</span> {tenant.name}</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="password">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Change password</CardTitle>
-              <CardDescription>Changing your password signs you out of every other session.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ChangePasswordForm />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="security">
-          <SecurityPanel />
-        </TabsContent>
-
-        <TabsContent value="notifications">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Notification preferences</CardTitle>
-              <CardDescription>
-                Notification preferences now live on your profile —{' '}
-                <Link href="/profile" className="text-primary underline-offset-4 hover:underline">
-                  manage them there
-                </Link>
-                .
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {NOTIFICATION_PREFERENCES.map((pref) => (
-                <div key={pref.key} className="flex items-center gap-2">
-                  <Checkbox id={pref.key} defaultChecked disabled />
-                  <Label htmlFor={pref.key} className="font-normal text-muted-foreground">
-                    {pref.label}
-                  </Label>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="sessions">
-          <SessionsPanel />
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-/** Self-service TOTP 2FA — enable/disable and backup-code management, layered on `GET /profile`'s `mfaEnabled` flag. */
-function SecurityPanel() {
+  const [tab, setTab] = React.useState<SettingsTab>(isTab(requested) ? requested : 'account');
   const profile = useIamProfile();
-  const [enableOpen, setEnableOpen] = React.useState(false);
-  const [disableOpen, setDisableOpen] = React.useState(false);
-  const [regenerateOpen, setRegenerateOpen] = React.useState(false);
-
-  const mfaEnabled = profile.data?.mfaEnabled ?? false;
-
-  return (
-    <div className="space-y-5">
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <div className="flex items-center gap-3">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <ShieldCheck className="size-4.5" aria-hidden />
-            </div>
-            <div>
-              <CardTitle className="text-base">Two-factor authentication</CardTitle>
-              <CardDescription>Require a code from an authenticator app in addition to your password.</CardDescription>
-            </div>
-          </div>
-          {profile.isPending ? null : <Badge variant={mfaEnabled ? 'success' : 'outline'}>{mfaEnabled ? 'Enabled' : 'Disabled'}</Badge>}
-        </CardHeader>
-        <CardContent>
-          {profile.isPending ? (
-            <Skeleton className="h-9 w-40" />
-          ) : mfaEnabled ? (
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => setRegenerateOpen(true)}>
-                Regenerate backup codes
-              </Button>
-              <Button variant="destructive" size="sm" onClick={() => setDisableOpen(true)}>
-                Disable 2FA
-              </Button>
-            </div>
-          ) : (
-            <Button size="sm" onClick={() => setEnableOpen(true)}>
-              Enable 2FA
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-
-      <EnableTwoFactorDialog open={enableOpen} onOpenChange={setEnableOpen} />
-      <DisableTwoFactorDialog open={disableOpen} onOpenChange={setDisableOpen} />
-      <RegenerateBackupCodesDialog open={regenerateOpen} onOpenChange={setRegenerateOpen} />
-    </div>
-  );
-}
-
-/** Active devices + login history — session revocation runs through the auth API. */
-function SessionsPanel() {
   const sessions = useActiveSessions();
-  const revokeSession = useRevokeSession();
-  const { logoutAllDevices, isLoggingOut } = useLogoutAllDevices();
-  const history = useLoginHistory({ limit: 10 });
 
+  const changeTab = (value: string) => {
+    if (!isTab(value)) return;
+    setTab(value);
+    router.replace(`${pathname}?tab=${value}`, { scroll: false });
+  };
+
+  const last = profile.data?.lastLoginAt;
   return (
     <div className="space-y-5">
-      <Card>
-        <CardHeader className="flex-row items-center justify-between space-y-0">
-          <div>
-            <CardTitle className="text-base">Active sessions</CardTitle>
-            <CardDescription>Devices currently signed in to your account.</CardDescription>
-          </div>
-          <Button variant="outline" size="sm" disabled={isLoggingOut} onClick={() => logoutAllDevices()}>
-            <LogOut className="size-4" /> Sign out everywhere
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {sessions.isPending ? (
-            Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)
-          ) : (sessions.data ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No active sessions.</p>
-          ) : (
-            (sessions.data ?? []).map((session) => (
-              <div key={session.id} className="flex items-center gap-3 rounded-lg border p-3">
-                <MonitorSmartphone className="size-5 shrink-0 text-muted-foreground" />
-                <div className="min-w-0 flex-1 text-sm">
-                  <div className="truncate font-medium">
-                    {session.deviceLabel ?? session.userAgent ?? 'Unknown device'}
-                    {session.isCurrent ? <Badge className="ml-2">This device</Badge> : null}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {session.ipAddress ?? 'Unknown IP'} · Active {new Date(session.lastActiveAt).toLocaleString()}
-                  </p>
-                </div>
-                {!session.isCurrent ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={revokeSession.isPending}
-                    onClick={() =>
-                      revokeSession.mutate(session.id, {
-                        onSuccess: () => toast.success('Session revoked'),
-                        onError: (err) => toast.error(toIamError(err).message),
-                      })
-                    }
-                  >
-                    Revoke
-                  </Button>
-                ) : null}
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Login history</CardTitle>
-          <CardDescription>Recent sign-in attempts on your account.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {history.isPending ? (
-            Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)
-          ) : (history.data?.items ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">No login history yet.</p>
-          ) : (
-            (history.data?.items ?? []).map((entry) => (
-              <div key={entry.id} className="flex items-center gap-3 text-sm">
-                <span
-                  className={cn('size-2 shrink-0 rounded-full', entry.success ? 'bg-emerald-500' : 'bg-red-500')}
-                  aria-hidden
-                />
-                <span className="flex-1">
-                  {entry.success ? 'Successful sign-in' : `Failed sign-in${entry.reason ? ` (${entry.reason})` : ''}`}
-                  <span className="block text-xs text-muted-foreground">
-                    {entry.ipAddress ?? 'Unknown IP'} · {new Date(entry.createdAt).toLocaleString()}
-                  </span>
-                </span>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+      <ReportsHero
+        eyebrow="Account"
+        title="Account Settings"
+        subtitle="Manage your profile, password and sign-in security."
+        accent="members"
+        icon={Settings2}
+        stats={[
+          { label: 'Two-factor', value: profile.data ? (profile.data.mfaEnabled ? 'On' : 'Off') : '—' },
+          { label: 'Active sessions', value: sessions.data ? sessions.data.length : '—' },
+          ...(last ? [{ label: 'Last sign-in', value: new Date(last).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) }] : []),
+        ]}
+        tabs={TABS}
+        activeTab={tab}
+        onTabChange={changeTab}
+      />
+      {tab === 'account' ? <AccountTab /> : null}
+      {tab === 'password' ? <PasswordTab /> : null}
+      {tab === 'security' ? <SecurityTab /> : null}
+      {tab === 'notifications' ? <NotificationsTab /> : null}
+      {tab === 'sessions' ? <SessionsTab /> : null}
     </div>
   );
 }

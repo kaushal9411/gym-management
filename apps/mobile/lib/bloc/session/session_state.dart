@@ -49,5 +49,6 @@ class SessionAuthenticatedMember extends SessionState {
   final TenantBranding tenant;
 
   @override
-  List<Object?> get props => [member.id, tenant.slug];
+  List<Object?> get props =>
+      [member.id, member.name, member.profilePhotoUrl, tenant.slug];
 }

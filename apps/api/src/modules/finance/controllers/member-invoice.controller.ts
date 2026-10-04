@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
 import { actorFrom } from '../../authentication/utils/actor.util';
-import type { GenerateInvoiceInput, ListInvoicesQuery } from '../dto/finance.dto';
+import type { GenerateInvoiceInput, InvoiceAnalyticsQuery, ListInvoicesQuery } from '../dto/finance.dto';
 import { MemberInvoiceService } from '../services/member-invoice.service';
 
 function serviceFor(req: Request): MemberInvoiceService {
@@ -12,6 +12,10 @@ function serviceFor(req: Request): MemberInvoiceService {
 export class MemberInvoiceController {
   async list(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await serviceFor(req).list(req.query as unknown as ListInvoicesQuery, req.auth!.sub));
+  }
+
+  async analytics(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await serviceFor(req).analytics(req.query as unknown as InvoiceAnalyticsQuery, req.auth!.sub));
   }
 
   async getById(req: Request, res: Response): Promise<void> {

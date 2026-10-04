@@ -1,10 +1,12 @@
-import type { DeviceTokenPlatform } from '@prisma/client';
+import type { DeviceTokenPlatform, TenantNotificationCategory } from '@prisma/client';
 import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
 import { buildMemberAuthService } from '../../member-auth/services/member-auth.service';
 import { MemberGdprService } from '../../members/services/member-gdpr.service';
+import { MemberOverviewService } from '../services/member-overview.service';
 import { MemberPortalService } from '../services/member-portal.service';
+import { MemberProfileService } from '../services/member-profile.service';
 
 function serviceFor(req: Request): MemberPortalService {
   return new MemberPortalService(req.tenant!.id);
@@ -14,7 +16,54 @@ function memberId(req: Request): string {
   return req.memberAuth!.sub;
 }
 
+function overviewFor(req: Request): MemberOverviewService {
+  return new MemberOverviewService(req.tenant!.id);
+}
+
+function profileFor(req: Request): MemberProfileService {
+  return new MemberProfileService(req.tenant!.id);
+}
+
+function ctxOf(req: Request) {
+  return { ipAddress: req.ip, userAgent: req.get('user-agent') };
+}
+
 export class MemberPortalController {
+  async getProfile(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await profileFor(req).get(memberId(req)));
+  }
+
+  async updateProfile(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await profileFor(req).update(memberId(req), req.body, ctxOf(req)), 'Profile updated.');
+  }
+
+  async uploadProfilePhoto(req: Request, res: Response): Promise<void> {
+    const { image } = req.body as { image: string };
+    sendSuccess(res, await profileFor(req).uploadPhoto(memberId(req), image, ctxOf(req)), 'Photo updated.');
+  }
+
+  async removeProfilePhoto(req: Request, res: Response): Promise<void> {
+    await profileFor(req).removePhoto(memberId(req), ctxOf(req));
+    sendSuccess(res, null, 'Photo removed.');
+  }
+
+  async overview(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await overviewFor(req).getOverview(memberId(req)));
+  }
+
+  async payments(req: Request, res: Response): Promise<void> {
+    const { page, limit } = req.query as unknown as { page: number; limit: number };
+    sendSuccess(res, await overviewFor(req).listPayments(memberId(req), page, limit));
+  }
+
+  async invoiceDetail(req: Request<{ id: string }>, res: Response): Promise<void> {
+    sendSuccess(res, await overviewFor(req).getInvoiceDetail(memberId(req), req.params.id));
+  }
+
+  async gym(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await overviewFor(req).getGym(memberId(req)));
+  }
+
   async me(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await serviceFor(req).getProfile(memberId(req)));
   }
@@ -46,8 +95,13 @@ export class MemberPortalController {
   }
 
   async notifications(req: Request, res: Response): Promise<void> {
-    const { unreadOnly, page, limit } = req.query as unknown as { unreadOnly?: boolean; page: number; limit: number };
-    sendSuccess(res, await serviceFor(req).getNotifications(memberId(req), { unreadOnly, page, limit }));
+    const { unreadOnly, category, page, limit } = req.query as unknown as {
+      unreadOnly?: boolean;
+      category?: TenantNotificationCategory;
+      page: number;
+      limit: number;
+    };
+    sendSuccess(res, await serviceFor(req).getNotifications(memberId(req), { unreadOnly, category, page, limit }));
   }
 
   async unreadNotificationCount(req: Request, res: Response): Promise<void> {
@@ -84,7 +138,11 @@ export class MemberPortalController {
 
   async downloadInvoice(req: Request<{ id: string }>, res: Response): Promise<void> {
     const { filename, content } = await serviceFor(req).downloadInvoicePdf(memberId(req), req.params.id);
-    res.status(200).setHeader('Content-Type', 'application/pdf').setHeader('Content-Disposition', `attachment; filename="${filename}"`).send(content);
+    res
+      .status(200)
+      .setHeader('Content-Type', 'application/pdf')
+      .setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+      .send(content);
   }
 
   async classes(req: Request, res: Response): Promise<void> {
@@ -112,7 +170,10 @@ export class MemberPortalController {
   }
 
   async changePassword(req: Request, res: Response): Promise<void> {
-    const { currentPassword, newPassword } = req.body as { currentPassword: string; newPassword: string };
+    const { currentPassword, newPassword } = req.body as {
+      currentPassword: string;
+      newPassword: string;
+    };
     await buildMemberAuthService(req.tenant!.id).changePassword(memberId(req), currentPassword, newPassword);
     sendSuccess(res, null, 'Password changed. Please sign in again on your other devices.');
   }

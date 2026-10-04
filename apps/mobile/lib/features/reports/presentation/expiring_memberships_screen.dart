@@ -5,6 +5,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../models/report_summary.dart';
 import '../../../models/branch_option.dart';
 import '../../../models/expiring_membership_row.dart';
 import '../../../repositories/branch_repository.dart';
@@ -12,6 +13,7 @@ import '../../../repositories/reports_repository.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import 'widgets/load_more_button.dart';
 import 'widgets/report_filter_bar.dart';
+import 'widgets/report_summary_header.dart';
 
 String _fmtIsoDate(String iso) {
   final parts = iso.split('-');
@@ -140,6 +142,12 @@ class _ExpiringMembershipsScreenState extends State<ExpiringMembershipsScreen> {
                 branches: _branchOptions,
                 selectedBranchId: _branchId,
                 onBranchChanged: _onBranchChanged,
+              ),
+            ),
+            ReportSummaryHeader(
+              type: 'expiring-memberships',
+              filters: ReportSummaryFilters(
+                branchId: _branchId,
               ),
             ),
             Expanded(

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
 import '../models/announcement.dart';
+import '../models/announcement_stats.dart';
 import '../models/paginated_result.dart';
 import '../models/platform_announcement.dart';
 
@@ -29,15 +30,56 @@ class AnnouncementRepository {
     }
   }
 
-  Future<PaginatedResult<Announcement>> list({int page = 1}) async {
+  Future<PaginatedResult<Announcement>> list({int page = 1}) async =>
+      (await listWithCounts(page: page)).page;
+
+  /// `GET /tenant-announcements` with the server-side `status` / `audience`
+  /// / `search` filters plus the `counts` block (status-tab badges; null if
+  /// an older API omits it).
+  Future<
+      ({
+        PaginatedResult<Announcement> page,
+        AnnouncementCounts? counts,
+      })> listWithCounts({
+    int page = 1,
+    String? status,
+    AnnouncementAudience? audience,
+    String? search,
+  }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/tenant-announcements',
-        queryParameters: {'page': page, 'limit': 20},
+        queryParameters: {
+          'page': page,
+          'limit': 20,
+          if (status != null) 'status': status,
+          if (audience != null) 'audience': audience.apiValue,
+          if (search != null && search.trim().isNotEmpty)
+            'search': search.trim(),
+        },
       );
-      return PaginatedResult.fromJson(
+      final data = response.data!['data'] as Map<String, dynamic>;
+      return (
+        page: PaginatedResult.fromJson(data, Announcement.fromJson),
+        counts: AnnouncementCounts.tryParse(data['counts']),
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /tenant-announcements/stats` (perm `announcements:view`).
+  Future<AnnouncementStats> stats({
+    required String dateFrom,
+    required String dateTo,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/tenant-announcements/stats',
+        queryParameters: {'dateFrom': dateFrom, 'dateTo': dateTo},
+      );
+      return AnnouncementStats.fromJson(
         response.data!['data'] as Map<String, dynamic>,
-        Announcement.fromJson,
       );
     } on DioException catch (e) {
       throw _mapError(e);

@@ -1,20 +1,32 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { AuthServiceError } from '@/features/auth/types';
 import { announcementService } from '../services/announcement.service';
-import type { AnnouncementStatus, CreateAnnouncementInput, ScheduleAnnouncementInput, UpdateAnnouncementInput } from '../types';
+import type { AnnouncementListParams, AnnouncementStatsParams, CreateAnnouncementInput, ScheduleAnnouncementInput, UpdateAnnouncementInput } from '../types';
 
 export function toAnnouncementError(error: unknown): AuthServiceError {
   if (error instanceof AuthServiceError) return error;
   return new AuthServiceError('UNKNOWN', 'Something went wrong. Please try again.');
 }
 
-export function useAnnouncements(params: { status?: AnnouncementStatus; page?: number; limit?: number } = {}) {
+export function useAnnouncements(params: AnnouncementListParams = {}) {
   return useQuery({
     queryKey: ['tenant-announcements', params],
     queryFn: () => announcementService.list(params),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** Analytics for the Announcements page; gate with `enabled` (permission + valid range). Invalidated with the list by every mutation. */
+export function useAnnouncementStats(params: AnnouncementStatsParams, enabled = true) {
+  return useQuery({
+    queryKey: ['tenant-announcements', 'stats', params],
+    queryFn: () => announcementService.getStats(params),
+    enabled,
+    placeholderData: keepPreviousData,
+    retry: false,
   });
 }
 

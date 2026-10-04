@@ -1,10 +1,10 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { AuthServiceError } from '@/features/auth/types';
 import { reportsService } from '../services/reports.service';
-import type { CreateScheduledReportPayload, Paginated, ReportFilters } from '../types';
+import type { CreateScheduledReportPayload, Paginated, ReportFilters, ReportsOverviewParams } from '../types';
 
 export function toReportError(error: unknown): AuthServiceError {
   if (error instanceof AuthServiceError) return error;
@@ -50,6 +50,26 @@ export function useReportData<T>(reportType: string, filters: ReportFilters) {
   });
 }
 
+/** Redesigned overview dashboard data; `enabled` lets pages wait for a valid custom range. */
+export function useReportsOverview(params: ReportsOverviewParams, enabled = true) {
+  return useQuery({
+    queryKey: ['reports', 'overview', params],
+    queryFn: () => reportsService.getOverview(params),
+    placeholderData: keepPreviousData,
+    enabled,
+  });
+}
+
+/** KPI/breakdown/series summary for one tabular report type (same filters as the list, no paging). */
+export function useReportSummary(type: string, params: ReportFilters, enabled = true) {
+  return useQuery({
+    queryKey: ['reports', 'summary', type, params],
+    queryFn: () => reportsService.getReportSummary(type, params),
+    placeholderData: keepPreviousData,
+    enabled,
+  });
+}
+
 export function isPaginated<T>(data: Paginated<T> | T[] | undefined): data is Paginated<T> {
   return !!data && !Array.isArray(data);
 }
@@ -78,8 +98,12 @@ export function usePaymentCollection(dateFrom?: string, dateTo?: string, branchI
   return useQuery({ queryKey: ['reports', 'analytics', 'payment-collection', dateFrom, dateTo, branchId], queryFn: () => reportsService.paymentCollection(dateFrom, dateTo, branchId) });
 }
 
-export function useBranchComparison(branchId?: string) {
-  return useQuery({ queryKey: ['reports', 'analytics', 'branch-comparison', branchId ?? null], queryFn: () => reportsService.branchComparison(branchId) });
+export function useBranchComparison(branchId?: string, dateFrom?: string, dateTo?: string) {
+  return useQuery({
+    queryKey: ['reports', 'analytics', 'branch-comparison', branchId ?? null, dateFrom ?? null, dateTo ?? null],
+    queryFn: () => reportsService.branchComparison(branchId, dateFrom, dateTo),
+    placeholderData: keepPreviousData,
+  });
 }
 
 // ── Scheduled reports ──────────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import type { TenantNotificationCategory } from '@prisma/client';
 import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
@@ -5,14 +6,24 @@ import { tenantNotificationService } from '../services/tenant-notification.servi
 
 interface ListQuery {
   unreadOnly?: boolean;
+  category?: TenantNotificationCategory;
+  search?: string;
   page: number;
   limit: number;
 }
 
 export class TenantNotificationController {
   async list(req: Request, res: Response): Promise<void> {
-    const result = await tenantNotificationService.list(req.tenant!.id, req.query as unknown as ListQuery);
+    const result = await tenantNotificationService.list(
+      req.tenant!.id,
+      req.query as unknown as ListQuery,
+    );
     sendSuccess(res, result);
+  }
+
+  async stats(req: Request, res: Response): Promise<void> {
+    const { dateFrom, dateTo } = req.query as { dateFrom?: string; dateTo?: string };
+    sendSuccess(res, await tenantNotificationService.stats(req.tenant!.id, dateFrom, dateTo));
   }
 
   async unreadCount(req: Request, res: Response): Promise<void> {
@@ -21,7 +32,10 @@ export class TenantNotificationController {
   }
 
   async getById(req: Request, res: Response): Promise<void> {
-    const notification = await tenantNotificationService.getById(req.tenant!.id, req.params.notificationId!);
+    const notification = await tenantNotificationService.getById(
+      req.tenant!.id,
+      req.params.notificationId!,
+    );
     sendSuccess(res, notification);
   }
 

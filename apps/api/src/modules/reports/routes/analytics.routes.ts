@@ -5,7 +5,7 @@ import { authenticateMiddleware } from '../../authentication/middlewares/authent
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
 import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { analyticsController } from '../controllers/analytics.controller';
-import { trendQuerySchema } from '../validators/reports.validators';
+import { overviewQuerySchema, trendQuerySchema } from '../validators/reports.validators';
 
 export const analyticsRouter: Router = Router();
 
@@ -56,9 +56,10 @@ analyticsRouter.get(
   asyncHandler(analyticsController.paymentCollection.bind(analyticsController)),
 );
 
-/** @openapi { "/analytics/branch-comparison": { get: { tags: [Analytics], summary: "Point-in-time comparison of members/revenue/attendance across branches", security: [{bearerAuth: []}], responses: { 200: { description: "BranchComparisonRow[]" } } } } } */
+/** @openapi { "/analytics/branch-comparison": { get: { tags: [Analytics], summary: "Comparison of members/revenue/attendance across branches (optional dateFrom/dateTo; default month-to-date)", security: [{bearerAuth: []}], responses: { 200: { description: "BranchComparisonRow[]" } } } } } */
 analyticsRouter.get(
   '/branch-comparison',
   requirePermission('analytics:view'),
+  validate({ query: overviewQuerySchema }),
   asyncHandler(analyticsController.branchComparison.bind(analyticsController)),
 );

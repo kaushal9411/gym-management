@@ -4,6 +4,7 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../models/report_summary.dart';
 import '../../../models/branch_option.dart';
 import '../../../models/trend_point.dart';
 import '../../../repositories/analytics_repository.dart';
@@ -11,6 +12,7 @@ import '../../../repositories/branch_repository.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import 'widgets/report_filter_bar.dart';
+import 'widgets/report_summary_header.dart';
 import 'widgets/simple_bar_chart.dart';
 
 /// Design frame "9c. Attendance report" — daily check-ins, filterable by
@@ -112,6 +114,14 @@ class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
                 onBranchChanged: _onBranchChanged,
                 dateRange: _range,
                 onDateRangeTap: _pickDateRange,
+              ),
+            ),
+            ReportSummaryHeader(
+              type: 'attendance',
+              filters: ReportSummaryFilters(
+                from: _range.start,
+                to: _range.end,
+                branchId: _branchId,
               ),
             ),
             Expanded(

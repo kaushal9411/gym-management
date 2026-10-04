@@ -1,7 +1,25 @@
 import { z } from 'zod';
 
+import { isoDay } from '../../finance/validators/finance.validators';
+
+const NOTIFICATION_CATEGORIES = [
+  'ANNOUNCEMENT',
+  'SYSTEM',
+  'SUBSCRIPTION',
+  'GENERAL',
+  'MEMBER',
+  'MEMBERSHIP',
+  'PAYMENT',
+  'ATTENDANCE',
+  'WORKOUT',
+  'DIET',
+  'STAFF',
+] as const;
+
 export const listNotificationsQuerySchema = z.object({
-  unreadOnly: z.coerce.boolean().optional(),
+  unreadOnly: z.preprocess((v) => (v === 'false' ? false : v), z.coerce.boolean().optional()),
+  category: z.enum(NOTIFICATION_CATEGORIES).optional(),
+  search: z.string().trim().min(1).max(200).optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
 });
@@ -9,8 +27,6 @@ export const listNotificationsQuerySchema = z.object({
 export const notificationIdParamSchema = z.object({
   notificationId: z.string().uuid(),
 });
-
-const NOTIFICATION_CATEGORIES = ['ANNOUNCEMENT', 'SYSTEM', 'SUBSCRIPTION', 'GENERAL', 'MEMBER', 'MEMBERSHIP', 'PAYMENT', 'ATTENDANCE', 'WORKOUT', 'DIET', 'STAFF'] as const;
 
 export const createNotificationSchema = z.object({
   category: z.enum(NOTIFICATION_CATEGORIES).default('GENERAL'),
@@ -41,3 +57,23 @@ export const updateTemplateSchema = z.object({
   bodyTemplate: z.string().trim().min(1),
   isActive: z.boolean().default(true),
 });
+
+export const notificationStatsQuerySchema = z
+  .object({ dateFrom: isoDay.optional(), dateTo: isoDay.optional() })
+  .refine((v) => !v.dateFrom || !v.dateTo || v.dateFrom <= v.dateTo, {
+    message: 'dateFrom must be on or before dateTo.',
+    path: ['dateFrom'],
+  })
+  .refine(
+    (v) =>
+      !v.dateFrom ||
+      !v.dateTo ||
+      (new Date(`${v.dateTo}T00:00:00Z`).getTime() -
+        new Date(`${v.dateFrom}T00:00:00Z`).getTime()) /
+        86_400_000 <
+        366,
+    {
+      message: 'Range may not exceed 366 days.',
+      path: ['dateTo'],
+    },
+  );

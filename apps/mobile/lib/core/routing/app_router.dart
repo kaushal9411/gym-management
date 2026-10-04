@@ -45,11 +45,14 @@ import '../../features/manager/presentation/member_detail_screen.dart';
 import '../../features/member/presentation/member_attendance_screen.dart';
 import '../../features/member/presentation/member_class_booked_screen.dart';
 import '../../features/member/presentation/member_data_export_screen.dart';
+import '../../features/member/presentation/member_gym_info_screen.dart';
 import '../../features/member/presentation/member_invoice_detail_screen.dart';
 import '../../features/member/presentation/member_invoices_screen.dart';
 import '../../features/member/presentation/member_measurements_screen.dart';
 import '../../features/member/presentation/member_notifications_screen.dart';
+import '../../features/member/presentation/member_payments_screen.dart';
 import '../../features/member/presentation/member_change_password_screen.dart';
+import '../../features/member/presentation/member_edit_profile_screen.dart';
 import '../../features/member/presentation/member_profile_screen.dart';
 import '../../features/member/presentation/member_visit_detail_screen.dart';
 import '../../features/manager/presentation/member_form_screen.dart';
@@ -143,6 +146,7 @@ import '../../models/gym_member.dart';
 import '../../models/gym_profile.dart';
 import '../../models/iam_user.dart';
 import '../../models/member_invoice.dart';
+import '../../models/member_self_profile.dart';
 import '../../models/member_visit.dart';
 import '../../models/membership_plan.dart';
 import '../../models/notification_template.dart';
@@ -784,6 +788,12 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         builder: (context, state) => const MemberProfileScreen(),
       ),
       GoRoute(
+        path: AppRoutes.memberEditProfile,
+        builder: (context, state) => MemberEditProfileScreen(
+          profile: state.extra as MemberSelfProfile,
+        ),
+      ),
+      GoRoute(
         path: AppRoutes.memberChangePassword,
         builder: (context, state) => const MemberChangePasswordScreen(),
       ),
@@ -798,6 +808,14 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       GoRoute(
         path: AppRoutes.memberNotifications,
         builder: (context, state) => const MemberNotificationsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.memberPayments,
+        builder: (context, state) => const MemberPaymentsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.memberGymInfo,
+        builder: (context, state) => const MemberGymInfoScreen(),
       ),
       GoRoute(
         path: AppRoutes.memberClassBooked,

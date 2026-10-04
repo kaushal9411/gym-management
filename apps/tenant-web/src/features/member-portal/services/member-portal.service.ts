@@ -69,6 +69,34 @@ interface Paginated<T> {
   totalPages: number;
 }
 
+export interface MemberPortalPayment {
+  id: string;
+  paymentNumber: string;
+  amount: string;
+  method: string;
+  status: string;
+  paymentDate: string;
+  invoiceId: string | null;
+  invoiceNumber: string | null;
+  totalRefunded: string;
+}
+
+export interface MemberInvoiceDetail {
+  invoiceNumber: string;
+  invoiceDate: string;
+  dueDate: string;
+  status: string;
+  subtotal: string;
+  taxAmount: string;
+  discountAmount: string;
+  totalAmount: string;
+  items: { description: string; quantity: number; unitPrice: string; amount: string }[];
+  payments: { paymentNumber: string; finalAmount: string; status: string; paymentDate: string }[];
+  paid: string;
+  balance: string;
+  branch: { name: string } | null;
+}
+
 export interface MemberPortalClassSession {
   id: string;
   groupClass: { id: string; name: string };
@@ -240,7 +268,7 @@ export const memberPortalService = {
     }
   },
 
-  async getNotifications(params: { unreadOnly?: boolean; page?: number; limit?: number } = {}): Promise<MemberNotificationListResult> {
+  async getNotifications(params: { unreadOnly?: boolean; category?: MemberNotificationCategory; page?: number; limit?: number } = {}): Promise<MemberNotificationListResult> {
     try {
       const res = await memberApiClient.get<Envelope<MemberNotificationListResult>>('/portal/notifications', { params });
       return res.data.data;
@@ -327,6 +355,24 @@ export const memberPortalService = {
     }
   },
 
+  async getPayments(page = 1, limit = 20): Promise<Paginated<MemberPortalPayment>> {
+    try {
+      const res = await memberApiClient.get<Envelope<Paginated<MemberPortalPayment>>>('/portal/payments', { params: { page, limit } });
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async getInvoice(invoiceId: string): Promise<MemberInvoiceDetail> {
+    try {
+      const res = await memberApiClient.get<Envelope<MemberInvoiceDetail>>(`/portal/invoices/${invoiceId}`);
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
   async downloadInvoice(invoiceId: string, invoiceNumber: string): Promise<void> {
     const res = await memberApiClient.get(`/portal/invoices/${invoiceId}/download`, { responseType: 'blob' });
     const url = window.URL.createObjectURL(new Blob([res.data]));
@@ -358,3 +404,69 @@ export const memberPortalService = {
     window.URL.revokeObjectURL(url);
   },
 };
+
+/** `GET /portal/overview` — one aggregated payload for the dashboard. Every block except `member`/`attendance`/`billing`/`classes`/`notifications` may be null (hide the element, never fake it). */
+export interface MemberOverview {
+  member: { id: string; memberId: string; name: string; photoUrl: string | null; joiningDate: string; branch: { id: string; name: string } | null; trainer: { id: string; name: string } | null };
+  membership: { planName: string; status: string; startDate: string | null; endDate: string; daysLeft: number; totalDays: number | null; price: string | number | null; amountPaid: string | number | null; expired: boolean } | null;
+  attendance: {
+    thisMonth: { visits: number; previous: number };
+    currentStreakDays: number;
+    bestStreakDays: number;
+    totalVisits: number;
+    avgVisitMinutes: number | null;
+    lastVisitAt: string | null;
+    weekday: { weekday: number; count: number }[];
+    daily: { date: string; visits: number }[];
+  };
+  workout: { planName: string; progressPercent: number; completedExercises: number; totalExercises: number; completedThisWeek: number } | null;
+  diet: { planName: string; dailyCalories: number | null; loggedToday: boolean; waterTodayMl: number | null; latestWeightKg: string | number | null } | null;
+  billing: { outstanding: { value: string | number; invoiceCount: number }; nextDueDate: string | null; paidLast90Days: { value: string | number; count: number } };
+  classes: { upcoming: { sessionId: string; name: string; date: string; startTime: string; endTime: string; trainerName: string | null; bookingStatus: string }[] };
+  notifications: { unread: number };
+}
+
+/** `GET /portal/gym` - gym + the member's branch contact info (every field may be null: hide the element). */
+export interface MemberGymAddress {
+  line1: string | null;
+  line2?: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  postalCode: string | null;
+}
+export interface MemberGymHour {
+  day: string;
+  open: string | null;
+  close: string | null;
+  closed: boolean;
+}
+export interface MemberGymInfo {
+  name: string;
+  logoUrl: string | null;
+  address: MemberGymAddress | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  businessHours: MemberGymHour[] | null;
+  social: Record<string, string> | null;
+  branch: { name: string; phone: string | null; email: string | null; address: MemberGymAddress | null; businessHours: MemberGymHour[] | null } | null;
+}
+
+export async function fetchMemberOverview(): Promise<MemberOverview> {
+  try {
+    const res = await memberApiClient.get<Envelope<MemberOverview>>('/portal/overview');
+    return res.data.data;
+  } catch (error) {
+    throw toMemberAuthServiceError(error);
+  }
+}
+
+export async function fetchGymInfo(): Promise<MemberGymInfo> {
+  try {
+    const res = await memberApiClient.get<Envelope<MemberGymInfo>>('/portal/gym');
+    return res.data.data;
+  } catch (error) {
+    throw toMemberAuthServiceError(error);
+  }
+}

@@ -1,10 +1,45 @@
 import { z } from 'zod';
 
-const memberPaymentMethodSchema = z.enum(['CASH', 'UPI', 'CREDIT_CARD', 'DEBIT_CARD', 'BANK_TRANSFER', 'CHEQUE', 'ONLINE_GATEWAY']);
-const memberPaymentStatusSchema = z.enum(['PENDING', 'SUCCESS', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED']);
-const memberInvoiceStatusSchema = z.enum(['UNPAID', 'PAID', 'PARTIALLY_PAID', 'OVERDUE', 'CANCELLED']);
-const incomeCategorySchema = z.enum(['MEMBERSHIP_FEE', 'PERSONAL_TRAINING', 'PRODUCT_SALES', 'OTHER']);
-const expenseCategorySchema = z.enum(['RENT', 'SALARY', 'UTILITIES', 'EQUIPMENT', 'MAINTENANCE', 'MARKETING', 'OFFICE_SUPPLIES', 'OTHER']);
+const memberPaymentMethodSchema = z.enum([
+  'CASH',
+  'UPI',
+  'CREDIT_CARD',
+  'DEBIT_CARD',
+  'BANK_TRANSFER',
+  'CHEQUE',
+  'ONLINE_GATEWAY',
+]);
+const memberPaymentStatusSchema = z.enum([
+  'PENDING',
+  'SUCCESS',
+  'FAILED',
+  'CANCELLED',
+  'REFUNDED',
+  'PARTIALLY_REFUNDED',
+]);
+const memberInvoiceStatusSchema = z.enum([
+  'UNPAID',
+  'PAID',
+  'PARTIALLY_PAID',
+  'OVERDUE',
+  'CANCELLED',
+]);
+const incomeCategorySchema = z.enum([
+  'MEMBERSHIP_FEE',
+  'PERSONAL_TRAINING',
+  'PRODUCT_SALES',
+  'OTHER',
+]);
+const expenseCategorySchema = z.enum([
+  'RENT',
+  'SALARY',
+  'UTILITIES',
+  'EQUIPMENT',
+  'MAINTENANCE',
+  'MARKETING',
+  'OFFICE_SUPPLIES',
+  'OTHER',
+]);
 
 export const idParamSchema = z.object({ id: z.string().uuid() });
 
@@ -50,9 +85,46 @@ export const listPaymentsQuerySchema = z.object({
   status: memberPaymentStatusSchema.optional(),
   dateFrom: z.string().trim().optional(),
   dateTo: z.string().trim().optional(),
+  planId: z.string().uuid().optional(),
+  minAmount: z.coerce.number().min(0).optional(),
+  maxAmount: z.coerce.number().min(0).optional(),
   sortBy: z.enum(['paymentDate', 'finalAmount', 'createdAt']).default('paymentDate'),
   sortDir: z.enum(['asc', 'desc']).default('desc'),
 });
+
+export const isoDay = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}/, 'Expected an ISO date (YYYY-MM-DD).')
+  .transform((v) => v.slice(0, 10))
+  .refine((v) => !Number.isNaN(new Date(`${v}T00:00:00Z`).getTime()), 'Invalid date.');
+
+export const paymentsAnalyticsQuerySchema = z
+  .object({
+    dateFrom: isoDay.optional(),
+    dateTo: isoDay.optional(),
+    branchId: z.string().uuid().optional(),
+  })
+  .refine((v) => !v.dateFrom || !v.dateTo || v.dateFrom <= v.dateTo, {
+    message: 'dateFrom must be on or before dateTo.',
+    path: ['dateFrom'],
+  })
+  .refine(
+    (v) =>
+      !v.dateFrom ||
+      !v.dateTo ||
+      (new Date(`${v.dateTo}T00:00:00Z`).getTime() -
+        new Date(`${v.dateFrom}T00:00:00Z`).getTime()) /
+        86_400_000 <
+        366,
+    {
+      message: 'Range may not exceed 366 days.',
+      path: ['dateTo'],
+    },
+  );
+
+/** Income + expenses analytics share the payments analytics query contract (range, branch, 366-day cap). */
+export const ledgerAnalyticsQuerySchema = paymentsAnalyticsQuerySchema;
 
 export const refundPaymentSchema = z.object({
   amount: z.coerce.number().positive().optional(),
@@ -106,9 +178,14 @@ export const listInvoicesQuerySchema = z.object({
   status: memberInvoiceStatusSchema.optional(),
   dateFrom: z.string().trim().optional(),
   dateTo: z.string().trim().optional(),
+  minAmount: z.coerce.number().min(0).optional(),
+  maxAmount: z.coerce.number().min(0).optional(),
   sortBy: z.enum(['invoiceDate', 'dueDate', 'totalAmount', 'createdAt']).default('createdAt'),
   sortDir: z.enum(['asc', 'desc']).default('desc'),
 });
+
+/** Same query shape + range rules as the payments analytics endpoint. */
+export const invoiceAnalyticsQuerySchema = paymentsAnalyticsQuerySchema;
 
 export const emailInvoiceSchema = z.object({
   email: z.string().trim().email().optional(),

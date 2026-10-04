@@ -5,8 +5,11 @@ import { getTenantScopedClient } from '../../../infrastructure/database/tenant-s
 import { assertBranchAccess, getBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
-import type { CreateIncomeInput, IncomeDto, ListIncomeQuery, UpdateIncomeInput } from '../dto/finance.dto';
+import type { CreateIncomeInput, IncomeDto, ListIncomeQuery, UpdateIncomeInput, LedgerAnalyticsDto, LedgerSummaryDto } from '../dto/finance.dto';
+import { ExpenseRepository } from '../repositories/expense.repository';
 import { IncomeRepository, type IncomeRow } from '../repositories/income.repository';
+import { assembleLedgerAnalytics } from '../utils/ledger-analytics.util';
+import { resolveRanges } from '../utils/payments-analytics.util';
 
 function toDto(row: IncomeRow): IncomeDto {
   return {
@@ -30,18 +33,45 @@ function escapeCsv(value: string): string {
 
 export class IncomeService {
   private readonly income: IncomeRepository;
+  private readonly other: ExpenseRepository;
   private readonly auditLog: AuditLogRepository;
 
   constructor(private readonly tenantId: string) {
     const db = getTenantScopedClient(tenantId);
     this.income = new IncomeRepository(db);
+    this.other = new ExpenseRepository(db);
     this.auditLog = new AuditLogRepository(db);
   }
 
   async list(query: ListIncomeQuery, actorUserId: string) {
     const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
-    const { items, total } = await this.income.list(this.tenantId, query, restrictToBranchIds);
-    return { items: items.map(toDto), total, page: query.page, limit: query.limit, totalPages: Math.max(1, Math.ceil(total / query.limit)) };
+    const [{ items, total }, agg] = await Promise.all([
+      this.income.list(this.tenantId, query, restrictToBranchIds),
+      this.income.summary(this.tenantId, query, restrictToBranchIds),
+    ]);
+    const summary: LedgerSummaryDto = {
+      total: agg.total.toFixed(2),
+      count: agg.count,
+      average: (agg.count > 0 ? agg.total / agg.count : 0).toFixed(2),
+    };
+    return {
+      items: items.map(toDto),
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.max(1, Math.ceil(total / query.limit)),
+      summary,
+    };
+  }
+
+  async analytics(query: { dateFrom?: string; dateTo?: string; branchId?: string }, actorUserId: string): Promise<LedgerAnalyticsDto> {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { range, previousRange } = resolveRanges(query.dateFrom, query.dateTo);
+    const [current, previous] = await Promise.all([
+      this.other.scopedTotal(this.tenantId, range, query.branchId, restrictToBranchIds),
+      this.other.scopedTotal(this.tenantId, previousRange, query.branchId, restrictToBranchIds),
+    ]);
+    return assembleLedgerAnalytics(await this.income.analyticsRaw(this.tenantId, range, previousRange, query.branchId, restrictToBranchIds, { current, previous }));
   }
 
   async getById(id: string, actorUserId: string): Promise<IncomeDto> {
@@ -93,14 +123,19 @@ export class IncomeService {
     const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
     const { items } = await this.income.list(
       this.tenantId,
-      { page: 1, limit: 10_000, includeDeleted: false, sortBy: 'incomeDate', sortDir: 'desc', ...query },
+      {
+        page: 1,
+        limit: 10_000,
+        includeDeleted: false,
+        sortBy: 'incomeDate',
+        sortDir: 'desc',
+        ...query,
+      },
       restrictToBranchIds,
     );
     const header = 'Date,Category,Amount,Branch,Description';
     const rows = items.map((row) =>
-      [row.incomeDate.toISOString().slice(0, 10), row.category, row.amount.toString(), row.branch?.name ?? '', row.description ?? '']
-        .map((v) => escapeCsv(String(v)))
-        .join(','),
+      [row.incomeDate.toISOString().slice(0, 10), row.category, row.amount.toString(), row.branch?.name ?? '', row.description ?? ''].map((v) => escapeCsv(String(v))).join(','),
     );
     return [header, ...rows].join('\n');
   }
@@ -109,7 +144,14 @@ export class IncomeService {
     const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
     const { items } = await this.income.list(
       this.tenantId,
-      { page: 1, limit: 10_000, includeDeleted: false, sortBy: 'incomeDate', sortDir: 'desc', ...query },
+      {
+        page: 1,
+        limit: 10_000,
+        includeDeleted: false,
+        sortBy: 'incomeDate',
+        sortDir: 'desc',
+        ...query,
+      },
       restrictToBranchIds,
     );
     const workbook = new ExcelJS.Workbook();

@@ -143,6 +143,31 @@ class SessionCubit extends Cubit<SessionState> {
     unawaited(_pushNotificationService.registerForSession(ActorType.member));
   }
 
+  /// Self-service profile edit/photo change: keeps the name/photo shown in
+  /// the member header, menu and dashboard in sync (and in the cold-start
+  /// cache) without a re-login. [clearPhoto] removes the photo.
+  Future<void> memberProfileChanged({
+    String? name,
+    String? email,
+    String? profilePhotoUrl,
+    bool clearPhoto = false,
+  }) async {
+    final current = state;
+    if (current is! SessionAuthenticatedMember) return;
+    final next = current.member.copyWith(
+      name: name,
+      email: email,
+      profilePhotoUrl: profilePhotoUrl,
+      clearPhoto: clearPhoto,
+    );
+    emit(SessionAuthenticatedMember(next, current.tenant));
+    try {
+      await _storage.saveMemberProfile(next.toJson());
+    } catch (_) {
+      // Cache write is best-effort; the in-memory session is already updated.
+    }
+  }
+
   Future<void> signOut() async {
     final current = state;
     if (current is SessionAuthenticatedStaff) {

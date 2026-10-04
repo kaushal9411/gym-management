@@ -3,7 +3,7 @@ import { createReadStream } from 'node:fs';
 import { copyFile, mkdir, rename, stat, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import { env } from '../../config/env';
@@ -89,7 +89,9 @@ export async function uploadDataUrl(
 
   if (!env.storage.isConfigured) {
     if (!warnedOnce) {
-      logger.warn('AWS S3 is not configured (S3_BUCKET/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY) — uploads are being stored on local disk instead.');
+      logger.warn(
+        'AWS S3 is not configured (S3_BUCKET/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY) — uploads are being stored on local disk instead.',
+      );
       warnedOnce = true;
     }
     const url = await saveLocalFile(key, buffer);
@@ -129,7 +131,9 @@ export async function uploadLargeFile(
 
   if (!env.storage.isConfigured) {
     if (!warnedOnce) {
-      logger.warn('AWS S3 is not configured (S3_BUCKET/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY) — uploads are being stored on local disk instead.');
+      logger.warn(
+        'AWS S3 is not configured (S3_BUCKET/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY) — uploads are being stored on local disk instead.',
+      );
       warnedOnce = true;
     }
     const destPath = join(LOCAL_UPLOADS_DIR, key);
@@ -170,4 +174,33 @@ export async function uploadLargeFile(
 export async function presignGetUrl(key: string, expiresInSeconds = 3600): Promise<string> {
   if (!env.storage.isConfigured) return localFileUrl(key); // local-disk fallback — see uploadDataUrl above.
   return getSignedUrl(getS3Client(), new GetObjectCommand({ Bucket: env.storage.bucket, Key: key }), { expiresIn: expiresInSeconds });
+}
+
+/**
+ * Best-effort removal of a previously stored PUBLIC object, given the URL
+ * `uploadDataUrl` returned. Deliberately scoped to `public/member-photos/`
+ * keys only (a URL pointing anywhere else — an external avatar, another
+ * module's file — is never touched) and never throws: a failed cleanup must
+ * not fail the user-facing write that triggered it.
+ */
+export async function deleteStoredMemberPhoto(url: string | null | undefined): Promise<void> {
+  if (!url) return;
+  try {
+    const marker = '/uploads/';
+    const base = env.storage.publicUrlBase ? `${env.storage.publicUrlBase}/` : null;
+    let key: string | null = null;
+    if (base && url.startsWith(base)) key = url.slice(base.length);
+    else if (url.includes(marker)) key = url.slice(url.indexOf(marker) + marker.length);
+    if (!key || !key.startsWith('public/member-photos/') || key.includes('..')) return;
+
+    if (env.storage.isConfigured && base && url.startsWith(base)) {
+      await getS3Client().send(new DeleteObjectCommand({ Bucket: env.storage.bucket, Key: key }));
+    } else {
+      await unlink(join(LOCAL_UPLOADS_DIR, key));
+    }
+  } catch (error) {
+    logger.warn('Could not delete a replaced member photo object', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }

@@ -1,212 +1,205 @@
 'use client';
 
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
-import Link from 'next/link';
-import { ArrowDown, ArrowUp, ArrowUpDown, CreditCard, Download, Plus, Upload } from 'lucide-react';
+import { FileText, Plus, TrendingDown, TrendingUp } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { Input } from '@/components/ui/input';
-import { Pagination } from '@/components/ui/pagination';
-import { SearchBar } from '@/components/ui/search-bar';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
-import { FinanceSummaryCards } from '@/features/finance/components/finance-summary-cards';
-import { PaymentMethodBadge, PaymentStatusBadge } from '@/features/finance/components/finance-badges';
-import { RevenueTrendChart } from '@/features/finance/components/revenue-trend-chart';
-import { useFinanceDashboard, usePaymentList } from '@/features/finance/hooks/use-finance';
+import { AttentionPanel, BranchComparePanel, MethodDonutPanel, StatusRefundPanel, TopPlansPanel, WeeklyComparePanel } from '@/features/finance/components/payments/analytics-panels';
+import { CollectionsChart } from '@/features/finance/components/payments/collections-chart';
+import { EMPTY_FILTERS, FiltersBar, type PaymentFilters } from '@/features/finance/components/payments/filters-bar';
+import { KpiStrip } from '@/features/finance/components/payments/kpi-strip';
+import { HeroButton, PaymentsHero } from '@/features/finance/components/payments/payments-hero';
+import { computeRange, periodNoun, toYmd, type PeriodKey } from '@/features/finance/components/payments/payments-period';
+import { PaymentsTable } from '@/features/finance/components/payments/payments-table';
+import { PeriodBar } from '@/features/finance/components/payments/period-bar';
+import { toFinanceError, usePaymentAnalytics, usePaymentList, useVerifyPaymentStatus } from '@/features/finance/hooks/use-finance';
 import { financeService } from '@/features/finance/services/finance.service';
-import type { ListPaymentsParams, MemberPaymentListItem, MemberPaymentMethod, MemberPaymentStatus } from '@/features/finance/types';
+import type { ListPaymentsParams } from '@/features/finance/types';
+import { formatMoney } from '@/features/members/components/detail/detail-ui';
 import { useCurrencySymbol } from '@/lib/currency';
-import { cn } from '@/lib/utils';
 
-const selectClassName = cn(
-  'h-9 rounded-md border border-input bg-background px-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-);
-
-type SortableColumn = NonNullable<ListPaymentsParams['sortBy']>;
+const PAGE_SIZE = 20;
 
 export default function PaymentsPage() {
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('finance:payment-create');
   const { currentBranchId } = useCurrentBranch();
-  const currencySymbol = useCurrencySymbol();
+  const sym = useCurrencySymbol();
+  const verify = useVerifyPaymentStatus();
 
-  const [search, setSearch] = React.useState('');
-  const debouncedSearch = useDebouncedValue(search, 300);
-  const [status, setStatus] = React.useState<MemberPaymentStatus | ''>('');
-  const [method, setMethod] = React.useState<MemberPaymentMethod | ''>('');
-  const [dateFrom, setDateFrom] = React.useState('');
-  const [dateTo, setDateTo] = React.useState('');
-  const [page, setPage] = React.useState(1);
-  const [sortBy, setSortBy] = React.useState<SortableColumn>('paymentDate');
-  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
-
-  // Header branch switch re-scopes the whole page — back to page 1 like any other filter change.
+  const [period, setPeriod] = React.useState<PeriodKey>('month');
+  const [custom, setCustom] = React.useState(() => {
+    const t = toYmd(new Date());
+    return { from: t, to: t };
+  });
+  const [compare, setCompare] = React.useState(true);
+  // Local branch select (needs an explicit "All branches"), seeded from + re-synced to the header's current branch like Attendance/Analytics do.
+  const [branchId, setBranchId] = React.useState('');
   React.useEffect(() => {
-    setPage(1);
+    setBranchId(currentBranchId ?? '');
   }, [currentBranchId]);
 
-  const dashboard = useFinanceDashboard(currentBranchId ?? undefined);
-  const params = {
+  const [filters, setFilters] = React.useState<PaymentFilters>(EMPTY_FILTERS);
+  const debouncedSearch = useDebouncedValue(filters.search, 300);
+  const [page, setPage] = React.useState(1);
+  const [sortBy, setSortBy] = React.useState<NonNullable<ListPaymentsParams['sortBy']>>('paymentDate');
+  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
+
+  const range = React.useMemo(() => computeRange(period, custom), [period, custom]);
+  const rangeReady = Boolean(range.from && range.to);
+
+  const analytics = usePaymentAnalytics({ dateFrom: rangeReady ? range.from : undefined, dateTo: rangeReady ? range.to : undefined, branchId: branchId || undefined });
+
+  const listParams: ListPaymentsParams = {
     page,
-    limit: 20,
+    limit: PAGE_SIZE,
     search: debouncedSearch || undefined,
-    status: status || undefined,
-    method: method || undefined,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-    branchId: currentBranchId ?? undefined,
+    status: filters.status || undefined,
+    method: filters.method || undefined,
+    planId: filters.planId || undefined,
+    minAmount: filters.minAmount !== '' ? Number(filters.minAmount) : undefined,
+    maxAmount: filters.maxAmount !== '' ? Number(filters.maxAmount) : undefined,
+    dateFrom: rangeReady ? range.from : undefined,
+    dateTo: rangeReady ? range.to : undefined,
+    branchId: branchId || undefined,
     sortBy,
     sortDir,
   };
-  const payments = usePaymentList(params);
+  const payments = usePaymentList(listParams, { keepPrevious: true });
 
-  const data = payments.data;
-  const items = data?.items ?? [];
-
-  const toggleSort = (column: SortableColumn) => {
-    if (sortBy === column) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+  const patchFilters = (patch: Partial<PaymentFilters>) => {
+    setFilters((f) => ({ ...f, ...patch }));
+    setPage(1);
+  };
+  const changePeriod = (p: PeriodKey) => {
+    setPeriod(p);
+    setPage(1);
+  };
+  const setDates = (from: string, to: string) => {
+    setCustom({ from, to });
+    setPeriod('custom');
+    setPage(1);
+  };
+  const reset = () => {
+    setFilters(EMPTY_FILTERS);
+    setPeriod('month');
+    setPage(1);
+  };
+  const toggleSort = (c: NonNullable<ListPaymentsParams['sortBy']>) => {
+    if (sortBy === c) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else {
-      setSortBy(column);
+      setSortBy(c);
       setSortDir('desc');
     }
+    setPage(1);
   };
-  const sortIcon = (column: SortableColumn) => {
-    if (sortBy !== column) return <ArrowUpDown className="size-3.5 text-muted-foreground" />;
-    return sortDir === 'asc' ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />;
-  };
-  const sortableHeader = (label: string, column: SortableColumn) => (
-    <button type="button" className="flex items-center gap-1 font-medium hover:text-foreground" onClick={() => toggleSort(column)}>
-      {label} {sortIcon(column)}
-    </button>
-  );
 
-  const columns: DataTableColumn<MemberPaymentListItem>[] = [
-    {
-      key: 'paymentNumber',
-      header: 'Payment',
-      render: (p) => (
-        <Link href={`/payments/${p.id}`} className="hover:underline">
-          <span className="block font-medium">{p.paymentNumber}</span>
-          <span className="block text-xs text-muted-foreground">{p.member.name}</span>
-        </Link>
-      ),
-    },
-    { key: 'method', header: 'Method', render: (p) => <PaymentMethodBadge method={p.method} /> },
-    { key: 'finalAmount', header: sortableHeader('Amount', 'finalAmount'), render: (p) => `${currencySymbol}${p.finalAmount}` },
-    { key: 'paymentDate', header: sortableHeader('Date', 'paymentDate'), render: (p) => new Date(p.paymentDate).toLocaleDateString() },
-    { key: 'status', header: 'Status', render: (p) => <PaymentStatusBadge status={p.status} /> },
-  ];
+  const analyticsData = analytics.data;
+  const aLoading = analytics.isPending;
+  const aError = analytics.isError && !analyticsData;
+  const previousLabel = period === 'month' ? 'Last month' : period === 'lastMonth' ? 'Month before' : 'Previous period';
+  const exportParams = { ...listParams, page: undefined, limit: undefined } as Partial<ListPaymentsParams>;
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <div
-            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
-            style={{
-              backgroundColor: 'color-mix(in oklch, var(--primary) 16%, transparent)',
-              color: 'var(--primary)',
-              boxShadow: '0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent)',
-            }}
-          >
-            <CreditCard className="size-5" aria-hidden />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Payments</h1>
-            <p className="text-muted-foreground">Member payments, invoices, income, and expenses.</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/invoices">Invoices</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/income">Income</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/expenses">Expenses</Link>
-          </Button>
-          {canCreate ? (
-            <Button size="sm" asChild>
-              <Link href="/payments/new">
+      <PaymentsHero
+        eyebrow="Finance"
+        title="Payments"
+        subtitle="Every rupee collected, refunded and still pending — compared against the previous period, split by method and branch."
+        stats={[
+          { value: analyticsData ? formatMoney(sym, analyticsData.kpis.collected.value) : '—', label: `collected ${periodNoun(period)}` },
+          { value: analyticsData ? analyticsData.kpis.paymentCount.value : '—', label: 'payments' },
+          { value: analyticsData ? `${(analyticsData.kpis.successRate.value * 100).toFixed(1)}%` : '—', label: 'success rate' },
+        ]}
+        statsLoading={aLoading}
+        actions={
+          <>
+            <HeroButton href="/invoices">
+              <FileText className="size-4" /> Invoices
+            </HeroButton>
+            <HeroButton href="/income">
+              <TrendingUp className="size-4" /> Income
+            </HeroButton>
+            <HeroButton href="/expenses">
+              <TrendingDown className="size-4" /> Expenses
+            </HeroButton>
+            {canCreate ? (
+              <HeroButton href="/payments/new" solid>
                 <Plus className="size-4" /> Record payment
-              </Link>
-            </Button>
-          ) : null}
-        </div>
+              </HeroButton>
+            ) : null}
+          </>
+        }
+      />
+
+      <PeriodBar
+        period={period}
+        onPeriod={changePeriod}
+        customFrom={custom.from}
+        customTo={custom.to}
+        onCustom={setDates}
+        branchId={branchId}
+        onBranch={(id) => {
+          setBranchId(id);
+          setPage(1);
+        }}
+        compare={compare}
+        onCompare={setCompare}
+      />
+
+      <KpiStrip analytics={analyticsData} loading={aLoading} error={aError} compare={compare} vsLabel={`vs ${previousLabel.toLowerCase()}`} />
+
+      <div className="flex flex-wrap gap-3.5">
+        <CollectionsChart analytics={analyticsData} loading={aLoading} error={aError} compare={compare} previousLabel={previousLabel} />
+        <MethodDonutPanel analytics={analyticsData} loading={aLoading} error={aError} />
       </div>
 
-      <div className="space-y-5">
-        <FinanceSummaryCards summary={dashboard.data} loading={dashboard.isPending} />
-        <RevenueTrendChart trend={dashboard.data?.revenueTrend} loading={dashboard.isPending} />
+      <div className="flex flex-wrap gap-3.5">
+        <WeeklyComparePanel analytics={analyticsData} loading={aLoading} error={aError} compare={compare} previousLabel={previousLabel} />
+        <BranchComparePanel analytics={analyticsData} loading={aLoading} error={aError} compare={compare} />
+        <StatusRefundPanel analytics={analyticsData} loading={aLoading} error={aError} compare={compare} />
       </div>
 
-      <div className="space-y-4 border-t border-border pt-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <SearchBar
-            containerClassName="max-w-xs"
-            placeholder="Search payment number, member, reference…"
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
-          />
-          <select
-            className={selectClassName}
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value as MemberPaymentStatus | '');
-              setPage(1);
-            }}
-            aria-label="Filter by status"
-          >
-            <option value="">All statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="SUCCESS">Success</option>
-            <option value="FAILED">Failed</option>
-            <option value="CANCELLED">Cancelled</option>
-            <option value="REFUNDED">Refunded</option>
-            <option value="PARTIALLY_REFUNDED">Partially refunded</option>
-          </select>
-          <select
-            className={selectClassName}
-            value={method}
-            onChange={(e) => {
-              setMethod(e.target.value as MemberPaymentMethod | '');
-              setPage(1);
-            }}
-            aria-label="Filter by method"
-          >
-            <option value="">All methods</option>
-            <option value="CASH">Cash</option>
-            <option value="UPI">UPI</option>
-            <option value="CREDIT_CARD">Credit Card</option>
-            <option value="DEBIT_CARD">Debit Card</option>
-            <option value="BANK_TRANSFER">Bank Transfer</option>
-            <option value="CHEQUE">Cheque</option>
-            <option value="ONLINE_GATEWAY">Online Gateway</option>
-          </select>
-          <Input type="date" aria-label="From date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} />
-          <Input type="date" aria-label="To date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} />
-          <Button variant="outline" size="sm" onClick={() => void financeService.exportPaymentsCsvUrl(params)}>
-            <Upload className="size-4" /> CSV
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => void financeService.exportPaymentsExcel(params)}>
-            <Download className="size-4" /> Excel
-          </Button>
-        </div>
-
-        <DataTable columns={columns} rows={items} rowKey={(p) => p.id} loading={payments.isPending} error={payments.error} onRetry={() => payments.refetch()} emptyMessage="No payments match these filters." />
-
-        {data ? (
-          <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
-        ) : null}
+      <div className="flex flex-wrap gap-3.5">
+        <TopPlansPanel analytics={analyticsData} loading={aLoading} error={aError} />
+        <AttentionPanel analytics={analyticsData} loading={aLoading} error={aError} onStatus={(s) => patchFilters({ status: s })} />
       </div>
+
+      <FiltersBar
+        filters={filters}
+        onChange={patchFilters}
+        dateFrom={range.from}
+        dateTo={range.to}
+        onDates={setDates}
+        statuses={analyticsData?.statuses}
+        branchId={branchId}
+        onReset={reset}
+        onCsv={() => void financeService.exportPaymentsCsvUrl(exportParams)}
+        onExcel={() => void financeService.exportPaymentsExcel(exportParams)}
+      />
+
+      <PaymentsTable
+        data={payments.data}
+        loading={payments.isPending}
+        error={payments.error}
+        onRetry={() => void payments.refetch()}
+        page={page}
+        onPage={setPage}
+        pageSize={PAGE_SIZE}
+        sortBy={sortBy}
+        sortDir={sortDir}
+        onSort={toggleSort}
+        canVerify={hasPermission('finance:payment-create')}
+        onVerify={(id) =>
+          verify.mutate(id, {
+            onSuccess: (r) => toast.success(`Status verified: ${r.status}`),
+            onError: (err) => toast.error(toFinanceError(err).message),
+          })
+        }
+      />
     </div>
   );
 }

@@ -5,8 +5,8 @@ import type { TenantScopedPrisma } from '../../../infrastructure/database/tenant
 export class MemberNotificationRepository {
   constructor(private readonly db: TenantScopedPrisma) {}
 
-  async list(tenantId: string, memberId: string, params: { unreadOnly?: boolean; skip: number; take: number }) {
-    const where = { tenantId, memberId, ...(params.unreadOnly ? { readAt: null } : {}) };
+  async list(tenantId: string, memberId: string, params: { unreadOnly?: boolean; category?: TenantNotificationCategory; skip: number; take: number }) {
+    const where = { tenantId, memberId, ...(params.unreadOnly ? { readAt: null } : {}), ...(params.category ? { category: params.category } : {}) };
     const [total, unreadCount, items] = await Promise.all([
       this.db.memberNotification.count({ where }),
       this.db.memberNotification.count({ where: { tenantId, memberId, readAt: null } }),

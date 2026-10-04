@@ -1,16 +1,18 @@
 'use client';
 
 import * as React from 'react';
-import { Building2 } from 'lucide-react';
+import { Building2, Clock3, Contact, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { BusinessHoursEditor } from '@/features/gym-settings/components/business-hours-editor';
-import { GymSettingsNav } from '@/features/gym-settings/components/gym-settings-nav';
+import { BusinessCardPreview, HoursChart, hoursPerDay } from '@/features/gym-settings/components/previews';
+import { Field, SectionCard, SettingsLayout, textareaClassName } from '@/features/gym-settings/components/settings-ui';
+import { SettingsHero } from '@/features/gym-settings/components/settings-hero';
+import { SetupProgressCard } from '@/features/gym-settings/components/setup-progress';
+import { StaggerGroup } from '@/features/reports/components/ui';
 import { SocialLinksEditor } from '@/features/gym-settings/components/social-links-editor';
 import { UnsavedChangesBar } from '@/features/gym-settings/components/unsaved-changes-bar';
 import {
@@ -129,24 +131,25 @@ export default function GymProfilePage() {
     }
   };
 
+  const weeklyHours = form ? Math.round(hoursPerDay(form.businessHours).reduce((s, d) => s + d.hours, 0) * 10) / 10 : null;
+
+  const input = (id: keyof FormState & string, extra: React.ComponentProps<typeof Input> = {}) => (
+    <Input id={id} value={form ? String(form[id as keyof FormState]) : ''} disabled={!canManage} onChange={(e) => set(id as 'gymName', e.target.value)} {...extra} />
+  );
+
   return (
     <div className="space-y-5">
-      <div className="flex items-start gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
-          <Building2 className="size-5" aria-hidden />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Gym Profile</h1>
-          <p className="text-muted-foreground">Your gym&apos;s identity, legal details, contact info, hours and social links.</p>
-        </div>
-      </div>
-
-      <GymSettingsNav />
+      <SettingsHero
+        title="Gym Profile"
+        subtitle="Your gym's identity, legal details, contact info, hours and social links."
+        icon={Building2}
+        stats={weeklyHours !== null ? [{ label: 'Hours open / week', value: weeklyHours, format: 'number' }] : undefined}
+      />
 
       {profile.isPending || !form ? (
         <div className="space-y-4">
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full rounded-[20px]" />
+          <Skeleton className="h-48 w-full rounded-[20px]" />
         </div>
       ) : profile.isError ? (
         <p className="text-sm text-destructive">Couldn&apos;t load the gym profile — try refreshing.</p>
@@ -156,172 +159,106 @@ export default function GymProfilePage() {
             <UnsavedChangesBar isDirty={isDirty} saving={saving} onSave={() => void handleSave()} onCancel={handleCancel} />
           ) : null}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Basic information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="gymName" required>Gym name</Label>
-                  <Input id="gymName" value={form.gymName} disabled={!canManage} onChange={(e) => set('gymName', e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="legalBusinessName">Legal business name</Label>
-                  <Input
-                    id="legalBusinessName"
-                    value={form.legalBusinessName}
-                    disabled={!canManage}
-                    onChange={(e) => set('legalBusinessName', e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div className="space-y-2">
-                  <Label htmlFor="registrationNumber">Registration number</Label>
-                  <Input
-                    id="registrationNumber"
-                    value={form.registrationNumber}
-                    disabled={!canManage}
-                    onChange={(e) => set('registrationNumber', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="gstVatNumber">GST / VAT number</Label>
-                  <Input
-                    id="gstVatNumber"
-                    value={form.gstVatNumber}
-                    disabled={!canManage}
-                    onChange={(e) => set('gstVatNumber', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="businessType">Business type</Label>
-                  <Input
-                    id="businessType"
-                    placeholder="e.g. Fitness Center"
-                    value={form.businessType}
-                    disabled={!canManage}
-                    onChange={(e) => set('businessType', e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <textarea
-                  id="description"
-                  className="flex min-h-24 w-full rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm shadow-xs transition-all duration-150 placeholder:text-muted-foreground/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted/40"
-                  value={form.description}
-                  disabled={!canManage}
-                  onChange={(e) => set('description', e.target.value)}
+          <SettingsLayout
+            aside={
+              <StaggerGroup className="space-y-5">
+                <HoursChart value={form.businessHours} />
+                <BusinessCardPreview
+                  gymName={form.gymName}
+                  businessType={form.businessType}
+                  description={form.description}
+                  email={form.email}
+                  phone={form.phone}
+                  website={form.website}
+                  addressLine={form.addressLine}
+                  city={form.city}
+                  state={form.state}
+                  country={form.country}
+                  postalCode={form.postalCode}
+                  socialLinks={form.socialLinks}
                 />
-              </div>
-            </CardContent>
-          </Card>
+              </StaggerGroup>
+            }
+          >
+            <StaggerGroup className="space-y-5">
+              <SetupProgressCard />
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Contact information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={form.email} disabled={!canManage} onChange={(e) => set('email', e.target.value)} />
+              <SectionCard tone="operations" icon={Building2} title="Basic information" subtitle="Identity and legal details.">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Gym name" htmlFor="gymName" required>
+                    {input('gymName')}
+                  </Field>
+                  <Field label="Legal business name" htmlFor="legalBusinessName">
+                    {input('legalBusinessName')}
+                  </Field>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="website">Website</Label>
-                  <Input id="website" type="url" value={form.website} disabled={!canManage} onChange={(e) => set('website', e.target.value)} />
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Field label="Registration number" htmlFor="registrationNumber">
+                    {input('registrationNumber')}
+                  </Field>
+                  <Field label="GST / VAT number" htmlFor="gstVatNumber">
+                    {input('gstVatNumber')}
+                  </Field>
+                  <Field label="Business type" htmlFor="businessType">
+                    {input('businessType', { placeholder: 'e.g. Fitness Center' })}
+                  </Field>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone</Label>
-                  <Input id="phone" type="tel" value={form.phone} disabled={!canManage} onChange={(e) => set('phone', e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="alternatePhone">Alternate phone</Label>
-                  <Input
-                    id="alternatePhone"
-                    type="tel"
-                    value={form.alternatePhone}
-                    disabled={!canManage}
-                    onChange={(e) => set('alternatePhone', e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="addressLine">Address</Label>
-                <Input id="addressLine" value={form.addressLine} disabled={!canManage} onChange={(e) => set('addressLine', e.target.value)} />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-4">
-                <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
-                  <Input id="city" value={form.city} disabled={!canManage} onChange={(e) => set('city', e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="state">State</Label>
-                  <Input id="state" value={form.state} disabled={!canManage} onChange={(e) => set('state', e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
-                  <Input id="country" value={form.country} disabled={!canManage} onChange={(e) => set('country', e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="postalCode">Postal code</Label>
-                  <Input id="postalCode" value={form.postalCode} disabled={!canManage} onChange={(e) => set('postalCode', e.target.value)} />
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="latitude">Latitude</Label>
-                  <Input
-                    id="latitude"
-                    type="number"
-                    step="any"
-                    value={form.latitude}
-                    disabled={!canManage}
-                    onChange={(e) => set('latitude', e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="longitude">Longitude</Label>
-                  <Input
-                    id="longitude"
-                    type="number"
-                    step="any"
-                    value={form.longitude}
-                    disabled={!canManage}
-                    onChange={(e) => set('longitude', e.target.value)}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                <Field label="Description" htmlFor="description">
+                  <textarea id="description" className={`${textareaClassName} min-h-24`} value={form.description} disabled={!canManage} onChange={(e) => set('description', e.target.value)} />
+                </Field>
+              </SectionCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Business hours</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <BusinessHoursEditor
-                value={form.businessHours}
-                disabled={!canManage}
-                onChange={(businessHours) => set('businessHours', businessHours)}
-              />
-            </CardContent>
-          </Card>
+              <SectionCard tone="members" icon={Contact} title="Contact information" subtitle="How members and partners reach you.">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Email" htmlFor="email">
+                    {input('email', { type: 'email' })}
+                  </Field>
+                  <Field label="Website" htmlFor="website">
+                    {input('website', { type: 'url' })}
+                  </Field>
+                  <Field label="Phone" htmlFor="phone">
+                    {input('phone', { type: 'tel' })}
+                  </Field>
+                  <Field label="Alternate phone" htmlFor="alternatePhone">
+                    {input('alternatePhone', { type: 'tel' })}
+                  </Field>
+                </div>
+                <Field label="Address" htmlFor="addressLine">
+                  {input('addressLine')}
+                </Field>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <Field label="City" htmlFor="city">
+                    {input('city')}
+                  </Field>
+                  <Field label="State" htmlFor="state">
+                    {input('state')}
+                  </Field>
+                  <Field label="Country" htmlFor="country">
+                    {input('country')}
+                  </Field>
+                  <Field label="Postal code" htmlFor="postalCode">
+                    {input('postalCode')}
+                  </Field>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Latitude" htmlFor="latitude">
+                    {input('latitude', { type: 'number', step: 'any' })}
+                  </Field>
+                  <Field label="Longitude" htmlFor="longitude">
+                    {input('longitude', { type: 'number', step: 'any' })}
+                  </Field>
+                </div>
+              </SectionCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Social media links</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <SocialLinksEditor
-                value={form.socialLinks}
-                disabled={!canManage}
-                onChange={(socialLinks) => set('socialLinks', socialLinks)}
-              />
-            </CardContent>
-          </Card>
+              <SectionCard tone="attendance" icon={Clock3} title="Business hours" subtitle="Opening and closing time for each day.">
+                <BusinessHoursEditor value={form.businessHours} disabled={!canManage} onChange={(businessHours) => set('businessHours', businessHours)} />
+              </SectionCard>
+
+              <SectionCard tone="staff" icon={Share2} title="Social media links">
+                <SocialLinksEditor value={form.socialLinks} disabled={!canManage} onChange={(socialLinks) => set('socialLinks', socialLinks)} />
+              </SectionCard>
+            </StaggerGroup>
+          </SettingsLayout>
         </>
       )}
     </div>

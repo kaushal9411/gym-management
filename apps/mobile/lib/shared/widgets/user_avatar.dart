@@ -17,11 +17,15 @@ class UserAvatar extends StatelessWidget {
     required this.avatarUrl,
     required this.name,
     this.size = 38,
+    this.role = AppRole.staff,
   });
 
   final String? avatarUrl;
   final String name;
   final double size;
+
+  /// Palette of the initials fallback — member screens pass `AppRole.member`.
+  final AppRole role;
 
   String get _initials {
     final words =
@@ -71,8 +75,8 @@ class UserAvatar extends StatelessWidget {
   Widget _fallback() => Container(
         width: size,
         height: size,
-        decoration: const BoxDecoration(
-          gradient: AppColors.staffGrad,
+        decoration: BoxDecoration(
+          gradient: role.gradient,
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
@@ -81,7 +85,7 @@ class UserAvatar extends StatelessWidget {
           style: AppText.body(
             size: size * 0.32,
             weight: FontWeight.w800,
-            color: Colors.white,
+            color: role.onGradient,
           ),
         ),
       );

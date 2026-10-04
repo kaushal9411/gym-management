@@ -1,6 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { memberPortalService } from '../services/member-portal.service';
+import { useAppDispatch } from '@/store/hooks';
+import { memberProfileUpdated } from '../store/member-auth-slice';
+import { memberProfileService, type MemberProfilePatch, type MemberSelfProfile } from '../services/member-profile.service';
+import { fetchGymInfo, fetchMemberOverview, memberPortalService, type MemberNotificationCategory } from '../services/member-portal.service';
 
 export function useMemberProfile() {
   return useQuery({ queryKey: ['member-portal', 'me'], queryFn: memberPortalService.getProfile });
@@ -26,7 +29,7 @@ export function useVerifyRenewalCheckout() {
 }
 
 export function useMemberAttendance(page = 1, limit = 20) {
-  return useQuery({ queryKey: ['member-portal', 'attendance', page, limit], queryFn: () => memberPortalService.getAttendance(page, limit) });
+  return useQuery({ queryKey: ['member-portal', 'attendance', page, limit], queryFn: () => memberPortalService.getAttendance(page, limit), placeholderData: keepPreviousData });
 }
 
 export function useMemberWorkout() {
@@ -63,6 +66,14 @@ export function useMemberInvoices(page = 1, limit = 20) {
   return useQuery({ queryKey: ['member-portal', 'invoices', page, limit], queryFn: () => memberPortalService.getInvoices(page, limit) });
 }
 
+export function useMemberInvoice(id: string) {
+  return useQuery({ queryKey: ['member-portal', 'invoice', id], queryFn: () => memberPortalService.getInvoice(id), enabled: Boolean(id), retry: false });
+}
+
+export function useMemberPayments(page = 1, limit = 20) {
+  return useQuery({ queryKey: ['member-portal', 'payments', page, limit], queryFn: () => memberPortalService.getPayments(page, limit) });
+}
+
 export function useStartInvoicePaymentCheckout() {
   return useMutation({ mutationFn: (invoiceId: string) => memberPortalService.startInvoicePaymentCheckout(invoiceId) });
 }
@@ -82,8 +93,8 @@ export function useVerifyInvoicePaymentCheckout() {
   });
 }
 
-export function useMemberNotifications(params: { unreadOnly?: boolean; page?: number; limit?: number } = {}) {
-  return useQuery({ queryKey: ['member-portal', 'notifications', params], queryFn: () => memberPortalService.getNotifications(params) });
+export function useMemberNotifications(params: { unreadOnly?: boolean; category?: MemberNotificationCategory; page?: number; limit?: number } = {}) {
+  return useQuery({ queryKey: ['member-portal', 'notifications', params], queryFn: () => memberPortalService.getNotifications(params), placeholderData: keepPreviousData });
 }
 
 export function useMarkMemberNotificationRead() {
@@ -126,4 +137,66 @@ export function useBookClass() {
 export function useCancelMemberBooking() {
   const invalidate = useInvalidateMemberClasses();
   return useMutation({ mutationFn: (bookingId: string) => memberPortalService.cancelBooking(bookingId), onSuccess: invalidate });
+}
+
+/** Aggregated dashboard payload (`/portal/overview`). No retry: a 404/error just means "use the per-resource fallback". */
+export function useMemberOverview() {
+  return useQuery({ queryKey: ['member-portal', 'overview'], queryFn: fetchMemberOverview, retry: false, staleTime: 30_000 });
+}
+
+/** Public gym info (`/portal/gym`); errors are silent (teaser hides). */
+export function useGymInfo() {
+  return useQuery({ queryKey: ['member-portal', 'gym'], queryFn: fetchGymInfo, retry: false, staleTime: 5 * 60_000 });
+}
+
+/** Live unread count for the bell / nav badges (shares the notifications query family so mark-read invalidates it). */
+export function useMemberUnreadCount(): number {
+  const { data } = useMemberNotifications({ page: 1, limit: 1 });
+  return data?.unreadCount ?? 0;
+}
+
+// ── Self-service profile (GET/PATCH /portal/profile + photo) ─────────────
+const SELF_PROFILE_KEY = ['member-portal', 'profile'] as const;
+
+export function useMemberSelfProfile() {
+  return useQuery({ queryKey: SELF_PROFILE_KEY, queryFn: memberProfileService.get, retry: false });
+}
+
+/** Writes the returned DTO into the cache and refreshes the shell's `/portal/me` mirror + the Redux header name. */
+function useProfileSync() {
+  const queryClient = useQueryClient();
+  const dispatch = useAppDispatch();
+  return (profile: MemberSelfProfile) => {
+    queryClient.setQueryData(SELF_PROFILE_KEY, profile);
+    dispatch(memberProfileUpdated({ name: profile.name, email: profile.email }));
+    void queryClient.invalidateQueries({ queryKey: ['member-portal', 'me'] });
+    void queryClient.invalidateQueries({ queryKey: ['member-portal', 'overview'] });
+  };
+}
+
+export function useUpdateMemberProfile() {
+  const sync = useProfileSync();
+  return useMutation({ mutationFn: (patch: MemberProfilePatch) => memberProfileService.update(patch), onSuccess: sync });
+}
+
+export function useUploadMemberPhoto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ image, onProgress }: { image: string; onProgress?: (pct: number) => void }) => memberProfileService.uploadPhoto(image, onProgress),
+    onSuccess: ({ profilePhotoUrl }) => {
+      queryClient.setQueryData<MemberSelfProfile>(SELF_PROFILE_KEY, (old) => (old ? { ...old, profilePhotoUrl } : old));
+      void queryClient.invalidateQueries({ queryKey: ['member-portal'] });
+    },
+  });
+}
+
+export function useRemoveMemberPhoto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => memberProfileService.removePhoto(),
+    onSuccess: () => {
+      queryClient.setQueryData<MemberSelfProfile>(SELF_PROFILE_KEY, (old) => (old ? { ...old, profilePhotoUrl: null } : old));
+      void queryClient.invalidateQueries({ queryKey: ['member-portal'] });
+    },
+  });
 }

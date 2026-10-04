@@ -1,7 +1,4 @@
-import PDFDocument from 'pdfkit';
-
 import { NotFoundError, ValidationError } from '../../../core/errors/app-error';
-import { PDF_FONT_REGULAR } from '../../../core/pdf/pdf-fonts';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { formatMoney } from '../../../infrastructure/mail/templates/base-layout';
 import { memberInvoiceSummaryEmail } from '../../../infrastructure/mail/templates/member-templates';
@@ -12,21 +9,22 @@ import type { IamActor } from '../../authentication/utils/actor.util';
 import { decryptMemberContactNullable } from '../../members/utils/member-pii.util';
 import { TenantInvoiceSettingsRepository } from '../../settings/repositories/tenant-invoice-settings.repository';
 import { tenantService } from '../../tenants/service/tenant.service';
-import type {
-  GenerateInvoiceInput,
-  InvoiceItemDto,
-  InvoiceItemInput,
-  ListInvoicesQuery,
-  MemberInvoiceDetailDto,
-  MemberInvoiceListItemDto,
-} from '../dto/finance.dto';
+import type { GenerateInvoiceInput, InvoiceAnalyticsDto, InvoiceAnalyticsQuery, InvoiceItemDto, InvoiceItemInput, ListInvoicesQuery, MemberInvoiceDetailDto, MemberInvoiceListItemDto } from '../dto/finance.dto';
 import { MemberInvoiceRepository, type MemberInvoiceDetailRow, type MemberInvoiceListRow } from '../repositories/member-invoice.repository';
+import { assembleInvoiceAnalytics } from '../utils/invoice-analytics.util';
+import { loadInvoiceLogo } from '../utils/invoice-logo.util';
+import { renderInvoicePdf } from '../utils/invoice-pdf.renderer';
+import { resolveRanges } from '../utils/payments-analytics.util';
 
 function toListDto(row: MemberInvoiceListRow): MemberInvoiceListItemDto {
   return {
     id: row.id,
     invoiceNumber: row.invoiceNumber,
-    member: { id: row.member.id, memberId: row.member.memberId, name: `${row.member.firstName} ${row.member.lastName}`.trim() },
+    member: {
+      id: row.member.id,
+      memberId: row.member.memberId,
+      name: `${row.member.firstName} ${row.member.lastName}`.trim(),
+    },
     branch: { id: row.branch.id, name: row.branch.name },
     invoiceDate: row.invoiceDate.toISOString().slice(0, 10),
     dueDate: row.dueDate.toISOString().slice(0, 10),
@@ -81,8 +79,24 @@ export class MemberInvoiceService {
 
   async list(query: ListInvoicesQuery, actorUserId: string) {
     const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
-    const { items, total } = await this.invoices.list(this.tenantId, query, restrictToBranchIds);
-    return { items: items.map(toListDto), total, page: query.page, limit: query.limit, totalPages: Math.max(1, Math.ceil(total / query.limit)) };
+    const [{ items, total }, extras] = await Promise.all([
+      this.invoices.list(this.tenantId, query, restrictToBranchIds),
+      this.invoices.listExtras(this.tenantId, query, restrictToBranchIds),
+    ]);
+    return {
+      items: items.map(toListDto),
+      ...extras,
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.max(1, Math.ceil(total / query.limit)),
+    };
+  }
+
+  async analytics(query: InvoiceAnalyticsQuery, actorUserId: string): Promise<InvoiceAnalyticsDto> {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { range, previousRange, today } = resolveRanges(query.dateFrom, query.dateTo);
+    return assembleInvoiceAnalytics(await this.invoices.analyticsRaw(this.tenantId, range, previousRange, today, query.branchId, restrictToBranchIds));
   }
 
   async getById(id: string, actorUserId: string): Promise<MemberInvoiceDetailDto> {
@@ -91,24 +105,24 @@ export class MemberInvoiceService {
 
   /** Manual "Generate Invoice" — e.g. billing an upcoming renewal in advance, with no payment yet. */
   async generate(input: GenerateInvoiceInput, actor: IamActor): Promise<MemberInvoiceDetailDto> {
-    const member = await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null } });
+    const member = await this.db.member.findFirst({
+      where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null },
+    });
     if (!member) throw new NotFoundError('Member not found.');
     const branchId = input.branchId ?? member.branchId;
     await assertBranchAccess(this.tenantId, actor.userId, branchId);
 
-    const invoice = await this.createInvoiceRow(
-      {
-        memberId: input.memberId,
-        branchId,
-        invoiceDate: input.invoiceDate ? new Date(input.invoiceDate) : new Date(),
-        dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
-        items: input.items,
-        taxAmount: input.taxAmount ?? 0,
-        discountAmount: input.discountAmount ?? 0,
-        notes: input.notes,
-        status: 'UNPAID',
-      },
-    );
+    const invoice = await this.createInvoiceRow({
+      memberId: input.memberId,
+      branchId,
+      invoiceDate: input.invoiceDate ? new Date(input.invoiceDate) : new Date(),
+      dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
+      items: input.items,
+      taxAmount: input.taxAmount ?? 0,
+      discountAmount: input.discountAmount ?? 0,
+      notes: input.notes,
+      status: 'UNPAID',
+    });
     await this.audit(actor, 'member_invoice.generated', invoice.id);
     return toDetailDto(invoice);
   }
@@ -181,76 +195,44 @@ export class MemberInvoiceService {
 
   async listOwn(query: ListInvoicesQuery) {
     const { items, total } = await this.invoices.list(this.tenantId, query);
-    return { items: items.map(toListDto), total, page: query.page, limit: query.limit, totalPages: Math.max(1, Math.ceil(total / query.limit)) };
+    return {
+      items: items.map(toListDto),
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.max(1, Math.ceil(total / query.limit)),
+    };
   }
 
-  async getOwnById(id: string): Promise<MemberInvoiceDetailDto> {
-    const invoice = await this.invoices.findById(this.tenantId, id);
+  /** `memberId` is the AUTHENTICATED member (never a URL value) — the row is only found if it is theirs, else 404. */
+  async getOwnById(id: string, memberId: string): Promise<MemberInvoiceDetailDto> {
+    const invoice = await this.invoices.findOwnById(this.tenantId, memberId, id);
     if (!invoice) throw new NotFoundError('Invoice not found.');
     return toDetailDto(invoice);
   }
 
-  async renderOwnPdf(id: string, tenantName: string): Promise<Buffer> {
-    const invoice = await this.invoices.findById(this.tenantId, id);
+  /** Same ownership scoping as `getOwnById` — the service itself refuses a foreign invoice, not just its caller. */
+  async renderOwnPdf(id: string, memberId: string, tenantName: string): Promise<Buffer> {
+    const invoice = await this.invoices.findOwnById(this.tenantId, memberId, id);
     if (!invoice) throw new NotFoundError('Invoice not found.');
     return this.renderPdfFor(toDetailDto(invoice), tenantName);
   }
 
   private async renderPdfFor(invoice: MemberInvoiceDetailDto, tenantName: string): Promise<Buffer> {
-    const settings = await this.db.tenantSettings.findUnique({ where: { tenantId: this.tenantId } });
-    const currencySymbol = settings?.currencySymbol ?? '₹';
-    const money = (amount: string | number) => formatMoney(Number(amount), currencySymbol);
-
-    return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50 });
-      const chunks: Buffer[] = [];
-      doc.on('data', (chunk) => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
-
-      // PDFKit's default Helvetica has no ₹ glyph — see pdf-fonts.ts.
-      doc.registerFont('body', PDF_FONT_REGULAR).font('body');
-
-      doc.fontSize(20).text(`Invoice ${invoice.invoiceNumber}`, { align: 'left' });
-      doc.moveDown(0.5);
-      doc.fontSize(10).fillColor('#6b7280');
-      doc.text(`${tenantName}`);
-      doc.text(`Billed to: ${invoice.member.name}`);
-      doc.text(`Invoice date: ${invoice.invoiceDate}    Due date: ${invoice.dueDate}`);
-      doc.text(`Status: ${invoice.status}`);
-      doc.moveDown();
-      doc.fillColor('#111827');
-
-      const tableTop = doc.y;
-      doc.fontSize(10).text('Description', 50, tableTop, { width: 260 });
-      doc.text('Qty', 320, tableTop, { width: 50, align: 'right' });
-      doc.text('Unit price', 370, tableTop, { width: 80, align: 'right' });
-      doc.text('Amount', 460, tableTop, { width: 80, align: 'right' });
-      doc.moveTo(50, tableTop + 15).lineTo(540, tableTop + 15).stroke();
-
-      let y = tableTop + 22;
-      for (const item of invoice.items) {
-        doc.text(item.description, 50, y, { width: 260 });
-        doc.text(String(item.quantity), 320, y, { width: 50, align: 'right' });
-        doc.text(money(item.unitPrice), 370, y, { width: 80, align: 'right' });
-        doc.text(money(item.amount), 460, y, { width: 80, align: 'right' });
-        y += 20;
-      }
-
-      y += 10;
-      doc.text(`Subtotal: ${money(invoice.subtotal)}`, 370, y, { width: 170, align: 'right' });
-      y += 16;
-      doc.text(`Tax: ${money(invoice.taxAmount)}`, 370, y, { width: 170, align: 'right' });
-      y += 16;
-      doc.text(`Discount: -${money(invoice.discountAmount)}`, 370, y, { width: 170, align: 'right' });
-      y += 16;
-      doc.fontSize(12).text(`Total: ${money(invoice.totalAmount)}`, 370, y, { width: 170, align: 'right' });
-
-      if (invoice.notes) {
-        doc.moveDown(2).fontSize(9).fillColor('#6b7280').text(invoice.notes);
-      }
-
-      doc.end();
+    const [settings, profile, invoiceSettings, tenant] = await Promise.all([
+      this.db.tenantSettings.findUnique({ where: { tenantId: this.tenantId } }),
+      this.db.tenantProfile.findUnique({ where: { tenantId: this.tenantId } }),
+      this.invoiceSettings.find(this.tenantId),
+      tenantService.resolveById(this.tenantId),
+    ]);
+    const logo = await loadInvoiceLogo(tenant?.branding.logoUrl);
+    return renderInvoicePdf({
+      invoice,
+      tenantName,
+      profile,
+      logo,
+      footerText: invoiceSettings?.invoiceFooter ?? null,
+      currencySymbol: settings?.currencySymbol ?? '₹',
     });
   }
 
@@ -263,9 +245,15 @@ export class MemberInvoiceService {
 
     const tenant = await tenantService.resolveById(this.tenantId);
     const branding = tenant
-      ? { tenantName: tenant.name, primaryColor: tenant.branding.primaryColor, logoUrl: tenant.branding.emailLogoUrl ?? tenant.branding.logoUrl }
+      ? {
+          tenantName: tenant.name,
+          primaryColor: tenant.branding.primaryColor,
+          logoUrl: tenant.branding.emailLogoUrl ?? tenant.branding.logoUrl,
+        }
       : { tenantName: 'FitCloud' };
-    const settings = await this.db.tenantSettings.findUnique({ where: { tenantId: this.tenantId } });
+    const settings = await this.db.tenantSettings.findUnique({
+      where: { tenantId: this.tenantId },
+    });
     const currencySymbol = settings?.currencySymbol ?? '₹';
     const mail = memberInvoiceSummaryEmail(
       branding,

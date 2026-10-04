@@ -49,7 +49,11 @@ export class MemberAuthService {
   }
 
   async login(memberCode: string, password: string, device: DeviceInfo): Promise<MemberAuthSuccess> {
-    const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, memberId: memberCode, deletedAt: null } }));
+    const member = decryptMemberContactNullable(
+      await this.db.member.findFirst({
+        where: { tenantId: this.tenantId, memberId: memberCode, deletedAt: null },
+      }),
+    );
     const credential = member ? await this.credentials.findByMemberId(this.tenantId, member.id) : null;
 
     const passwordToCompare = credential?.passwordHash ?? '$2a$12$invalidinvalidinvaliduinvalidinvalidinvalidinvalidin';
@@ -57,7 +61,14 @@ export class MemberAuthService {
 
     if (!member || !credential || !passwordMatches) {
       if (credential) await this.recordFailure(credential.id, credential.failedLoginAttempts);
-      await this.auditLog.record({ tenantId: this.tenantId, actorUserId: null, actorRole: 'MEMBER', action: 'member_auth.login_failed', ipAddress: device.ipAddress, userAgent: device.userAgent });
+      await this.auditLog.record({
+        tenantId: this.tenantId,
+        actorUserId: null,
+        actorRole: 'MEMBER',
+        action: 'member_auth.login_failed',
+        ipAddress: device.ipAddress,
+        userAgent: device.userAgent,
+      });
       throw new AppError(ErrorCode.INVALID_CREDENTIALS, 'Incorrect member ID or password', 401);
     }
 
@@ -73,7 +84,16 @@ export class MemberAuthService {
 
     const tokens = await this.issueTokens(member.id, device);
 
-    await this.auditLog.record({ tenantId: this.tenantId, actorUserId: null, actorRole: 'MEMBER', action: 'member_auth.login_succeeded', entityType: 'member', entityId: member.id, ipAddress: device.ipAddress, userAgent: device.userAgent });
+    await this.auditLog.record({
+      tenantId: this.tenantId,
+      actorUserId: null,
+      actorRole: 'MEMBER',
+      action: 'member_auth.login_succeeded',
+      entityType: 'member',
+      entityId: member.id,
+      ipAddress: device.ipAddress,
+      userAgent: device.userAgent,
+    });
     authLogger.info('Member portal login succeeded', { memberId: member.id });
 
     return { member: this.toProfileDto(member), ...tokens };
@@ -86,7 +106,10 @@ export class MemberAuthService {
 
     if (existing.revokedAt) {
       await this.sessions.revokeFamily(existing.family);
-      securityLogger.warn('Member refresh token reuse detected — session family revoked', { memberId: existing.memberId, family: existing.family });
+      securityLogger.warn('Member refresh token reuse detected — session family revoked', {
+        memberId: existing.memberId,
+        family: existing.family,
+      });
       throw new UnauthenticatedError(ErrorCode.TOKEN_REUSE_DETECTED, 'Session invalidated for security reasons');
     }
     if (existing.expiresAt.getTime() < Date.now()) {
@@ -94,7 +117,8 @@ export class MemberAuthService {
     }
 
     const credential = await this.credentials.findByMemberId(this.tenantId, existing.memberId);
-    if (!credential || credential.status !== 'ACTIVE') throw new UnauthenticatedError(ErrorCode.TOKEN_INVALID, 'Portal access is not active');
+    if (!credential || credential.status !== 'ACTIVE')
+      throw new UnauthenticatedError(ErrorCode.TOKEN_INVALID, 'Portal access is not active');
 
     const nextPlain = generateOpaqueToken(REFRESH_TOKEN_BYTES);
     const nextSession = await this.sessions.rotate(tokenHash, {
@@ -107,8 +131,16 @@ export class MemberAuthService {
       userAgent: device.userAgent,
     });
 
-    const access = memberJwtService.signAccessToken({ memberId: existing.memberId, tenantId: this.tenantId, sid: nextSession.id });
-    return { accessToken: access.token, accessTokenExpiresAt: access.expiresAt.toISOString(), refreshToken: nextPlain };
+    const access = memberJwtService.signAccessToken({
+      memberId: existing.memberId,
+      tenantId: this.tenantId,
+      sid: nextSession.id,
+    });
+    return {
+      accessToken: access.token,
+      accessTokenExpiresAt: access.expiresAt.toISOString(),
+      refreshToken: nextPlain,
+    };
   }
 
   async logout(refreshTokenPlain: string): Promise<void> {
@@ -128,21 +160,45 @@ export class MemberAuthService {
       throw new AppError(ErrorCode.CONFLICT, 'This member has already activated portal access.', 409);
     }
     if (!credential) {
-      credential = await this.credentials.create({ tenantId: this.tenantId, memberId, passwordHash: await passwordService.hash(generateOpaqueToken(24)), status: 'PENDING_ACTIVATION' });
+      credential = await this.credentials.create({
+        tenantId: this.tenantId,
+        memberId,
+        passwordHash: await passwordService.hash(generateOpaqueToken(24)),
+        status: 'PENDING_ACTIVATION',
+      });
     }
 
     const token = generateOpaqueToken();
     const expiresAt = new Date(Date.now() + ACTIVATION_TTL_HOURS * 3600_000);
-    await this.verifications.create({ tenantId: this.tenantId, memberId, purpose: 'ACTIVATION', tokenHash: hashToken(token), expiresAt });
-    eventBus.emitEvent(MemberAuthEvents.ActivationRequested, { tenantId: this.tenantId, email, name: memberName, token });
-    authLogger.info('Member portal invite created/resent', { memberId, credentialId: credential.id });
+    await this.verifications.create({
+      tenantId: this.tenantId,
+      memberId,
+      purpose: 'ACTIVATION',
+      tokenHash: hashToken(token),
+      expiresAt,
+    });
+    eventBus.emitEvent(MemberAuthEvents.ActivationRequested, {
+      tenantId: this.tenantId,
+      email,
+      name: memberName,
+      token,
+    });
+    authLogger.info('Member portal invite created/resent', {
+      memberId,
+      credentialId: credential.id,
+    });
   }
 
   async lookupVerification(token: string, purpose: 'ACTIVATION' | 'PASSWORD_RESET'): Promise<{ memberName: string; expiresAt: string }> {
     const verification = await this.mustFindVerification(token, purpose);
-    const member = await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: verification.memberId } });
+    const member = await this.db.member.findFirst({
+      where: { tenantId: this.tenantId, id: verification.memberId },
+    });
     if (!member) throw new AppError(ErrorCode.NOT_FOUND, 'Member not found.', 404);
-    return { memberName: `${member.firstName} ${member.lastName}`.trim(), expiresAt: verification.expiresAt.toISOString() };
+    return {
+      memberName: `${member.firstName} ${member.lastName}`.trim(),
+      expiresAt: verification.expiresAt.toISOString(),
+    };
   }
 
   async acceptActivation(token: string, password: string): Promise<void> {
@@ -153,19 +209,41 @@ export class MemberAuthService {
 
     await this.credentials.setPassword(credential.id, await passwordService.hash(password));
     await this.verifications.consume(verification.id);
-    await this.auditLog.record({ tenantId: this.tenantId, actorUserId: null, actorRole: 'MEMBER', action: 'member_auth.activated', entityType: 'member', entityId: verification.memberId });
+    await this.auditLog.record({
+      tenantId: this.tenantId,
+      actorUserId: null,
+      actorRole: 'MEMBER',
+      action: 'member_auth.activated',
+      entityType: 'member',
+      entityId: verification.memberId,
+    });
   }
 
   async forgotPassword(memberCode: string): Promise<void> {
-    const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, memberId: memberCode, deletedAt: null } }));
+    const member = decryptMemberContactNullable(
+      await this.db.member.findFirst({
+        where: { tenantId: this.tenantId, memberId: memberCode, deletedAt: null },
+      }),
+    );
     if (!member || !member.email) return; // don't reveal whether a member/portal account exists
     const credential = await this.credentials.findByMemberId(this.tenantId, member.id);
     if (!credential || credential.status !== 'ACTIVE') return;
 
     const token = generateOpaqueToken();
     const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MINUTES * 60_000);
-    await this.verifications.create({ tenantId: this.tenantId, memberId: member.id, purpose: 'PASSWORD_RESET', tokenHash: hashToken(token), expiresAt });
-    eventBus.emitEvent(MemberAuthEvents.PasswordResetRequested, { tenantId: this.tenantId, email: member.email, name: `${member.firstName} ${member.lastName}`.trim(), token });
+    await this.verifications.create({
+      tenantId: this.tenantId,
+      memberId: member.id,
+      purpose: 'PASSWORD_RESET',
+      tokenHash: hashToken(token),
+      expiresAt,
+    });
+    eventBus.emitEvent(MemberAuthEvents.PasswordResetRequested, {
+      tenantId: this.tenantId,
+      email: member.email,
+      name: `${member.firstName} ${member.lastName}`.trim(),
+      token,
+    });
   }
 
   /**
@@ -183,13 +261,28 @@ export class MemberAuthService {
     const credential = await this.credentials.findByMemberId(this.tenantId, memberId);
     if (!credential) throw new AppError(ErrorCode.NOT_FOUND, 'Portal access is not set up for this member.', 404);
     if (credential.status !== 'ACTIVE') {
-      throw new AppError(ErrorCode.VALIDATION_ERROR, 'This member has not activated portal access yet — use "Enable portal access" instead.', 422);
+      throw new AppError(
+        ErrorCode.VALIDATION_ERROR,
+        'This member has not activated portal access yet — use "Enable portal access" instead.',
+        422,
+      );
     }
 
     const token = generateOpaqueToken();
     const expiresAt = new Date(Date.now() + PASSWORD_RESET_TTL_MINUTES * 60_000);
-    await this.verifications.create({ tenantId: this.tenantId, memberId, purpose: 'PASSWORD_RESET', tokenHash: hashToken(token), expiresAt });
-    eventBus.emitEvent(MemberAuthEvents.PasswordResetRequested, { tenantId: this.tenantId, email, name: memberName, token });
+    await this.verifications.create({
+      tenantId: this.tenantId,
+      memberId,
+      purpose: 'PASSWORD_RESET',
+      tokenHash: hashToken(token),
+      expiresAt,
+    });
+    eventBus.emitEvent(MemberAuthEvents.PasswordResetRequested, {
+      tenantId: this.tenantId,
+      email,
+      name: memberName,
+      token,
+    });
     authLogger.info('Member portal password reset requested by staff', { memberId });
   }
 
@@ -229,7 +322,44 @@ export class MemberAuthService {
 
     await this.credentials.setPassword(credential.id, await passwordService.hash(newPassword));
     await this.sessions.revokeAllForMember(this.tenantId, memberId);
-    await this.auditLog.record({ tenantId: this.tenantId, actorUserId: null, actorRole: 'MEMBER', action: 'member_auth.password_changed', entityType: 'member', entityId: memberId });
+    await this.auditLog.record({
+      tenantId: this.tenantId,
+      actorUserId: null,
+      actorRole: 'MEMBER',
+      action: 'member_auth.password_changed',
+      entityType: 'member',
+      entityId: memberId,
+    });
+  }
+
+  /**
+   * Re-authentication gate for sensitive profile edits (email change). A
+   * wrong password counts toward the same failed-login throttle/lockout as
+   * `login` and answers 422 (not 401 — a 401 would make clients treat the
+   * still-valid session as expired and bounce the member to sign-in).
+   */
+  async verifyCurrentPassword(memberId: string, password: string): Promise<void> {
+    const credential = await this.credentials.findByMemberId(this.tenantId, memberId);
+    if (!credential) throw new AppError(ErrorCode.NOT_FOUND, 'Portal access is not set up for this member.', 404);
+    if (credential.lockedUntil && credential.lockedUntil.getTime() > Date.now()) {
+      throw new AppError(ErrorCode.ACCOUNT_LOCKED, 'Too many failed attempts. This account is temporarily locked.', 423);
+    }
+    const matches = await passwordService.verify(password, credential.passwordHash);
+    if (!matches) {
+      await this.recordFailure(credential.id, credential.failedLoginAttempts);
+      await this.auditLog.record({
+        tenantId: this.tenantId,
+        actorUserId: null,
+        actorRole: 'MEMBER',
+        action: 'member_auth.reauth_failed',
+        entityType: 'member',
+        entityId: memberId,
+      });
+      throw new ValidationError('Current password is incorrect', {
+        fields: [{ field: 'currentPassword', message: 'Current password is incorrect' }],
+      });
+    }
+    if (credential.failedLoginAttempts > 0) await this.credentials.resetFailedLogins(credential.id);
   }
 
   // ── internals ───────────────────────────────────────────────────────────
@@ -245,8 +375,16 @@ export class MemberAuthService {
       ipAddress: device.ipAddress,
       userAgent: device.userAgent,
     });
-    const access = memberJwtService.signAccessToken({ memberId, tenantId: this.tenantId, sid: session.id });
-    return { accessToken: access.token, accessTokenExpiresAt: access.expiresAt.toISOString(), refreshToken: refreshPlain };
+    const access = memberJwtService.signAccessToken({
+      memberId,
+      tenantId: this.tenantId,
+      sid: session.id,
+    });
+    return {
+      accessToken: access.token,
+      accessTokenExpiresAt: access.expiresAt.toISOString(),
+      refreshToken: refreshPlain,
+    };
   }
 
   private async recordFailure(credentialId: string, currentAttempts: number): Promise<void> {
@@ -266,8 +404,21 @@ export class MemberAuthService {
     return verification;
   }
 
-  private toProfileDto(member: { id: string; memberId: string; firstName: string; lastName: string; email: string | null; status: string }): MemberProfileDto {
-    return { id: member.id, memberId: member.memberId, name: `${member.firstName} ${member.lastName}`.trim(), email: member.email, status: member.status };
+  private toProfileDto(member: {
+    id: string;
+    memberId: string;
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    status: string;
+  }): MemberProfileDto {
+    return {
+      id: member.id,
+      memberId: member.memberId,
+      name: `${member.firstName} ${member.lastName}`.trim(),
+      email: member.email,
+      status: member.status,
+    };
   }
 }
 

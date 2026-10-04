@@ -1,155 +1,96 @@
 'use client';
 
+import { LifeBuoy, Mail, Plus } from 'lucide-react';
 import * as React from 'react';
-import { HelpCircle, LifeBuoy, Mail } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { EmptyState } from '@/components/ui/empty-state';
-import { Pagination } from '@/components/ui/pagination';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
-import { usePublishedCmsPages } from '@/features/cms/hooks/use-cms';
+import { HeroButton } from '@/features/finance/components/payments/payments-hero';
+import { AnnouncementsPeriodBar } from '@/features/announcements/components/announcements-period-bar';
+import { useAnnouncementPeriod } from '@/features/announcements/lib/use-announcement-period';
+import { EmptyState } from '@/features/reports/components/ui';
+import { HelpCentre } from '@/features/support/components/help-centre';
 import { NewTicketDialog } from '@/features/support/components/new-ticket-dialog';
+import { SupportHero } from '@/features/support/components/support-hero';
+import { SupportInsights } from '@/features/support/components/support-insights';
 import { TicketDetailDialog } from '@/features/support/components/ticket-detail-dialog';
-import { TicketPriorityBadge, TicketStatusBadge } from '@/features/support/components/ticket-badges';
-import { useTicketList } from '@/features/support/hooks/use-tickets';
-import type { TicketListItem } from '@/features/support/types';
+import { TicketList } from '@/features/support/components/ticket-list';
+import { useTicketStats } from '@/features/support/hooks/use-tickets';
 import { useTenant } from '@/features/tenant/tenant-provider';
 
-function buildColumns(onView: (ticketId: string) => void): DataTableColumn<TicketListItem>[] {
-  return [
-    {
-      key: 'subject',
-      header: 'Subject',
-      render: (row) => (
-        <div>
-          <p className="font-medium text-foreground">{row.subject}</p>
-          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{row.description}</p>
-        </div>
-      ),
-    },
-    { key: 'priority', header: 'Priority', render: (row) => <TicketPriorityBadge priority={row.priority} /> },
-    { key: 'status', header: 'Status', render: (row) => <TicketStatusBadge status={row.status} /> },
-    {
-      key: 'createdAt',
-      header: 'Raised',
-      render: (row) => <span className="text-xs text-muted-foreground">{new Date(row.createdAt).toLocaleDateString()}</span>,
-    },
-    {
-      key: 'actions',
-      header: '',
-      className: 'text-right',
-      render: (row) => (
-        <Button variant="outline" size="sm" onClick={() => onView(row.id)}>
-          View
-        </Button>
-      ),
-    },
-  ];
-}
-
-/** Help Center: FAQs + contact info + support tickets (Prompt 32). */
+/** Support: hero + period/analytics (stats API) + help centre + tickets. Plan gating (`support_tickets`) and `support:view`/`support:create` unchanged. */
 export default function SupportPage() {
   const tenant = useTenant();
   const { hasPermission } = usePermissions();
   const hasTickets = tenant.featureFlags.includes('support_tickets');
   const canView = hasPermission('support:view');
   const canCreate = hasPermission('support:create');
-  const faqsQuery = usePublishedCmsPages('FAQ');
-  const faqs = faqsQuery.data ?? [];
+  const ticketsEnabled = hasTickets && canView;
 
-  const [page, setPage] = React.useState(1);
+  const controls = useAnnouncementPeriod('month');
+  const statsQuery = useTicketStats(controls.params, ticketsEnabled && controls.rangeReady);
+  // Analytics are optional: a failing stats call (or no view permission/plan) hides the section and hero stats; the list keeps working.
+  const showInsights = ticketsEnabled && !statsQuery.isError;
+  const stats = statsQuery.data;
+  const statsLoading = statsQuery.isPending && statsQuery.fetchStatus !== 'idle';
+
+  const [newOpen, setNewOpen] = React.useState(false);
   const [selectedTicketId, setSelectedTicketId] = React.useState<string | null>(null);
-  const ticketsQuery = useTicketList({ page, limit: 10 });
-  const tickets = ticketsQuery.data;
-  const columns = React.useMemo(() => buildColumns(setSelectedTicketId), []);
+  const canRaise = hasTickets && canCreate;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start gap-3">
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
-          <LifeBuoy className="size-5" aria-hidden />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Help Center</h1>
-          <p className="text-muted-foreground">Find answers or reach the FitCloud team.</p>
-        </div>
-      </div>
+    <div className="space-y-5">
+      <SupportHero
+        stats={
+          showInsights
+            ? [
+                { label: 'Open', value: stats?.kpis.open.value ?? 0 },
+                { label: 'In progress', value: stats?.kpis.inProgress.value ?? 0 },
+                { label: 'Resolved', value: stats?.kpis.resolved.value ?? 0 },
+              ]
+            : undefined
+        }
+        statsLoading={statsLoading && !stats}
+        actions={
+          <>
+            {canRaise ? (
+              <HeroButton solid onClick={() => setNewOpen(true)}>
+                <Plus className="size-4" aria-hidden /> New ticket
+              </HeroButton>
+            ) : null}
+            <HeroButton href="mailto:support@fitcloud.com">
+              <Mail className="size-4" aria-hidden /> Contact us
+            </HeroButton>
+          </>
+        }
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <HelpCircle className="size-4 text-muted-foreground" aria-hidden />
-            Frequently asked questions
-          </CardTitle>
-        </CardHeader>
-        <CardContent className={faqs.length > 0 ? 'divide-y divide-border' : undefined}>
-          {faqsQuery.isPending ? (
-            <p className="py-3.5 text-sm text-muted-foreground">Loading…</p>
-          ) : faqs.length === 0 ? (
-            <p className="py-3.5 text-sm text-muted-foreground">No FAQs published yet.</p>
-          ) : (
-            faqs.map((faq) => (
-              <div key={faq.id} className="py-3.5 first:pt-0 last:pb-0">
-                <p className="text-sm font-medium">{faq.title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{String(faq.content.answer ?? '')}</p>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+      {showInsights ? (
+        <>
+          <AnnouncementsPeriodBar
+            period={controls.period}
+            onPeriod={controls.changePeriod}
+            customFrom={controls.custom.from}
+            customTo={controls.custom.to}
+            onCustom={controls.setDates}
+            compare={controls.compare}
+            onCompare={controls.setCompare}
+          />
+          <SupportInsights stats={stats} loading={statsLoading && !stats} compare={controls.compare} previousLabel={controls.period === 'month' ? 'Last month' : 'Previous period'} />
+        </>
+      ) : null}
 
-      <Card>
-        <CardHeader className="flex flex-row items-start justify-between gap-3">
-          <div>
-            <CardTitle className="text-base">Support tickets</CardTitle>
-            <CardDescription>Track and raise issues directly with our team.</CardDescription>
-          </div>
-          {hasTickets && canCreate ? <NewTicketDialog /> : null}
-        </CardHeader>
-        <CardContent>
-          {!hasTickets ? (
-            <EmptyState icon={LifeBuoy} title="Not on your plan" description="Upgrade your subscription to unlock support tickets." />
-          ) : !canView ? (
-            <EmptyState icon={LifeBuoy} title="No access" description="You don't have permission to view support tickets." />
-          ) : (
-            <div className="space-y-4">
-              <DataTable
-                columns={columns}
-                rows={tickets?.items ?? []}
-                rowKey={(row) => row.id}
-                loading={ticketsQuery.isLoading}
-                error={ticketsQuery.error}
-                onRetry={() => void ticketsQuery.refetch()}
-                emptyMessage="No tickets yet — raise one above if you run into an issue."
-              />
-              {tickets ? (
-                <Pagination page={page} totalPages={tickets.totalPages} onPageChange={setPage} totalItems={tickets.total} pageSize={tickets.limit} />
-              ) : null}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <HelpCentre />
 
+      {!hasTickets ? (
+        <EmptyState icon={LifeBuoy} title="Not on your plan" description="Upgrade your subscription to unlock support tickets." />
+      ) : !canView ? (
+        <EmptyState icon={LifeBuoy} title="No access" description="You don't have permission to view support tickets." />
+      ) : (
+        <TicketList enabled={ticketsEnabled} onView={setSelectedTicketId} onCreate={canRaise ? () => setNewOpen(true) : undefined} />
+      )}
+
+      {canRaise ? <NewTicketDialog open={newOpen} onOpenChange={setNewOpen} /> : null}
       <TicketDetailDialog ticketId={selectedTicketId} onOpenChange={(open) => !open && setSelectedTicketId(null)} />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Contact us</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <a
-            href="mailto:support@fitcloud.com"
-            className="inline-flex items-center gap-2.5 rounded-lg border border-input bg-background px-3.5 py-2.5 text-sm font-medium text-foreground shadow-xs transition-colors duration-150 hover:bg-accent hover:text-accent-foreground"
-          >
-            <span className="flex size-7 items-center justify-center rounded-md bg-primary/10 text-primary">
-              <Mail className="size-3.5" aria-hidden />
-            </span>
-            support@fitcloud.com
-          </a>
-        </CardContent>
-      </Card>
     </div>
   );
 }

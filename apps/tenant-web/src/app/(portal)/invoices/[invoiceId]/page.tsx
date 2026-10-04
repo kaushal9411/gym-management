@@ -1,46 +1,57 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Download, Mail, Printer } from 'lucide-react';
+import { Download, Mail, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
-import { InvoiceStatusBadge, PaymentStatusBadge } from '@/features/finance/components/finance-badges';
+import { InvoiceStatusBadge } from '@/features/finance/components/finance-badges';
+import { InvoiceItemsCard, SettlingPaymentsCard } from '@/features/finance/components/invoices/invoice-items-card';
+import { computeInvoiceMath } from '@/features/finance/components/invoices/invoice-math';
+import { BilledToCard, CollectionProgressCard, InvoiceTimelineCard, PdfCopyCard } from '@/features/finance/components/invoices/invoice-side-panels';
+import { InvoiceSummaryCards } from '@/features/finance/components/invoices/invoice-summary-cards';
+import { HeroButton, PaymentsHero } from '@/features/finance/components/payments/payments-hero';
+import { fmtDate } from '@/features/finance/components/payments/payments-ui';
 import { toFinanceError, useEmailInvoice, useInvoice } from '@/features/finance/hooks/use-finance';
 import { financeService } from '@/features/finance/services/finance.service';
-import { useCurrencySymbol } from '@/lib/currency';
 
 export default function InvoiceDetailPage() {
   const params = useParams<{ invoiceId: string }>();
   const { hasPermission } = usePermissions();
-  const currencySymbol = useCurrencySymbol();
   const invoiceId = params.invoiceId;
 
   const invoice = useInvoice(invoiceId);
   const emailInvoice = useEmailInvoice();
   const canDownload = hasPermission('finance:invoice-download');
+  const canRecord = hasPermission('finance:payment-create');
 
   const [downloading, setDownloading] = React.useState(false);
   const [printing, setPrinting] = React.useState(false);
 
   if (invoice.isPending) {
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-64 w-full" />
+      <div className="space-y-5">
+        <Skeleton className="h-52 w-full rounded-[28px]" />
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-3.5">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-[20px]" />
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-3.5">
+          <Skeleton className="h-96 min-w-0 flex-[2_1_620px] rounded-[20px]" />
+          <Skeleton className="h-96 min-w-0 flex-[1_1_320px] rounded-[20px]" />
+        </div>
       </div>
     );
   }
   if (invoice.isError || !invoice.data) {
-    return <p className="text-sm text-destructive">Couldn&apos;t load this invoice — try refreshing.</p>;
+    return <p className="text-sm text-destructive">Couldn&apos;t load this invoice — it may not exist or was removed. Try refreshing.</p>;
   }
 
   const data = invoice.data;
+  const math = computeInvoiceMath(data);
 
   const handleDownload = async () => {
     setDownloading(true);
@@ -75,109 +86,45 @@ export default function InvoiceDetailPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <Button variant="ghost" size="sm" asChild>
-        <Link href="/invoices">
-          <ArrowLeft className="size-4" /> Back to invoices
-        </Link>
-      </Button>
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{data.invoiceNumber}</h1>
-          <p className="text-muted-foreground">
-            {data.member.name} ({data.member.memberId}) · {data.branch.name}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <InvoiceStatusBadge status={data.status} />
-          {canDownload ? (
+    <div className="space-y-5">
+      <PaymentsHero
+        backHref="/invoices"
+        backLabel="Back to invoices"
+        eyebrow={`Invoice · issued ${fmtDate(data.invoiceDate, { day: 'numeric', month: 'short', year: 'numeric' })}`}
+        title={data.invoiceNumber}
+        titleAdornment={<InvoiceStatusBadge status={data.status} onDark className="h-[30px] text-sm" />}
+        subtitle={`${data.member.name} (${data.member.memberId}) · ${data.branch.name} · due ${fmtDate(data.dueDate, { day: 'numeric', month: 'short', year: 'numeric' })}`}
+        actions={
+          canDownload ? (
             <>
-              <Button variant="outline" size="sm" disabled={printing} onClick={() => void handlePrint()}>
+              <HeroButton disabled={printing} onClick={() => void handlePrint()}>
                 <Printer className="size-4" /> Print
-              </Button>
-              <Button variant="outline" size="sm" disabled={downloading} onClick={() => void handleDownload()}>
+              </HeroButton>
+              <HeroButton disabled={emailInvoice.isPending} onClick={handleEmail}>
+                <Mail className="size-4" /> {emailInvoice.isPending ? 'Sending…' : 'Email invoice'}
+              </HeroButton>
+              <HeroButton solid disabled={downloading} onClick={() => void handleDownload()}>
                 <Download className="size-4" /> {downloading ? 'Downloading…' : 'Download PDF'}
-              </Button>
-              <Button size="sm" disabled={emailInvoice.isPending} onClick={handleEmail}>
-                <Mail className="size-4" /> {emailInvoice.isPending ? 'Sending…' : 'Email'}
-              </Button>
+              </HeroButton>
             </>
-          ) : null}
+          ) : undefined
+        }
+      />
+
+      <InvoiceSummaryCards invoice={data} math={math} />
+
+      <section className="flex flex-wrap items-start gap-3.5">
+        <div className="flex min-w-0 flex-[2_1_620px] flex-col gap-3.5">
+          <InvoiceItemsCard invoice={data} math={math} />
+          <SettlingPaymentsCard invoice={data} math={math} canRecord={canRecord} />
         </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-muted-foreground">Invoice date</p>
-              <p className="font-medium">{new Date(data.invoiceDate).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Due date</p>
-              <p className="font-medium">{new Date(data.dueDate).toLocaleDateString()}</p>
-            </div>
-          </div>
-
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b text-muted-foreground">
-                <th className="py-1.5 font-medium">Description</th>
-                <th className="py-1.5 text-right font-medium">Qty</th>
-                <th className="py-1.5 text-right font-medium">Unit price</th>
-                <th className="py-1.5 text-right font-medium">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((item) => (
-                <tr key={item.id} className="border-b last:border-0">
-                  <td className="py-1.5">{item.description}</td>
-                  <td className="py-1.5 text-right">{item.quantity}</td>
-                  <td className="py-1.5 text-right">{currencySymbol}{item.unitPrice}</td>
-                  <td className="py-1.5 text-right">{currencySymbol}{item.amount}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className="flex flex-col items-end gap-1 text-sm">
-            <p>Subtotal: {currencySymbol}{data.subtotal}</p>
-            <p>Tax: {currencySymbol}{data.taxAmount}</p>
-            <p>Discount: -{currencySymbol}{data.discountAmount}</p>
-            <p className="text-base font-semibold">Total: {currencySymbol}{data.totalAmount}</p>
-          </div>
-
-          {data.notes ? (
-            <div>
-              <p className="text-muted-foreground">Notes</p>
-              <p>{data.notes}</p>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      {data.payments.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Settling payments</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {data.payments.map((p) => (
-              <Link key={p.id} href={`/payments/${p.id}`} className="flex items-center justify-between border-b pb-2 text-sm last:border-0 last:pb-0 hover:underline">
-                <span>
-                  {p.paymentNumber} — {currencySymbol}{p.finalAmount}
-                  <span className="block text-xs text-muted-foreground">{new Date(p.paymentDate).toLocaleDateString()}</span>
-                </span>
-                <PaymentStatusBadge status={p.status} />
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
+        <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-3.5">
+          <CollectionProgressCard math={math} />
+          <InvoiceTimelineCard invoice={data} math={math} />
+          <BilledToCard invoice={data} math={math} />
+          {canDownload ? <PdfCopyCard invoiceNumber={data.invoiceNumber} downloading={downloading} printing={printing} onDownload={() => void handleDownload()} onPrint={() => void handlePrint()} /> : null}
+        </div>
+      </section>
     </div>
   );
 }

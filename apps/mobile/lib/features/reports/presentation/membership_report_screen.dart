@@ -5,6 +5,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../models/report_summary.dart';
 import '../../../models/branch_option.dart';
 import '../../../models/membership_report_row.dart';
 import '../../../repositories/branch_repository.dart';
@@ -13,6 +14,7 @@ import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import 'widgets/load_more_button.dart';
 import 'widgets/report_filter_bar.dart';
+import 'widgets/report_summary_header.dart';
 
 const _statusTones = {
   'ACTIVE': AppPillTone.success,
@@ -175,6 +177,13 @@ class _MembershipReportScreenState extends State<MembershipReportScreen> {
               ),
             ),
             const SizedBox(height: 8),
+            ReportSummaryHeader(
+              type: 'membership',
+              filters: ReportSummaryFilters(
+                branchId: _branchId,
+                memberStatus: _status,
+              ),
+            ),
             Expanded(
               child: _error != null && _items.isEmpty
                   ? AppErrorView(message: _error!, onRetry: _load)

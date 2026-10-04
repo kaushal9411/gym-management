@@ -1,32 +1,29 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { FileText, RefreshCw, RotateCcw, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
-import { PaymentMethodBadge, PaymentStatusBadge } from '@/features/finance/components/finance-badges';
-import { toFinanceError, useCancelPayment, usePayment, useRefundPayment, useVerifyPaymentStatus } from '@/features/finance/hooks/use-finance';
-import { useCurrencySymbol } from '@/lib/currency';
+import { METHOD_LABELS, PaymentStatusBadge } from '@/features/finance/components/finance-badges';
+import { HeroButton, PaymentsHero } from '@/features/finance/components/payments/payments-hero';
+import { DetailsCard, OtherPaymentsCard, RefundSplitCard, SummaryCards, TimelineCard } from '@/features/finance/components/payments/payment-detail-sections';
+import { fmtDateTime } from '@/features/finance/components/payments/payments-ui';
+import { RefundDialog } from '@/features/finance/components/payments/refund-dialog';
+import { toFinanceError, useCancelPayment, usePayment, useVerifyPaymentStatus } from '@/features/finance/hooks/use-finance';
 
 export default function PaymentDetailPage() {
   const params = useParams<{ paymentId: string }>();
   const { hasPermission } = usePermissions();
-  const currencySymbol = useCurrencySymbol();
   const paymentId = params.paymentId;
 
   const payment = usePayment(paymentId);
   const cancelPayment = useCancelPayment();
-  const refundPayment = useRefundPayment();
   const verifyStatus = useVerifyPaymentStatus();
 
   const canRefund = hasPermission('finance:payment-refund');
@@ -34,14 +31,17 @@ export default function PaymentDetailPage() {
 
   const [confirmCancel, setConfirmCancel] = React.useState(false);
   const [refundOpen, setRefundOpen] = React.useState(false);
-  const [refundAmount, setRefundAmount] = React.useState('');
-  const [refundReason, setRefundReason] = React.useState('');
 
   if (payment.isPending) {
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-64 w-full" />
+      <div className="space-y-5">
+        <Skeleton className="h-52 w-full rounded-[28px]" />
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-3.5">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-[20px]" />
+          ))}
+        </div>
+        <Skeleton className="h-80 w-full rounded-[20px]" />
       </div>
     );
   }
@@ -50,7 +50,6 @@ export default function PaymentDetailPage() {
   }
 
   const data = payment.data;
-  const remaining = Number(data.finalAmount) - Number(data.totalRefunded);
   const canCancel = data.status !== 'CANCELLED' && data.status !== 'REFUNDED' && data.status !== 'PARTIALLY_REFUNDED';
   const canBeRefunded = data.status === 'SUCCESS' || data.status === 'PARTIALLY_REFUNDED';
 
@@ -69,174 +68,56 @@ export default function PaymentDetailPage() {
     });
   };
 
-  const handleRefund = (e: React.FormEvent) => {
-    e.preventDefault();
-    refundPayment.mutate(
-      { id: paymentId, payload: { amount: refundAmount ? Number(refundAmount) : undefined, reason: refundReason || undefined } },
-      {
-        onSuccess: () => {
-          toast.success('Refund recorded.');
-          setRefundOpen(false);
-          setRefundAmount('');
-          setRefundReason('');
-        },
-        onError: (err) => toast.error(toFinanceError(err).message),
-      },
-    );
-  };
-
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <Button variant="ghost" size="sm" asChild>
-        <Link href="/payments">
-          <ArrowLeft className="size-4" /> Back to payments
-        </Link>
-      </Button>
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{data.paymentNumber}</h1>
-          <p className="text-muted-foreground">
-            {data.member.name} ({data.member.memberId}) · {data.branch.name}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <PaymentStatusBadge status={data.status} />
-          {canManage ? (
-            <Button variant="outline" size="sm" disabled={verifyStatus.isPending} onClick={handleVerify}>
-              {verifyStatus.isPending ? 'Verifying…' : 'Verify status'}
-            </Button>
-          ) : null}
-          {canRefund && canBeRefunded ? (
-            <Button size="sm" onClick={() => setRefundOpen(true)}>
-              Refund
-            </Button>
-          ) : null}
-          {canManage && canCancel ? (
-            <Button variant="destructive" size="sm" onClick={() => setConfirmCancel(true)}>
-              Cancel
-            </Button>
-          ) : null}
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Payment details</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-muted-foreground">Amount</p>
-              <p className="font-medium">{currencySymbol}{data.amount}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Discount / Tax</p>
-              <p className="font-medium">
-                -{currencySymbol}{data.discount} / +{currencySymbol}{data.tax}
-              </p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Final amount</p>
-              <p className="font-medium">{currencySymbol}{data.finalAmount}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Method</p>
-              <PaymentMethodBadge method={data.method} />
-            </div>
-            <div>
-              <p className="text-muted-foreground">Payment date</p>
-              <p className="font-medium">{new Date(data.paymentDate).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Reference</p>
-              <p className="font-medium">{data.transactionReference ?? '—'}</p>
-            </div>
-            {data.membership ? (
-              <div>
-                <p className="text-muted-foreground">Membership</p>
-                <p className="font-medium">{data.membership.planName}</p>
-              </div>
-            ) : null}
+    <div className="space-y-5">
+      <PaymentsHero
+        backHref="/payments"
+        eyebrow={`Payment · ${fmtDateTime(data.paymentDate)}`}
+        title={data.paymentNumber}
+        titleAdornment={<PaymentStatusBadge status={data.status} onDark className="h-[30px] text-sm" />}
+        subtitle={`${data.member.name}${data.membership ? ` · ${data.membership.planName}` : ''} · ${data.branch.name} · ${METHOD_LABELS[data.method]}`}
+        actions={
+          <>
             {data.invoiceId ? (
-              <div>
-                <p className="text-muted-foreground">Invoice</p>
-                <Link href={`/invoices/${data.invoiceId}`} className="font-medium hover:underline">
-                  View invoice
-                </Link>
-              </div>
+              <HeroButton href={`/invoices/${data.invoiceId}`}>
+                <FileText className="size-4" /> View invoice
+              </HeroButton>
             ) : null}
-            {data.recordedBy ? (
-              <div>
-                <p className="text-muted-foreground">Recorded by</p>
-                <p className="font-medium">{data.recordedBy.name}</p>
-              </div>
+            {canRefund && canBeRefunded ? (
+              <HeroButton solid danger onClick={() => setRefundOpen(true)}>
+                <RotateCcw className="size-4" /> Refund payment
+              </HeroButton>
             ) : null}
-          </div>
-          {data.notes ? (
-            <div>
-              <p className="text-muted-foreground">Notes</p>
-              <p>{data.notes}</p>
+          </>
+        }
+      />
+
+      <SummaryCards payment={data} />
+
+      <section className="flex flex-wrap items-start gap-3.5">
+        <div className="flex min-w-0 flex-[2_1_620px] flex-col gap-3.5">
+          <DetailsCard payment={data} />
+          <TimelineCard payment={data} />
+        </div>
+        <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-3.5">
+          <RefundSplitCard payment={data} />
+          <OtherPaymentsCard payment={data} />
+          {canManage ? (
+            <div className="flex flex-col gap-2.5 rounded-[20px] border bg-card p-5 shadow-xs">
+              <LoadingButton variant="outline" className="h-[46px] rounded-xl font-bold" loading={verifyStatus.isPending} loadingText="Verifying…" onClick={handleVerify}>
+                <RefreshCw className="size-4" /> Verify gateway status
+              </LoadingButton>
+              {canCancel ? (
+                <Button variant="outline" className="h-[46px] rounded-xl border-destructive/40 font-bold text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => setConfirmCancel(true)}>
+                  <XCircle className="size-4" /> Cancel payment
+                </Button>
+              ) : null}
             </div>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      {data.refunds.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Refund history</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {data.refunds.map((r) => (
-              <div key={r.id} className="flex items-center justify-between border-b pb-2 text-sm last:border-0 last:pb-0">
-                <span>
-                  {currencySymbol}{r.amount} {r.reason ? `— ${r.reason}` : ''}
-                  <span className="block text-xs text-muted-foreground">
-                    {new Date(r.refundedAt).toLocaleString()} {r.refundedBy ? `by ${r.refundedBy.name}` : ''}
-                  </span>
-                </span>
-              </div>
-            ))}
-            <p className="text-sm font-medium">Total refunded: {currencySymbol}{data.totalRefunded}</p>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      <Dialog open={refundOpen} onOpenChange={setRefundOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Refund payment</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleRefund} className="space-y-4">
-            <p className="text-sm text-muted-foreground">Remaining refundable balance: {currencySymbol}{remaining.toFixed(2)}</p>
-            <div className="space-y-2">
-              <Label htmlFor="refundAmount">Refund amount (leave blank for full remaining balance)</Label>
-              <Input
-                id="refundAmount"
-                type="number"
-                min={0}
-                max={remaining}
-                step="0.01"
-                value={refundAmount}
-                onChange={(e) => setRefundAmount(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="refundReason">Reason</Label>
-              <textarea
-                id="refundReason"
-                className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                value={refundReason}
-                onChange={(e) => setRefundReason(e.target.value)}
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={refundPayment.isPending}>
-              {refundPayment.isPending ? 'Processing…' : 'Confirm refund'}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <RefundDialog payment={data} open={refundOpen} onOpenChange={setRefundOpen} />
 
       <ConfirmDialog
         open={confirmCancel}

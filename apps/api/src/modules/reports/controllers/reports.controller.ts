@@ -3,7 +3,10 @@ import type { Request, Response } from 'express';
 import { sendSuccess } from '../../../core/http/response';
 import type { ReportFilters, ReportType } from '../dto/reports.dto';
 import { ReportExportService } from '../services/report-export.service';
+import { ReportSummaryService } from '../services/report-summary.service';
+import { ReportsOverviewService } from '../services/reports-overview.service';
 import { ReportsService } from '../services/reports.service';
+import type { SummaryReportType } from '../utils/report-summary.util';
 
 function serviceFor(req: Request): ReportsService {
   return new ReportsService(req.tenant!.id);
@@ -18,6 +21,15 @@ function filtersFrom(req: Request): ReportFilters {
 }
 
 export class ReportsController {
+  async overview(req: Request, res: Response): Promise<void> {
+    const { dateFrom, dateTo, branchId } = req.query as { dateFrom?: string; dateTo?: string; branchId?: string };
+    sendSuccess(res, await new ReportsOverviewService(req.tenant!.id).overview(req.auth!.sub, dateFrom, dateTo, branchId));
+  }
+
+  async summary(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await new ReportSummaryService(req.tenant!.id).summary(req.params.reportType as SummaryReportType, req.auth!.sub, filtersFrom(req)));
+  }
+
   async membership(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await serviceFor(req).membershipReport(req.auth!.sub, filtersFrom(req)));
   }

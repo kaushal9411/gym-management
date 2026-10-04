@@ -31,6 +31,8 @@ export interface ScheduleAnnouncementInput {
 
 export interface ListAnnouncementsQuery {
   status?: TenantAnnouncementStatus;
+  audience?: TenantAnnouncementAudience;
+  search?: string;
   page: number;
   limit: number;
 }

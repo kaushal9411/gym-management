@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../bloc/session/session_cubit.dart';
+import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
@@ -22,7 +25,11 @@ import 'payments_screen.dart';
 /// `POST /payments/:id/refund`, and the response carries a `refunds[]`
 /// history), and both actions are conditional — Refund needs a `SUCCESS`
 /// payment with something still refundable, Cancel is rejected once a
-/// refund exists. Buttons hide rather than fail.
+/// refund exists. Buttons hide rather than fail — Refund additionally needs
+/// `finance:payment-refund` and a SUCCESS / PARTIALLY_REFUNDED status.
+/// The refund sheet (quick amounts, reason chips, after-status preview) and
+/// the refunded/refundable balance card use only fields the detail DTO
+/// already returns.
 class PaymentDetailScreen extends StatefulWidget {
   const PaymentDetailScreen({required this.paymentId, super.key});
 
@@ -59,9 +66,15 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
   Future<void> _refund() async {
     final payment = _payment;
     if (payment == null) return;
-    final result = await showDialog<({double? amount, String reason})>(
+    final result =
+        await showModalBottomSheet<({double? amount, String reason})>(
       context: context,
-      builder: (_) => _RefundDialog(refundable: payment.refundableAmount),
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface2,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _RefundSheet(payment: payment),
     );
     if (result == null || !mounted) return;
 
@@ -70,11 +83,14 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
       _error = null;
     });
     try {
-      final updated = await getIt<PaymentRepository>().refund(
+      await getIt<PaymentRepository>().refund(
         payment.id,
         amount: result.amount,
         reason: result.reason,
       );
+      // Re-fetch rather than trust the action response: the detail DTO is
+      // what carries the refunds[] history and the recomputed status.
+      final updated = await getIt<PaymentRepository>().getById(payment.id);
       if (!mounted) return;
       setState(() => _payment = updated);
       ScaffoldMessenger.of(context)
@@ -146,9 +162,16 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
     }
   }
 
+  bool get _mayRefund {
+    final session = context.read<SessionCubit>().state;
+    return session is SessionAuthenticatedStaff &&
+        session.user.hasPermission('finance:payment-refund');
+  }
+
   @override
   Widget build(BuildContext context) {
     final payment = _payment;
+    final canRefund = payment != null && payment.canRefund && _mayRefund;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -253,6 +276,10 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                       ],
                     ),
                   ),
+                  if (payment.totalRefunded > 0 || payment.canRefund) ...[
+                    const SizedBox(height: 12),
+                    _BalanceCard(payment: payment),
+                  ],
                   if (payment.refunds.isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Container(
@@ -313,10 +340,10 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                     ),
                   ],
                   const SizedBox(height: 20),
-                  if (payment.canRefund || payment.canCancel)
+                  if (canRefund || payment.canCancel)
                     Row(
                       children: [
-                        if (payment.canRefund)
+                        if (canRefund)
                           Expanded(
                             child: AppButton(
                               label: 'Refund',
@@ -325,7 +352,7 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
                               onPressed: _refund,
                             ),
                           ),
-                        if (payment.canRefund && payment.canCancel)
+                        if (canRefund && payment.canCancel)
                           const SizedBox(width: 10),
                         if (payment.canCancel)
                           Expanded(
@@ -345,110 +372,289 @@ class _PaymentDetailScreenState extends State<PaymentDetailScreen> {
   }
 }
 
-/// Refund amount defaults to everything still refundable; clearing it back
-/// to empty sends no `amount`, which the API treats as a full refund.
-class _RefundDialog extends StatefulWidget {
-  const _RefundDialog({required this.refundable});
+/// Cap on the free-text refund reason (`refundPaymentSchema.reason`).
+const _maxReason = 1000;
 
-  final double refundable;
+const _reasonChips = [
+  'Customer request',
+  'Duplicate payment',
+  'Service not delivered',
+  'Billing error',
+  'Other',
+];
+
+/// Refunded vs still-refundable summary shown under the detail rows.
+class _BalanceCard extends StatelessWidget {
+  const _BalanceCard({required this.payment});
+
+  final MemberPayment payment;
 
   @override
-  State<_RefundDialog> createState() => _RefundDialogState();
+  Widget build(BuildContext context) {
+    Widget cell(String label, double v, Color color) => Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: AppText.eyebrow()),
+              const SizedBox(height: 4),
+              Text(
+                Formatters.currency(v),
+                style: AppText.display(size: 18, color: color),
+              ),
+            ],
+          ),
+        );
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(AppRadii.card),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        children: [
+          cell('Refunded', payment.totalRefunded, AppColors.warning),
+          cell(
+            'Refundable',
+            payment.status == 'SUCCESS' ||
+                    payment.status == 'PARTIALLY_REFUNDED'
+                ? payment.refundableAmount
+                : 0,
+            AppColors.ink,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-class _RefundDialogState extends State<_RefundDialog> {
-  late final _amountController = TextEditingController(
-    text: widget.refundable.toStringAsFixed(
-      widget.refundable % 1 == 0 ? 0 : 2,
-    ),
-  );
-  final _reasonController = TextEditingController();
+/// Refund bottom sheet: quick-amount chips (25% / 50% / Full remainder /
+/// Custom), reason chips + optional note, remaining-balance line and the
+/// status the payment will have afterwards. Pops `(amount, reason)`;
+/// `amount: null` = full remainder (the API's default).
+class _RefundSheet extends StatefulWidget {
+  const _RefundSheet({required this.payment});
+
+  final MemberPayment payment;
+
+  @override
+  State<_RefundSheet> createState() => _RefundSheetState();
+}
+
+class _RefundSheetState extends State<_RefundSheet> {
+  final _custom = TextEditingController();
+  final _note = TextEditingController();
+  String _mode = 'full'; // 25 | 50 | full | custom
+  String? _reason;
   String? _error;
+
+  double get _refundable => widget.payment.refundableAmount;
 
   @override
   void dispose() {
-    _amountController.dispose();
-    _reasonController.dispose();
+    _custom.dispose();
+    _note.dispose();
     super.dispose();
   }
 
-  void _submit() {
-    final raw = _amountController.text.trim();
-    final amount = raw.isEmpty ? null : double.tryParse(raw);
-    if (raw.isNotEmpty && (amount == null || amount <= 0)) {
-      setState(() => _error = 'Enter a valid amount');
-      return;
+  /// Rounded to cents so 25%/50% never exceed the balance by a float hair.
+  double? get _amount {
+    switch (_mode) {
+      case '25':
+        return (_refundable * 25).roundToDouble() / 100;
+      case '50':
+        return (_refundable * 50).roundToDouble() / 100;
+      case 'custom':
+        return double.tryParse(_custom.text.trim());
+      default:
+        return _refundable;
     }
-    if (amount != null && amount > widget.refundable) {
-      setState(
-        () => _error =
-            'Max ${Formatters.currency(widget.refundable)} can be refunded',
-      );
+  }
+
+  void _pick(String mode) => setState(() {
+        _mode = mode;
+        _error = null;
+      });
+
+  String? get _invalid {
+    final a = _amount;
+    if (a == null || a <= 0) return 'Enter a valid amount';
+    if (a > _refundable + 0.004) {
+      return 'Max ${Formatters.currency(_refundable)} can be refunded';
+    }
+    return null;
+  }
+
+  String get _composedReason {
+    final note = _note.text.trim();
+    final text =
+        [if (_reason != null) _reason!, if (note.isNotEmpty) note].join(' — ');
+    return text.length > _maxReason ? text.substring(0, _maxReason) : text;
+  }
+
+  void _submit() {
+    final problem = _invalid;
+    if (problem != null) {
+      setState(() => _error = problem);
       return;
     }
     Navigator.of(context).pop(
-      (amount: amount, reason: _reasonController.text.trim()),
+      (
+        amount: _mode == 'full' ? null : _amount,
+        reason: _composedReason,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: AppColors.surface2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadii.card),
+    final amount = _amount;
+    final valid = _invalid == null;
+    final remaining = valid ? _refundable - amount! : _refundable;
+    final after = valid
+        ? widget.payment.statusAfterRefund(_mode == 'full' ? null : amount)
+        : null;
+
+    Widget chip(String label, bool selected, VoidCallback onTap) => ChoiceChip(
+          label: Text(label),
+          selected: selected,
+          showCheckmark: false,
+          onSelected: (_) => onTap(),
+          backgroundColor: AppColors.surface3,
+          selectedColor: AppColors.staffSoft,
+          side: BorderSide(
+            color: selected ? AppColors.staffB : AppColors.line,
+          ),
+          labelStyle: AppText.body(
+            size: 12,
+            weight: FontWeight.w700,
+            color: selected ? AppColors.staffPillFg : AppColors.inkSoft,
+          ),
+        );
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        18,
+        18,
+        18,
+        18 + MediaQuery.of(context).viewInsets.bottom,
       ),
-      title: Text('Refund payment', style: AppText.display(size: 18)),
-      content: Column(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Text('Refund payment', style: AppText.display(size: 18)),
+          const SizedBox(height: 4),
+          Text(
+            '${widget.payment.paymentNumber} · up to '
+            '${Formatters.currency(_refundable)} refundable',
+            style: AppText.body(size: 12, color: AppColors.inkFaint),
+          ),
+          const SizedBox(height: 14),
           if (_error != null) ...[
             FormAlert(message: _error!),
             const SizedBox(height: 10),
           ],
-          Text(
-            'Up to ${Formatters.currency(widget.refundable)} refundable.',
-            style: AppText.body(size: 12, color: AppColors.inkFaint),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _amountController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+          Text('Amount', style: AppText.eyebrow()),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              chip('25%', _mode == '25', () => _pick('25')),
+              chip('50%', _mode == '50', () => _pick('50')),
+              chip('Full remainder', _mode == 'full', () => _pick('full')),
+              chip('Custom', _mode == 'custom', () => _pick('custom')),
             ],
-            style: AppText.body(size: 15, weight: FontWeight.w600),
-            decoration: _fieldDecoration('Amount'),
+          ),
+          if (_mode == 'custom') ...[
+            const SizedBox(height: 10),
+            TextField(
+              controller: _custom,
+              autofocus: true,
+              onChanged: (_) => setState(() => _error = null),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+              ],
+              style: AppText.body(size: 15, weight: FontWeight.w600),
+              decoration: _fieldDecoration('Amount'),
+            ),
+          ],
+          const SizedBox(height: 14),
+          Text('Reason', style: AppText.eyebrow()),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final r in _reasonChips)
+                chip(
+                  r,
+                  _reason == r,
+                  () => setState(() => _reason = _reason == r ? null : r),
+                ),
+            ],
           ),
           const SizedBox(height: 10),
           TextField(
-            controller: _reasonController,
+            controller: _note,
+            maxLength: _maxReason,
+            maxLines: 2,
             style: AppText.body(size: 15, weight: FontWeight.w600),
-            decoration: _fieldDecoration('Reason (optional)'),
+            decoration: _fieldDecoration('Note (optional)'),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surface3,
+              borderRadius: BorderRadius.circular(AppRadii.field),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Refunding ${valid ? Formatters.currency(amount!) : '—'} · '
+                  '${Formatters.currency(remaining)} would remain',
+                  style: AppText.body(size: 12.5, weight: FontWeight.w700),
+                ),
+                if (after != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'After this refund: ${after.replaceAll('_', ' ')}',
+                    style: AppText.body(
+                      size: 12,
+                      color: AppColors.inkFaint,
+                      weight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: AppButton(
+                  label: 'Cancel',
+                  variant: AppButtonVariant.ghost,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: AppButton(
+                  label: 'Refund',
+                  onPressed: valid ? _submit : null,
+                ),
+              ),
+            ],
           ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(
-            'Cancel',
-            style: AppText.body(size: 13, weight: FontWeight.w700),
-          ),
-        ),
-        TextButton(
-          onPressed: _submit,
-          child: Text(
-            'Refund',
-            style: AppText.body(
-              size: 13,
-              weight: FontWeight.w700,
-              color: AppColors.staffPillFg,
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -458,6 +664,7 @@ class _RefundDialogState extends State<_RefundDialog> {
         fillColor: AppColors.surface3,
         hintText: hint,
         hintStyle: AppText.body(size: 14, color: AppColors.inkFaint),
+        counterText: '',
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(

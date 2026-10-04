@@ -5,7 +5,7 @@ import { authenticateMiddleware } from '../../authentication/middlewares/authent
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
 import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { memberInvoiceController } from '../controllers/member-invoice.controller';
-import { emailInvoiceSchema, generateInvoiceSchema, idParamSchema, listInvoicesQuerySchema } from '../validators/finance.validators';
+import { emailInvoiceSchema, generateInvoiceSchema, idParamSchema, invoiceAnalyticsQuerySchema, listInvoicesQuerySchema } from '../validators/finance.validators';
 
 export const memberInvoiceRouter: Router = Router();
 
@@ -26,13 +26,21 @@ memberInvoiceRouter.use(requireModuleEnabled('payments'));
  *     summary: Paginated invoice list with search + filters (member, branch, status, date range)
  *     security: [{ bearerAuth: [] }]
  *     responses:
- *       200: { description: "{ items, total, page, limit, totalPages }" }
+ *       200: { description: "{ items, total, page, limit, totalPages, summary, counts }" }
  */
 memberInvoiceRouter.get(
   '/',
   requirePermission('finance:invoice-view'),
   validate({ query: listInvoicesQuerySchema }),
   asyncHandler(memberInvoiceController.list.bind(memberInvoiceController)),
+);
+
+/** @openapi { "/invoices/analytics": { get: { tags: [Finance], summary: "Invoice analytics for a date range vs the preceding equal-length range (KPIs, daily series, status split, receivables aging, top debtors, branches)", security: [{bearerAuth: []}], responses: { 200: { description: "{ range, previousRange, kpis, daily, byStatus, aging, topDebtors, branches }" } } } } } */
+memberInvoiceRouter.get(
+  '/analytics',
+  requirePermission('finance:invoice-view'),
+  validate({ query: invoiceAnalyticsQuerySchema }),
+  asyncHandler(memberInvoiceController.analytics.bind(memberInvoiceController)),
 );
 
 /** @openapi { "/invoices": { post: { tags: [Finance], summary: "Manually generate an invoice (e.g. billing an upcoming renewal in advance)", security: [{bearerAuth: []}], responses: { 201: { description: Invoice generated } } } } } */

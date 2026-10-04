@@ -7,13 +7,55 @@ import { emitToTenant } from '../../../infrastructure/realtime/socket-server';
 import { deviceTokenService } from '../../device-tokens/services/device-token.service';
 import { MemberNotificationRepository } from '../repositories/member-notification.repository';
 import { TenantNotificationRepository } from '../repositories/tenant-notification.repository';
+import {
+  addDaysStr,
+  assembleNotificationStats,
+  resolveRanges,
+  type NotificationStatsDto,
+} from '../utils/notification-stats.util';
 
 export class TenantNotificationService {
-  async list(tenantId: string, params: { unreadOnly?: boolean; page: number; limit: number }) {
+  async stats(tenantId: string, dateFrom?: string, dateTo?: string): Promise<NotificationStatsDto> {
+    const repository = new TenantNotificationRepository(getTenantScopedClient(tenantId));
+    const { range, previousRange } = resolveRanges(dateFrom, dateTo);
+    const dayStart = (d: string) => new Date(`${d}T00:00:00.000Z`);
+    const toExclusive = dayStart(addDaysStr(range.to, 1));
+    const [dayCategory, hourly, unreadNow] = await Promise.all([
+      repository.statsDayCategory(tenantId, dayStart(previousRange.from), toExclusive),
+      repository.statsHourly(tenantId, dayStart(range.from), toExclusive),
+      repository.countUnread(tenantId),
+    ]);
+    return assembleNotificationStats({ range, previousRange, dayCategory, hourly, unreadNow });
+  }
+
+  async list(
+    tenantId: string,
+    params: {
+      unreadOnly?: boolean;
+      category?: TenantNotificationCategory;
+      search?: string;
+      page: number;
+      limit: number;
+    },
+  ) {
     const repository = new TenantNotificationRepository(getTenantScopedClient(tenantId));
     const skip = (params.page - 1) * params.limit;
-    const { total, unreadCount, items } = await repository.list(tenantId, { unreadOnly: params.unreadOnly, skip, take: params.limit });
-    return { items, unreadCount, page: params.page, limit: params.limit, total, totalPages: Math.ceil(total / params.limit) };
+    const { total, unreadCount, counts, items } = await repository.list(tenantId, {
+      unreadOnly: params.unreadOnly,
+      category: params.category,
+      search: params.search,
+      skip,
+      take: params.limit,
+    });
+    return {
+      items,
+      unreadCount,
+      counts,
+      page: params.page,
+      limit: params.limit,
+      total,
+      totalPages: Math.ceil(total / params.limit),
+    };
   }
 
   async getById(tenantId: string, id: string) {
@@ -29,11 +71,16 @@ export class TenantNotificationService {
   }
 
   /** Manual "Create Notification" — an ad-hoc staff-authored notice, distinct from the business-event triggers in `notification-trigger.service.ts`. */
-  async create(tenantId: string, input: { category: TenantNotificationCategory; title: string; body: string }) {
+  async create(
+    tenantId: string,
+    input: { category: TenantNotificationCategory; title: string; body: string },
+  ) {
     const repository = new TenantNotificationRepository(getTenantScopedClient(tenantId));
     const notification = await repository.create(tenantId, input);
     emitToTenant(tenantId, 'notification:new', notification);
-    await deviceTokenService.pushToStaff(tenantId, input.title, input.body, { category: input.category });
+    await deviceTokenService.pushToStaff(tenantId, input.title, input.body, {
+      category: input.category,
+    });
     return notification;
   }
 
@@ -58,7 +105,12 @@ export class TenantNotificationService {
    * have a single tenantId in hand (billing emails, subscription jobs) —
    * writes through the normal tenant-scoped/RLS path.
    */
-  async notifyTenant(tenantId: string, category: TenantNotificationCategory, title: string, body: string): Promise<void> {
+  async notifyTenant(
+    tenantId: string,
+    category: TenantNotificationCategory,
+    title: string,
+    body: string,
+  ): Promise<void> {
     const repository = new TenantNotificationRepository(getTenantScopedClient(tenantId));
     const notification = await repository.create(tenantId, { category, title, body });
     emitToTenant(tenantId, 'notification:new', notification);
@@ -73,23 +125,57 @@ export class TenantNotificationService {
    * hardened production deployment would run this under a dedicated
    * platform-service DB role instead.
    */
-  async broadcast(tenantIds: string[], title: string, body: string, sourceNotificationId: string): Promise<void> {
+  async broadcast(
+    tenantIds: string[],
+    title: string,
+    body: string,
+    sourceNotificationId: string,
+  ): Promise<void> {
     if (tenantIds.length === 0) return;
     await prisma.tenantNotification.createMany({
-      data: tenantIds.map((tenantId) => ({ tenantId, category: 'ANNOUNCEMENT' as const, title, body, sourceNotificationId })),
+      data: tenantIds.map((tenantId) => ({
+        tenantId,
+        category: 'ANNOUNCEMENT' as const,
+        title,
+        body,
+        sourceNotificationId,
+      })),
     });
     for (const tenantId of tenantIds) {
-      emitToTenant(tenantId, 'notification:new', { tenantId, category: 'ANNOUNCEMENT', title, body, sourceNotificationId, createdAt: new Date().toISOString() });
+      emitToTenant(tenantId, 'notification:new', {
+        tenantId,
+        category: 'ANNOUNCEMENT',
+        title,
+        body,
+        sourceNotificationId,
+        createdAt: new Date().toISOString(),
+      });
     }
   }
 
   // ── Member plane — mirrors the staff methods above, one row per member ────
 
-  async listForMember(tenantId: string, memberId: string, params: { unreadOnly?: boolean; page: number; limit: number }) {
+  async listForMember(
+    tenantId: string,
+    memberId: string,
+    params: { unreadOnly?: boolean; category?: TenantNotificationCategory; page: number; limit: number },
+  ) {
     const repository = new MemberNotificationRepository(getTenantScopedClient(tenantId));
     const skip = (params.page - 1) * params.limit;
-    const { total, unreadCount, items } = await repository.list(tenantId, memberId, { unreadOnly: params.unreadOnly, skip, take: params.limit });
-    return { items, unreadCount, page: params.page, limit: params.limit, total, totalPages: Math.ceil(total / params.limit) };
+    const { total, unreadCount, items } = await repository.list(tenantId, memberId, {
+      unreadOnly: params.unreadOnly,
+      category: params.category,
+      skip,
+      take: params.limit,
+    });
+    return {
+      items,
+      unreadCount,
+      page: params.page,
+      limit: params.limit,
+      total,
+      totalPages: Math.ceil(total / params.limit),
+    };
   }
 
   async unreadCountForMember(tenantId: string, memberId: string): Promise<{ unreadCount: number }> {
@@ -114,7 +200,13 @@ export class TenantNotificationService {
    * itself no-ops — e.g. no device registered, or Firebase unconfigured),
    * then pushes.
    */
-  async notifyMember(tenantId: string, memberId: string, category: TenantNotificationCategory, title: string, body: string): Promise<void> {
+  async notifyMember(
+    tenantId: string,
+    memberId: string,
+    category: TenantNotificationCategory,
+    title: string,
+    body: string,
+  ): Promise<void> {
     const repository = new MemberNotificationRepository(getTenantScopedClient(tenantId));
     await repository.create(tenantId, memberId, { category, title, body });
     await deviceTokenService.pushToMember(tenantId, memberId, title, body, { category });
@@ -125,11 +217,24 @@ export class TenantNotificationService {
    * gets their own history row, not just the ones with a registered device
    * token, so it's still there in their history once they DO log in.
    */
-  async notifyMembersInTenant(tenantId: string, category: TenantNotificationCategory, title: string, body: string, branchId?: string): Promise<void> {
+  async notifyMembersInTenant(
+    tenantId: string,
+    category: TenantNotificationCategory,
+    title: string,
+    body: string,
+    branchId?: string,
+  ): Promise<void> {
     const db = getTenantScopedClient(tenantId);
-    const members = await db.member.findMany({ where: { tenantId, ...(branchId ? { branchId } : {}) }, select: { id: true } });
+    const members = await db.member.findMany({
+      where: { tenantId, ...(branchId ? { branchId } : {}) },
+      select: { id: true },
+    });
     const repository = new MemberNotificationRepository(db);
-    await repository.createManyForMembers(tenantId, members.map((m) => m.id), { category, title, body });
+    await repository.createManyForMembers(
+      tenantId,
+      members.map((m) => m.id),
+      { category, title, body },
+    );
     await deviceTokenService.pushToMembersInTenant(tenantId, title, body, branchId, { category });
   }
 }

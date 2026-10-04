@@ -5,7 +5,12 @@ import { authenticateMiddleware } from '../../authentication/middlewares/authent
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
 import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { tenantNotificationController } from '../controllers/tenant-notification.controller';
-import { createNotificationSchema, listNotificationsQuerySchema, notificationIdParamSchema } from '../validators/tenant-notification.validators';
+import {
+  createNotificationSchema,
+  listNotificationsQuerySchema,
+  notificationIdParamSchema,
+  notificationStatsQuerySchema,
+} from '../validators/tenant-notification.validators';
 
 export const tenantNotificationRouter: Router = Router();
 
@@ -30,13 +35,19 @@ tenantNotificationRouter.use(requireModuleEnabled('notifications'));
  *         name: unreadOnly
  *         schema: { type: boolean }
  *       - in: query
+ *         name: category
+ *         schema: { type: string }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *       - in: query
  *         name: page
  *         schema: { type: integer, default: 1 }
  *       - in: query
  *         name: limit
  *         schema: { type: integer, default: 20 }
  *     responses:
- *       200: { description: "{ items, unreadCount, page, limit, total, totalPages }" }
+ *       200: { description: "{ items, unreadCount, counts: {all, unread}, page, limit, total, totalPages }" }
  */
 tenantNotificationRouter.get(
   '/',
@@ -45,11 +56,27 @@ tenantNotificationRouter.get(
   asyncHandler(tenantNotificationController.list.bind(tenantNotificationController)),
 );
 
+/** @openapi { "/notifications/stats": { get: { tags: [Tenant Notifications], summary: "Notification analytics (KPIs, daily, categories, hourly) for a date range vs the previous equal-length range", security: [{bearerAuth: []}], parameters: [{in: query, name: dateFrom, schema: {type: string}}, {in: query, name: dateTo, schema: {type: string}}], responses: { 200: { description: OK } } } } } */
+tenantNotificationRouter.get(
+  '/stats',
+  requirePermission('notifications:view'),
+  validate({ query: notificationStatsQuerySchema }),
+  asyncHandler(tenantNotificationController.stats.bind(tenantNotificationController)),
+);
+
 /** @openapi { "/notifications/unread-count": { get: { tags: [Tenant Notifications], summary: Unread notification count, security: [{bearerAuth: []}], responses: { 200: { description: "{ unreadCount }" } } } } } */
-tenantNotificationRouter.get('/unread-count', requirePermission('notifications:view'), asyncHandler(tenantNotificationController.unreadCount.bind(tenantNotificationController)));
+tenantNotificationRouter.get(
+  '/unread-count',
+  requirePermission('notifications:view'),
+  asyncHandler(tenantNotificationController.unreadCount.bind(tenantNotificationController)),
+);
 
 /** @openapi { "/notifications/read-all": { post: { tags: [Tenant Notifications], summary: Mark every notification read, security: [{bearerAuth: []}], responses: { 200: { description: All marked read } } } } } */
-tenantNotificationRouter.post('/read-all', requirePermission('notifications:view'), asyncHandler(tenantNotificationController.markAllRead.bind(tenantNotificationController)));
+tenantNotificationRouter.post(
+  '/read-all',
+  requirePermission('notifications:view'),
+  asyncHandler(tenantNotificationController.markAllRead.bind(tenantNotificationController)),
+);
 
 /** @openapi { "/notifications": { post: { tags: [Tenant Notifications], summary: Create an ad-hoc notification, security: [{bearerAuth: []}], responses: { 201: { description: Created } } } } } */
 tenantNotificationRouter.post(

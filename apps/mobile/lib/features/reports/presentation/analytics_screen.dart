@@ -4,6 +4,8 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/formatters.dart';
+import '../../../models/branch_comparison_row.dart';
 import '../../../models/branch_option.dart';
 import '../../../repositories/analytics_repository.dart';
 import '../../../repositories/branch_repository.dart';
@@ -43,6 +45,10 @@ class AnalyticsScreen extends StatefulWidget {
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
   List<BarDatum>? _monthlyNewMembers;
   Map<String, double>? _byMethod;
+
+  /// Revenue per branch over the same 6-month window; null = hidden (the
+  /// caller lacks `analytics:view`, or the request failed — non-fatal).
+  List<BranchComparisonRow>? _branches;
   List<BranchOption> _branchOptions = [];
   String? _error;
   String? _branchId;
@@ -92,10 +98,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       }).toList();
 
       final byMethod = await methodFuture;
+      List<BranchComparisonRow>? branches;
+      try {
+        branches = await getIt<AnalyticsRepository>()
+            .branchComparison(from: from, to: to, branchId: _branchId);
+      } on ApiException {
+        branches = null; // optional block — never fail the screen for it
+      }
       if (!mounted) return;
       setState(() {
         _monthlyNewMembers = bars;
         _byMethod = byMethod;
+        _branches = branches;
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -194,6 +208,40 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ],
           ),
         ),
+        if (_branches != null && _branches!.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Revenue by branch', style: AppText.eyebrow()),
+                const SizedBox(height: 10),
+                for (final b in _branches!)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          b.branch,
+                          style:
+                              AppText.body(size: 13, weight: FontWeight.w700),
+                        ),
+                        Text(
+                          Formatters.currency(b.revenue),
+                          style: AppText.tabular(
+                            size: 13,
+                            weight: FontWeight.w700,
+                            color: AppColors.success,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }

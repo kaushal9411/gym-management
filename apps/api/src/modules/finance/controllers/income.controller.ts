@@ -2,7 +2,7 @@ import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
 import { actorFrom } from '../../authentication/utils/actor.util';
-import type { CreateIncomeInput, ListIncomeQuery, UpdateIncomeInput } from '../dto/finance.dto';
+import type { CreateIncomeInput, ListIncomeQuery, UpdateIncomeInput, PaymentsAnalyticsQuery } from '../dto/finance.dto';
 import { IncomeService } from '../services/income.service';
 
 function serviceFor(req: Request): IncomeService {
@@ -12,6 +12,10 @@ function serviceFor(req: Request): IncomeService {
 export class IncomeController {
   async list(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await serviceFor(req).list(req.query as unknown as ListIncomeQuery, req.auth!.sub));
+  }
+
+  async analytics(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await serviceFor(req).analytics(req.query as unknown as PaymentsAnalyticsQuery, req.auth!.sub));
   }
 
   async getById(req: Request, res: Response): Promise<void> {

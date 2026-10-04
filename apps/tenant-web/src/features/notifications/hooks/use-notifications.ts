@@ -1,19 +1,21 @@
 'use client';
 
 import * as React from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAppDispatch } from '@/store/hooks';
 import { notificationService } from '../services/notification.service';
 import { unreadCountSet } from '../store/notification-slice';
-import type { CreateNotificationInput, NotificationTemplateType, UpdateNotificationTemplateInput } from '../types';
+import type { CreateNotificationInput, NotificationListParams, NotificationStatsParams, NotificationTemplateType, UpdateNotificationTemplateInput } from '../types';
 
-export function useNotifications(params: { unreadOnly?: boolean; page?: number; limit?: number } = {}) {
+export function useNotifications(params: NotificationListParams = {}) {
   const dispatch = useAppDispatch();
   const query = useQuery({
     queryKey: ['notifications', params],
     queryFn: () => notificationService.list(params),
     refetchInterval: 60_000,
+    // Server-side category/search/unread filters change the key; keep the old rows on screen meanwhile.
+    placeholderData: keepPreviousData,
   });
 
   React.useEffect(() => {
@@ -21,6 +23,17 @@ export function useNotifications(params: { unreadOnly?: boolean; page?: number; 
   }, [query.data, dispatch]);
 
   return query;
+}
+
+/** Period stats for the /notifications dashboard. Key sits under ['notifications'] so mark-read / realtime invalidations refresh it. */
+export function useNotificationStats(params: NotificationStatsParams, enabled = true) {
+  return useQuery({
+    queryKey: ['notifications', 'stats', params],
+    queryFn: () => notificationService.stats(params),
+    enabled,
+    placeholderData: keepPreviousData,
+    retry: false,
+  });
 }
 
 export function useNotificationDetails(notificationId: string | null) {
@@ -71,10 +84,11 @@ export function useMarkAllNotificationsRead() {
   });
 }
 
-export function useNotificationTemplates() {
+export function useNotificationTemplates(enabled = true) {
   return useQuery({
     queryKey: ['notifications', 'templates'],
     queryFn: () => notificationService.listTemplates(),
+    enabled,
   });
 }
 

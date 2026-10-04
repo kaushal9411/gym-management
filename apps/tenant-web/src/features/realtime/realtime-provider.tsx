@@ -31,6 +31,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const handleNewNotification = () => {
       dispatch(unreadCountIncremented());
       void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      void queryClient.invalidateQueries({ queryKey: ['tenant-announcements'] });
     };
     socket.on('notification:new', handleNewNotification);
 

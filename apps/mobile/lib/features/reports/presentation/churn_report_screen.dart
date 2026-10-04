@@ -4,6 +4,7 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../models/report_summary.dart';
 import '../../../models/active_vs_inactive_row.dart';
 import '../../../models/branch_option.dart';
 import '../../../repositories/branch_repository.dart';
@@ -12,6 +13,7 @@ import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import 'widgets/donut_chart.dart';
 import 'widgets/report_filter_bar.dart';
+import 'widgets/report_summary_header.dart';
 
 const _statusColors = {
   'ACTIVE': AppColors.success,
@@ -99,6 +101,12 @@ class _ChurnReportScreenState extends State<ChurnReportScreen> {
                 branches: _branchOptions,
                 selectedBranchId: _branchId,
                 onBranchChanged: _onBranchChanged,
+              ),
+            ),
+            ReportSummaryHeader(
+              type: 'active-vs-inactive',
+              filters: ReportSummaryFilters(
+                branchId: _branchId,
               ),
             ),
             Expanded(

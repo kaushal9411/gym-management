@@ -8,6 +8,7 @@ import { tenantAnnouncementController } from '../controllers/tenant-announcement
 import {
   createAnnouncementSchema,
   idParamSchema,
+  announcementStatsQuerySchema,
   listAnnouncementsQuerySchema,
   scheduleAnnouncementSchema,
   updateAnnouncementSchema,
@@ -30,6 +31,14 @@ tenantAnnouncementRouter.get(
   requirePermission('announcements:view'),
   validate({ query: listAnnouncementsQuerySchema }),
   asyncHandler(tenantAnnouncementController.list.bind(tenantAnnouncementController)),
+);
+
+/** @openapi { "/tenant-announcements/stats": { get: { tags: [Tenant Announcements], summary: "Announcement analytics (KPIs, daily, status/audience/branch splits, upcoming/expiring/recent) for a date range vs the previous equal-length range", security: [{bearerAuth: []}], parameters: [{in: query, name: dateFrom, schema: {type: string}}, {in: query, name: dateTo, schema: {type: string}}], responses: { 200: { description: OK } } } } } */
+tenantAnnouncementRouter.get(
+  '/stats',
+  requirePermission('announcements:view'),
+  validate({ query: announcementStatsQuerySchema }),
+  asyncHandler(tenantAnnouncementController.stats.bind(tenantAnnouncementController)),
 );
 
 /** @openapi { "/tenant-announcements": { post: { tags: [Tenant Announcements], summary: "Create a draft announcement", security: [{bearerAuth: []}], responses: { 201: { description: Created } } } } } */

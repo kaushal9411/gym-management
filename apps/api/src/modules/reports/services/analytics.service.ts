@@ -2,6 +2,7 @@ import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrast
 import type { BranchComparisonRow, RevenueTrendPoint, TrendPoint } from '../dto/reports.dto';
 import { resolveBranchScope } from '../utils/branch-scope.util';
 import { addDaysStr, fillDailyTrend, resolveDateRange } from '../utils/date-range.util';
+import { resolveRanges } from '../utils/reports-overview.util';
 
 export class AnalyticsService {
   private readonly db: TenantScopedPrisma;
@@ -156,7 +157,7 @@ export class AnalyticsService {
     return fillDailyTrend(from, to, rows, { income: 0, expenses: 0 });
   }
 
-  async branchComparison(userId: string, requestedBranchId?: string): Promise<BranchComparisonRow[]> {
+  async branchComparison(userId: string, requestedBranchId?: string, dateFrom?: string, dateTo?: string): Promise<BranchComparisonRow[]> {
     const branchScope = await resolveBranchScope(this.tenantId, userId, requestedBranchId);
     const branches = await this.db.branch.findMany({
       where: { tenantId: this.tenantId, isActive: true, ...(branchScope ? { id: branchScope } : {}) },
@@ -164,9 +165,10 @@ export class AnalyticsService {
     if (branches.length === 0) return [];
     const branchIds = branches.map((b) => b.id);
 
-    const todayIso = new Date().toISOString().slice(0, 10);
-    const monthStart = new Date(`${todayIso.slice(0, 7)}-01T00:00:00.000Z`);
-    const todayEnd = new Date(`${todayIso}T23:59:59.999Z`);
+    // No dates = month-to-date (resolveRanges' default); with dates, revenue/attendance cover exactly [dateFrom, dateTo] (UTC days).
+    const { range } = resolveRanges(dateFrom, dateTo);
+    const monthStart = new Date(`${range.from}T00:00:00.000Z`);
+    const todayEnd = new Date(`${range.to}T23:59:59.999Z`);
 
     // Grouped aggregates instead of 3 queries per branch (Prompt 37 perf
     // pass — same fan-out shape as reports.service.ts's branch/trainer

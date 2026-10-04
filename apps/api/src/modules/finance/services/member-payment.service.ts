@@ -17,21 +17,28 @@ import type {
   MemberPaymentDetailDto,
   MemberPaymentListItemDto,
   PaymentLinkDto,
+  PaymentsAnalyticsDto,
+  PaymentsAnalyticsQuery,
   RefundPaymentInput,
   ResendPaymentLinkNotificationInput,
   UpdatePaymentInput,
 } from '../dto/finance.dto';
 import { MemberPaymentRepository, type MemberPaymentDetailRow, type MemberPaymentListRow } from '../repositories/member-payment.repository';
+import { assembleAnalytics, resolveRanges } from '../utils/payments-analytics.util';
 
 import { MemberBalanceService } from './member-balance.service';
 import { MemberInvoiceService } from './member-invoice.service';
 import { createPaymentLink, fetchPaymentLink, notifyPaymentLink } from './razorpay-gateway.service';
 
-function toListDto(row: MemberPaymentListRow): MemberPaymentListItemDto {
+function toListDto(row: MemberPaymentListRow, totalRefunded = 0): MemberPaymentListItemDto {
   return {
     id: row.id,
     paymentNumber: row.paymentNumber,
-    member: { id: row.member.id, memberId: row.member.memberId, name: `${row.member.firstName} ${row.member.lastName}`.trim() },
+    member: {
+      id: row.member.id,
+      memberId: row.member.memberId,
+      name: `${row.member.firstName} ${row.member.lastName}`.trim(),
+    },
     branch: { id: row.branch.id, name: row.branch.name },
     membership: row.membership ? { id: row.membership.id, planName: row.membership.plan.name } : null,
     invoiceId: row.invoiceId,
@@ -44,13 +51,14 @@ function toListDto(row: MemberPaymentListRow): MemberPaymentListItemDto {
     transactionReference: row.transactionReference,
     status: row.status,
     createdAt: row.createdAt.toISOString(),
+    totalRefunded: totalRefunded.toFixed(2),
   };
 }
 
 function toDetailDto(row: MemberPaymentDetailRow): MemberPaymentDetailDto {
   const totalRefunded = row.refunds.reduce((sum, r) => sum + Number(r.amount), 0);
   return {
-    ...toListDto(row),
+    ...toListDto(row, totalRefunded),
     notes: row.notes,
     updatedAt: row.updatedAt.toISOString(),
     recordedBy: row.recordedByUser ? { id: row.recordedByUser.id, name: row.recordedByUser.name } : null,
@@ -61,7 +69,6 @@ function toDetailDto(row: MemberPaymentDetailRow): MemberPaymentDetailDto {
       refundedBy: r.refundedByUser ? { id: r.refundedByUser.id, name: r.refundedByUser.name } : null,
       refundedAt: r.refundedAt.toISOString(),
     })),
-    totalRefunded: totalRefunded.toFixed(2),
   };
 }
 
@@ -80,8 +87,31 @@ export class MemberPaymentService {
 
   async list(query: ListPaymentsQuery, actorUserId: string) {
     const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
-    const { items, total } = await this.payments.list(this.tenantId, query, restrictToBranchIds);
-    return { items: items.map(toListDto), total, page: query.page, limit: query.limit, totalPages: Math.max(1, Math.ceil(total / query.limit)) };
+    const [{ items, total }, summary] = await Promise.all([
+      this.payments.list(this.tenantId, query, restrictToBranchIds),
+      this.payments.listSummary(this.tenantId, query, restrictToBranchIds),
+    ]);
+    const refunded = await this.payments.refundTotalsByPayment(
+      this.tenantId,
+      items.map((i) => i.id),
+    );
+    return {
+      items: items.map((row) => toListDto(row, refunded.get(row.id) ?? 0)),
+      total,
+      page: query.page,
+      limit: query.limit,
+      totalPages: Math.max(1, Math.ceil(total / query.limit)),
+      summary: {
+        collectedTotal: summary.collectedTotal.toFixed(2),
+        refundedTotal: summary.refundedTotal.toFixed(2),
+      },
+    };
+  }
+
+  async analytics(query: PaymentsAnalyticsQuery, actorUserId: string): Promise<PaymentsAnalyticsDto> {
+    const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
+    const { range, previousRange, today } = resolveRanges(query.dateFrom, query.dateTo);
+    return assembleAnalytics(await this.payments.analyticsRaw(this.tenantId, range, previousRange, today, query.branchId, restrictToBranchIds));
   }
 
   async getById(id: string, actorUserId: string): Promise<MemberPaymentDetailDto> {
@@ -89,19 +119,27 @@ export class MemberPaymentService {
   }
 
   async create(input: CreatePaymentInput, actor: IamActor): Promise<MemberPaymentDetailDto> {
-    const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null } }));
+    const member = decryptMemberContactNullable(
+      await this.db.member.findFirst({
+        where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null },
+      }),
+    );
     if (!member) throw new NotFoundError('Member not found.');
     const branchId = input.branchId ?? member.branchId;
     await assertBranchAccess(this.tenantId, actor.userId, branchId);
 
     if (input.membershipId) {
-      const membership = await this.db.membership.findFirst({ where: { tenantId: this.tenantId, id: input.membershipId, memberId: input.memberId } });
+      const membership = await this.db.membership.findFirst({
+        where: { tenantId: this.tenantId, id: input.membershipId, memberId: input.memberId },
+      });
       if (!membership) throw new NotFoundError('Membership not found for this member.');
     }
 
     let invoice = null;
     if (input.invoiceId) {
-      invoice = await this.db.memberInvoice.findFirst({ where: { tenantId: this.tenantId, id: input.invoiceId } });
+      invoice = await this.db.memberInvoice.findFirst({
+        where: { tenantId: this.tenantId, id: input.invoiceId },
+      });
       if (!invoice) throw new NotFoundError('Invoice not found.');
       // Business rule: prevent duplicate payments for the same invoice.
       const existing = await this.payments.findActiveByInvoice(this.tenantId, input.invoiceId);
@@ -161,7 +199,11 @@ export class MemberPaymentService {
    * what flips it to `SUCCESS`/`FAILED` once the member has paid.
    */
   async createPaymentLink(input: CreatePaymentLinkInput, actor: IamActor): Promise<PaymentLinkDto> {
-    const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null } }));
+    const member = decryptMemberContactNullable(
+      await this.db.member.findFirst({
+        where: { tenantId: this.tenantId, id: input.memberId, deletedAt: null },
+      }),
+    );
     if (!member) throw new NotFoundError('Member not found.');
     if (!member.email && !member.phone) {
       throw new ValidationError('This member has no email or phone on file — add one before sending a payment link.');
@@ -174,11 +216,15 @@ export class MemberPaymentService {
     await assertBranchAccess(this.tenantId, actor.userId, branchId);
 
     if (input.membershipId) {
-      const membership = await this.db.membership.findFirst({ where: { tenantId: this.tenantId, id: input.membershipId, memberId: input.memberId } });
+      const membership = await this.db.membership.findFirst({
+        where: { tenantId: this.tenantId, id: input.membershipId, memberId: input.memberId },
+      });
       if (!membership) throw new NotFoundError('Membership not found for this member.');
     }
     if (input.invoiceId) {
-      const invoice = await this.db.memberInvoice.findFirst({ where: { tenantId: this.tenantId, id: input.invoiceId } });
+      const invoice = await this.db.memberInvoice.findFirst({
+        where: { tenantId: this.tenantId, id: input.invoiceId },
+      });
       if (!invoice) throw new NotFoundError('Invoice not found.');
       const existing = await this.payments.findActiveByInvoice(this.tenantId, input.invoiceId);
       if (existing) throw new ConflictError(ErrorCode.CONFLICT, 'This invoice already has an active payment recorded against it.');
@@ -187,7 +233,9 @@ export class MemberPaymentService {
     const discount = input.discount ?? 0;
     const tax = input.tax ?? 0;
     const finalAmount = Math.max(input.amount - discount + tax, 0);
-    const settings = await this.db.tenantSettings.findUnique({ where: { tenantId: this.tenantId } });
+    const settings = await this.db.tenantSettings.findUnique({
+      where: { tenantId: this.tenantId },
+    });
     const currency = (settings?.currency ?? 'INR').toUpperCase();
     const paymentNumber = await this.payments.nextPaymentNumber(this.tenantId);
 
@@ -272,7 +320,11 @@ export class MemberPaymentService {
 
     const updated = await this.mustFind(id, actor.userId);
     if (!wasSuccess && updated.status === 'SUCCESS') {
-      const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: updated.member.id } }));
+      const member = decryptMemberContactNullable(
+        await this.db.member.findFirst({
+          where: { tenantId: this.tenantId, id: updated.member.id },
+        }),
+      );
       await this.onPaymentSucceeded(updated, member!, updated.branch.id);
     }
     return toDetailDto((await this.payments.findById(this.tenantId, id))!);
@@ -305,10 +357,17 @@ export class MemberPaymentService {
     const link = await fetchPaymentLink(payment.transactionReference);
 
     if (link.status === 'paid') {
-      await this.payments.update(id, { status: 'SUCCESS', transactionReference: link.razorpayPaymentId ?? payment.transactionReference });
+      await this.payments.update(id, {
+        status: 'SUCCESS',
+        transactionReference: link.razorpayPaymentId ?? payment.transactionReference,
+      });
       await this.audit(actor, 'member_payment.payment_link_paid', id);
       const updated = await this.mustFind(id, actor.userId);
-      const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: updated.member.id } }));
+      const member = decryptMemberContactNullable(
+        await this.db.member.findFirst({
+          where: { tenantId: this.tenantId, id: updated.member.id },
+        }),
+      );
       await this.onPaymentSucceeded(updated, member!, updated.branch.id);
       return { status: 'SUCCESS', verifiedAt: new Date().toISOString() };
     }
@@ -316,10 +375,14 @@ export class MemberPaymentService {
     if (link.status === 'expired' || link.status === 'cancelled') {
       await this.payments.update(id, { status: 'FAILED' });
       await this.audit(actor, 'member_payment.payment_link_failed', id);
-      const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: payment.member.id } }));
+      const member = decryptMemberContactNullable(
+        await this.db.member.findFirst({
+          where: { tenantId: this.tenantId, id: payment.member.id },
+        }),
+      );
       if (member) {
         this.emitPaymentUpdated(member.id, `${member.firstName} ${member.lastName}`.trim(), 'FAILED');
-      await notifyPaymentFailed(this.tenantId, {
+        await notifyPaymentFailed(this.tenantId, {
           memberId: member.id,
           memberName: `${member.firstName} ${member.lastName}`.trim(),
           amount: Number(payment.finalAmount).toFixed(2),
@@ -346,16 +409,27 @@ export class MemberPaymentService {
     if (!payment || payment.status !== 'PENDING') return; // already resolved, or a retried/duplicate webhook delivery — idempotent no-op
 
     if (outcome === 'paid') {
-      await this.payments.update(paymentId, { status: 'SUCCESS', transactionReference: razorpayPaymentId ?? payment.transactionReference ?? undefined });
+      await this.payments.update(paymentId, {
+        status: 'SUCCESS',
+        transactionReference: razorpayPaymentId ?? payment.transactionReference ?? undefined,
+      });
       const updated = (await this.payments.findById(this.tenantId, paymentId))!;
-      const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: updated.member.id } }));
+      const member = decryptMemberContactNullable(
+        await this.db.member.findFirst({
+          where: { tenantId: this.tenantId, id: updated.member.id },
+        }),
+      );
       if (member) await this.onPaymentSucceeded(updated, member, updated.branch.id);
     } else {
       await this.payments.update(paymentId, { status: 'FAILED' });
-      const member = decryptMemberContactNullable(await this.db.member.findFirst({ where: { tenantId: this.tenantId, id: payment.member.id } }));
+      const member = decryptMemberContactNullable(
+        await this.db.member.findFirst({
+          where: { tenantId: this.tenantId, id: payment.member.id },
+        }),
+      );
       if (member) {
         this.emitPaymentUpdated(member.id, `${member.firstName} ${member.lastName}`.trim(), 'FAILED');
-      await notifyPaymentFailed(this.tenantId, {
+        await notifyPaymentFailed(this.tenantId, {
           memberId: member.id,
           memberName: `${member.firstName} ${member.lastName}`.trim(),
           amount: Number(payment.finalAmount).toFixed(2),
@@ -399,22 +473,11 @@ export class MemberPaymentService {
   async exportCsv(query: Partial<ListPaymentsQuery>, actorUserId: string): Promise<string> {
     const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
     const { items: rawItems } = await this.payments.list(this.tenantId, { page: 1, limit: 10_000, sortBy: 'paymentDate', sortDir: 'desc', ...query }, restrictToBranchIds);
-    const items = rawItems.map(toListDto);
+    const items = rawItems.map((row) => toListDto(row));
     const escape = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
     const header = 'Payment Number,Member,Amount,Discount,Tax,Final Amount,Method,Payment Date,Status,Transaction Reference';
     const rows = items.map((row) =>
-      [
-        row.paymentNumber,
-        row.member.name,
-        row.amount,
-        row.discount,
-        row.tax,
-        row.finalAmount,
-        row.method,
-        row.paymentDate,
-        row.status,
-        row.transactionReference ?? '',
-      ]
+      [row.paymentNumber, row.member.name, row.amount, row.discount, row.tax, row.finalAmount, row.method, row.paymentDate, row.status, row.transactionReference ?? '']
         .map((v) => escape(String(v)))
         .join(','),
     );
@@ -424,7 +487,7 @@ export class MemberPaymentService {
   async exportExcel(query: Partial<ListPaymentsQuery>, actorUserId: string): Promise<ExcelJS.Buffer> {
     const restrictToBranchIds = await this.resolveBranchRestriction(actorUserId);
     const { items: rawItems } = await this.payments.list(this.tenantId, { page: 1, limit: 10_000, sortBy: 'paymentDate', sortDir: 'desc', ...query }, restrictToBranchIds);
-    const items = rawItems.map(toListDto);
+    const items = rawItems.map((row) => toListDto(row));
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Payments');
     sheet.columns = [
@@ -477,11 +540,7 @@ export class MemberPaymentService {
    * a `MEMBERSHIP_FEE` income row so the revenue ledger stays in sync with
    * cash actually received.
    */
-  private async onPaymentSucceeded(
-    payment: MemberPaymentDetailRow,
-    member: { firstName: string; lastName: string; email: string | null },
-    branchId: string,
-  ): Promise<void> {
+  private async onPaymentSucceeded(payment: MemberPaymentDetailRow, member: { firstName: string; lastName: string; email: string | null }, branchId: string): Promise<void> {
     const balance = new MemberBalanceService(this.tenantId);
     if (!payment.invoiceId) {
       const items = [
@@ -502,7 +561,11 @@ export class MemberPaymentService {
       // second PAID invoice for the same money next to it.
       const openBalance = payment.membership ? await balance.findOpenBalanceInvoice(payment.membership.id) : null;
       if (openBalance && Number(payment.finalAmount) >= Number(openBalance.totalAmount) - 0.01) {
-        await this.invoiceService.settleBalanceWithReceipt(openBalance.id, { items, taxAmount, discountAmount });
+        await this.invoiceService.settleBalanceWithReceipt(openBalance.id, {
+          items,
+          taxAmount,
+          discountAmount,
+        });
         await this.payments.update(payment.id, { invoiceId: openBalance.id });
       } else {
         const invoice = await this.invoiceService.generateForPayment({
@@ -527,7 +590,9 @@ export class MemberPaymentService {
     await this.activatePendingMembershipIfAny(payment.member.id);
     if (payment.membership) await balance.reconcile(payment.membership.id);
 
-    const existingIncome = await this.db.income.findFirst({ where: { tenantId: this.tenantId, sourcePaymentId: payment.id } });
+    const existingIncome = await this.db.income.findFirst({
+      where: { tenantId: this.tenantId, sourcePaymentId: payment.id },
+    });
     if (!existingIncome) {
       await this.db.income.create({
         data: {
@@ -542,10 +607,10 @@ export class MemberPaymentService {
       });
     }
 
-    const settings = await this.db.tenantSettings.findUnique({ where: { tenantId: this.tenantId } });
-    const totalPaid = payment.membership
-      ? await this.payments.sumSuccessForMembership(this.tenantId, payment.membership.id)
-      : Number(payment.finalAmount);
+    const settings = await this.db.tenantSettings.findUnique({
+      where: { tenantId: this.tenantId },
+    });
+    const totalPaid = payment.membership ? await this.payments.sumSuccessForMembership(this.tenantId, payment.membership.id) : Number(payment.finalAmount);
     const openAfter = payment.membership ? await balance.findOpenBalanceInvoice(payment.membership.id) : null;
     const dueAmount = openAfter ? Number(openAfter.totalAmount) : 0;
     this.emitPaymentUpdated(payment.member.id, `${member.firstName} ${member.lastName}`.trim(), 'SUCCESS', Number(payment.finalAmount));
@@ -557,7 +622,11 @@ export class MemberPaymentService {
       paymentNumber: payment.paymentNumber,
       memberEmail: member.email,
       receipt: {
-        paymentDate: payment.paymentDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        paymentDate: payment.paymentDate.toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        }),
         method: payment.method,
         currencySymbol: settings?.currencySymbol ?? '₹',
         amountPaid: Number(payment.finalAmount),
@@ -567,7 +636,11 @@ export class MemberPaymentService {
         dueAmount,
         membershipPlanName: payment.membership?.plan.name ?? null,
         membershipValidTill: payment.membership
-          ? payment.membership.endDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+          ? payment.membership.endDate.toLocaleDateString('en-IN', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric',
+            })
           : null,
         transactionReference: payment.transactionReference,
       },
@@ -595,7 +668,10 @@ export class MemberPaymentService {
 
     const startDate = new Date();
     const endDate = addDuration(startDate, pending.plan.durationValue, pending.plan.durationType);
-    await this.db.membership.update({ where: { id: pending.id }, data: { status: 'ACTIVE', startDate, endDate } });
+    await this.db.membership.update({
+      where: { id: pending.id },
+      data: { status: 'ACTIVE', startDate, endDate },
+    });
   }
 
   private async audit(actor: IamActor, action: string, entityId: string): Promise<void> {

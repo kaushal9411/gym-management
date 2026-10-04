@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
+import '../models/notification_stats.dart';
 import '../models/notification_template.dart';
 import '../models/paginated_result.dart';
 import '../models/tenant_notification.dart';
@@ -10,15 +11,56 @@ class TenantNotificationRepository {
 
   final Dio _dio;
 
-  Future<PaginatedResult<TenantNotification>> list({int page = 1}) async {
+  Future<PaginatedResult<TenantNotification>> list({int page = 1}) async =>
+      (await listWithCounts(page: page)).page;
+
+  /// `GET /notifications` with the server-side `category` / `search` /
+  /// `unreadOnly` filters, plus the feed-wide `counts:{all,unread}` block
+  /// (null if an older API omits it).
+  Future<
+      ({
+        PaginatedResult<TenantNotification> page,
+        NotificationCounts? counts,
+      })> listWithCounts({
+    int page = 1,
+    String? category,
+    String? search,
+    bool unreadOnly = false,
+  }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/notifications',
-        queryParameters: {'page': page, 'limit': 20},
+        queryParameters: {
+          'page': page,
+          'limit': 20,
+          if (category != null) 'category': category,
+          if (search != null && search.trim().isNotEmpty)
+            'search': search.trim(),
+          if (unreadOnly) 'unreadOnly': true,
+        },
       );
-      return PaginatedResult.fromJson(
+      final data = response.data!['data'] as Map<String, dynamic>;
+      return (
+        page: PaginatedResult.fromJson(data, TenantNotification.fromJson),
+        counts: NotificationCounts.tryParse(data['counts']),
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /notifications/stats` (perm `notifications:view`).
+  Future<NotificationStats> stats({
+    required String dateFrom,
+    required String dateTo,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/notifications/stats',
+        queryParameters: {'dateFrom': dateFrom, 'dateTo': dateTo},
+      );
+      return NotificationStats.fromJson(
         response.data!['data'] as Map<String, dynamic>,
-        TenantNotification.fromJson,
       );
     } on DioException catch (e) {
       throw _mapError(e);

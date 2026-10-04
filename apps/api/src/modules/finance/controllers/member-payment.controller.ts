@@ -6,6 +6,7 @@ import type {
   CreatePaymentInput,
   CreatePaymentLinkInput,
   ListPaymentsQuery,
+  PaymentsAnalyticsQuery,
   RefundPaymentInput,
   ResendPaymentLinkNotificationInput,
   UpdatePaymentInput,
@@ -19,6 +20,10 @@ function serviceFor(req: Request): MemberPaymentService {
 export class MemberPaymentController {
   async list(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await serviceFor(req).list(req.query as unknown as ListPaymentsQuery, req.auth!.sub));
+  }
+
+  async analytics(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await serviceFor(req).analytics(req.query as unknown as PaymentsAnalyticsQuery, req.auth!.sub));
   }
 
   async getById(req: Request, res: Response): Promise<void> {

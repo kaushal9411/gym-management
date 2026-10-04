@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { memberRenewalPaymentParamSchema, memberVerifyRenewalCheckoutSchema } from './member-portal.validators';
+import { memberNotificationsQuerySchema, memberRenewalPaymentParamSchema, memberVerifyRenewalCheckoutSchema } from './member-portal.validators';
 
 describe('member-portal renewal validators', () => {
   describe('memberRenewalPaymentParamSchema', () => {
@@ -28,5 +28,18 @@ describe('member-portal renewal validators', () => {
     it('rejects an empty razorpayOrderId', () => {
       expect(memberVerifyRenewalCheckoutSchema.safeParse({ ...valid, razorpayOrderId: '' }).success).toBe(false);
     });
+  });
+});
+
+describe('memberNotificationsQuerySchema', () => {
+  it('parses the literal string "false" as false (not truthy)', () => {
+    expect(memberNotificationsQuerySchema.parse({ unreadOnly: 'false' }).unreadOnly).toBe(false);
+    expect(memberNotificationsQuerySchema.parse({ unreadOnly: 'true' }).unreadOnly).toBe(true);
+    expect(memberNotificationsQuerySchema.parse({}).unreadOnly).toBeUndefined();
+  });
+
+  it('accepts a known category and rejects an unknown one', () => {
+    expect(memberNotificationsQuerySchema.parse({ category: 'PAYMENT' }).category).toBe('PAYMENT');
+    expect(memberNotificationsQuerySchema.safeParse({ category: 'NOPE' }).success).toBe(false);
   });
 });

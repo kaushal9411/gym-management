@@ -9,6 +9,9 @@ import '../models/member_progress_row.dart';
 import '../models/membership_report_row.dart';
 import '../models/paginated_result.dart';
 import '../models/payment_report_row.dart';
+import '../models/payments_analytics.dart' show jsonMap;
+import '../models/report_summary.dart';
+import '../models/reports_overview.dart';
 import '../models/revenue_report_row.dart';
 import '../models/staff_report_row.dart';
 import '../models/trainer_performance_row.dart';
@@ -294,6 +297,62 @@ class ReportsRepository {
       return list
           .map((e) => ActiveVsInactiveRow.fromJson(e as Map<String, dynamic>))
           .toList();
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  String _day(DateTime d) => d.toIso8601String().substring(0, 10);
+
+  /// `GET /reports/overview` — KPIs vs previous period, daily series,
+  /// weekday/hourly attendance, status/plan/method/branch/trainer/expiring
+  /// blocks. Perm `reports:view` (403 for others — callers hide the UI).
+  /// Dates are UTC `YYYY-MM-DD` strings (the API buckets by UTC day).
+  Future<ReportsOverview> overview({
+    String? dateFrom,
+    String? dateTo,
+    String? branchId,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/reports/overview',
+        queryParameters: {
+          if (dateFrom != null) 'dateFrom': dateFrom,
+          if (dateTo != null) 'dateTo': dateTo,
+          if (branchId != null) 'branchId': branchId,
+        },
+      );
+      return ReportsOverview.fromJson(jsonMap(response.data!['data']));
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /reports/:type/summary` — [type] is one of the 11 list report
+  /// path segments (`membership`, `attendance`, `revenue`, `expenses`,
+  /// `payments`, `staff`, `trainer-performance`, `member-progress`,
+  /// `branch-performance`, `expiring-memberships`, `active-vs-inactive`).
+  /// Same filter names as the lists, no paging.
+  Future<ReportSummary> summary(
+    String type, [
+    ReportSummaryFilters filters = const ReportSummaryFilters(),
+  ]) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/reports/$type/summary',
+        queryParameters: {
+          if (filters.from != null) 'dateFrom': _day(filters.from!),
+          if (filters.to != null) 'dateTo': _day(filters.to!),
+          if (filters.branchId != null) 'branchId': filters.branchId,
+          if (filters.planId != null) 'planId': filters.planId,
+          if (filters.trainerId != null) 'trainerId': filters.trainerId,
+          if (filters.memberStatus != null)
+            'memberStatus': filters.memberStatus,
+          if (filters.paymentStatus != null)
+            'paymentStatus': filters.paymentStatus,
+        },
+      );
+      return ReportSummary.fromJson(jsonMap(response.data!['data']));
     } on DioException catch (e) {
       throw _mapError(e);
     }

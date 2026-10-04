@@ -5,14 +5,7 @@ import { Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingButton } from '@/components/ui/loading-button';
@@ -21,6 +14,7 @@ import { useTenant } from '@/features/tenant/tenant-provider';
 import { useSubmitHandler } from '@/hooks/use-submit-handler';
 import { useAppSelector } from '@/store/hooks';
 import { cn } from '@/lib/utils';
+import { SUPPORT_HERO_GRADIENT } from '../lib/ticket-meta';
 
 const textareaClassName = cn(
   'flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm',
@@ -82,14 +76,15 @@ export function ContactSalesDialog({ topic, triggerLabel, triggerVariant = 'outl
           {triggerLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{topic === 'sales' ? 'Talk to sales' : 'Contact billing'}</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-[520px] gap-0 overflow-y-auto rounded-3xl p-0 [&>button:last-child]:right-5 [&>button:last-child]:top-5 [&>button:last-child]:z-10 [&>button:last-child]:bg-white/20 [&>button:last-child]:text-white [&>button:last-child]:opacity-100 [&>button:last-child]:hover:bg-white/30">
+        <div className="px-6 py-[22px] text-white" style={{ backgroundImage: SUPPORT_HERO_GRADIENT }}>
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/80">Contact us</p>
+          <DialogTitle className="mt-1 pr-10 text-[22px] font-extrabold">{topic === 'sales' ? 'Talk to sales' : 'Contact billing'}</DialogTitle>
+          <DialogDescription className="mt-1 text-white/85">
             Tell us how to reach you — the {topic} team replies within one business day.
           </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
+        </div>
+        <form onSubmit={submit} className="space-y-4 px-6 py-6">
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">

@@ -1,70 +1,54 @@
 'use client';
 
-import Link from 'next/link';
-import { BarChart3 } from 'lucide-react';
-
-import { Card, CardHeader, CardInteractive, CardTitle } from '@/components/ui/card';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
-import { cn } from '@/lib/utils';
-import { REPORT_CARD_TONE_VAR, REPORT_CARDS } from '@/features/reports/components/report-cards';
+import { PeriodBar } from '@/features/finance/components/payments/period-bar';
 import { ScheduledReportsPanel } from '@/features/reports/components/scheduled-reports-panel';
+import { Reveal } from '@/features/reports/components/ui';
+import { HubCatalogue } from '@/features/reports/components/hub/hub-catalogue';
+import { HubHero, SCHEDULED_PANEL_ID } from '@/features/reports/components/hub/hub-hero';
+import { HubKpis } from '@/features/reports/components/hub/hub-kpis';
+import { HubInsights } from '@/features/reports/components/hub/hub-sections';
+import { useReportsOverview } from '@/features/reports/hooks/use-reports';
+import { useReportsControls } from '@/features/reports/hooks/use-reports-controls';
 
-export default function ReportsCenterPage() {
+export default function ReportsHubPage() {
   const { hasPermission } = usePermissions();
+  const c = useReportsControls('month');
+  const canView = hasPermission('reports:view');
+  const q = useReportsOverview(c.params, canView && c.rangeReady);
 
-  if (!hasPermission('reports:view')) {
+  if (!canView) {
     return <p className="text-sm text-muted-foreground">You don&apos;t have access to reports.</p>;
   }
 
+  const overview = q.data;
+  const loading = q.isPending && c.rangeReady;
+  const error = q.isError && !overview;
+  const periodLabel = c.rangeReady ? `${c.range.from} to ${c.range.to}` : 'select a valid range';
+  const shared = { overview, loading, error, compare: c.compare, previousLabel: c.previousLabel };
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <div
-            className="flex size-10 shrink-0 items-center justify-center rounded-xl sm:size-11"
-            style={{
-              backgroundColor: 'color-mix(in oklch, var(--primary) 16%, transparent)',
-              color: 'var(--primary)',
-              boxShadow: '0 0 0 1px color-mix(in oklch, var(--primary) 18%, transparent)',
-            }}
-          >
-            <BarChart3 className="size-5" aria-hidden />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Reports Center</h1>
-            <p className="text-muted-foreground">Named reports covering members, attendance, finance, staff, and branches.</p>
-          </div>
-        </div>
-        <Link href="/analytics" className="flex items-center gap-1.5 text-sm text-primary hover:underline">
-          <BarChart3 className="size-4" /> Go to Analytics Dashboard
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {REPORT_CARDS.map((card) => (
-          <Link key={card.reportType} href={`/reports/${card.reportType}`}>
-            <Card className={cn('h-full hover:border-primary/50', CardInteractive)}>
-              <CardHeader className="flex flex-row items-start gap-3 space-y-0">
-                <div
-                  className="flex size-9 shrink-0 items-center justify-center rounded-lg"
-                  style={{
-                    backgroundColor: `color-mix(in oklch, ${REPORT_CARD_TONE_VAR[card.tone]} 16%, transparent)`,
-                    color: REPORT_CARD_TONE_VAR[card.tone],
-                  }}
-                >
-                  <card.icon className="size-4.5" aria-hidden />
-                </div>
-                <div>
-                  <CardTitle className="text-base">{card.label}</CardTitle>
-                  <p className="text-sm text-muted-foreground">{card.description}</p>
-                </div>
-              </CardHeader>
-            </Card>
-          </Link>
-        ))}
-      </div>
-
-      <ScheduledReportsPanel />
+    <div className="min-w-0 space-y-5">
+      <HubHero overview={overview} loading={loading} periodLabel={periodLabel} />
+      <Reveal>
+        <PeriodBar
+          period={c.period}
+          onPeriod={c.changePeriod}
+          customFrom={c.custom.from}
+          customTo={c.custom.to}
+          onCustom={c.setDates}
+          branchId={c.branchId}
+          onBranch={c.changeBranch}
+          compare={c.compare}
+          onCompare={c.setCompare}
+        />
+      </Reveal>
+      <HubKpis overview={overview} loading={loading} compare={c.compare} />
+      <HubInsights {...shared} />
+      <HubCatalogue />
+      <Reveal id={SCHEDULED_PANEL_ID} className="scroll-mt-4">
+        <ScheduledReportsPanel />
+      </Reveal>
     </div>
   );
 }

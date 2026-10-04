@@ -37,6 +37,14 @@ export function errorHandlerMiddleware(
     return;
   }
 
+  // body-parser's oversize rejection (global 1 MB JSON cap) — a client error, not a 500.
+  if ((err as { type?: string })?.type === 'entity.too.large') {
+    sendError(res, 413, 'The request is too large. If you are uploading a photo, choose a smaller one.', [
+      { code: ErrorCode.VALIDATION_ERROR, message: 'Request body too large' },
+    ]);
+    return;
+  }
+
   logger.error('Unhandled error', {
     message: (err as Error)?.message,
     stack: (err as Error)?.stack,

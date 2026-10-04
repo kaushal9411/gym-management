@@ -1,18 +1,21 @@
 'use client';
 
 import * as React from 'react';
-import { Play, Plus, Trash2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { CalendarClock, Mail, Play, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { cn } from '@/lib/utils';
+import { accentChipStyle, accentWash } from '../lib/reports-theme';
+import { useMotionSafe } from '../lib/motion';
 import {
   toReportError,
   useCreateScheduledReport,
@@ -33,6 +36,7 @@ export function ScheduledReportsPanel() {
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('reports:export');
 
+  const m = useMotionSafe();
   const schedules = useScheduledReports();
   const createSchedule = useCreateScheduledReport();
   const deleteSchedule = useDeleteScheduledReport();
@@ -82,31 +86,53 @@ export function ScheduledReportsPanel() {
   };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base">Scheduled Reports</CardTitle>
+    <Card className="overflow-hidden rounded-[20px]">
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 border-b" style={{ backgroundImage: accentWash('analytics') }}>
+        <div className="flex items-center gap-3">
+          <span className="flex size-9 items-center justify-center rounded-xl" style={accentChipStyle('analytics')}>
+            <CalendarClock className="size-4.5" aria-hidden />
+          </span>
+          <div>
+            <CardTitle className="text-[17px] font-extrabold">Scheduled Reports</CardTitle>
+            <p className="text-[13px] text-muted-foreground">Automatic email delivery on a schedule</p>
+          </div>
+        </div>
         {canManage ? (
           <Button size="sm" onClick={() => setDialogOpen(true)}>
             <Plus className="size-4" /> Schedule a report
           </Button>
         ) : null}
       </CardHeader>
-      <CardContent className="space-y-2">
+      <CardContent className="space-y-1 pt-4">
         {schedules.isPending ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : (schedules.data ?? []).length === 0 ? (
           <p className="text-sm text-muted-foreground">No scheduled reports yet — set one up for automatic email delivery.</p>
         ) : (
-          (schedules.data ?? []).map((s) => (
-            <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 border-b pb-2 text-sm last:border-0 last:pb-0">
+          <AnimatePresence initial={false}>
+            {(schedules.data ?? []).map((s) => (
+            <motion.div
+              key={s.id}
+              layout={m.reduce ? false : 'position'}
+              initial={m.reduce ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={m.reduce ? undefined : { opacity: 0, x: -12 }}
+              transition={{ duration: 0.25 }}
+              className="-mx-2 flex flex-wrap items-center justify-between gap-2 rounded-xl px-2 py-2.5 text-sm transition-colors hover:bg-muted/60"
+            >
               <div>
-                <p className="font-medium">{s.name}</p>
+                <p className="flex items-center gap-1.5 font-semibold">
+                  <Mail className="size-3.5 text-muted-foreground" aria-hidden /> {s.name}
+                </p>
                 <p className="text-xs text-muted-foreground">
                   {s.reportType} · {s.frequency.toLowerCase()} · {s.recipientEmails.length} recipient(s) · next run {new Date(s.nextRunAt).toLocaleString()}
                 </p>
               </div>
               <div className="flex items-center gap-1.5">
-                <Badge variant={s.isActive ? 'secondary' : 'outline'}>{s.isActive ? 'Active' : 'Paused'}</Badge>
+                <Badge variant={s.isActive ? 'secondary' : 'outline'} className="gap-1.5">
+                  <span className={cn('size-1.5 rounded-full', s.isActive ? 'bg-success' : 'bg-muted-foreground/50')} aria-hidden />
+                  {s.isActive ? 'Active' : 'Paused'}
+                </Badge>
                 {canManage ? (
                   <>
                     <Button
@@ -132,8 +158,9 @@ export function ScheduledReportsPanel() {
                   </>
                 ) : null}
               </div>
-            </div>
-          ))
+            </motion.div>
+            ))}
+          </AnimatePresence>
         )}
       </CardContent>
 
@@ -144,11 +171,13 @@ export function ScheduledReportsPanel() {
           if (!open) resetForm();
         }}
       >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Schedule a report</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={submit} className="space-y-4">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-lg gap-0 overflow-y-auto rounded-3xl p-0 [&>button:last-child]:right-5 [&>button:last-child]:top-5 [&>button:last-child]:z-10 [&>button:last-child]:bg-white/20 [&>button:last-child]:text-white [&>button:last-child]:opacity-100 [&>button:last-child]:hover:bg-white/30">
+          <div className="px-6 py-[22px] text-white" style={{ backgroundImage: 'linear-gradient(115deg, #4338ca, #7c3aed 62%, #c026d3)' }}>
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/80">Automated delivery</p>
+            <DialogTitle className="mt-1 pr-10 text-[22px] font-extrabold">Schedule a report</DialogTitle>
+            <DialogDescription className="sr-only">Email a report to recipients on a daily, weekly or monthly schedule.</DialogDescription>
+          </div>
+          <form onSubmit={submit} className="space-y-4 px-6 py-6">
             {error ? (
               <p role="alert" className="text-sm text-destructive">
                 {error}

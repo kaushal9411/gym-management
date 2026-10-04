@@ -21,9 +21,19 @@ export interface TenantNotification {
   createdAt: string;
 }
 
+export interface NotificationListParams {
+  unreadOnly?: boolean;
+  page?: number;
+  limit?: number;
+  category?: NotificationCategory;
+  search?: string;
+}
+
 export interface NotificationListResult {
   items: TenantNotification[];
   unreadCount: number;
+  /** Tab counts for the current category/search filters (ignores `unreadOnly`). Absent until the API supports it. */
+  counts?: { all: number; unread: number };
   page: number;
   limit: number;
   total: number;
@@ -66,4 +76,29 @@ export interface UpdateNotificationTemplateInput {
   titleTemplate: string;
   bodyTemplate: string;
   isActive: boolean;
+}
+
+export interface NotificationStatsParams {
+  dateFrom: string;
+  dateTo: string;
+}
+
+interface StatsRange {
+  from: string;
+  to: string;
+}
+
+export interface NotificationStats {
+  range: StatsRange;
+  previousRange: StatsRange;
+  kpis: {
+    total: { value: number; previous: number };
+    unread: { value: number };
+    read: { value: number; previous: number };
+    /** 0..1 */
+    readRate: { value: number; previous: number };
+  };
+  daily: Array<{ date: string; total: number; read: number; previousTotal: number }>;
+  categories: Array<{ category: NotificationCategory; count: number; unread: number; previousCount: number }>;
+  hourly: Array<{ hour: number; count: number }>;
 }

@@ -2,20 +2,22 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Palette } from 'lucide-react';
+import { ImageIcon, Palette } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { ColorPicker } from '@/features/gym-settings/components/color-picker';
-import { GymSettingsNav } from '@/features/gym-settings/components/gym-settings-nav';
+import { BrandingPreview } from '@/features/gym-settings/components/previews';
+import { Field, SectionCard, SettingsLayout, selectClassName } from '@/features/gym-settings/components/settings-ui';
+import { SettingsHero } from '@/features/gym-settings/components/settings-hero';
+import { StaggerGroup } from '@/features/reports/components/ui';
 import { ImageUploadField } from '@/features/gym-settings/components/image-upload-field';
 import { UnsavedChangesBar } from '@/features/gym-settings/components/unsaved-changes-bar';
 import {
   toGymSettingsError,
+  useGymProfile,
   useBranding,
   useUpdateBranding,
   useUploadBrandingAsset,
@@ -23,13 +25,6 @@ import {
   useUploadLogo,
 } from '@/features/gym-settings/hooks/use-gym-settings';
 import type { ThemePreference } from '@/features/gym-settings/types';
-import { cn } from '@/lib/utils';
-
-const selectClassName = cn(
-  'flex h-10 w-full items-center rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs transition-all duration-150',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring',
-  'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted/40',
-);
 
 interface ColorForm {
   primaryColor: string;
@@ -117,31 +112,22 @@ export default function BrandingPage() {
     }
   };
 
+  const profile = useGymProfile();
+  const uploadedCount = branding.data ? [branding.data.logoUrl, branding.data.faviconUrl, branding.data.loginBackgroundUrl, branding.data.dashboardBannerUrl, branding.data.emailLogoUrl].filter(Boolean).length : null;
+
   return (
     <div className="space-y-5">
-      <div className="flex items-start gap-3">
-        <div
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl"
-          style={{
-            backgroundColor: 'color-mix(in oklch, var(--chart-3) 16%, transparent)',
-            color: 'var(--chart-3)',
-            boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-3) 18%, transparent)',
-          }}
-        >
-          <Palette className="size-5" aria-hidden />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Branding</h1>
-          <p className="text-muted-foreground">Your gym&apos;s colors, logo, and images across the portal, login, and emails.</p>
-        </div>
-      </div>
-
-      <GymSettingsNav />
+      <SettingsHero
+        title="Branding"
+        subtitle="Your gym's colors, logo, and images across the portal, login, and emails."
+        icon={Palette}
+        stats={uploadedCount !== null ? [{ label: 'Images uploaded (of 5)', value: uploadedCount, format: 'number' }] : undefined}
+      />
 
       {branding.isPending || !form ? (
         <div className="space-y-4">
-          <Skeleton className="h-48 w-full" />
-          <Skeleton className="h-48 w-full" />
+          <Skeleton className="h-48 w-full rounded-[20px]" />
+          <Skeleton className="h-48 w-full rounded-[20px]" />
         </div>
       ) : branding.isError ? (
         <p className="text-sm text-destructive">Couldn&apos;t load branding — try refreshing.</p>
@@ -151,104 +137,53 @@ export default function BrandingPage() {
             <UnsavedChangesBar isDirty={isDirty} saving={updateBranding.isPending} onSave={() => void handleSave()} onCancel={handleCancel} />
           ) : null}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Theme colors</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <ColorPicker
-                  id="primaryColor"
-                  label="Primary color"
-                  value={form.primaryColor}
-                  disabled={!canManage}
-                  onChange={(value) => setForm({ ...form, primaryColor: value })}
+          <SettingsLayout
+            aside={
+              <StaggerGroup className="space-y-5">
+                <BrandingPreview
+                  primaryColor={form.primaryColor}
+                  secondaryColor={form.secondaryColor}
+                  theme={form.theme}
+                  welcomeMessage={form.welcomeMessage}
+                  logoUrl={branding.data.logoUrl}
+                  loginBackgroundUrl={branding.data.loginBackgroundUrl}
+                  dashboardBannerUrl={branding.data.dashboardBannerUrl}
+                  gymName={profile.data?.gymName ?? ''}
                 />
-                <ColorPicker
-                  id="secondaryColor"
-                  label="Secondary color"
-                  value={form.secondaryColor}
-                  disabled={!canManage}
-                  onChange={(value) => setForm({ ...form, secondaryColor: value })}
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="theme" required>Theme</Label>
-                  <select
-                    id="theme"
-                    className={selectClassName}
-                    value={form.theme}
-                    disabled={!canManage}
-                    onChange={(e) => setForm({ ...form, theme: e.target.value as ThemePreference })}
-                  >
-                    <option value="SYSTEM">Match device</option>
-                    <option value="LIGHT">Light</option>
-                    <option value="DARK">Dark</option>
-                  </select>
+              </StaggerGroup>
+            }
+          >
+            <StaggerGroup className="space-y-5">
+              <SectionCard tone="staff" icon={Palette} title="Theme colors" subtitle="Applied to the sidebar, buttons and login screen.">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <ColorPicker id="primaryColor" label="Primary color" value={form.primaryColor} disabled={!canManage} onChange={(value) => setForm({ ...form, primaryColor: value })} />
+                  <ColorPicker id="secondaryColor" label="Secondary color" value={form.secondaryColor} disabled={!canManage} onChange={(value) => setForm({ ...form, secondaryColor: value })} />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="welcomeMessage">Login welcome message</Label>
-                  <Input
-                    id="welcomeMessage"
-                    value={form.welcomeMessage}
-                    disabled={!canManage}
-                    onChange={(e) => setForm({ ...form, welcomeMessage: e.target.value })}
-                  />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Theme" htmlFor="theme" required>
+                    <select id="theme" className={selectClassName} value={form.theme} disabled={!canManage} onChange={(e) => setForm({ ...form, theme: e.target.value as ThemePreference })}>
+                      <option value="SYSTEM">Match device</option>
+                      <option value="LIGHT">Light</option>
+                      <option value="DARK">Dark</option>
+                    </select>
+                  </Field>
+                  <Field label="Login welcome message" htmlFor="welcomeMessage">
+                    <Input id="welcomeMessage" value={form.welcomeMessage} disabled={!canManage} onChange={(e) => setForm({ ...form, welcomeMessage: e.target.value })} />
+                  </Field>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </SectionCard>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Images</CardTitle>
-              <CardDescription>Uploads are resized in your browser and saved immediately.</CardDescription>
-            </CardHeader>
-            <CardContent className="divide-y divide-border [&>*+*]:pt-6">
-              <ImageUploadField
-                label="Gym logo"
-                description="Shown in the sidebar and login screen."
-                value={branding.data.logoUrl}
-                maxDimension={512}
-                disabled={!canManage}
-                onUpload={(dataUrl, onProgress) => handleUpload('logo', dataUrl, onProgress)}
-              />
-              <ImageUploadField
-                label="Favicon"
-                description="Shown in the browser tab."
-                value={branding.data.faviconUrl}
-                maxDimension={64}
-                previewClassName="size-10"
-                disabled={!canManage}
-                onUpload={(dataUrl, onProgress) => handleUpload('favicon', dataUrl, onProgress)}
-              />
-              <ImageUploadField
-                label="Login background image"
-                value={branding.data.loginBackgroundUrl}
-                maxDimension={1280}
-                previewClassName="h-16 w-28"
-                disabled={!canManage}
-                onUpload={(dataUrl, onProgress) => handleUpload('loginBackgroundUrl', dataUrl, onProgress)}
-              />
-              <ImageUploadField
-                label="Dashboard banner"
-                value={branding.data.dashboardBannerUrl}
-                maxDimension={1280}
-                previewClassName="h-16 w-28"
-                disabled={!canManage}
-                onUpload={(dataUrl, onProgress) => handleUpload('dashboardBannerUrl', dataUrl, onProgress)}
-              />
-              <ImageUploadField
-                label="Email logo"
-                description="Used in transactional emails sent to your staff and members."
-                value={branding.data.emailLogoUrl}
-                maxDimension={512}
-                disabled={!canManage}
-                onUpload={(dataUrl, onProgress) => handleUpload('emailLogoUrl', dataUrl, onProgress)}
-              />
-            </CardContent>
-          </Card>
+              <SectionCard tone="members" icon={ImageIcon} title="Images" subtitle="Uploads are resized in your browser and saved immediately.">
+                <div className="divide-y divide-border [&>*+*]:pt-6 [&>*]:pb-6 [&>*:last-child]:pb-0">
+                  <ImageUploadField label="Gym logo" description="Shown in the sidebar and login screen." value={branding.data.logoUrl} maxDimension={512} disabled={!canManage} onUpload={(dataUrl, onProgress) => handleUpload('logo', dataUrl, onProgress)} />
+                  <ImageUploadField label="Favicon" description="Shown in the browser tab." value={branding.data.faviconUrl} maxDimension={64} previewClassName="size-10" disabled={!canManage} onUpload={(dataUrl, onProgress) => handleUpload('favicon', dataUrl, onProgress)} />
+                  <ImageUploadField label="Login background image" value={branding.data.loginBackgroundUrl} maxDimension={1280} previewClassName="h-16 w-28" disabled={!canManage} onUpload={(dataUrl, onProgress) => handleUpload('loginBackgroundUrl', dataUrl, onProgress)} />
+                  <ImageUploadField label="Dashboard banner" value={branding.data.dashboardBannerUrl} maxDimension={1280} previewClassName="h-16 w-28" disabled={!canManage} onUpload={(dataUrl, onProgress) => handleUpload('dashboardBannerUrl', dataUrl, onProgress)} />
+                  <ImageUploadField label="Email logo" description="Used in transactional emails sent to your staff and members." value={branding.data.emailLogoUrl} maxDimension={512} disabled={!canManage} onUpload={(dataUrl, onProgress) => handleUpload('emailLogoUrl', dataUrl, onProgress)} />
+                </div>
+              </SectionCard>
+            </StaggerGroup>
+          </SettingsLayout>
         </>
       )}
     </div>

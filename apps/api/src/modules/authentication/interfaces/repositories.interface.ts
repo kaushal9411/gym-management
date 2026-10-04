@@ -127,5 +127,6 @@ export interface IAuditLogRepository {
     entityId?: string;
     ipAddress?: string;
     userAgent?: string;
+    after?: Record<string, unknown>;
   }): Promise<void>;
 }

@@ -5,7 +5,12 @@ import { authenticateMiddleware } from '../../authentication/middlewares/authent
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
 import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { ticketController } from '../controllers/ticket.controller';
-import { createTicketSchema, listTicketsQuerySchema, ticketIdParamSchema } from '../validators/ticket.validators';
+import {
+  createTicketSchema,
+  listTicketsQuerySchema,
+  ticketIdParamSchema,
+  ticketStatsQuerySchema,
+} from '../validators/ticket.validators';
 
 export const ticketRouter: Router = Router();
 
@@ -24,6 +29,14 @@ ticketRouter.get(
   requirePermission('support:view'),
   validate({ query: listTicketsQuerySchema }),
   asyncHandler(ticketController.list.bind(ticketController)),
+);
+
+/** @openapi { "/support/tickets/stats": { get: { tags: [Support], summary: "Ticket analytics (created vs previous range, status/priority splits, oldest unresolved)", security: [{bearerAuth: []}], parameters: [{in: query, name: dateFrom, schema: {type: string}}, {in: query, name: dateTo, schema: {type: string}}], responses: { 200: { description: OK } } } } } */
+ticketRouter.get(
+  '/stats',
+  requirePermission('support:view'),
+  validate({ query: ticketStatsQuerySchema }),
+  asyncHandler(ticketController.stats.bind(ticketController)),
 );
 
 /** @openapi { "/support/tickets/{ticketId}": { get: { tags: [Support], summary: Ticket detail, security: [{bearerAuth: []}], responses: { 200: { description: Ticket } } } } } */

@@ -87,7 +87,17 @@ class MemberPayment {
   /// What's still refundable — the backend rejects a refund beyond this.
   double get refundableAmount => finalAmount - totalRefunded;
 
-  bool get canRefund => status == 'SUCCESS' && refundableAmount > 0;
+  bool get canRefund =>
+      (status == 'SUCCESS' || status == 'PARTIALLY_REFUNDED') &&
+      refundableAmount > 0;
+
+  /// Status the payment will have after refunding [amount] more — mirrors
+  /// the backend rule (balance left → PARTIALLY_REFUNDED, else REFUNDED).
+  /// [amount] null means "full remainder".
+  String statusAfterRefund(double? amount) {
+    final remaining = refundableAmount - (amount ?? refundableAmount);
+    return remaining > 0.004 ? 'PARTIALLY_REFUNDED' : 'REFUNDED';
+  }
 
   /// The API only allows cancelling a payment that hasn't been refunded.
   bool get canCancel =>
@@ -121,5 +131,26 @@ class MemberPayment {
         totalRefunded: json['totalRefunded'] == null
             ? 0
             : double.parse(json['totalRefunded'] as String),
+      );
+}
+
+/// `summary` block of `GET /payments` — totals for the filtered result set
+/// (not just the loaded page). Decimal strings on the wire.
+class PaymentListSummary {
+  const PaymentListSummary({
+    required this.collectedTotal,
+    required this.refundedTotal,
+  });
+
+  final double collectedTotal;
+  final double refundedTotal;
+
+  static double _d(Object? v) =>
+      v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
+
+  factory PaymentListSummary.fromJson(Map<String, dynamic> json) =>
+      PaymentListSummary(
+        collectedTotal: _d(json['collectedTotal']),
+        refundedTotal: _d(json['refundedTotal']),
       );
 }

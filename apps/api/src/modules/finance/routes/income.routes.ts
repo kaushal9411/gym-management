@@ -5,7 +5,7 @@ import { authenticateMiddleware } from '../../authentication/middlewares/authent
 import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
 import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { incomeController } from '../controllers/income.controller';
-import { createIncomeSchema, idParamSchema, listIncomeQuerySchema, updateIncomeSchema } from '../validators/finance.validators';
+import { createIncomeSchema, idParamSchema, ledgerAnalyticsQuerySchema, listIncomeQuerySchema, updateIncomeSchema } from '../validators/finance.validators';
 
 export const incomeRouter: Router = Router();
 
@@ -24,6 +24,9 @@ incomeRouter.get('/export', requirePermission('finance:view'), asyncHandler(inco
 /** @openapi { "/income/export/excel": { get: { tags: [Finance], summary: "Download filtered income as an Excel workbook", security: [{bearerAuth: []}], responses: { 200: { description: XLSX file } } } } } */
 incomeRouter.get('/export/excel', requirePermission('finance:view'), asyncHandler(incomeController.exportExcel.bind(incomeController)));
 
+/** @openapi { "/income/analytics": { get: { tags: [Finance], summary: "Income analytics for a date range vs the preceding equal-length range (KPIs incl. net profit, daily series, categories, branches, top entries)", security: [{bearerAuth: []}], responses: { 200: { description: "{ range, previousRange, kpis, daily, categories, branches, topEntries }" } } } } } */
+incomeRouter.get('/analytics', requirePermission('finance:view'), validate({ query: ledgerAnalyticsQuerySchema }), asyncHandler(incomeController.analytics.bind(incomeController)));
+
 /**
  * @openapi
  * /income:
@@ -32,7 +35,7 @@ incomeRouter.get('/export/excel', requirePermission('finance:view'), asyncHandle
  *     summary: Paginated income ledger with search + filters (category, branch, date range)
  *     security: [{ bearerAuth: [] }]
  *     responses:
- *       200: { description: "{ items, total, page, limit, totalPages }" }
+ *       200: { description: "{ items, total, page, limit, totalPages, summary:{total,count,average} }" }
  */
 incomeRouter.get('/', requirePermission('finance:view'), validate({ query: listIncomeQuerySchema }), asyncHandler(incomeController.list.bind(incomeController)));
 
@@ -51,9 +54,4 @@ incomeRouter.patch(
 );
 
 /** @openapi { "/income/{id}": { delete: { tags: [Finance], summary: "Soft-delete an income entry", security: [{bearerAuth: []}], responses: { 200: { description: Income deleted } } } } } */
-incomeRouter.delete(
-  '/:id',
-  requirePermission('finance:income-manage'),
-  validate({ params: idParamSchema }),
-  asyncHandler(incomeController.softDelete.bind(incomeController)),
-);
+incomeRouter.delete('/:id', requirePermission('finance:income-manage'), validate({ params: idParamSchema }), asyncHandler(incomeController.softDelete.bind(incomeController)));

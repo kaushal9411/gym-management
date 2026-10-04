@@ -10,6 +10,7 @@ import {
   createPaymentSchema,
   idParamSchema,
   listPaymentsQuerySchema,
+  paymentsAnalyticsQuerySchema,
   refundPaymentSchema,
   resendPaymentLinkNotificationSchema,
   updatePaymentSchema,
@@ -32,17 +33,30 @@ memberPaymentRouter.get('/export', requirePermission('finance:view'), asyncHandl
 /** @openapi { "/payments/export/excel": { get: { tags: [Finance], summary: "Download filtered payment history as an Excel workbook", security: [{bearerAuth: []}], responses: { 200: { description: XLSX file } } } } } */
 memberPaymentRouter.get('/export/excel', requirePermission('finance:view'), asyncHandler(memberPaymentController.exportExcel.bind(memberPaymentController)));
 
+/** @openapi { "/payments/analytics": { get: { tags: [Finance], summary: "Payments analytics for a date range vs the preceding equal-length range (KPIs, daily series, methods, statuses, branches, top plans, attention counts)", security: [{bearerAuth: []}], responses: { 200: { description: "{ range, previousRange, kpis, daily, methods, statuses, branches, topPlans, attention }" } } } } } */
+memberPaymentRouter.get(
+  '/analytics',
+  requirePermission('finance:view'),
+  validate({ query: paymentsAnalyticsQuerySchema }),
+  asyncHandler(memberPaymentController.analytics.bind(memberPaymentController)),
+);
+
 /**
  * @openapi
  * /payments:
  *   get:
  *     tags: [Finance]
- *     summary: Paginated payment history with search + filters (member, branch, method, status, date range)
+ *     summary: Paginated payment history with search + filters (member, branch, method, status, date range, planId, minAmount, maxAmount)
  *     security: [{ bearerAuth: [] }]
  *     responses:
- *       200: { description: "{ items, total, page, limit, totalPages }" }
+ *       200: { description: "{ items (each with totalRefunded), total, page, limit, totalPages, summary: { collectedTotal, refundedTotal } }" }
  */
-memberPaymentRouter.get('/', requirePermission('finance:view'), validate({ query: listPaymentsQuerySchema }), asyncHandler(memberPaymentController.list.bind(memberPaymentController)));
+memberPaymentRouter.get(
+  '/',
+  requirePermission('finance:view'),
+  validate({ query: listPaymentsQuerySchema }),
+  asyncHandler(memberPaymentController.list.bind(memberPaymentController)),
+);
 
 /** @openapi { "/payments": { post: { tags: [Finance], summary: "Record a payment — auto-generates an invoice on success unless invoiceId settles an existing one", security: [{bearerAuth: []}], responses: { 201: { description: Payment recorded } } } } } */
 memberPaymentRouter.post(

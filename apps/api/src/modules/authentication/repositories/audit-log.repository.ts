@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 import type { TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import type { IAuditLogRepository } from '../interfaces/repositories.interface';
 
@@ -13,6 +15,8 @@ export class AuditLogRepository implements IAuditLogRepository {
     entityId?: string;
     ipAddress?: string;
     userAgent?: string;
+    /** Optional structured detail (field names, never PII values). */
+    after?: Record<string, unknown>;
   }): Promise<void> {
     await this.db.auditLog.create({
       data: {
@@ -24,6 +28,7 @@ export class AuditLogRepository implements IAuditLogRepository {
         entityId: input.entityId,
         ipAddress: input.ipAddress,
         userAgent: input.userAgent,
+        after: input.after as Prisma.InputJsonObject | undefined,
       },
     });
   }

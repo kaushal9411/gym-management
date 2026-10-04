@@ -51,6 +51,12 @@ const memberAuthSlice = createSlice({
       state.refreshToken = action.payload.refreshToken;
       state.accessTokenExpiresAt = action.payload.accessTokenExpiresAt;
     },
+    memberProfileUpdated(state, action: PayloadAction<{ name: string; email: string | null }>) {
+      if (state.member) {
+        state.member.name = action.payload.name;
+        state.member.email = action.payload.email;
+      }
+    },
     memberAuthFailed(state, action: PayloadAction<{ code: MemberAuthErrorCode; message: string }>) {
       state.error = action.payload;
       state.status = action.payload.code === 'ACCOUNT_LOCKED' ? 'locked' : action.payload.code === 'ACCOUNT_SUSPENDED' ? 'suspended' : 'error';
@@ -72,6 +78,7 @@ export const {
   memberAuthStarted,
   memberSessionEstablished,
   memberTokensRefreshed,
+  memberProfileUpdated,
   memberAuthFailed,
   memberBootstrapFinished,
   memberAuthReset,

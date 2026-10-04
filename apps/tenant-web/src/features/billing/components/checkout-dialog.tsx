@@ -19,14 +19,10 @@ import { cn } from '@/lib/utils';
 import { loadRazorpayScript } from '@/lib/razorpay-checkout';
 import { toBillingError, useCheckout, useValidateCoupon, useVerifyCheckout } from '../hooks/use-billing';
 import type { BillingCycle, SubscriptionPlan } from '../types';
+import { formatMoney as formatMoneyBase } from './billing-ui';
 
-function formatMoney(amount: number, currency: string): string {
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 2 }).format(amount);
-  } catch {
-    return `${currency} ${amount}`;
-  }
-}
+const formatMoney = (amount: number, currency: string) => formatMoneyBase(amount, currency, 2);
+
 
 interface CheckoutDialogProps {
   open: boolean;
@@ -145,9 +141,9 @@ export function CheckoutDialog({ open, onOpenChange, targetPlan, currentSortOrde
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Switch to {targetPlan.name}</DialogTitle>
-          <DialogDescription>Tax is calculated automatically from your billing address.</DialogDescription>
+        <DialogHeader className="-mx-6 -mt-6 rounded-t-2xl px-6 py-5 text-white" style={{ backgroundImage: 'linear-gradient(115deg, #4338ca, #7c3aed 62%, #c026d3)' }}>
+          <DialogTitle className="text-xl font-extrabold">Switch to {targetPlan.name}</DialogTitle>
+          <DialogDescription className="text-white/85">Tax is calculated automatically from your billing address.</DialogDescription>
         </DialogHeader>
 
         <FormAlert variant="error" message={error} />
@@ -171,7 +167,7 @@ export function CheckoutDialog({ open, onOpenChange, targetPlan, currentSortOrde
             </div>
           </div>
 
-          <div className="rounded-lg border border-input bg-muted/40 p-3 text-sm">
+          <div className="rounded-2xl border bg-muted/40 p-4 text-sm">
             <div className="flex items-center justify-between">
               <span>
                 {targetPlan.name} ({billingCycle.toLowerCase()})

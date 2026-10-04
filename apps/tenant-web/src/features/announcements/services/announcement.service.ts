@@ -1,7 +1,9 @@
 import { apiClient } from '@/features/auth/services/api-client';
 import type {
+  AnnouncementListParams,
   AnnouncementListResult,
-  AnnouncementStatus,
+  AnnouncementStats,
+  AnnouncementStatsParams,
   CreateAnnouncementInput,
   ScheduleAnnouncementInput,
   TenantAnnouncement,
@@ -15,8 +17,13 @@ interface ApiEnvelope<T> {
 }
 
 class AnnouncementService {
-  async list(params: { status?: AnnouncementStatus; page?: number; limit?: number } = {}): Promise<AnnouncementListResult> {
+  async list(params: AnnouncementListParams = {}): Promise<AnnouncementListResult> {
     const res = await apiClient.get<ApiEnvelope<AnnouncementListResult>>('/tenant-announcements', { params });
+    return res.data.data;
+  }
+
+  async getStats(params: AnnouncementStatsParams): Promise<AnnouncementStats> {
+    const res = await apiClient.get<ApiEnvelope<AnnouncementStats>>('/tenant-announcements/stats', { params });
     return res.data.data;
   }
 

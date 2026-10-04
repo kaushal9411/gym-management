@@ -105,3 +105,91 @@ export interface CreateScheduledReportPayload {
   branchId?: string;
   isActive?: boolean;
 }
+
+// ── Reports redesign: overview + per-report summary (money = decimal strings, counts = numbers) ──
+
+export interface DateRange {
+  from: string;
+  to: string;
+}
+
+export interface MetricPair {
+  value: number;
+  previous?: number;
+}
+
+export interface MoneyPair {
+  value: string;
+  previous?: string;
+}
+
+export interface OverviewKpis {
+  revenue: MoneyPair;
+  expenses: MoneyPair;
+  netProfit: MoneyPair;
+  newMembers: MetricPair;
+  activeMembers: { value: number };
+  checkIns: MetricPair;
+  avgDailyCheckIns: MetricPair;
+  expiringIn30d: { value: number };
+  churned: MetricPair;
+}
+
+export interface OverviewDailyPoint {
+  date: string;
+  revenue: string;
+  expenses: string;
+  checkIns: number;
+  newMembers: number;
+  prevRevenue: string;
+  prevExpenses: string;
+  prevCheckIns: number;
+  prevNewMembers: number;
+}
+
+export interface ReportsOverview {
+  range: DateRange;
+  previousRange: DateRange;
+  kpis: OverviewKpis;
+  daily: OverviewDailyPoint[];
+  weekdayAttendance: Array<{ weekday: number | string; count: number; previousCount: number }>;
+  hourlyAttendance: Array<{ hour: number; count: number }>;
+  memberStatus: Array<{ status: string; count: number }>;
+  planDistribution: Array<{ planName: string; activeCount: number; revenue: string }>;
+  paymentMethods: Array<{ method: string; amount: string; count: number }>;
+  branches: Array<{ branchId: string; name: string; revenue: string; previousRevenue: string; newMembers: number; checkIns: number; activeMembers: number }>;
+  topTrainers: Array<{ trainerId: string; name: string; assignedMembers: number }>;
+  expiringBuckets: Array<{ label: string; count: number }>;
+}
+
+export interface ReportsOverviewParams {
+  dateFrom?: string;
+  dateTo?: string;
+  branchId?: string;
+}
+
+export type SummaryValueFormat = 'number' | 'money' | 'percent' | 'text';
+
+export interface ReportSummaryKpi {
+  key: string;
+  label: string;
+  /** Number, decimal string (money) or text depending on `format`. */
+  value: number | string;
+  format: SummaryValueFormat;
+  previous?: number | string;
+}
+
+export interface ReportSummaryBreakdown {
+  key: string;
+  title: string;
+  kind: 'donut' | 'bar';
+  items: Array<{ label: string; value: number; previous?: number }>;
+}
+
+export interface ReportSummary {
+  range?: DateRange;
+  previousRange?: DateRange;
+  kpis: ReportSummaryKpi[];
+  breakdowns: ReportSummaryBreakdown[];
+  series: { title: string; points: Array<{ date: string; value: number; previous?: number }> } | null;
+}

@@ -2,7 +2,12 @@ import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
 import { actorFrom } from '../../authentication/utils/actor.util';
-import type { CreateTenantAnnouncementInput, ListAnnouncementsQuery, ScheduleAnnouncementInput, UpdateTenantAnnouncementInput } from '../dto/tenant-announcement.dto';
+import type {
+  CreateTenantAnnouncementInput,
+  ListAnnouncementsQuery,
+  ScheduleAnnouncementInput,
+  UpdateTenantAnnouncementInput,
+} from '../dto/tenant-announcement.dto';
 import { TenantAnnouncementService } from '../services/tenant-announcement.service';
 
 function serviceFor(req: Request): TenantAnnouncementService {
@@ -14,17 +19,29 @@ export class TenantAnnouncementController {
     sendSuccess(res, await serviceFor(req).list(req.query as unknown as ListAnnouncementsQuery));
   }
 
+  async stats(req: Request, res: Response): Promise<void> {
+    const { dateFrom, dateTo } = req.query as { dateFrom?: string; dateTo?: string };
+    sendSuccess(res, await serviceFor(req).stats(dateFrom, dateTo));
+  }
+
   async getById(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await serviceFor(req).getById(req.params.id!));
   }
 
   async create(req: Request, res: Response): Promise<void> {
-    const announcement = await serviceFor(req).create(req.body as CreateTenantAnnouncementInput, actorFrom(req));
+    const announcement = await serviceFor(req).create(
+      req.body as CreateTenantAnnouncementInput,
+      actorFrom(req),
+    );
     sendSuccess(res, announcement, 'Announcement created.', 201);
   }
 
   async update(req: Request, res: Response): Promise<void> {
-    const announcement = await serviceFor(req).update(req.params.id!, req.body as UpdateTenantAnnouncementInput, actorFrom(req));
+    const announcement = await serviceFor(req).update(
+      req.params.id!,
+      req.body as UpdateTenantAnnouncementInput,
+      actorFrom(req),
+    );
     sendSuccess(res, announcement, 'Announcement updated.');
   }
 
@@ -39,7 +56,11 @@ export class TenantAnnouncementController {
   }
 
   async schedule(req: Request, res: Response): Promise<void> {
-    const announcement = await serviceFor(req).schedule(req.params.id!, req.body as ScheduleAnnouncementInput, actorFrom(req));
+    const announcement = await serviceFor(req).schedule(
+      req.params.id!,
+      req.body as ScheduleAnnouncementInput,
+      actorFrom(req),
+    );
     sendSuccess(res, announcement, 'Announcement scheduled.');
   }
 }

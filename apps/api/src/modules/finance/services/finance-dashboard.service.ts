@@ -4,11 +4,15 @@ import { ExpenseRepository } from '../repositories/expense.repository';
 import { IncomeRepository } from '../repositories/income.repository';
 import { MemberPaymentRepository, type MemberPaymentListRow } from '../repositories/member-payment.repository';
 
-function toListItem(row: MemberPaymentListRow) {
+function toListItem(row: MemberPaymentListRow, totalRefunded = 0) {
   return {
     id: row.id,
     paymentNumber: row.paymentNumber,
-    member: { id: row.member.id, memberId: row.member.memberId, name: `${row.member.firstName} ${row.member.lastName}`.trim() },
+    member: {
+      id: row.member.id,
+      memberId: row.member.memberId,
+      name: `${row.member.firstName} ${row.member.lastName}`.trim(),
+    },
     branch: { id: row.branch.id, name: row.branch.name },
     membership: row.membership ? { id: row.membership.id, planName: row.membership.plan.name } : null,
     invoiceId: row.invoiceId,
@@ -21,6 +25,7 @@ function toListItem(row: MemberPaymentListRow) {
     transactionReference: row.transactionReference,
     status: row.status,
     createdAt: row.createdAt.toISOString(),
+    totalRefunded: totalRefunded.toFixed(2),
   };
 }
 
@@ -60,6 +65,10 @@ export class FinanceDashboardService {
       Promise.resolve(addDaysStr(todayStr, -29)),
     ]);
 
+    const refunded = await this.payments.refundTotalsByPayment(
+      this.tenantId,
+      recentPayments.map((p) => p.id),
+    );
     const trendFromDate = new Date(`${trendFrom}T00:00:00.000Z`);
     const [incomeDaily, expenseDaily] = await Promise.all([
       this.income.dailyTotalsForRange(this.tenantId, trendFromDate, todayEnd, branchId),
@@ -70,7 +79,11 @@ export class FinanceDashboardService {
 
     const revenueTrend: Array<{ date: string; income: number; expenses: number }> = [];
     for (let d = trendFrom; d <= todayStr; d = addDaysStr(d, 1)) {
-      revenueTrend.push({ date: d, income: incomeByDate.get(d) ?? 0, expenses: expenseByDate.get(d) ?? 0 });
+      revenueTrend.push({
+        date: d,
+        income: incomeByDate.get(d) ?? 0,
+        expenses: expenseByDate.get(d) ?? 0,
+      });
     }
 
     return {
@@ -79,7 +92,7 @@ export class FinanceDashboardService {
       monthlyExpenses: monthlyExpenses.toFixed(2),
       outstandingPayments: outstanding.total.toFixed(2),
       outstandingInvoiceCount: outstanding.count,
-      recentPayments: recentPayments.map(toListItem),
+      recentPayments: recentPayments.map((row) => toListItem(row, refunded.get(row.id) ?? 0)),
       revenueTrend,
     };
   }

@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../bloc/common/period_stats_cubit.dart';
+import '../../../bloc/session/session_cubit.dart';
+import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/member_invoice.dart';
+import '../../../models/member_overview.dart';
 import '../../../models/member_portal_profile.dart';
 import '../../../models/member_visit.dart';
 import '../../../models/member_workout_assignment.dart';
@@ -14,8 +19,10 @@ import '../../../repositories/member_portal_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/notification_bell_icon.dart';
+import '../../../shared/widgets/user_avatar.dart';
 import 'member_dashboard_detail_sheet.dart';
 import 'member_renew_sheet.dart';
+import 'widgets/member_insights.dart';
 
 /// Design frame "4. Dashboard". The design's "Renew membership" CTA (frame
 /// "4a. Renew — Confirm & pay") is now built — `MemberRenewSheet`, opened
@@ -42,10 +49,26 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
   bool _loading = true;
   String? _error;
 
+  /// Drives the Insights section (`GET /portal/overview`). Reuses the
+  /// generic [PeriodStatsCubit] — the fetcher ignores the date range since
+  /// the member overview has no period chips. A failure only hides the
+  /// section; it never affects the rest of the dashboard.
+  late final PeriodStatsCubit<MemberOverview> _insights =
+      PeriodStatsCubit<MemberOverview>(
+    ({required String dateFrom, required String dateTo}) =>
+        getIt<MemberPortalRepository>().overview(),
+  );
+
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _insights.close();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -53,6 +76,8 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
       _loading = true;
       _error = null;
     });
+    // Fire-and-forget: independent of the core dashboard fetches below.
+    _insights.load(null, true);
     try {
       final repo = getIt<MemberPortalRepository>();
       // Fired in parallel (not individually awaited yet) — a plain
@@ -170,6 +195,15 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
     final profile = _profile;
     if (profile == null) return const SizedBox.shrink();
 
+    // Name/photo follow the session so a self-service edit shows up here
+    // immediately (this tab is cached by the shell's IndexedStack).
+    final session = context.watch<SessionCubit>().state;
+    final sessionMember =
+        session is SessionAuthenticatedMember ? session.member : null;
+    final displayName = (sessionMember?.name.isNotEmpty ?? false)
+        ? sessionMember!.name
+        : profile.name;
+
     return RefreshIndicator(
       color: AppColors.memberB,
       backgroundColor: AppColors.surface2,
@@ -184,28 +218,16 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(_greeting, style: AppText.eyebrow()),
-                    Text(profile.name, style: AppText.display(size: 22)),
+                    Text(displayName, style: AppText.display(size: 22)),
                   ],
                 ),
               ),
               const NotificationBellIcon(isStaff: false),
               const SizedBox(width: 10),
-              Container(
-                width: 38,
-                height: 38,
-                decoration: const BoxDecoration(
-                  gradient: AppColors.memberGrad,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  profile.initials,
-                  style: AppText.body(
-                    size: 12,
-                    weight: FontWeight.w800,
-                    color: AppColors.memberOnGrad,
-                  ),
-                ),
+              UserAvatar(
+                avatarUrl: sessionMember?.profilePhotoUrl,
+                name: displayName,
+                role: AppRole.member,
               ),
             ],
           ),
@@ -297,6 +319,11 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 18),
+          BlocProvider<PeriodStatsCubit<MemberOverview>>.value(
+            value: _insights,
+            child: const MemberInsightsSection(),
           ),
         ],
       ),
@@ -392,7 +419,7 @@ class _MembershipCard extends StatelessWidget {
               role: AppRole.member,
               size: AppButtonSize.small,
               fullWidth: false,
-              onPressed: () => _openRenewSheet(context, membership!.planName),
+              onPressed: () => _openRenewSheet(context, membership.planName),
             ),
           ],
         ],

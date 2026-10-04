@@ -45,8 +45,8 @@ export class AnalyticsController {
   }
 
   async branchComparison(req: Request, res: Response): Promise<void> {
-    const branchId = req.query.branchId as string | undefined;
-    sendSuccess(res, await serviceFor(req).branchComparison(req.auth!.sub, branchId));
+    const { dateFrom, dateTo, branchId } = req.query as TrendQuery;
+    sendSuccess(res, await serviceFor(req).branchComparison(req.auth!.sub, branchId, dateFrom, dateTo));
   }
 }
 

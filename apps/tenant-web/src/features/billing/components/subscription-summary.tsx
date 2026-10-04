@@ -1,113 +1,121 @@
 'use client';
 
 import * as React from 'react';
-import { toast } from 'sonner';
+import { CalendarClock, CreditCard, Hourglass, ShieldAlert } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { FormAlert } from '@/features/auth/components/form-alert';
 import { LoadingButton } from '@/components/ui/loading-button';
-import { cn } from '@/lib/utils';
-import { toBillingError, useCancelSubscription } from '../hooks/use-billing';
+import { PanelCard } from '@/features/finance/components/payments/payments-ui';
+import { FormAlert } from '@/features/auth/components/form-alert';
 import type { Subscription } from '../types';
+import { formatDate, formatMoney, StatusPill } from './billing-ui';
 
-const STATUS_STYLES: Record<string, string> = {
-  TRIALING: 'bg-primary/10 text-primary',
-  ACTIVE: 'bg-success/10 text-success',
-  PAST_DUE: 'bg-warning/15 text-warning-foreground',
-  GRACE: 'bg-warning/15 text-warning-foreground',
-  SUSPENDED: 'bg-destructive/10 text-destructive',
-  CANCELED: 'bg-muted text-muted-foreground',
-  EXPIRED: 'bg-muted text-muted-foreground',
-};
+const DAY_MS = 86_400_000;
 
-function formatDate(value: string | null): string {
-  return value ? new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+/** Days left until `end` (ceil, floored at 0) and % of the current period elapsed. Null when the period has no end. */
+export function periodProgress(subscription: Subscription): { daysLeft: number; elapsedPct: number } | null {
+  if (!subscription.currentPeriodEnd) return null;
+  const start = new Date(subscription.currentPeriodStart).getTime();
+  const end = new Date(subscription.currentPeriodEnd).getTime();
+  const now = Date.now();
+  const total = Math.max(end - start, 1);
+  return { daysLeft: Math.max(Math.ceil((end - now) / DAY_MS), 0), elapsedPct: Math.min(Math.max(((now - start) / total) * 100, 0), 100) };
 }
 
-export function SubscriptionSummary({ subscription, onCancelled }: { subscription: Subscription; onCancelled: () => void }) {
-  const cancel = useCancelSubscription();
-  const [confirmingCancel, setConfirmingCancel] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+export function isCancellable(subscription: Subscription): boolean {
+  return subscription.status !== 'CANCELED' && subscription.status !== 'EXPIRED';
+}
 
-  const handleCancel = (immediate: boolean) => {
-    setError(null);
-    cancel.mutate(
-      { immediate, reason: 'Cancelled from billing portal' },
-      {
-        onSuccess: () => {
-          toast.success(immediate ? 'Subscription cancelled' : 'Subscription will cancel at period end');
-          setConfirmingCancel(false);
-          onCancelled();
-        },
-        onError: (err) => setError(toBillingError(err).message),
-      },
-    );
-  };
+interface SubscriptionSummaryProps {
+  subscription: Subscription;
+  confirmingCancel: boolean;
+  onKeep: () => void;
+  onCancel: (immediate: boolean) => void;
+  cancelling: boolean;
+  error: string | null;
+}
+
+/** Overview cards: plan + period progress, and a details panel. The Cancel button itself lives in the hero; its confirm bar renders here. */
+export function SubscriptionSummary({ subscription, confirmingCancel, onKeep, onCancel, cancelling, error }: SubscriptionSummaryProps) {
+  const progress = periodProgress(subscription);
+  const yearly = subscription.billingCycle === 'YEARLY';
+  const price = yearly ? subscription.plan.priceYearly : subscription.plan.priceMonthly;
+  const periodLabel = subscription.cancelAtPeriodEnd ? 'Ends on' : 'Renews on';
 
   return (
-    <Card>
-      <CardContent className="space-y-4 p-5">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">Current plan</p>
-            <h2 className="text-xl font-semibold">{subscription.plan.name}</h2>
-          </div>
-          <Badge className={cn('border-transparent', STATUS_STYLES[subscription.status] ?? 'bg-muted text-muted-foreground')}>
-            {subscription.status.replace('_', ' ')}
-          </Badge>
-        </div>
+    <div className="space-y-4">
+      {subscription.cancelAtPeriodEnd ? (
+        <FormAlert variant="error" message={`This subscription will cancel on ${formatDate(subscription.currentPeriodEnd)}.`} />
+      ) : null}
+      <FormAlert variant="error" message={error} />
 
-        <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
-          <div>
-            <p className="text-muted-foreground">Billing cycle</p>
-            <p className="font-medium">{subscription.billingCycle === 'YEARLY' ? 'Yearly' : 'Monthly'}</p>
+      {confirmingCancel && isCancellable(subscription) ? (
+        <div className="flex flex-col gap-2 rounded-2xl border border-destructive/30 bg-destructive/5 p-3 sm:flex-row">
+          <LoadingButton variant="outline" className="flex-1" onClick={() => onCancel(false)} loading={cancelling} loadingText="Cancelling…">
+            Cancel at period end
+          </LoadingButton>
+          <LoadingButton variant="destructive" className="flex-1" onClick={() => onCancel(true)} loading={cancelling} loadingText="Cancelling…">
+            Cancel immediately
+          </LoadingButton>
+          <Button variant="ghost" onClick={onKeep} disabled={cancelling}>
+            Keep subscription
+          </Button>
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <PanelCard title={subscription.plan.name} subtitle={subscription.plan.description} action={<StatusPill status={subscription.status} />}>
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <span className="text-[34px] font-extrabold tabular-nums">{formatMoney(price, subscription.plan.currency)}</span>
+            <span className="text-sm font-semibold text-muted-foreground">/ {yearly ? 'year' : 'month'}</span>
           </div>
-          <div>
-            <p className="text-muted-foreground">Current period ends</p>
-            <p className="font-medium">{formatDate(subscription.currentPeriodEnd)}</p>
-          </div>
-          {subscription.status === 'TRIALING' ? (
-            <div>
-              <p className="text-muted-foreground">Trial ends</p>
-              <p className="font-medium">{formatDate(subscription.trialEndsAt)}</p>
+
+          {progress ? (
+            <div className="mt-5">
+              <div className="mb-1.5 flex justify-between text-[13px] font-semibold">
+                <span>{progress.daysLeft} {progress.daysLeft === 1 ? 'day' : 'days'} remaining</span>
+                <span className="text-muted-foreground">{Math.round(progress.elapsedPct)}% of period used</span>
+              </div>
+              <div
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(progress.elapsedPct)}
+                aria-label="Billing period elapsed"
+                className="h-2.5 overflow-hidden rounded-full bg-muted"
+              >
+                <div className="h-full rounded-full" style={{ width: `${progress.elapsedPct}%`, backgroundImage: 'linear-gradient(90deg, var(--chart-1), var(--chart-3))' }} />
+              </div>
+              <div className="mt-1.5 flex justify-between text-xs text-muted-foreground">
+                <span>{formatDate(subscription.currentPeriodStart)}</span>
+                <span>{formatDate(subscription.currentPeriodEnd)}</span>
+              </div>
             </div>
           ) : null}
-          {subscription.graceEndsAt ? (
-            <div>
-              <p className="text-muted-foreground">Grace period ends</p>
-              <p className="font-medium">{formatDate(subscription.graceEndsAt)}</p>
-            </div>
-          ) : null}
-        </div>
+        </PanelCard>
 
-        {subscription.cancelAtPeriodEnd ? (
-          <FormAlert variant="error" message={`This subscription will cancel on ${formatDate(subscription.currentPeriodEnd)}.`} />
-        ) : null}
+        <PanelCard title="Subscription details" subtitle="From your current subscription">
+          <dl className="space-y-3 text-sm">
+            <Row icon={<CreditCard className="size-4" />} label="Billing cycle" value={yearly ? 'Yearly' : 'Monthly'} />
+            <Row icon={<CalendarClock className="size-4" />} label="Period started" value={formatDate(subscription.currentPeriodStart)} />
+            <Row icon={<CalendarClock className="size-4" />} label={periodLabel} value={formatDate(subscription.currentPeriodEnd)} />
+            {subscription.status === 'TRIALING' ? <Row icon={<Hourglass className="size-4" />} label="Trial ends" value={formatDate(subscription.trialEndsAt)} /> : null}
+            {subscription.graceEndsAt ? <Row icon={<ShieldAlert className="size-4" />} label="Grace period ends" value={formatDate(subscription.graceEndsAt)} /> : null}
+          </dl>
+        </PanelCard>
+      </div>
+    </div>
+  );
+}
 
-        <FormAlert variant="error" message={error} />
-
-        {subscription.status !== 'CANCELED' && subscription.status !== 'EXPIRED' ? (
-          confirmingCancel ? (
-            <div className="flex flex-col gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 sm:flex-row">
-              <LoadingButton variant="outline" className="flex-1" onClick={() => handleCancel(false)} loading={cancel.isPending} loadingText="Cancelling…">
-                Cancel at period end
-              </LoadingButton>
-              <LoadingButton variant="destructive" className="flex-1" onClick={() => handleCancel(true)} loading={cancel.isPending} loadingText="Cancelling…">
-                Cancel immediately
-              </LoadingButton>
-              <Button variant="ghost" onClick={() => setConfirmingCancel(false)} disabled={cancel.isPending}>
-                Keep subscription
-              </Button>
-            </div>
-          ) : (
-            <Button variant="outline" size="sm" onClick={() => setConfirmingCancel(true)}>
-              Cancel subscription
-            </Button>
-          )
-        ) : null}
-      </CardContent>
-    </Card>
+function Row({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b pb-3 last:border-0 last:pb-0">
+      <dt className="flex items-center gap-2 text-muted-foreground">
+        {icon}
+        {label}
+      </dt>
+      <dd className="font-bold">{value}</dd>
+    </div>
   );
 }

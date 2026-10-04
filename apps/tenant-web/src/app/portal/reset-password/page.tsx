@@ -29,7 +29,7 @@ const itemVariants = {
 };
 
 const DARK_FIELD_CLASS =
-  'h-12 border-white/10 bg-white/4 text-white placeholder:text-white/35 focus-visible:border-orange-400/50 focus-visible:ring-orange-400/20';
+  'h-12 border-white/10 bg-white/4 text-white placeholder:text-white/35 focus-visible:border-primary focus-visible:ring-primary/30';
 
 /**
  * Member-plane counterpart to `reset-password-form.tsx` — same neon shell
@@ -85,13 +85,13 @@ export default function MemberResetPasswordPage() {
           background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%);
         }
         .login-ripple-btn {
-          background-image: linear-gradient(135deg, #ff8a3d 0%, #ff5a1f 45%, #e0271b 100%);
+          background-image: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklab, var(--primary) 70%, black) 100%);
           transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease-out;
-          box-shadow: 0 8px 24px -6px rgba(255, 90, 31, 0.55);
+          box-shadow: 0 8px 24px -6px color-mix(in oklab, var(--primary) 55%, transparent);
         }
         .login-ripple-btn:hover {
           transform: translateY(-2px);
-          box-shadow: 0 16px 36px -8px rgba(255, 90, 31, 0.7);
+          box-shadow: 0 16px 36px -8px color-mix(in oklab, var(--primary) 70%, transparent);
         }
         .login-ripple-btn:active {
           transform: translateY(0) scale(0.98);
@@ -99,6 +99,12 @@ export default function MemberResetPasswordPage() {
       `}</style>
 
       <LoginHero backgroundImageUrl={tenant.branding.loginBackgroundUrl} />
+      {/* Tenant-primary wash over the shared hero backdrop (branding follows the gym's colour). */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 -z-0 opacity-70"
+        style={{ background: 'radial-gradient(120% 70% at 50% 0%, color-mix(in oklab, var(--primary) 45%, transparent), transparent 70%)' }}
+      />
 
       <main className="flex flex-1 items-center justify-center px-4 py-10">
         <motion.div
@@ -110,10 +116,10 @@ export default function MemberResetPasswordPage() {
           <motion.div variants={containerVariants} initial="hidden" animate="show">
             <motion.div
               variants={itemVariants}
-              className="login-glass-card relative rounded-4xl border border-white/10 p-6 shadow-[0_0_60px_-15px_rgba(255,90,31,0.25),0_0_80px_-20px_rgba(34,211,238,0.15)] backdrop-blur-2xl sm:p-8"
+              className="login-glass-card relative rounded-4xl border border-white/10 p-6 shadow-[0_0_60px_-15px_color-mix(in_oklab,var(--primary)_30%,transparent),0_0_80px_-20px_rgba(34,211,238,0.15)] backdrop-blur-2xl sm:p-8"
             >
               <div className="mb-7 flex flex-col items-center gap-3 text-center">
-                <div className="flex size-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5 p-2 shadow-[0_0_24px_rgba(255,138,61,0.25)]">
+                <div className="flex size-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5 p-2 shadow-[0_0_24px_color-mix(in_oklab,var(--primary)_35%,transparent)]">
                   <TenantLogo size="lg" className="size-full rounded-xl" />
                 </div>
                 <div>

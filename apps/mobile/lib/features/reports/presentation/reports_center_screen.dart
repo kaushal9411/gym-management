@@ -1,10 +1,18 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../bloc/reports/reports_overview_cubit.dart';
+import '../../../bloc/session/session_cubit.dart';
+import '../../../bloc/session/session_state.dart';
+import '../../../core/di/service_locator.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import 'widgets/reports_insights_header.dart';
 
 class _ReportEntry {
   const _ReportEntry({
@@ -128,52 +136,101 @@ const _sections = [
 /// working, and view-only — no report renders a transaction/payment-record
 /// table for its own sake, matching the rest of this app's "charts and
 /// summaries, not ledgers" convention.
-class ReportsCenterScreen extends StatelessWidget {
+///
+/// Above the report links sits the animated [ReportsInsightsHeader]
+/// (`GET /reports/overview`), hidden without `reports:view`. This screen is
+/// an `IndexedStack` tab (Owner shell), so `initState` runs once at shell
+/// construction and never again on tab switch — hence pull-to-refresh
+/// reloads the insights, and the period chips reload them too.
+class ReportsCenterScreen extends StatefulWidget {
   const ReportsCenterScreen({super.key});
+
+  @override
+  State<ReportsCenterScreen> createState() => _ReportsCenterScreenState();
+}
+
+class _ReportsCenterScreenState extends State<ReportsCenterScreen> {
+  late final ReportsOverviewCubit _overview;
+
+  bool get _canView {
+    final session = context.read<SessionCubit>().state;
+    return session is SessionAuthenticatedStaff &&
+        session.user.hasPermission('reports:view');
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _overview = getIt<ReportsOverviewCubit>();
+    if (_canView) {
+      unawaited(_overview.load());
+    } else {
+      _overview.hide();
+    }
+  }
+
+  @override
+  void dispose() {
+    _overview.close();
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    if (_canView) await _overview.load();
+  }
 
   @override
   Widget build(BuildContext context) {
     final total = _sections.fold<int>(0, (n, s) => n + s.reports.length);
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 90),
-      children: [
-        Text(
-          '$total named reports · ${_sections.length} categories',
-          style: AppText.eyebrow(),
-        ),
-        Text('Reports Center', style: AppText.display(size: 22)),
-        const SizedBox(height: 4),
-        Text(
-          'Covering members, attendance, finance, staff, and branches.',
-          style: AppText.body(size: 12, color: AppColors.inkFaint),
-        ),
-        const SizedBox(height: 16),
-        _AnalyticsBanner(onTap: () => context.push(AppRoutes.analytics)),
-        for (final section in _sections) ...[
-          const SizedBox(height: 22),
-          Text(section.label, style: AppText.eyebrow()),
-          const SizedBox(height: 10),
-          for (final report in section.reports) ...[
-            _ReportTile(
-              entry: report,
-              onTap: () => context.push(report.route),
+    return BlocProvider<ReportsOverviewCubit>.value(
+      value: _overview,
+      child: RefreshIndicator(
+        color: AppColors.staffB,
+        onRefresh: _refresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 90),
+          children: [
+            Text(
+              '$total named reports · ${_sections.length} categories',
+              style: AppText.eyebrow(),
             ),
-            const SizedBox(height: 8),
+            Text('Reports Center', style: AppText.display(size: 22)),
+            const SizedBox(height: 4),
+            Text(
+              'Covering members, attendance, finance, staff, and branches.',
+              style: AppText.body(size: 12, color: AppColors.inkFaint),
+            ),
+            const SizedBox(height: 16),
+            const ReportsInsightsHeader(),
+            _AnalyticsBanner(onTap: () => context.push(AppRoutes.analytics)),
+            for (final section in _sections) ...[
+              const SizedBox(height: 22),
+              Text(section.label, style: AppText.eyebrow()),
+              const SizedBox(height: 10),
+              for (final report in section.reports) ...[
+                _ReportTile(
+                  entry: report,
+                  onTap: () => context.push(report.route),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ],
+            const SizedBox(height: 22),
+            Text('Automation', style: AppText.eyebrow()),
+            const SizedBox(height: 10),
+            _ReportTile(
+              entry: const _ReportEntry(
+                icon: Icons.event_note_outlined,
+                title: 'Scheduled Reports',
+                subtitle: 'Schedule a report to run and email automatically.',
+                route: AppRoutes.scheduledReports,
+              ),
+              onTap: () => context.push(AppRoutes.scheduledReports),
+            ),
           ],
-        ],
-        const SizedBox(height: 22),
-        Text('Automation', style: AppText.eyebrow()),
-        const SizedBox(height: 10),
-        _ReportTile(
-          entry: const _ReportEntry(
-            icon: Icons.event_note_outlined,
-            title: 'Scheduled Reports',
-            subtitle: 'Schedule a report to run and email automatically.',
-            route: AppRoutes.scheduledReports,
-          ),
-          onTap: () => context.push(AppRoutes.scheduledReports),
         ),
-      ],
+      ),
     );
   }
 }

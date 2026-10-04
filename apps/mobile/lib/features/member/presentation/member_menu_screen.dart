@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/user_avatar.dart';
 
 class _MenuEntry {
   const _MenuEntry({
@@ -44,6 +45,12 @@ const _entries = [
     route: AppRoutes.memberInvoices,
   ),
   _MenuEntry(
+    icon: Icons.payments_outlined,
+    title: 'Payments',
+    subtitle: 'Receipts and refunds',
+    route: AppRoutes.memberPayments,
+  ),
+  _MenuEntry(
     icon: Icons.straighten_outlined,
     title: 'Body Measurements',
     subtitle: 'Your progress over time',
@@ -54,6 +61,12 @@ const _entries = [
     title: 'Profile',
     subtitle: 'Your details',
     route: AppRoutes.memberProfile,
+  ),
+  _MenuEntry(
+    icon: Icons.storefront_outlined,
+    title: 'Gym info',
+    subtitle: 'Hours, address and contact',
+    route: AppRoutes.memberGymInfo,
   ),
   _MenuEntry(
     icon: Icons.download_outlined,
@@ -77,8 +90,9 @@ class MemberMenuScreen extends StatelessWidget {
     final session = context.watch<SessionCubit>().state;
     final name =
         session is SessionAuthenticatedMember ? session.member.name : '';
-    final initials =
-        session is SessionAuthenticatedMember ? session.member.initials : '';
+    final photoUrl = session is SessionAuthenticatedMember
+        ? session.member.profilePhotoUrl
+        : null;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 90),
@@ -94,22 +108,10 @@ class MemberMenuScreen extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              width: 38,
-              height: 38,
-              decoration: const BoxDecoration(
-                gradient: AppColors.memberGrad,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                initials,
-                style: AppText.body(
-                  size: 12,
-                  weight: FontWeight.w800,
-                  color: AppColors.memberOnGrad,
-                ),
-              ),
+            UserAvatar(
+              avatarUrl: photoUrl,
+              name: name,
+              role: AppRole.member,
             ),
           ],
         ),

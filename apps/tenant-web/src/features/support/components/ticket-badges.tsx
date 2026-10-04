@@ -1,39 +1,31 @@
-import { Badge, type BadgeProps } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { PRIORITY_META, STATUS_META, tint } from '../lib/ticket-meta';
 import type { TicketPriority, TicketStatus } from '../types';
 
-const STATUS_VARIANT: Record<TicketStatus, NonNullable<BadgeProps['variant']>> = {
-  OPEN: 'warning',
-  IN_PROGRESS: 'outline',
-  RESOLVED: 'success',
-  CLOSED: 'secondary',
-};
-
-const STATUS_LABEL: Record<TicketStatus, string> = {
-  OPEN: 'Open',
-  IN_PROGRESS: 'In progress',
-  RESOLVED: 'Resolved',
-  CLOSED: 'Closed',
-};
-
-const PRIORITY_VARIANT: Record<TicketPriority, NonNullable<BadgeProps['variant']>> = {
-  LOW: 'secondary',
-  MEDIUM: 'outline',
-  HIGH: 'warning',
-  URGENT: 'destructive',
-};
-
-export function TicketStatusBadge({ status }: { status: TicketStatus }) {
+/** Coloured pill (inline-flex span, safe inside <p>); tint + text come from the status colour token. */
+export function TicketStatusBadge({ status, className }: { status: TicketStatus; className?: string }) {
+  const meta = STATUS_META[status];
+  const Icon = meta.icon;
   return (
-    <Badge variant={STATUS_VARIANT[status]} className="font-medium">
-      {STATUS_LABEL[status]}
-    </Badge>
+    <span
+      className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold', className)}
+      style={{ backgroundColor: tint(meta.color, 15), color: `color-mix(in oklch, ${meta.color} 75%, var(--foreground))` }}
+    >
+      <Icon className="size-3" aria-hidden />
+      {meta.label}
+    </span>
   );
 }
 
-export function TicketPriorityBadge({ priority }: { priority: TicketPriority }) {
+export function TicketPriorityBadge({ priority, className }: { priority: TicketPriority; className?: string }) {
+  const meta = PRIORITY_META[priority];
   return (
-    <Badge variant={PRIORITY_VARIANT[priority]} className="font-medium">
-      {priority}
-    </Badge>
+    <span
+      className={cn('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-bold', className)}
+      style={{ borderColor: tint(meta.color, 35), color: `color-mix(in oklch, ${meta.color} 75%, var(--foreground))` }}
+    >
+      <span className="size-1.5 rounded-full" style={{ backgroundColor: meta.color }} aria-hidden />
+      {meta.label}
+    </span>
   );
 }

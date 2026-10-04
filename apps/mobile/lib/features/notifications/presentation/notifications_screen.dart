@@ -1,16 +1,24 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../bloc/common/paginated_list_cubit.dart';
 import '../../../bloc/common/paginated_list_state.dart';
+import '../../../bloc/common/period_stats_cubit.dart';
+import '../../../bloc/session/session_cubit.dart';
+import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../models/notification_stats.dart';
 import '../../../models/tenant_notification.dart';
 import '../../../repositories/tenant_notification_repository.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/list_filters.dart';
+import 'widgets/notification_insights_header.dart';
 
 const _categoryIcons = {
   'PAYMENT': Icons.payments_outlined,
@@ -21,61 +29,110 @@ const _categoryIcons = {
   'SUPPORT': Icons.support_agent_outlined,
 };
 
-/// The design's filter pills. `GET /notifications` takes no category
-/// query param (only `unreadOnly`/paging), so filtering is applied to the
-/// fetched page client-side on each item's real `category`.
-enum _NotificationFilter { all, payments, members }
+/// Filter chip keys: `all`, `unread`, or a real category API value.
+const _filterAll = 'all';
+const _filterUnread = 'unread';
 
-extension _NotificationFilterX on _NotificationFilter {
-  String get label => switch (this) {
-        _NotificationFilter.all => 'All',
-        _NotificationFilter.payments => 'Payments',
-        _NotificationFilter.members => 'Members',
-      };
+/// Categories offered as chips (the staff-relevant ones); any other category
+/// present in the insights is appended so nothing is unreachable.
+const _chipCategories = [
+  'PAYMENT',
+  'MEMBER',
+  'MEMBERSHIP',
+  'ATTENDANCE',
+  'SUBSCRIPTION',
+  'ANNOUNCEMENT',
+  'SYSTEM',
+  'STAFF',
+];
 
-  bool matches(TenantNotification n) => switch (this) {
-        _NotificationFilter.all => true,
-        _NotificationFilter.payments => n.category == 'PAYMENT',
-        _NotificationFilter.members =>
-          n.category == 'MEMBER' || n.category == 'MEMBERSHIP',
-      };
-}
-
-/// Design frame "17. Notifications" — unread count, All/Payments/Members
-/// filter pills and a per-row unread dot, over `GET /notifications` +
-/// mark-read/read-all. No Socket.IO live-push wiring in this pass, so new
-/// notifications appear on pull-to-refresh rather than instantly.
-class NotificationsScreen extends StatelessWidget {
+/// Design frame "17. Notifications" — an animated insights header
+/// (`GET /notifications/stats`), All / Unread / per-category chips and a
+/// search box that all use the SERVER-side `unreadOnly` / `category` /
+/// `search` params (the old client-side-after-pagination filtering is gone),
+/// then the feed with a per-row unread dot over `GET /notifications` +
+/// mark-read/read-all. No Socket.IO live-push wiring, so new notifications
+/// appear on pull-to-refresh.
+///
+/// Read state is tenant-wide: one `readAt` shared by every staff user, so
+/// "Mark all read" clears the feed for the whole team — the button's
+/// tooltip and the Unread KPI say so.
+///
+/// Chip counts: the API's `counts` block only has `all` and `unread`, so only
+/// those two chips carry a number; per-category figures live in the
+/// insights' "By category" block (they are period-scoped, so putting them on
+/// all-time chips would mislead).
+class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return BlocProvider<PaginatedListCubit<TenantNotification>>(
-      create: (_) => PaginatedListCubit<TenantNotification>(
-        (page) => getIt<TenantNotificationRepository>().list(page: page),
-      )..load(),
-      child: const _NotificationsView(),
-    );
-  }
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsView extends StatefulWidget {
-  const _NotificationsView();
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  late final PaginatedListCubit<TenantNotification> _list;
+  late final NotificationStatsCubit _stats;
+  final ValueNotifier<NotificationCounts?> _counts = ValueNotifier(null);
+  bool _markingAll = false;
+  String _filter = _filterAll;
+  String _search = '';
+
+  bool get _canViewStats {
+    final session = context.read<SessionCubit>().state;
+    return session is SessionAuthenticatedStaff &&
+        session.user.hasPermission('notifications:view');
+  }
 
   @override
-  State<_NotificationsView> createState() => _NotificationsViewState();
-}
+  void initState() {
+    super.initState();
+    final repo = getIt<TenantNotificationRepository>();
+    _list = PaginatedListCubit<TenantNotification>((page) async {
+      final r = await repo.listWithCounts(
+        page: page,
+        category: (_filter == _filterAll || _filter == _filterUnread)
+            ? null
+            : _filter,
+        unreadOnly: _filter == _filterUnread,
+        search: _search,
+      );
+      if (r.counts != null) _counts.value = r.counts;
+      return r.page;
+    })
+      ..load();
+    _stats = NotificationStatsCubit(repo.stats);
+    if (_canViewStats) {
+      unawaited(_stats.load());
+    } else {
+      _stats.hide();
+    }
+  }
 
-class _NotificationsViewState extends State<_NotificationsView> {
-  bool _markingAll = false;
-  _NotificationFilter _filter = _NotificationFilter.all;
+  @override
+  void dispose() {
+    _list.close();
+    _stats.close();
+    _counts.dispose();
+    super.dispose();
+  }
+
+  Future<void> _refresh({bool silentStats = false}) async {
+    if (_canViewStats) unawaited(_stats.load(null, silentStats));
+    await _list.load();
+  }
+
+  void _setFilter(String f) {
+    if (f == _filter) return;
+    setState(() => _filter = f);
+    _list.load();
+  }
 
   Future<void> _markAllRead() async {
     setState(() => _markingAll = true);
     try {
       await getIt<TenantNotificationRepository>().markAllRead();
       if (!mounted) return;
-      context.read<PaginatedListCubit<TenantNotification>>().load();
+      await _refresh(silentStats: true);
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -90,87 +147,120 @@ class _NotificationsViewState extends State<_NotificationsView> {
       try {
         await getIt<TenantNotificationRepository>().markRead(n.id);
         if (!mounted) return;
-        context.read<PaginatedListCubit<TenantNotification>>().load();
+        await _refresh(silentStats: true);
       } on ApiException {
         // Non-fatal — the notification stays visible either way.
       }
     }
   }
 
+  List<FilterChipOption<String>> _options(NotificationCounts? counts) {
+    final extra = <String>[];
+    final s = _stats.state;
+    if (s is PeriodStatsLoaded<NotificationStats>) {
+      for (final c in s.data.categories) {
+        if (c.count > 0 && !_chipCategories.contains(c.category)) {
+          extra.add(c.category);
+        }
+      }
+    }
+    return [
+      FilterChipOption(_filterAll, 'All', count: counts?.all),
+      FilterChipOption(_filterUnread, 'Unread', count: counts?.unread),
+      for (final c in [..._chipCategories, ...extra])
+        FilterChipOption(c, notificationCategoryLabel(c)),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<PaginatedListCubit<TenantNotification>>.value(
+          value: _list,
+        ),
+        BlocProvider<NotificationStatsCubit>.value(value: _stats),
+      ],
+      child: Scaffold(
         backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: BlocBuilder<PaginatedListCubit<TenantNotification>,
-            PaginatedListState<TenantNotification>>(
-          builder: (context, state) {
-            final unread = state is PaginatedListLoaded<TenantNotification>
-                ? state.items.where((n) => n.isUnread).length
-                : 0;
-            return Column(
+        appBar: AppBar(
+          backgroundColor: AppColors.bg,
+          elevation: 0,
+          title: ValueListenableBuilder<NotificationCounts?>(
+            valueListenable: _counts,
+            builder: (context, counts, _) => Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('$unread unread', style: AppText.eyebrow()),
+                Text(
+                  '${counts?.unread ?? 0} unread',
+                  style: AppText.eyebrow(),
+                ),
                 Text('Notifications', style: AppText.display(size: 18)),
               ],
-            );
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: _markingAll ? null : _markAllRead,
-            child: Text(
-              'Mark all read',
-              style: AppText.body(
-                size: 12,
-                weight: FontWeight.w700,
-                color: AppColors.staffPillFg,
+            ),
+          ),
+          actions: [
+            Tooltip(
+              message: 'Read status is shared by all staff',
+              child: TextButton(
+                onPressed: _markingAll ? null : _markAllRead,
+                child: Text(
+                  'Mark all read',
+                  style: AppText.body(
+                    size: 12,
+                    weight: FontWeight.w700,
+                    color: AppColors.staffPillFg,
+                  ),
+                ),
               ),
             ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 4, 18, 10),
-            child: Row(
-              children: _NotificationFilter.values.map((f) {
-                final selected = f == _filter;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: GestureDetector(
-                    onTap: () => setState(() => _filter = f),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: selected ? AppColors.staffGrad : null,
-                        color: selected ? null : AppColors.surface3,
-                        borderRadius: BorderRadius.circular(AppRadii.pill),
-                      ),
-                      child: Text(
-                        f.label,
-                        style: AppText.body(
-                          size: 12,
-                          weight: FontWeight.w700,
-                          color: selected ? Colors.white : AppColors.inkSoft,
+          ],
+        ),
+        body: RefreshIndicator(
+          color: AppColors.staffB,
+          backgroundColor: AppColors.surface2,
+          onRefresh: _refresh,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              const SliverPadding(
+                padding: EdgeInsets.fromLTRB(18, 4, 18, 0),
+                sliver: SliverToBoxAdapter(
+                  child: NotificationInsightsHeader(),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      ValueListenableBuilder<NotificationCounts?>(
+                        valueListenable: _counts,
+                        builder: (context, counts, _) => FilterChipsRow<String>(
+                          options: _options(counts),
+                          selected: _filter,
+                          onSelected: _setFilter,
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 10),
+                      DebouncedSearchField(
+                        hint: 'Search notifications',
+                        onChanged: (v) {
+                          if (v == _search) return;
+                          _search = v;
+                          _list.load();
+                        },
+                      ),
+                    ],
                   ),
-                );
-              }).toList(),
-            ),
+                ),
+              ),
+              _buildList(),
+            ],
           ),
-          Expanded(child: _buildList()),
-        ],
+        ),
       ),
     );
   }
@@ -178,39 +268,63 @@ class _NotificationsViewState extends State<_NotificationsView> {
   Widget _buildList() {
     return BlocBuilder<PaginatedListCubit<TenantNotification>,
         PaginatedListState<TenantNotification>>(
-      builder: (context, state) {
-        final filtered = state is PaginatedListLoaded<TenantNotification>
-            ? state.items.where(_filter.matches).toList()
-            : const <TenantNotification>[];
-        return switch (state) {
-          PaginatedListLoading() => const AppLoadingView(),
-          PaginatedListError(:final message) => AppErrorView(
-              message: message,
-              onRetry: () =>
-                  context.read<PaginatedListCubit<TenantNotification>>().load(),
+      builder: (context, state) => switch (state) {
+        PaginatedListLoading() => const SliverToBoxAdapter(
+            child: SizedBox(height: 220, child: AppLoadingView()),
+          ),
+        PaginatedListError(:final message) => SliverToBoxAdapter(
+            child: SizedBox(
+              height: 260,
+              child: AppErrorView(message: message, onRetry: _list.load),
             ),
-          PaginatedListLoaded() when filtered.isEmpty => AppEmptyState(
-              icon: Icons.notifications_none_rounded,
-              title: _filter == _NotificationFilter.all
-                  ? 'No notifications yet'
-                  : 'Nothing under ${_filter.label}',
-              message: "You're all caught up.",
-            ),
-          PaginatedListLoaded() => RefreshIndicator(
-              color: AppColors.staffB,
-              backgroundColor: AppColors.surface2,
-              onRefresh: () =>
-                  context.read<PaginatedListCubit<TenantNotification>>().load(),
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
-                itemCount: filtered.length,
-                itemBuilder: (context, i) => _NotificationTile(
-                  notification: filtered[i],
-                  onTap: () => _tapNotification(filtered[i]),
-                ),
+          ),
+        PaginatedListLoaded(:final items) when items.isEmpty =>
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 260,
+              child: AppEmptyState(
+                icon: Icons.notifications_none_rounded,
+                title: _filter == _filterAll && _search.isEmpty
+                    ? 'No notifications yet'
+                    : 'Nothing matches',
+                message: _filter == _filterUnread
+                    ? "You're all caught up."
+                    : 'Try another filter or search.',
               ),
             ),
-        };
+          ),
+        PaginatedListLoaded(
+          :final items,
+          :final hasMore,
+          :final loadingMore,
+        ) =>
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
+            sliver: SliverList.builder(
+              itemCount: items.length + (hasMore ? 1 : 0),
+              itemBuilder: (context, i) {
+                if (i >= items.length) {
+                  return Center(
+                    child: loadingMore
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: CircularProgressIndicator(
+                              color: AppColors.staffB,
+                            ),
+                          )
+                        : TextButton(
+                            onPressed: _list.loadMore,
+                            child: const Text('Load more'),
+                          ),
+                  );
+                }
+                return _NotificationTile(
+                  notification: items[i],
+                  onTap: () => _tapNotification(items[i]),
+                );
+              },
+            ),
+          ),
       },
     );
   }

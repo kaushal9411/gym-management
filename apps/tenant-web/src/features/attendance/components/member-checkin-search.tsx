@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Search } from 'lucide-react';
 
+import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { useMemberList } from '@/features/members/hooks/use-members';
@@ -11,10 +12,11 @@ import type { MemberListItem } from '@/features/members/types';
 interface MemberCheckinSearchProps {
   onSelect: (member: MemberListItem) => void;
   placeholder?: string;
+  className?: string;
 }
 
 /** Debounced "Manual Member Search" — search-as-you-type over the Member Management list, used by the Check-In/Check-Out manual flow. */
-export function MemberCheckinSearch({ onSelect, placeholder }: MemberCheckinSearchProps) {
+export function MemberCheckinSearch({ onSelect, placeholder, className }: MemberCheckinSearchProps) {
   const [query, setQuery] = React.useState('');
   const [debounced, setDebounced] = React.useState('');
   const [open, setOpen] = React.useState(false);
@@ -28,7 +30,7 @@ export function MemberCheckinSearch({ onSelect, placeholder }: MemberCheckinSear
   const items = debounced.length >= 2 ? (results.data?.items ?? []) : [];
 
   return (
-    <div className="relative max-w-sm">
+    <div className={cn('relative max-w-sm', className)}>
       <div className="relative">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input

@@ -1,20 +1,19 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Copy, Link2, Mail, MessageSquare, RefreshCw, Wallet } from 'lucide-react';
+import { Copy, Link2, Mail, MessageSquare, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
-import { LoadingButton } from '@/components/ui/loading-button';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { LoadingButton } from '@/components/ui/loading-button';
 import { MemberCheckinSearch } from '@/features/attendance/components/member-checkin-search';
-import type { MemberListItem } from '@/features/members/types';
+import { PaymentsHero } from '@/features/finance/components/payments/payments-hero';
+import { Chip, FieldLabel, PanelCard } from '@/features/finance/components/payments/payments-ui';
+import { HeroSteps, MemberSnapshot, OptionCard, RecentPaymentsCard, StepHeader, SummaryCard } from '@/features/finance/components/payments/record-payment-parts';
 import {
   toFinanceError,
   useCreatePayment,
@@ -25,26 +24,33 @@ import {
   useVerifyPaymentStatus,
 } from '@/features/finance/hooks/use-finance';
 import type { MemberPaymentMethod, PaymentLinkResult } from '@/features/finance/types';
+import { formatMoney } from '@/features/members/components/detail/detail-ui';
+import type { MemberListItem } from '@/features/members/types';
 import { useCurrencySymbol } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
-const selectClassName = cn(
-  'h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
-);
-
-/** Offline/manual methods only — Online is its own dedicated Payment Link flow below, not a value staff pick from this dropdown. */
+/** Offline/manual methods only — Online is its own dedicated Payment Link flow, not a value staff pick here. No card-number/expiry/CVV fields exist anywhere on this page. */
 const OFFLINE_METHODS: { value: MemberPaymentMethod; label: string }[] = [
   { value: 'CASH', label: 'Cash' },
   { value: 'UPI', label: 'UPI' },
-  { value: 'CREDIT_CARD', label: 'Credit Card' },
-  { value: 'DEBIT_CARD', label: 'Debit Card' },
-  { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
+  { value: 'DEBIT_CARD', label: 'Debit card' },
+  { value: 'CREDIT_CARD', label: 'Credit card' },
+  { value: 'BANK_TRANSFER', label: 'Bank transfer' },
   { value: 'CHEQUE', label: 'Cheque' },
 ];
 
 type Channel = 'online' | 'offline';
 type LinkStatus = 'PENDING' | 'SUCCESS' | 'FAILED';
+
+function MoneyInput({ id, value, onChange, big }: { id: string; value: string; onChange: (v: string) => void; big?: boolean }) {
+  const sym = useCurrencySymbol();
+  return (
+    <div className="flex h-12 items-center gap-2 rounded-xl border border-input bg-background px-3.5 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/40">
+      <b>{sym}</b>
+      <input id={id} type="number" min={0} step="0.01" inputMode="decimal" value={value} onChange={(e) => onChange(e.target.value)} className={cn('w-full bg-transparent tabular-nums outline-none', big ? 'text-lg font-extrabold' : 'text-sm')} />
+    </div>
+  );
+}
 
 export default function RecordPaymentPage() {
   const router = useRouter();
@@ -55,7 +61,7 @@ export default function RecordPaymentPage() {
   const resendEmail = useResendPaymentLinkNotification();
   const resendSms = useResendPaymentLinkNotification();
 
-  const [channel, setChannel] = React.useState<Channel>('online');
+  const [channel, setChannel] = React.useState<Channel>('offline');
   const [member, setMember] = React.useState<MemberListItem | null>(null);
   const [selectedInvoiceId, setSelectedInvoiceId] = React.useState('');
   const [amount, setAmount] = React.useState('');
@@ -74,11 +80,12 @@ export default function RecordPaymentPage() {
   const hasEmail = Boolean(member?.email);
   const hasPhone = Boolean(member?.phone);
 
-  // Default both channels on whenever a member with that contact detail is
-  // selected — staff can still uncheck one before generating the link.
+  // Notify checkboxes are OFF by default (FRONTEND-GUIDE rule) — a contact-less
+  // member can't have them on, so clear them whenever the selection changes.
   React.useEffect(() => {
-    setNotifyEmail(Boolean(member?.email));
-    setNotifySms(Boolean(member?.phone));
+    setNotifyEmail(false);
+    setNotifySms(false);
+    setSelectedInvoiceId('');
   }, [member]);
 
   // Outstanding invoices for the selected member — settling one is optional
@@ -145,9 +152,6 @@ export default function RecordPaymentPage() {
   const generateLink = (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate() || !member) return;
-    if (!notifyEmail && !notifySms) {
-      setError('Choose at least one way to notify the member, or share the link yourself once it’s generated.');
-    }
     createPaymentLink.mutate(
       {
         memberId: member.id,
@@ -217,96 +221,106 @@ export default function RecordPaymentPage() {
     setNotes('');
   };
 
-  return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <Button variant="ghost" size="sm" asChild>
-        <Link href="/payments">
-          <ArrowLeft className="size-4" /> Back to payments
-        </Link>
-      </Button>
+  const sym = currencySymbol;
+  const amountNum = Number(amount) || 0;
+  const remainingAfter = totalDue !== null ? Math.max(totalDue - finalAmount, 0) : null;
+  const invoiceNote: React.ReactNode =
+    selectedInvoice.data && remainingAfter !== null ? (
+      channel === 'online' ? (
+        <>Invoice {selectedInvoice.data.invoiceNumber} is updated once the member pays through the link.</>
+      ) : (
+        <>
+          Invoice {selectedInvoice.data.invoiceNumber} will be marked{' '}
+          <b style={{ color: 'var(--success)' }}>{remainingAfter < 0.005 ? 'Paid' : 'Partially paid'}</b>
+          {remainingAfter >= 0.005 ? ` (${formatMoney(sym, remainingAfter)} remaining)` : ''}.
+        </>
+      )
+    ) : channel === 'online' ? (
+      'The payment stays pending until the member completes it on the gateway page.'
+    ) : (
+      'Not linked to an invoice.'
+    );
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Record a payment</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={channel === 'online' ? generateLink : submitOffline} className="space-y-4">
+  const showLinkPanel = channel === 'online' && linkResult;
+
+  return (
+    <form onSubmit={channel === 'online' ? generateLink : submitOffline} className="space-y-5">
+      <PaymentsHero
+        backHref="/payments"
+        eyebrow="Finance · New"
+        title="Record a payment"
+        subtitle="Log cash or UPI taken at the desk, or send the member a secure payment link."
+        aside={<HeroSteps hasMember={Boolean(member)} hasAmount={amountNum > 0} />}
+      />
+
+      <section className="flex flex-wrap items-start gap-3.5">
+        <div className="flex min-w-0 flex-[2_1_640px] flex-col gap-3.5">
+          <PanelCard className="p-6">
+            <StepHeader n={1} title="Member" />
+            <MemberCheckinSearch className="max-w-none" onSelect={setMember} placeholder="Search member by name, email, or member ID…" />
+            {member ? <MemberSnapshot member={member} /> : <p className="mt-3 text-sm text-muted-foreground">Search and pick the member this payment is for.</p>}
+          </PanelCard>
+
+          <PanelCard className="p-6">
+            <StepHeader n={2} title="Invoice" hint="optional" />
+            {!member ? (
+              <p className="text-sm text-muted-foreground">Select a member to see their outstanding invoices.</p>
+            ) : (
+              <div role="radiogroup" aria-label="Invoice" className="flex flex-wrap gap-3">
+                {outstandingInvoices.map((inv) => (
+                  <OptionCard key={inv.id} active={selectedInvoiceId === inv.id} onClick={() => setSelectedInvoiceId(inv.id)}>
+                    <div className="flex justify-between gap-2 font-extrabold">
+                      <span className="truncate">{inv.invoiceNumber}</span>
+                      <span className="tabular-nums">{formatMoney(sym, inv.totalAmount)}</span>
+                    </div>
+                    <div className="mt-1 text-[13px] font-semibold text-muted-foreground">
+                      Due {new Date(inv.dueDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} · {inv.status === 'PARTIALLY_PAID' ? 'Partially paid' : 'Unpaid'}
+                    </div>
+                  </OptionCard>
+                ))}
+                <OptionCard active={selectedInvoiceId === ''} onClick={() => setSelectedInvoiceId('')}>
+                  <div className="font-extrabold">No invoice</div>
+                  <div className="mt-1 text-[13px] font-semibold text-muted-foreground">{invoices.isPending ? 'Checking invoices…' : outstandingInvoices.length === 0 ? 'No outstanding invoices for this member' : "Don't link this payment to an invoice"}</div>
+                </OptionCard>
+              </div>
+            )}
+            {selectedInvoice.data && totalDue !== null ? (
+              <p className="mt-3 text-sm text-muted-foreground">
+                Invoice total <b className="text-foreground">{formatMoney(sym, selectedInvoice.data.totalAmount)}</b> · paid so far <b className="text-foreground">{formatMoney(sym, amountPaidSoFar)}</b> · due{' '}
+                <b className="text-foreground">{formatMoney(sym, totalDue)}</b>
+              </p>
+            ) : null}
+          </PanelCard>
+
+          <PanelCard className="p-6">
+            <StepHeader n={3} title="How is it being paid?" />
             {error ? (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="mb-3 text-sm font-semibold text-destructive">
                 {error}
               </p>
             ) : null}
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setChannel('online')}
-                className={cn(
-                  'flex items-center justify-center gap-2 rounded-md border px-3 py-2.5 text-sm font-medium transition-colors',
-                  channel === 'online' ? 'border-primary bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-accent',
-                )}
-              >
-                <Link2 className="size-4" /> Send Payment Link
-              </button>
-              <button
-                type="button"
-                onClick={() => setChannel('offline')}
-                className={cn(
-                  'flex items-center justify-center gap-2 rounded-md border px-3 py-2.5 text-sm font-medium transition-colors',
-                  channel === 'offline' ? 'border-primary bg-primary/5 text-primary' : 'text-muted-foreground hover:bg-accent',
-                )}
-              >
-                <Wallet className="size-4" /> Offline / Mark as Paid
-              </button>
+            <div role="radiogroup" aria-label="Payment channel" className="mb-5 flex flex-wrap gap-3">
+              <OptionCard active={channel === 'offline'} onClick={() => setChannel('offline')}>
+                <div className="font-extrabold">Collected now</div>
+                <div className="mt-1 text-[13px] font-semibold text-muted-foreground">Cash, UPI, cheque or transfer at the desk</div>
+              </OptionCard>
+              <OptionCard active={channel === 'online'} onClick={() => setChannel('online')}>
+                <div className="flex items-center gap-2 font-extrabold">
+                  <Link2 className="size-4" aria-hidden /> Send payment link
+                </div>
+                <div className="mt-1 text-[13px] font-semibold text-muted-foreground">Member pays online via the gateway</div>
+              </OptionCard>
             </div>
 
-            <div className="space-y-2">
-              <Label>Member</Label>
-              <MemberCheckinSearch onSelect={setMember} placeholder="Search member by name, email, or member ID…" />
-              {member ? (
-                <p className="text-sm text-muted-foreground">
-                  Selected: <span className="font-medium text-foreground">{member.name}</span> ({member.memberId})
-                  {member.currentMembership ? ` — on ${member.currentMembership.planName}` : ' — no active membership'}
-                </p>
-              ) : null}
-            </div>
-
-            {member && outstandingInvoices.length > 0 ? (
-              <div className="space-y-2">
-                <Label htmlFor="settleInvoice">Settle an outstanding invoice (optional)</Label>
-                <select
-                  id="settleInvoice"
-                  className={selectClassName}
-                  value={selectedInvoiceId}
-                  onChange={(e) => setSelectedInvoiceId(e.target.value)}
-                >
-                  <option value="">Don&apos;t link to an invoice</option>
-                  {outstandingInvoices.map((inv) => (
-                    <option key={inv.id} value={inv.id}>
-                      {inv.invoiceNumber} — {currencySymbol}{inv.totalAmount} ({inv.status})
-                    </option>
-                  ))}
-                </select>
-                {selectedInvoice.data && totalDue !== null ? (
-                  <p className="text-sm text-muted-foreground">
-                    Invoice total: <span className="font-medium text-foreground">{currencySymbol}{selectedInvoice.data.totalAmount}</span> · Paid so far:{' '}
-                    <span className="font-medium text-foreground">{currencySymbol}{amountPaidSoFar.toFixed(2)}</span> · Due amount:{' '}
-                    <span className="font-medium text-foreground">{currencySymbol}{totalDue.toFixed(2)}</span>
-                  </p>
-                ) : null}
-              </div>
-            ) : null}
-
-            {channel === 'online' && linkResult ? (
-              <div className="space-y-3 rounded-md border border-dashed p-3">
+            {showLinkPanel ? (
+              <div className="space-y-3 rounded-2xl border border-dashed p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm text-muted-foreground">
                     Payment link for <span className="font-medium text-foreground">{member?.name}</span>
                     {linkResult.notifiedEmail || linkResult.notifiedSms ? (
                       <>
                         {' '}
-                        — sent by{' '}
-                        {[linkResult.notifiedEmail ? 'email' : null, linkResult.notifiedSms ? 'SMS' : null].filter(Boolean).join(' and ')}.
+                        — sent by {[linkResult.notifiedEmail ? 'email' : null, linkResult.notifiedSms ? 'SMS' : null].filter(Boolean).join(' and ')}.
                       </>
                     ) : (
                       ' — not auto-sent; share the link yourself.'
@@ -328,26 +342,10 @@ export default function RecordPaymentPage() {
                   <LoadingButton type="button" variant="outline" loading={verifyPaymentStatus.isPending} loadingText="Checking…" onClick={checkStatus}>
                     <RefreshCw className="size-4" /> Check payment status
                   </LoadingButton>
-                  <LoadingButton
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!hasEmail}
-                    loading={resendEmail.isPending}
-                    loadingText="Resending…"
-                    onClick={() => resend('email')}
-                  >
+                  <LoadingButton type="button" variant="outline" size="sm" disabled={!hasEmail} loading={resendEmail.isPending} loadingText="Resending…" onClick={() => resend('email')}>
                     <Mail className="size-4" /> Resend by email
                   </LoadingButton>
-                  <LoadingButton
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!hasPhone}
-                    loading={resendSms.isPending}
-                    loadingText="Resending…"
-                    onClick={() => resend('sms')}
-                  >
+                  <LoadingButton type="button" variant="outline" size="sm" disabled={!hasPhone} loading={resendSms.isPending} loadingText="Resending…" onClick={() => resend('sms')}>
                     <MessageSquare className="size-4" /> Resend by SMS
                   </LoadingButton>
                   <Button type="button" variant="ghost" onClick={startOver}>
@@ -357,105 +355,116 @@ export default function RecordPaymentPage() {
               </div>
             ) : (
               <>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="paymentAmount">Paid amount</Label>
-                    <Input id="paymentAmount" type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="paymentDiscount">Discount</Label>
-                    <Input id="paymentDiscount" type="number" min={0} step="0.01" value={discount} onChange={(e) => setDiscount(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="paymentTax">Tax</Label>
-                    <Input id="paymentTax" type="number" min={0} step="0.01" value={tax} onChange={(e) => setTax(e.target.value)} />
-                  </div>
-                </div>
-
-                <p className="text-sm text-muted-foreground">
-                  Final amount: <span className="font-medium text-foreground">{currencySymbol}{finalAmount.toFixed(2)}</span>
-                </p>
-
                 {channel === 'offline' ? (
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="paymentMethod">Payment method</Label>
-                      <select id="paymentMethod" className={selectClassName} value={method} onChange={(e) => setMethod(e.target.value as MemberPaymentMethod)}>
-                        {OFFLINE_METHODS.map((m) => (
-                          <option key={m.value} value={m.value}>
-                            {m.label}
-                          </option>
-                        ))}
-                      </select>
+                  <>
+                    <FieldLabel className="mb-2.5 block">Method</FieldLabel>
+                    <div role="radiogroup" aria-label="Payment method" className="mb-5 flex flex-wrap gap-2">
+                      {OFFLINE_METHODS.map((m) => (
+                        <Chip key={m.value} active={method === m.value} onClick={() => setMethod(m.value)} className="h-[38px] px-[15px]">
+                          {m.label}
+                        </Chip>
+                      ))}
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="paymentDate">Payment date</Label>
-                      <Input id="paymentDate" type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-                      Staff can&apos;t take card details here. Generate a secure payment link and send it to the member — they pay on Razorpay&apos;s own
-                      hosted page via card, UPI, netbanking, or wallet.
-                    </p>
-                    <div className="space-y-2">
-                      <Label>Notify the member</Label>
-                      <div className="flex flex-col gap-2 sm:flex-row sm:gap-6">
-                        <label className="flex items-center gap-2 text-sm">
-                          <Checkbox checked={notifyEmail} disabled={!hasEmail} onCheckedChange={(v) => setNotifyEmail(v === true)} />
-                          Email{!hasEmail ? <span className="text-muted-foreground">(no email on file)</span> : null}
-                        </label>
-                        <label className="flex items-center gap-2 text-sm">
-                          <Checkbox checked={notifySms} disabled={!hasPhone} onCheckedChange={(v) => setNotifySms(v === true)} />
-                          SMS{!hasPhone ? <span className="text-muted-foreground">(no phone on file)</span> : null}
-                        </label>
-                      </div>
-                      {!notifyEmail && !notifySms ? (
-                        <p className="text-sm text-muted-foreground">
-                          Razorpay won&apos;t auto-send anything — you&apos;ll need to copy and share the link yourself.
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                )}
-
-                {channel === 'offline' ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="paymentReference">Transaction reference</Label>
-                    <Input
-                      id="paymentReference"
-                      value={transactionReference}
-                      onChange={(e) => setTransactionReference(e.target.value)}
-                      placeholder="e.g. UPI txn ID, cheque number"
-                    />
-                  </div>
+                  </>
                 ) : null}
 
-                <div className="space-y-2">
-                  <Label htmlFor="paymentNotes">Notes</Label>
-                  <textarea
-                    id="paymentNotes"
-                    className="flex min-h-16 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
+                <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-4">
+                  <div>
+                    <FieldLabel className="mb-2 block">Amount</FieldLabel>
+                    <MoneyInput id="paymentAmount" big value={amount} onChange={setAmount} />
+                    {totalDue !== null && totalDue > 0 ? (
+                      <div className="mt-2 flex gap-1.5">
+                        <Chip small onClick={() => setAmount(totalDue.toFixed(2))}>
+                          Full invoice
+                        </Chip>
+                        <Chip small onClick={() => setAmount((totalDue / 2).toFixed(2))}>
+                          Half
+                        </Chip>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div>
+                    <FieldLabel className="mb-2 block">Discount</FieldLabel>
+                    <MoneyInput id="paymentDiscount" value={discount} onChange={setDiscount} />
+                  </div>
+                  <div>
+                    <FieldLabel className="mb-2 block">Tax</FieldLabel>
+                    <MoneyInput id="paymentTax" value={tax} onChange={setTax} />
+                  </div>
+                  {channel === 'offline' ? (
+                    <>
+                      <div>
+                        <FieldLabel className="mb-2 block">Payment date</FieldLabel>
+                        <Input id="paymentDate" type="date" className="h-12 rounded-xl" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
+                      </div>
+                      <div className="col-span-full">
+                        <FieldLabel className="mb-2 block">Transaction reference</FieldLabel>
+                        <Input id="paymentReference" className="h-12 rounded-xl" value={transactionReference} onChange={(e) => setTransactionReference(e.target.value)} placeholder="UPI ref / cheque no. (optional)" />
+                      </div>
+                    </>
+                  ) : null}
+                  <div className="col-span-full">
+                    <FieldLabel className="mb-2 block">Notes</FieldLabel>
+                    <textarea
+                      id="paymentNotes"
+                      placeholder="Internal note (optional)"
+                      className="min-h-[84px] w-full rounded-xl border border-input bg-background px-3.5 py-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 {channel === 'online' ? (
-                  <LoadingButton type="submit" className="w-full" loading={createPaymentLink.isPending} loadingText="Generating link…">
+                  <div className="mt-[22px] rounded-2xl border border-dashed bg-muted/40 p-[18px]">
+                    <div className="mb-1 font-extrabold">If sending a payment link</div>
+                    <p className="mb-3 text-[13px] font-semibold text-muted-foreground">Both are off by default. Pick how the member is notified — or copy the link and share it yourself.</p>
+                    <div className="flex flex-wrap gap-5 text-sm font-bold">
+                      <label className="flex items-center gap-2.5">
+                        <Checkbox checked={notifyEmail} disabled={!hasEmail} onCheckedChange={(v) => setNotifyEmail(v === true)} />
+                        Email the link{!hasEmail && member ? <span className="font-medium text-muted-foreground">(no email on file)</span> : null}
+                      </label>
+                      <label className="flex items-center gap-2.5">
+                        <Checkbox checked={notifySms} disabled={!hasPhone} onCheckedChange={(v) => setNotifySms(v === true)} />
+                        SMS the link{!hasPhone && member ? <span className="font-medium text-muted-foreground">(no phone on file)</span> : null}
+                      </label>
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            )}
+          </PanelCard>
+        </div>
+
+        <div className="flex min-w-0 flex-[1_1_330px] flex-col gap-3.5 lg:sticky lg:top-4">
+          <SummaryCard
+            amount={amountNum}
+            discount={Number(discount) || 0}
+            tax={Number(tax) || 0}
+            total={finalAmount}
+            online={channel === 'online'}
+            invoiceNote={invoiceNote}
+            submit={
+              <>
+                {showLinkPanel ? null : channel === 'online' ? (
+                  <LoadingButton type="submit" className="h-12 rounded-xl font-bold" loading={createPaymentLink.isPending} loadingText="Generating link…">
                     <Link2 className="size-4" /> Generate payment link
                   </LoadingButton>
                 ) : (
-                  <LoadingButton type="submit" className="w-full" loading={createPayment.isPending} loadingText="Recording…">
-                    Mark as paid
+                  <LoadingButton type="submit" className="h-12 rounded-xl font-bold" loading={createPayment.isPending} loadingText="Recording…">
+                    Record {formatMoney(sym, finalAmount)} payment
                   </LoadingButton>
                 )}
+                <Button type="button" variant="outline" className="h-12 rounded-xl font-bold" onClick={() => router.push('/payments')}>
+                  Cancel
+                </Button>
               </>
-            )}
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+            }
+          />
+          <RecentPaymentsCard memberId={member?.id} />
+          <div className="rounded-[20px] border border-primary/25 bg-primary/10 p-5 text-[13px] font-semibold leading-relaxed text-primary">Card details are never entered here. Online payments go through the gateway link.</div>
+        </div>
+      </section>
+    </form>
   );
 }

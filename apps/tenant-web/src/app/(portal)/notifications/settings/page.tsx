@@ -2,169 +2,151 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { AlertTriangle, Bell, CalendarCheck, CreditCard, Dumbbell, HeartHandshake, Lock, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { NotificationsHero } from '@/features/notifications/components/notifications-hero';
+import { TemplateCard, type TemplateGroup } from '@/features/notifications/components/template-parts';
+import { TemplateEditDialog } from '@/features/notifications/components/template-edit-dialog';
 import { useNotificationTemplates, useUpdateNotificationTemplate } from '@/features/notifications/hooks/use-notifications';
-import type { NotificationChannel, NotificationTemplate } from '@/features/notifications/types';
+import type { NotificationTemplate } from '@/features/notifications/types';
+import { ChartCard, EmptyState, SkeletonBlock } from '@/features/reports/components/ui';
+import { accentChipStyle } from '@/features/reports/lib/reports-theme';
 
-const CHANNEL_OPTIONS: Array<{ value: NotificationChannel; label: string; disabled?: boolean }> = [
-  { value: 'IN_APP', label: 'In-App' },
-  { value: 'EMAIL', label: 'Email' },
-  { value: 'PUSH', label: 'Push (Future)', disabled: true },
-  { value: 'SMS', label: 'SMS (Future)', disabled: true },
+const GROUPS: TemplateGroup[] = [
+  { key: 'membership', label: 'Membership', description: 'Expiry reminders and renewals', accent: 'members', icon: UserCheck, types: ['MEMBERSHIP_EXPIRY', 'MEMBERSHIP_RENEWAL'] },
+  { key: 'payments', label: 'Payments', description: 'Payment outcomes', accent: 'finance', icon: CreditCard, types: ['PAYMENT_SUCCESS', 'PAYMENT_FAILED'] },
+  { key: 'attendance', label: 'Attendance', description: 'Check-in confirmations', accent: 'attendance', icon: CalendarCheck, types: ['ATTENDANCE_CONFIRMATION'] },
+  { key: 'plans', label: 'Plans', description: 'Workout and diet assignments', accent: 'operations', icon: Dumbbell, types: ['WORKOUT_ASSIGNMENT', 'DIET_ASSIGNMENT'] },
+  { key: 'engagement', label: 'Engagement', description: 'Welcome and goodwill messages', accent: 'staff', icon: HeartHandshake, types: ['NEW_MEMBER_REGISTRATION', 'WELCOME_MESSAGE', 'BIRTHDAY_WISHES'] },
 ];
 
 export default function NotificationSettingsPage() {
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('notifications:manage');
-  const templates = useNotificationTemplates();
+  // Gated: users without notifications:manage never fire the templates request (it would 403).
+  const templates = useNotificationTemplates(canManage);
   const updateTemplate = useUpdateNotificationTemplate();
-
   const [editing, setEditing] = React.useState<NotificationTemplate | null>(null);
-  const [channels, setChannels] = React.useState<NotificationChannel[]>([]);
-  const [titleTemplate, setTitleTemplate] = React.useState('');
-  const [bodyTemplate, setBodyTemplate] = React.useState('');
-  const [isActive, setIsActive] = React.useState(true);
+  const [togglingType, setTogglingType] = React.useState<string | null>(null);
 
-  const openEdit = (template: NotificationTemplate) => {
-    setEditing(template);
-    setChannels(template.channels);
-    setTitleTemplate(template.titleTemplate);
-    setBodyTemplate(template.bodyTemplate);
-    setIsActive(template.isActive);
-  };
+  const list = React.useMemo(() => templates.data ?? [], [templates.data]);
+  const byType = React.useMemo(() => new Map(list.map((t) => [t.type, t])), [list]);
+  const stats = React.useMemo(
+    () => ({
+      active: list.filter((t) => t.isActive).length,
+      customized: list.filter((t) => t.isCustomized).length,
+      channels: new Set(list.filter((t) => t.isActive).flatMap((t) => t.channels)).size,
+    }),
+    [list],
+  );
+  // Templates the API returns that are not in any group (future types) still show up.
+  const grouped = new Set(GROUPS.flatMap((g) => g.types));
+  const extra = list.filter((t) => !grouped.has(t.type));
 
-  const toggleChannel = (channel: NotificationChannel) => {
-    setChannels((prev) => (prev.includes(channel) ? prev.filter((c) => c !== channel) : [...prev, channel]));
-  };
+  if (!canManage) {
+    return (
+      <div className="mx-auto max-w-lg pt-10">
+        <EmptyState
+          icon={Lock}
+          accent="staff"
+          title="Notification settings are managed by admins"
+          description="You don't have permission to manage notification templates. Ask your gym owner for the notifications:manage permission."
+          action={
+            <Link href="/notifications" className="inline-flex h-9 items-center rounded-lg border px-3 text-sm font-bold hover:bg-accent">
+              Back to notifications
+            </Link>
+          }
+        />
+      </div>
+    );
+  }
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editing) return;
+  const toggleActive = (t: NotificationTemplate) => {
+    setTogglingType(t.type);
     updateTemplate.mutate(
-      { type: editing.type, input: { channels, titleTemplate, bodyTemplate, isActive } },
-      { onSuccess: () => { toast.success('Template updated.'); setEditing(null); } },
+      { type: t.type, input: { channels: t.channels, titleTemplate: t.titleTemplate, bodyTemplate: t.bodyTemplate, isActive: !t.isActive } },
+      {
+        onSuccess: () => toast.success(t.isActive ? `${t.label} disabled.` : `${t.label} enabled.`),
+        onError: () => toast.error('Could not update the template.'),
+        onSettled: () => setTogglingType(null),
+      },
     );
   };
 
-  if (!canManage) {
-    return <p className="text-sm text-muted-foreground">You don&apos;t have permission to manage notification templates.</p>;
-  }
+  const renderCards = (items: NotificationTemplate[], accent: TemplateGroup['accent']) => (
+    <div className="grid gap-3.5 md:grid-cols-2 xl:grid-cols-3">
+      {items.map((t, i) => (
+        <TemplateCard key={t.type} template={t} accent={accent} index={i} toggling={togglingType === t.type} onToggle={() => toggleActive(t)} onEdit={() => setEditing(t)} />
+      ))}
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <Button variant="ghost" size="sm" asChild>
-        <Link href="/notifications">
-          <ArrowLeft className="size-4" /> Back to Notifications
-        </Link>
-      </Button>
+    <div className="space-y-5">
+      <NotificationsHero
+        active="settings"
+        eyebrow="Communication"
+        title="Notification settings"
+        subtitle="Customize the title, body and delivery channels of every automatic notification. Placeholders like {{memberName}} are filled in automatically."
+        backHref="/notifications"
+        backLabel="Back to notifications"
+        statsLoading={templates.isPending}
+        stats={templates.isError ? undefined : [
+          { label: 'Templates active', value: stats.active },
+          { label: 'Customized', value: stats.customized },
+          { label: 'Channels in use', value: stats.channels },
+        ]}
+      />
 
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Notification Settings</h1>
-        <p className="text-muted-foreground">
-          Customize the title, body, and delivery channels for each automatic notification. Placeholders like <code>{'{{memberName}}'}</code> are filled in
-          automatically.
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Templates</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {templates.isPending ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : (
-            (templates.data ?? []).map((template) => (
-              <div
-                key={template.type}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border-b border-border p-2 pb-3 transition-colors last:border-0 last:pb-0 hover:bg-accent/40"
+      {templates.isPending ? (
+        <div className="grid gap-3.5 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkeletonBlock key={i} height={200} />
+          ))}
+        </div>
+      ) : templates.isError ? (
+        <EmptyState
+          icon={AlertTriangle}
+          accent="staff"
+          title="Could not load templates"
+          action={
+            <button type="button" onClick={() => void templates.refetch()} className="rounded-lg border px-3 py-1.5 text-xs font-bold hover:bg-accent">
+              Try again
+            </button>
+          }
+        />
+      ) : (
+        <>
+          {GROUPS.map((g) => {
+            const items = g.types.map((t) => byType.get(t)).filter((t): t is NotificationTemplate => Boolean(t));
+            if (!items.length) return null;
+            return (
+              <ChartCard
+                key={g.key}
+                title={
+                  <span className="inline-flex items-center gap-2.5">
+                    <span className="flex size-8 items-center justify-center rounded-lg" style={accentChipStyle(g.accent)}>
+                      <g.icon className="size-4" aria-hidden />
+                    </span>
+                    {g.label}
+                  </span>
+                }
+                subtitle={g.description}
               >
-                <div>
-                  <p className="font-medium">{template.label}</p>
-                  <p className="text-xs text-muted-foreground">{template.description}</p>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {template.channels.map((c) => (
-                      <Badge key={c} variant="outline" className="text-[10px]">
-                        {c}
-                      </Badge>
-                    ))}
-                    {!template.isActive ? (
-                      <Badge variant="outline" className="text-[10px] text-destructive">
-                        Disabled
-                      </Badge>
-                    ) : null}
-                    {template.isCustomized ? (
-                      <Badge variant="secondary" className="text-[10px]">
-                        Customized
-                      </Badge>
-                    ) : null}
-                  </div>
-                </div>
-                <Button size="sm" variant="outline" onClick={() => openEdit(template)}>
-                  Edit
-                </Button>
-              </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
+                {renderCards(items, g.accent)}
+              </ChartCard>
+            );
+          })}
+          {extra.length ? (
+            <ChartCard title={<span className="inline-flex items-center gap-2"><Bell className="size-4" aria-hidden /> Other</span>}>{renderCards(extra, 'analytics')}</ChartCard>
+          ) : null}
+          {/* Push, SMS and WhatsApp are not delivered yet: shown as 'soon' chips on each card, disabled (PUSH/SMS) in the edit dialog. */}
+        </>
+      )}
 
-      <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{editing?.label}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="templateTitle">Title</Label>
-              <Input id="templateTitle" value={titleTemplate} onChange={(e) => setTitleTemplate(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="templateBody">Body</Label>
-              <textarea
-                id="templateBody"
-                value={bodyTemplate}
-                onChange={(e) => setBodyTemplate(e.target.value)}
-                rows={4}
-                className="w-full rounded-lg border border-input bg-background px-3.5 py-2 text-sm shadow-xs outline-none transition-all duration-150 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Channels</Label>
-              <div className="flex flex-wrap gap-4">
-                {CHANNEL_OPTIONS.map((opt) => (
-                  <label key={opt.value} className="flex items-center gap-2 text-sm">
-                    <Checkbox
-                      id={`channel-${opt.value}`}
-                      checked={channels.includes(opt.value)}
-                      disabled={opt.disabled}
-                      onCheckedChange={() => toggleChannel(opt.value)}
-                    />
-                    {opt.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <Checkbox id="templateActive" checked={isActive} onCheckedChange={(v) => setIsActive(v === true)} />
-              Active
-            </label>
-            <Button type="submit" className="w-full" disabled={updateTemplate.isPending}>
-              {updateTemplate.isPending ? 'Saving…' : 'Save template'}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <TemplateEditDialog template={editing} onClose={() => setEditing(null)} />
     </div>
   );
 }

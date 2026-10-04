@@ -1,4 +1,4 @@
-import type { DeviceTokenPlatform, Prisma } from '@prisma/client';
+import type { DeviceTokenPlatform, Prisma, TenantNotificationCategory } from '@prisma/client';
 
 import { env } from '../../../config/env';
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../../core/errors/app-error';
@@ -375,11 +375,10 @@ export class MemberPortalService {
   }
 
   async downloadInvoicePdf(memberId: string, invoiceId: string): Promise<{ filename: string; content: Buffer }> {
-    const invoice = await this.invoices.getOwnById(invoiceId);
-    if (invoice.member.id !== memberId) throw new NotFoundError('Invoice not found.');
+    const invoice = await this.invoices.getOwnById(invoiceId, memberId); // 404 for anyone else's invoice (scoped in the repository WHERE)
     const tenant = await tenantService.resolveById(this.tenantId);
     if (!tenant) throw new AppError(ErrorCode.NOT_FOUND, 'Tenant not found.', 404);
-    const content = await this.invoices.renderOwnPdf(invoiceId, tenant.name);
+    const content = await this.invoices.renderOwnPdf(invoiceId, memberId, tenant.name);
     return { filename: `${invoice.invoiceNumber}.pdf`, content };
   }
 
@@ -410,7 +409,7 @@ export class MemberPortalService {
     await deviceTokenService.unregisterMemberToken(this.tenantId, token);
   }
 
-  async getNotifications(memberId: string, params: { unreadOnly?: boolean; page: number; limit: number }) {
+  async getNotifications(memberId: string, params: { unreadOnly?: boolean; category?: TenantNotificationCategory; page: number; limit: number }) {
     return tenantNotificationService.listForMember(this.tenantId, memberId, params);
   }
 

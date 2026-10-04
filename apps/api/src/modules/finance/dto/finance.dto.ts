@@ -48,8 +48,42 @@ export interface ListInvoicesQuery {
   status?: MemberInvoiceStatus;
   dateFrom?: string;
   dateTo?: string;
+  minAmount?: number;
+  maxAmount?: number;
   sortBy: 'invoiceDate' | 'dueDate' | 'totalAmount' | 'createdAt';
   sortDir: 'asc' | 'desc';
+}
+
+export interface InvoiceListExtrasDto {
+  /** Full filtered set (incl. the status filter), ignoring pagination. count = rows in that set. */
+  summary: { invoiced: string; collected: string; outstanding: string; count: number };
+  /** Per effective status over the search/date/amount/branch-filtered set, IGNORING the status filter. */
+  counts: { all: number; unpaid: number; partiallyPaid: number; paid: number; overdue: number; cancelled: number };
+}
+
+export interface InvoiceAnalyticsQuery {
+  dateFrom?: string;
+  dateTo?: string;
+  branchId?: string;
+}
+
+export interface InvoiceAnalyticsDto {
+  range: { from: string; to: string };
+  previousRange: { from: string; to: string };
+  kpis: {
+    invoiced: { value: string; previous: string };
+    count: { value: number; previous: number };
+    collected: { value: string; previous: string };
+    avgInvoice: { value: string; previous: string };
+    collectionRate: { value: number; previous: number };
+    outstanding: { value: string; invoiceCount: number };
+    overdue: { value: string; count: number };
+  };
+  daily: Array<{ date: string; invoiced: string; count: number; previousInvoiced: string }>;
+  byStatus: Array<{ status: MemberInvoiceStatus; count: number; amount: string }>;
+  aging: Array<{ bucket: string; count: number; amount: string }>;
+  topDebtors: Array<{ memberId: string; memberCode: string; name: string; outstanding: string; invoiceCount: number }>;
+  branches: Array<{ branchId: string; name: string; invoiced: string; collected: string }>;
 }
 
 export interface MemberInvoiceListItemDto {
@@ -71,7 +105,13 @@ export interface MemberInvoiceDetailDto extends MemberInvoiceListItemDto {
   notes: string | null;
   updatedAt: string;
   items: InvoiceItemDto[];
-  payments: { id: string; paymentNumber: string; finalAmount: string; status: MemberPaymentStatus; paymentDate: string }[];
+  payments: {
+    id: string;
+    paymentNumber: string;
+    finalAmount: string;
+    status: MemberPaymentStatus;
+    paymentDate: string;
+  }[];
 }
 
 // ── Payments ─────────────────────────────────────────────────────────────
@@ -134,6 +174,9 @@ export interface ListPaymentsQuery {
   status?: MemberPaymentStatus;
   dateFrom?: string;
   dateTo?: string;
+  planId?: string;
+  minAmount?: number;
+  maxAmount?: number;
   sortBy: 'paymentDate' | 'finalAmount' | 'createdAt';
   sortDir: 'asc' | 'desc';
 }
@@ -162,6 +205,8 @@ export interface MemberPaymentListItemDto {
   transactionReference: string | null;
   status: MemberPaymentStatus;
   createdAt: string;
+  /** Sum of all refund rows for this payment (decimal string, "0.00" when none). */
+  totalRefunded: string;
 }
 
 export interface MemberPaymentDetailDto extends MemberPaymentListItemDto {
@@ -169,7 +214,42 @@ export interface MemberPaymentDetailDto extends MemberPaymentListItemDto {
   updatedAt: string;
   recordedBy: { id: string; name: string } | null;
   refunds: RefundDto[];
-  totalRefunded: string;
+}
+
+export interface PaymentsAnalyticsQuery {
+  dateFrom?: string;
+  dateTo?: string;
+  branchId?: string;
+}
+
+export interface PaymentsAnalyticsDto {
+  range: { from: string; to: string };
+  previousRange: { from: string; to: string };
+  kpis: {
+    collected: { value: string; previous: string };
+    todayCollected: { value: string; count: number };
+    outstanding: { value: string; invoiceCount: number };
+    refunded: { value: string; previous: string; count: number; rate: number };
+    avgPayment: { value: string; previous: string };
+    paymentCount: { value: number; previous: number };
+    successRate: { value: number; previous: number };
+  };
+  daily: Array<{
+    date: string;
+    collected: string;
+    refunded: string;
+    count: number;
+    previousCollected: string;
+  }>;
+  methods: Array<{ method: MemberPaymentMethod; amount: string; count: number }>;
+  statuses: Array<{ status: MemberPaymentStatus; count: number }>;
+  branches: Array<{ branchId: string; name: string; revenue: string; previousRevenue: string }>;
+  topPlans: Array<{ planName: string; revenue: string; count: number }>;
+  attention: {
+    pendingOver24h: number;
+    failed: number;
+    overdueInvoices: { count: number; amount: string };
+  };
 }
 
 export interface RefundPaymentInput {
@@ -188,6 +268,35 @@ export interface CreateIncomeInput {
 }
 
 export type UpdateIncomeInput = Partial<CreateIncomeInput>;
+
+export interface LedgerAnalyticsDto {
+  range: { from: string; to: string };
+  previousRange: { from: string; to: string };
+  kpis: {
+    total: { value: string; previous: string };
+    count: { value: number; previous: number };
+    average: { value: string; previous: string };
+    largest: { value: string; description: string | null; category: string; date: string } | null;
+    netProfit: { value: string; previous: string };
+  };
+  daily: Array<{ date: string; total: string; count: number; previousTotal: string }>;
+  categories: Array<{ category: string; amount: string; count: number; previousAmount: string }>;
+  branches: Array<{ branchId: string; name: string; total: string; previousTotal: string }>;
+  topEntries: Array<{
+    id: string;
+    description: string | null;
+    category: string;
+    amount: string;
+    date: string;
+  }>;
+}
+
+/** Full-filtered-set totals attached to the income/expense list responses. */
+export interface LedgerSummaryDto {
+  total: string;
+  count: number;
+  average: string;
+}
 
 export interface ListIncomeQuery {
   page: number;

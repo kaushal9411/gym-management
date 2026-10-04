@@ -2,18 +2,18 @@
 
 import * as React from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Receipt } from 'lucide-react';
+import { MapPin } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { FormAlert } from '@/features/auth/components/form-alert';
 import { LoadingButton } from '@/components/ui/loading-button';
-import { BillingNav } from '@/features/billing/components/billing-nav';
+import { BillingHero } from '@/features/billing/components/billing-hero';
+import { PanelCard } from '@/features/finance/components/payments/payments-ui';
 import { toBillingError, useBillingAddress, useSaveBillingAddress } from '@/features/billing/hooks/use-billing';
 
 const billingAddressSchema = z.object({
@@ -51,6 +51,11 @@ export default function BillingAddressPage() {
     defaultValues: { legalName: '', line1: '', line2: '', city: '', state: '', postalCode: '', country: '', taxId: '' },
   });
 
+  // Live preview of what's typed (react-hook-form watch — display only, no effect on validation/submit).
+  const w = form.watch();
+  const cityLine = [w.city?.trim(), [w.state?.trim(), w.postalCode?.trim()].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  const hasAny = Object.values(w).some((v) => typeof v === 'string' && v.trim());
+
   const fieldError = (name: keyof BillingAddressFormValues) => form.formState.errors[name]?.message;
 
   const onSubmit = form.handleSubmit((values) => {
@@ -71,30 +76,13 @@ export default function BillingAddressPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3.5">
-        <div
-          className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
-          style={{
-            backgroundColor: 'color-mix(in oklch, var(--chart-3) 16%, transparent)',
-            color: 'var(--chart-3)',
-            boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-3) 18%, transparent)',
-          }}
-        >
-          <Receipt className="size-5" aria-hidden />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Billing & Subscription</h1>
-          <p className="text-muted-foreground">Manage your FitCloud plan, payment, and invoices.</p>
-        </div>
-      </div>
-
-      <BillingNav />
+      <BillingHero subtitle="The address and tax ID printed on your FitCloud invoices." />
 
       {isLoading ? (
         <Skeleton className="h-96 rounded-xl" />
       ) : (
-        <Card>
-          <CardContent className="p-5">
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+          <PanelCard title="Billing address" subtitle="Used to calculate tax and shown on invoices">
             <form onSubmit={onSubmit} noValidate className="space-y-4">
               <FormAlert variant="error" message={serverError} />
 
@@ -149,8 +137,28 @@ export default function BillingAddressPage() {
                 Save billing address
               </LoadingButton>
             </form>
-          </CardContent>
-        </Card>
+          </PanelCard>
+
+          <PanelCard title="Invoice preview" subtitle="How your details will appear on invoices" className="lg:sticky lg:top-6">
+            <div className="rounded-2xl border bg-muted/40 p-5 text-sm">
+              <p className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <MapPin className="size-3.5" aria-hidden /> Billed to
+              </p>
+              {hasAny ? (
+                <address className="space-y-0.5 not-italic">
+                  {w.legalName?.trim() ? <p className="text-base font-extrabold">{w.legalName.trim()}</p> : null}
+                  {w.line1?.trim() ? <p>{w.line1.trim()}</p> : null}
+                  {w.line2?.trim() ? <p>{w.line2.trim()}</p> : null}
+                  {cityLine ? <p>{cityLine}</p> : null}
+                  {w.country?.trim() ? <p>{w.country.trim().toUpperCase()}</p> : null}
+                  {w.taxId?.trim() ? <p className="pt-2 text-xs font-semibold text-muted-foreground">Tax ID: {w.taxId.trim()}</p> : null}
+                </address>
+              ) : (
+                <p className="text-muted-foreground">Start typing to preview your invoice address.</p>
+              )}
+            </div>
+          </PanelCard>
+        </div>
       )}
     </div>
   );

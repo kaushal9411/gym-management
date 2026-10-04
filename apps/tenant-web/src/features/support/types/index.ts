@@ -38,4 +38,37 @@ export interface CreateTicketPayload {
   priority: TicketPriority;
 }
 
+export interface TicketCounts {
+  all: number;
+  open: number;
+  inProgress: number;
+  resolved: number;
+  closed: number;
+}
+
+/** List response; `counts` ignores the status filter (optional until the API lands). */
+export type TicketListResponse = Paginated<TicketListItem> & { counts?: TicketCounts };
+
+export interface TicketStatsParams {
+  dateFrom: string;
+  dateTo: string;
+}
+
+export interface TicketStats {
+  range: { from: string; to: string };
+  previousRange: { from: string; to: string };
+  kpis: {
+    created: { value: number; previous: number };
+    open: { value: number };
+    inProgress: { value: number };
+    resolved: { value: number };
+    closed: { value: number };
+    unresolved: { value: number };
+    oldestOpenDays: { value: number } | null;
+  };
+  daily: { date: string; created: number; previousCreated: number }[];
+  byStatus: { status: TicketStatus; count: number }[];
+  byPriority: { priority: TicketPriority; count: number; previousCount: number }[];
+}
+
 export type { Paginated };

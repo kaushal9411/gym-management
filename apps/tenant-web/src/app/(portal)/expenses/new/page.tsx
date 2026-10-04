@@ -1,21 +1,20 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { LoadingButton } from '@/components/ui/loading-button';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  DEFAULT_EXPENSE_FORM_STATE,
-  ExpenseFormFields,
-  type ExpenseFormState,
-} from '@/features/finance/components/expense-form-fields';
+import { LoadingButton } from '@/components/ui/loading-button';
+import { DEFAULT_EXPENSE_FORM_STATE, ExpenseFormFields, type ExpenseFormState } from '@/features/finance/components/expense-form-fields';
+import { ExpenseSummaryCard } from '@/features/finance/components/ledger/expense-summary-card';
+import { PaymentsHero } from '@/features/finance/components/payments/payments-hero';
+import { PanelCard } from '@/features/finance/components/payments/payments-ui';
+import { StepHeader } from '@/features/finance/components/payments/record-payment-parts';
 import { toFinanceError, useCreateExpense } from '@/features/finance/hooks/use-finance';
 
+// No client-side `finance:expense-manage` gate here on purpose: none of the other /new pages (payments, members, staff, …) redirect on a
+// missing permission — the API enforces it and surfaces the error in the form — so this page follows that established pattern.
 export default function NewExpensePage() {
   const router = useRouter();
   const createExpense = useCreateExpense();
@@ -49,31 +48,41 @@ export default function NewExpensePage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5">
-      <Button variant="ghost" size="sm" asChild>
-        <Link href="/expenses">
-          <ArrowLeft className="size-4" /> Back to expenses
-        </Link>
-      </Button>
+    <form onSubmit={submit} className="space-y-5">
+      <PaymentsHero backHref="/expenses" backLabel="Back to expenses" eyebrow="Finance · New" title="Add an expense" subtitle="Log rent, salaries, utilities or any other cost — attach the receipt so the books stay audit-ready." />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Add an expense</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={submit} className="space-y-6">
+      <section className="flex flex-wrap items-start gap-3.5">
+        <div className="flex min-w-0 flex-[2_1_640px] flex-col gap-3.5">
+          <PanelCard className="p-6">
+            <StepHeader n={1} title="Expense details" hint="category, amount, date, receipt" />
             {error ? (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className="mb-4 text-sm font-semibold text-destructive">
                 {error}
               </p>
             ) : null}
             <ExpenseFormFields value={form} onChange={setForm} disabled={createExpense.isPending} />
-            <LoadingButton type="submit" className="w-full" loading={createExpense.isPending} loadingText="Saving…">
-              Add expense
-            </LoadingButton>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          </PanelCard>
+        </div>
+
+        <div className="flex min-w-0 flex-[1_1_330px] flex-col gap-3.5 lg:sticky lg:top-4">
+          <ExpenseSummaryCard
+            amount={Number(form.amount) || 0}
+            category={form.category}
+            date={form.expenseDate}
+            receiptName={form.receiptFileName}
+            submit={
+              <>
+                <LoadingButton type="submit" className="h-12 rounded-xl font-bold" loading={createExpense.isPending} loadingText="Saving…">
+                  Add expense
+                </LoadingButton>
+                <Button type="button" variant="outline" className="h-12 rounded-xl font-bold" onClick={() => router.push('/expenses')}>
+                  Cancel
+                </Button>
+              </>
+            }
+          />
+        </div>
+      </section>
+    </form>
   );
 }

@@ -1,168 +1,169 @@
 'use client';
 
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
-import Link from 'next/link';
-import { ArrowDown, ArrowLeft, ArrowUp, ArrowUpDown, Plus, Receipt } from 'lucide-react';
+import { CreditCard, Plus, TrendingUp } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { Input } from '@/components/ui/input';
-import { Pagination } from '@/components/ui/pagination';
-import { SearchBar } from '@/components/ui/search-bar';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
-import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
-import { InvoiceStatusBadge } from '@/features/finance/components/finance-badges';
-import { useInvoiceList } from '@/features/finance/hooks/use-finance';
-import type { ListInvoicesParams, MemberInvoiceListItem, MemberInvoiceStatus } from '@/features/finance/types';
+import { InvoicesFilters, EMPTY_INVOICE_FILTERS, type InvoiceFilters } from '@/features/finance/components/invoices/invoices-filters';
+import { InvoicesInsights } from '@/features/finance/components/invoices/invoices-insights';
+import { InvoicesKpis } from '@/features/finance/components/invoices/invoices-kpis';
+import { InvoicesTable } from '@/features/finance/components/invoices/invoices-table';
+import { HeroButton, PaymentsHero } from '@/features/finance/components/payments/payments-hero';
+import { periodNoun } from '@/features/finance/components/payments/payments-period';
+import { PeriodBar } from '@/features/finance/components/payments/period-bar';
+import { useInvoiceAnalytics, useInvoiceList } from '@/features/finance/hooks/use-finance';
+import type { ListInvoicesParams } from '@/features/finance/types';
+import { formatMoney } from '@/features/members/components/detail/detail-ui';
+import { useReportsControls } from '@/features/reports/hooks/use-reports-controls';
+import { AnimatedNumber } from '@/features/reports/components/ui';
 import { useCurrencySymbol } from '@/lib/currency';
-import { cn } from '@/lib/utils';
+import { useDebouncedValue } from '@/hooks/use-debounced-value';
 
-const selectClassName = cn(
-  'h-9 rounded-md border border-input bg-background px-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-);
-
-type SortableColumn = NonNullable<ListInvoicesParams['sortBy']>;
+const PAGE_SIZE = 20;
 
 export default function InvoicesPage() {
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('finance:payment-create');
-  const { currentBranchId } = useCurrentBranch();
-  const currencySymbol = useCurrencySymbol();
+  const canView = hasPermission('finance:invoice-view');
+  const canDownload = hasPermission('finance:invoice-download');
+  const sym = useCurrencySymbol();
 
-  const [search, setSearch] = React.useState('');
-  const debouncedSearch = useDebouncedValue(search, 300);
-  const [status, setStatus] = React.useState<MemberInvoiceStatus | ''>('');
-  const [dateFrom, setDateFrom] = React.useState('');
-  const [dateTo, setDateTo] = React.useState('');
+  // Period / compare / branch (seeded from the header branch, "" = all) — same controls as Reports.
+  const c = useReportsControls('month');
+  const [filters, setFilters] = React.useState<InvoiceFilters>(EMPTY_INVOICE_FILTERS);
+  const debouncedSearch = useDebouncedValue(filters.search, 300);
   const [page, setPage] = React.useState(1);
-  const [sortBy, setSortBy] = React.useState<SortableColumn>('createdAt');
+  const [sortBy, setSortBy] = React.useState<NonNullable<ListInvoicesParams['sortBy']>>('createdAt');
   const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
 
   // Header branch switch re-scopes the whole list — back to page 1 like any other filter change.
   React.useEffect(() => {
     setPage(1);
-  }, [currentBranchId]);
+  }, [c.branchId]);
 
-  const invoices = useInvoiceList({
+  const analytics = useInvoiceAnalytics(c.params, canView && c.rangeReady);
+  const listParams: ListInvoicesParams = {
     page,
-    limit: 20,
+    limit: PAGE_SIZE,
     search: debouncedSearch || undefined,
-    status: status || undefined,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-    branchId: currentBranchId ?? undefined,
+    status: filters.status || undefined,
+    minAmount: filters.minAmount !== '' ? Number(filters.minAmount) : undefined,
+    maxAmount: filters.maxAmount !== '' ? Number(filters.maxAmount) : undefined,
+    dateFrom: c.rangeReady ? c.range.from : undefined,
+    dateTo: c.rangeReady ? c.range.to : undefined,
+    branchId: c.branchId || undefined,
     sortBy,
     sortDir,
-  });
+  };
+  const invoices = useInvoiceList(listParams, { keepPrevious: true });
 
-  const data = invoices.data;
-  const items = data?.items ?? [];
-
-  const toggleSort = (column: SortableColumn) => {
-    if (sortBy === column) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+  const patchFilters = (patch: Partial<InvoiceFilters>) => {
+    setFilters((f) => ({ ...f, ...patch }));
+    setPage(1);
+  };
+  const toggleSort = (col: NonNullable<ListInvoicesParams['sortBy']>) => {
+    if (sortBy === col) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else {
-      setSortBy(column);
+      setSortBy(col);
       setSortDir('desc');
     }
   };
-  const sortIcon = (column: SortableColumn) => {
-    if (sortBy !== column) return <ArrowUpDown className="size-3.5 text-muted-foreground" />;
-    return sortDir === 'asc' ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" />;
+  const reset = () => {
+    setFilters(EMPTY_INVOICE_FILTERS);
+    c.changePeriod('month');
+    setPage(1);
   };
-  const sortableHeader = (label: string, column: SortableColumn) => (
-    <button type="button" className="flex items-center gap-1 font-medium hover:text-foreground" onClick={() => toggleSort(column)}>
-      {label} {sortIcon(column)}
-    </button>
-  );
 
-  const columns: DataTableColumn<MemberInvoiceListItem>[] = [
-    {
-      key: 'invoiceNumber',
-      header: 'Invoice',
-      render: (inv) => (
-        <Link href={`/invoices/${inv.id}`} className="hover:underline">
-          <span className="block font-medium">{inv.invoiceNumber}</span>
-          <span className="block text-xs text-muted-foreground">{inv.member.name}</span>
-        </Link>
-      ),
-    },
-    { key: 'invoiceDate', header: sortableHeader('Invoice date', 'invoiceDate'), render: (inv) => new Date(inv.invoiceDate).toLocaleDateString() },
-    { key: 'dueDate', header: sortableHeader('Due date', 'dueDate'), render: (inv) => new Date(inv.dueDate).toLocaleDateString() },
-    { key: 'totalAmount', header: sortableHeader('Total', 'totalAmount'), render: (inv) => `${currencySymbol}${inv.totalAmount}` },
-    { key: 'status', header: 'Status', render: (inv) => <InvoiceStatusBadge status={inv.status} /> },
-  ];
+  const a = analytics.data;
+  const showAnalytics = canView && !(analytics.isError && !a);
+  const aLoading = analytics.isPending && showAnalytics;
+  const summary = invoices.data?.summary;
+  // Hero numbers: analytics when present, else the list's filtered summary (so the hero still works while the stats endpoint is down).
+  const heroNum = (fromA: string | undefined, fromList: string | undefined) => {
+    const v = fromA ?? fromList;
+    return v === undefined ? '—' : <AnimatedNumber value={Number(v) || 0} format={(n) => formatMoney(sym, n)} />;
+  };
 
   return (
     <div className="space-y-5">
-      <Button variant="ghost" size="sm" asChild>
-        <Link href="/payments">
-          <ArrowLeft className="size-4" /> Back to payments
-        </Link>
-      </Button>
+      <PaymentsHero
+        eyebrow="Finance"
+        title="Invoices"
+        subtitle="Bills issued to members — auto-generated on payment or created in advance — with collection, ageing and who still owes."
+        stats={[
+          { value: heroNum(a?.kpis.invoiced.value, summary?.invoiced), label: `invoiced ${periodNoun(c.period)}` },
+          { value: heroNum(a?.kpis.collected.value, summary?.collected), label: 'collected' },
+          { value: heroNum(a?.kpis.outstanding.value, summary?.outstanding), label: 'outstanding' },
+        ]}
+        statsLoading={aLoading && !summary}
+        actions={
+          <>
+            <HeroButton href="/payments">
+              <CreditCard className="size-4" /> Payments
+            </HeroButton>
+            <HeroButton href="/income">
+              <TrendingUp className="size-4" /> Income
+            </HeroButton>
+            {canCreate ? (
+              <HeroButton href="/invoices/new" solid>
+                <Plus className="size-4" /> Generate invoice
+              </HeroButton>
+            ) : null}
+          </>
+        }
+      />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <div
-            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
-            style={{
-              backgroundColor: 'color-mix(in oklch, var(--chart-7) 16%, transparent)',
-              color: 'var(--chart-7)',
-              boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-7) 18%, transparent)',
-            }}
-          >
-            <Receipt className="size-5" aria-hidden />
-          </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Invoices</h1>
-            <p className="text-muted-foreground">Bills issued to members — auto-generated on payment, or created in advance.</p>
-          </div>
-        </div>
-        {canCreate ? (
-          <Button size="sm" asChild>
-            <Link href="/invoices/new">
-              <Plus className="size-4" /> Generate invoice
-            </Link>
-          </Button>
-        ) : null}
-      </div>
+      <PeriodBar
+        period={c.period}
+        onPeriod={(p) => {
+          c.changePeriod(p);
+          setPage(1);
+        }}
+        customFrom={c.custom.from}
+        customTo={c.custom.to}
+        onCustom={(f, t) => {
+          c.setDates(f, t);
+          setPage(1);
+        }}
+        branchId={c.branchId}
+        onBranch={c.changeBranch}
+        compare={c.compare}
+        onCompare={c.setCompare}
+      />
 
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchBar
-          containerClassName="max-w-xs"
-          placeholder="Search invoice number, member…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-        <select
-          className={selectClassName}
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as MemberInvoiceStatus | '');
-            setPage(1);
-          }}
-          aria-label="Filter by status"
-        >
-          <option value="">All statuses</option>
-          <option value="UNPAID">Unpaid</option>
-          <option value="PAID">Paid</option>
-          <option value="PARTIALLY_PAID">Partially paid</option>
-          <option value="OVERDUE">Overdue</option>
-          <option value="CANCELLED">Cancelled</option>
-        </select>
-        <Input type="date" aria-label="From date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} />
-        <Input type="date" aria-label="To date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} />
-      </div>
-
-      <DataTable columns={columns} rows={items} rowKey={(inv) => inv.id} loading={invoices.isPending} error={invoices.error} onRetry={() => invoices.refetch()} emptyMessage="No invoices match these filters." />
-
-      {data ? (
-        <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
+      {showAnalytics ? (
+        <>
+          <InvoicesKpis analytics={a} loading={aLoading} compare={c.compare} vsLabel={`vs ${c.previousLabel.toLowerCase()}`} />
+          <InvoicesInsights analytics={a} loading={aLoading} compare={c.compare} previousLabel={c.previousLabel} />
+        </>
       ) : null}
+
+      <InvoicesFilters
+        filters={filters}
+        onChange={patchFilters}
+        dateFrom={c.range.from}
+        dateTo={c.range.to}
+        onDates={(f, t) => {
+          c.setDates(f, t);
+          setPage(1);
+        }}
+        counts={invoices.data?.counts}
+        onReset={reset}
+      />
+
+      <InvoicesTable
+        data={invoices.data}
+        loading={invoices.isPending}
+        error={invoices.error}
+        onRetry={() => void invoices.refetch()}
+        page={page}
+        onPage={setPage}
+        pageSize={PAGE_SIZE}
+        sortBy={sortBy}
+        sortDir={sortDir}
+        onSort={toggleSort}
+        canDownload={canDownload}
+      />
     </div>
   );
 }

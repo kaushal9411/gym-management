@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { AuthServiceError } from '@/features/auth/types';
 import { financeService } from '../services/finance.service';
@@ -13,6 +13,7 @@ import type {
   ListExpensesParams,
   ListIncomeParams,
   ListInvoicesParams,
+  AnalyticsParams,
   ListPaymentsParams,
   NotifyMedium,
   RefundPaymentPayload,
@@ -39,8 +40,23 @@ export function useFinanceDashboard(branchId?: string) {
 
 // ── Payments ─────────────────────────────────────────────────────────────
 
-export function usePaymentList(params: ListPaymentsParams) {
-  return useQuery({ queryKey: ['payments', 'list', params], queryFn: () => financeService.listPayments(params) });
+export function usePaymentList(params: ListPaymentsParams, options?: { enabled?: boolean; keepPrevious?: boolean }) {
+  return useQuery({
+    queryKey: ['payments', 'list', params],
+    queryFn: () => financeService.listPayments(params),
+    enabled: options?.enabled,
+    placeholderData: options?.keepPrevious ? keepPreviousData : undefined,
+  });
+}
+
+/** Payments page analytics (KPIs, charts, attention counts) — shares the `['payments', …]` prefix so every payment mutation refreshes it. */
+export function usePaymentAnalytics(params: AnalyticsParams) {
+  return useQuery({
+    queryKey: ['payments', 'analytics', params],
+    queryFn: () => financeService.getPaymentAnalytics(params),
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
 }
 
 export function usePayment(id: string | null) {
@@ -118,8 +134,18 @@ export function useRefundPayment() {
 
 // ── Invoices ─────────────────────────────────────────────────────────────
 
-export function useInvoiceList(params: ListInvoicesParams) {
-  return useQuery({ queryKey: ['invoices', 'list', params], queryFn: () => financeService.listInvoices(params) });
+export function useInvoiceList(params: ListInvoicesParams, options?: { enabled?: boolean; keepPrevious?: boolean }) {
+  return useQuery({
+    queryKey: ['invoices', 'list', params],
+    queryFn: () => financeService.listInvoices(params),
+    enabled: options?.enabled,
+    placeholderData: options?.keepPrevious ? keepPreviousData : undefined,
+  });
+}
+
+/** `GET /invoices/analytics` (finance:invoice-view). Refreshed by the existing `['invoices']` invalidations. */
+export function useInvoiceAnalytics(params: AnalyticsParams, enabled = true) {
+  return useQuery({ queryKey: ['invoices', 'analytics', params], queryFn: () => financeService.getInvoiceAnalytics(params), enabled, placeholderData: keepPreviousData, retry: false });
 }
 
 export function useInvoice(id: string | null) {
@@ -137,8 +163,23 @@ export function useEmailInvoice() {
 
 // ── Income ───────────────────────────────────────────────────────────────
 
-export function useIncomeList(params: ListIncomeParams) {
-  return useQuery({ queryKey: ['income', 'list', params], queryFn: () => financeService.listIncome(params) });
+export function useIncomeList(params: ListIncomeParams, options?: { keepPrevious?: boolean }) {
+  return useQuery({
+    queryKey: ['income', 'list', params],
+    queryFn: () => financeService.listIncome(params),
+    placeholderData: options?.keepPrevious ? keepPreviousData : undefined,
+  });
+}
+
+/** Income page analytics — `['income', …]` prefix so create/delete mutations refresh it. `enabled` lets callers skip it without `finance:view`. */
+export function useIncomeAnalytics(params: AnalyticsParams, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['income', 'analytics', params],
+    queryFn: () => financeService.getIncomeAnalytics(params),
+    enabled: options?.enabled,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
 }
 
 export function useCreateIncome() {
@@ -161,8 +202,22 @@ export function useDeleteIncome() {
 
 // ── Expenses ─────────────────────────────────────────────────────────────
 
-export function useExpenseList(params: ListExpensesParams) {
-  return useQuery({ queryKey: ['expenses', 'list', params], queryFn: () => financeService.listExpenses(params) });
+export function useExpenseList(params: ListExpensesParams, options?: { keepPrevious?: boolean }) {
+  return useQuery({
+    queryKey: ['expenses', 'list', params],
+    queryFn: () => financeService.listExpenses(params),
+    placeholderData: options?.keepPrevious ? keepPreviousData : undefined,
+  });
+}
+
+export function useExpenseAnalytics(params: AnalyticsParams, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['expenses', 'analytics', params],
+    queryFn: () => financeService.getExpenseAnalytics(params),
+    enabled: options?.enabled,
+    placeholderData: keepPreviousData,
+    retry: 1,
+  });
 }
 
 export function useExpense(id: string | null) {

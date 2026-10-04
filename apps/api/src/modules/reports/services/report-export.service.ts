@@ -98,7 +98,7 @@ export class ReportExportService {
         return { title: 'Payment Collection', columns: ['date', 'income', 'expenses'], rows };
       }
       case 'analytics-branch-comparison': {
-        const rows = await this.analytics.branchComparison(userId, filters.branchId);
+        const rows = await this.analytics.branchComparison(userId, filters.branchId, filters.dateFrom, filters.dateTo);
         return { title: 'Branch Comparison', columns: ['branch', 'members', 'revenue', 'attendance'], rows };
       }
       default:

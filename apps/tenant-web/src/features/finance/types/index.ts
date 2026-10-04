@@ -56,8 +56,38 @@ export interface ListInvoicesParams {
   status?: MemberInvoiceStatus;
   dateFrom?: string;
   dateTo?: string;
+  minAmount?: number;
+  maxAmount?: number;
   sortBy?: 'invoiceDate' | 'dueDate' | 'totalAmount' | 'createdAt';
   sortDir?: 'asc' | 'desc';
+}
+
+/** `GET /invoices` — `summary`/`counts` are absent until the backend ships them (code defensively). */
+export interface InvoiceListResponse extends Paginated<MemberInvoiceListItem> {
+  summary?: { invoiced: string; collected: string; outstanding: string; count: number };
+  /** Ignores the status filter — drives the status-chip counts. */
+  counts?: { all: number; unpaid: number; partiallyPaid: number; paid: number; overdue: number; cancelled: number };
+}
+
+/** `GET /invoices/analytics`. */
+export interface InvoiceAnalytics {
+  range: { from: string; to: string };
+  previousRange: { from: string; to: string };
+  kpis: {
+    invoiced: { value: string; previous: string };
+    count: { value: number; previous: number };
+    collected: { value: string; previous: string };
+    avgInvoice: { value: string; previous: string };
+    /** 0..1 */
+    collectionRate: { value: number; previous: number };
+    outstanding: { value: string; invoiceCount: number };
+    overdue: { value: string; count: number };
+  };
+  daily: { date: string; invoiced: string; count: number; previousInvoiced: string }[];
+  byStatus: { status: MemberInvoiceStatus; count: number; amount: string }[];
+  aging: { bucket: string; count: number; amount: string }[];
+  topDebtors: { memberId: string; memberCode: string; name: string; outstanding: string; invoiceCount: number }[];
+  branches: { branchId: string; name: string; invoiced: string; collected: string }[];
 }
 
 export interface MemberInvoiceListItem {
@@ -136,6 +166,9 @@ export interface ListPaymentsParams {
   status?: MemberPaymentStatus;
   dateFrom?: string;
   dateTo?: string;
+  planId?: string;
+  minAmount?: number;
+  maxAmount?: number;
   sortBy?: 'paymentDate' | 'finalAmount' | 'createdAt';
   sortDir?: 'asc' | 'desc';
 }
@@ -164,6 +197,8 @@ export interface MemberPaymentListItem {
   transactionReference: string | null;
   status: MemberPaymentStatus;
   createdAt: string;
+  /** Sum of all refunds against this payment (decimal string, `"0.00"` when none). */
+  totalRefunded: string;
 }
 
 export interface MemberPaymentDetail extends MemberPaymentListItem {
@@ -171,7 +206,51 @@ export interface MemberPaymentDetail extends MemberPaymentListItem {
   updatedAt: string;
   recordedBy: { id: string; name: string } | null;
   refunds: Refund[];
-  totalRefunded: string;
+}
+
+/** `GET /payments` response — the usual page envelope plus whole-result totals. */
+export interface PaymentListResponse extends Paginated<MemberPaymentListItem> {
+  summary?: { collectedTotal: string; refundedTotal: string };
+}
+
+// ── Payments analytics (`GET /payments/analytics`) ───────────────────────
+
+export interface AnalyticsParams {
+  dateFrom?: string;
+  dateTo?: string;
+  branchId?: string;
+}
+
+export interface DateRange {
+  from: string;
+  to: string;
+}
+
+interface ValuePrev {
+  value: string;
+  previous: string;
+}
+
+export interface PaymentAnalytics {
+  range: DateRange;
+  previousRange: DateRange;
+  kpis: {
+    collected: ValuePrev;
+    todayCollected: { value: string; count: number };
+    outstanding: { value: string; invoiceCount: number };
+    refunded: ValuePrev & { count: number; /** 0..1 */ rate: number };
+    avgPayment: ValuePrev;
+    paymentCount: { value: number; previous: number };
+    /** 0..1 */
+    successRate: { value: number; previous: number };
+  };
+  /** One row per day in `range`, zero-filled; `previousCollected` is aligned to `previousRange` by index. */
+  daily: { date: string; collected: string; refunded: string; count: number; previousCollected: string }[];
+  methods: { method: MemberPaymentMethod; amount: string; count: number }[];
+  statuses: { status: MemberPaymentStatus; count: number }[];
+  branches: { branchId: string; name: string; revenue: string; previousRevenue: string }[];
+  topPlans: { planName: string; revenue: string; count: number }[];
+  attention: { pendingOver24h: number; failed: number; overdueInvoices: { count: number; amount: string } };
 }
 
 export interface RefundPaymentPayload {
@@ -180,6 +259,32 @@ export interface RefundPaymentPayload {
 }
 
 // ── Income & Expense ─────────────────────────────────────────────────────
+
+/** `GET /income` / `GET /expenses` — page envelope plus totals over the WHOLE filtered result (not just this page). */
+export interface LedgerListResponse<T> extends Paginated<T> {
+  summary?: { total: string; count: number; average: string };
+}
+
+/** `GET /income/analytics` and `GET /expenses/analytics` share one shape (perm `finance:view`). Money = decimal strings. */
+export interface LedgerAnalytics<C extends string = string> {
+  range: DateRange;
+  previousRange: DateRange;
+  kpis: {
+    total: ValuePrev;
+    count: { value: number; previous: number };
+    average: ValuePrev;
+    largest: { value: string; description: string | null; category: C; date: string } | null;
+    netProfit: ValuePrev;
+  };
+  /** One row per day in `range`; `previousTotal` is aligned to `previousRange` by index. */
+  daily: { date: string; total: string; count: number; previousTotal: string }[];
+  categories: { category: C; amount: string; count: number; previousAmount: string }[];
+  branches: { branchId: string; name: string; total: string; previousTotal: string }[];
+  topEntries: { id: string; description: string | null; category: C; amount: string; date: string }[];
+}
+
+export type IncomeAnalytics = LedgerAnalytics<IncomeCategory>;
+export type ExpenseAnalytics = LedgerAnalytics<ExpenseCategory>;
 
 export interface CreateIncomePayload {
   category: IncomeCategory;

@@ -1,102 +1,68 @@
 'use client';
 
-import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
-import { Download, MoreHorizontal, Plus, TrendingUp, Upload } from 'lucide-react';
+import { Download, Plus, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import { Pagination } from '@/components/ui/pagination';
-import { SearchBar } from '@/components/ui/search-bar';
+import type { DataTableColumn } from '@/components/ui/data-table';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
-import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
-import { DEFAULT_INCOME_FORM_STATE, IncomeFormFields, type IncomeFormState } from '@/features/finance/components/income-form-fields';
-import { toFinanceError, useCreateIncome, useDeleteIncome, useIncomeList } from '@/features/finance/hooks/use-finance';
+import { AddIncomeDialog } from '@/features/finance/components/ledger/add-income-dialog';
+import { LedgerBranchComparePanel } from '@/features/finance/components/ledger/branch-compare-panel';
+import { CategoryDonutPanel } from '@/features/finance/components/ledger/category-donut-panel';
+import { LedgerFiltersBar } from '@/features/finance/components/ledger/ledger-filters-bar';
+import { LedgerKpiStrip } from '@/features/finance/components/ledger/ledger-kpi-strip';
+import { DeleteRowMenu, LedgerTable, SortHeader } from '@/features/finance/components/ledger/ledger-table';
+import { INCOME_THEME } from '@/features/finance/components/ledger/ledger-theme';
+import { TopEntriesPanel } from '@/features/finance/components/ledger/top-entries-panel';
+import { TrendChartPanel } from '@/features/finance/components/ledger/trend-chart-panel';
+import { useLedgerControls } from '@/features/finance/components/ledger/use-ledger-controls';
+import { CategoryBadge, INCOME_CATEGORY_META } from '@/features/finance/components/finance-badges';
+import { HeroButton, PaymentsHero } from '@/features/finance/components/payments/payments-hero';
+import { periodNoun } from '@/features/finance/components/payments/payments-period';
+import { fmtDate } from '@/features/finance/components/payments/payments-ui';
+import { PeriodBar } from '@/features/finance/components/payments/period-bar';
+import { toFinanceError, useDeleteIncome, useIncomeAnalytics, useIncomeList } from '@/features/finance/hooks/use-finance';
 import { financeService } from '@/features/finance/services/finance.service';
 import type { Income, IncomeCategory, ListIncomeParams } from '@/features/finance/types';
+import { formatMoney } from '@/features/members/components/detail/detail-ui';
 import { useCurrencySymbol } from '@/lib/currency';
-import { cn } from '@/lib/utils';
 
-const selectClassName = cn(
-  'h-9 rounded-md border border-input bg-background px-2 text-sm shadow-sm',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-);
-
-const CATEGORY_LABELS: Record<IncomeCategory, string> = {
-  MEMBERSHIP_FEE: 'Membership Fee',
-  PERSONAL_TRAINING: 'Personal Training',
-  PRODUCT_SALES: 'Product Sales',
-  OTHER: 'Other',
-};
+const PAGE_SIZE = 20;
+const theme = INCOME_THEME;
 
 export default function IncomePage() {
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('finance:income-manage');
-  const { currentBranchId } = useCurrentBranch();
-  const currencySymbol = useCurrencySymbol();
+  const canViewAnalytics = hasPermission('finance:view');
+  const sym = useCurrencySymbol();
+  const c = useLedgerControls();
 
-  const [search, setSearch] = React.useState('');
-  const debouncedSearch = useDebouncedValue(search, 300);
-  const [category, setCategory] = React.useState<IncomeCategory | ''>('');
-  const [dateFrom, setDateFrom] = React.useState('');
-  const [dateTo, setDateTo] = React.useState('');
-  const [page, setPage] = React.useState(1);
   const [createOpen, setCreateOpen] = React.useState(false);
-  const [form, setForm] = React.useState<IncomeFormState>(DEFAULT_INCOME_FORM_STATE);
-  const [formError, setFormError] = React.useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = React.useState<Income | null>(null);
-
-  // Header branch switch re-scopes the whole list — back to page 1 like any other filter change.
-  React.useEffect(() => {
-    setPage(1);
-  }, [currentBranchId]);
-
-  const params: ListIncomeParams = {
-    page,
-    limit: 20,
-    search: debouncedSearch || undefined,
-    category: category || undefined,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
-    branchId: currentBranchId ?? undefined,
-  };
-  const income = useIncomeList(params);
-  const createIncome = useCreateIncome();
   const deleteIncome = useDeleteIncome();
 
-  const data = income.data;
-  const items = data?.items ?? [];
+  const dateFrom = c.rangeReady ? c.range.from : undefined;
+  const dateTo = c.rangeReady ? c.range.to : undefined;
+  const analytics = useIncomeAnalytics({ dateFrom, dateTo, branchId: c.branchId || undefined }, { enabled: canViewAnalytics });
 
-  const openCreate = () => {
-    setForm(DEFAULT_INCOME_FORM_STATE);
-    setFormError(null);
-    setCreateOpen(true);
+  const listParams: ListIncomeParams = {
+    page: c.page,
+    limit: PAGE_SIZE,
+    search: c.debouncedSearch || undefined,
+    category: (c.category || undefined) as IncomeCategory | undefined,
+    dateFrom,
+    dateTo,
+    branchId: c.branchId || undefined,
+    sortBy: c.sortBy === 'date' ? 'incomeDate' : 'amount',
+    sortDir: c.sortDir,
   };
+  const income = useIncomeList(listParams, { keepPrevious: true });
+  const exportParams = { ...listParams, page: undefined, limit: undefined } as Partial<ListIncomeParams>;
 
-  const submitForm = (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
-    if (!form.amount || Number(form.amount) <= 0) {
-      setFormError('Enter a valid amount.');
-      return;
-    }
-    createIncome.mutate(
-      { category: form.category, amount: Number(form.amount), incomeDate: form.incomeDate, description: form.description || undefined },
-      {
-        onSuccess: () => {
-          toast.success('Income recorded.');
-          setCreateOpen(false);
-        },
-        onError: (err) => setFormError(toFinanceError(err).message),
-      },
-    );
-  };
+  const a = analytics.data;
+  const aLoading = analytics.isPending;
+  const aError = analytics.isError && !a;
 
   const runDelete = () => {
     if (!confirmDelete) return;
@@ -107,133 +73,117 @@ export default function IncomePage() {
     setConfirmDelete(null);
   };
 
+  const sortProps = { sortBy: c.sortBy, sortDir: c.sortDir, onSort: c.toggleSort };
   const columns: DataTableColumn<Income>[] = [
+    { key: 'category', header: 'Category', render: (i) => <CategoryBadge category={i.category} meta={INCOME_CATEGORY_META} /> },
+    { key: 'amount', header: <SortHeader label="Amount" column="amount" right {...sortProps} />, className: 'text-right', render: (i) => <span className="font-extrabold tabular-nums">{formatMoney(sym, i.amount)}</span> },
+    { key: 'date', header: <SortHeader label="Date" column="date" {...sortProps} />, render: (i) => <span className="whitespace-nowrap">{fmtDate(i.incomeDate, { day: 'numeric', month: 'short', year: 'numeric' })}</span> },
+    { key: 'branch', header: 'Branch', render: (i) => i.branch?.name ?? <span className="text-muted-foreground">—</span> },
+    { key: 'description', header: 'Description', render: (i) => <span className="block max-w-[280px] truncate" title={i.description ?? undefined}>{i.description ?? '—'}</span> },
     {
-      key: 'date',
-      header: 'Date',
-      render: (i) => new Date(i.incomeDate).toLocaleDateString(),
-    },
-    { key: 'category', header: 'Category', render: (i) => <Badge variant="secondary">{CATEGORY_LABELS[i.category]}</Badge> },
-    { key: 'amount', header: 'Amount', render: (i) => `${currencySymbol}${i.amount}` },
-    { key: 'branch', header: 'Branch', render: (i) => i.branch?.name ?? '—' },
-    { key: 'description', header: 'Description', render: (i) => i.description ?? '—' },
-    {
-      key: 'source',
-      header: 'Source',
-      render: (i) => (i.sourcePaymentId ? <Badge variant="outline">Auto (payment)</Badge> : 'Manual'),
+      key: 'recordedBy',
+      header: 'Recorded by',
+      render: (i) => (i.sourcePaymentId ? <span className="text-xs font-bold text-muted-foreground">Auto (payment)</span> : (i.recordedBy?.name ?? <span className="text-muted-foreground">—</span>)),
     },
     {
       key: 'actions',
-      header: '',
-      className: 'w-10',
-      render: (i) =>
-        canManage && !i.sourcePaymentId ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-8" aria-label="Actions">
-                <MoreHorizontal className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setConfirmDelete(i)}>
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null,
+      header: <span className="sr-only">Actions</span>,
+      className: 'w-10 text-right',
+      render: (i) => (canManage && !i.sourcePaymentId ? <DeleteRowMenu label={i.description ?? 'income entry'} onDelete={() => setConfirmDelete(i)} /> : null),
     },
   ];
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3.5">
-          <div
-            className="hidden size-10 shrink-0 items-center justify-center rounded-xl sm:flex"
-            style={{
-              backgroundColor: 'color-mix(in oklch, var(--success) 16%, transparent)',
-              color: 'var(--success)',
-              boxShadow: '0 0 0 1px color-mix(in oklch, var(--success) 18%, transparent)',
-            }}
-          >
-            <TrendingUp className="size-5" aria-hidden />
+      <PaymentsHero
+        eyebrow="Finance"
+        title="Income"
+        subtitle="The gym's revenue ledger — membership fees, training, sales and other income, compared against the previous period."
+        stats={
+          canViewAnalytics
+            ? [
+                { value: a ? formatMoney(sym, a.kpis.total.value) : '—', label: `total ${periodNoun(c.period)}` },
+                { value: a ? a.kpis.count.value : '—', label: 'entries' },
+                { value: a ? formatMoney(sym, a.kpis.average.value) : '—', label: 'average entry' },
+              ]
+            : undefined
+        }
+        statsLoading={aLoading}
+        actions={
+          <>
+            <HeroButton onClick={() => void financeService.exportIncomeCsv(exportParams)}>
+              <Upload className="size-4" /> CSV
+            </HeroButton>
+            <HeroButton onClick={() => void financeService.exportIncomeExcel(exportParams)}>
+              <Download className="size-4" /> Excel
+            </HeroButton>
+            {canManage ? (
+              <HeroButton solid onClick={() => setCreateOpen(true)}>
+                <Plus className="size-4" /> Add income
+              </HeroButton>
+            ) : null}
+          </>
+        }
+      />
+
+      <PeriodBar
+        period={c.period}
+        onPeriod={c.changePeriod}
+        customFrom={c.custom.from}
+        customTo={c.custom.to}
+        onCustom={c.setDates}
+        branchId={c.branchId}
+        onBranch={c.changeBranch}
+        compare={c.compare}
+        onCompare={c.setCompare}
+      />
+
+      {canViewAnalytics ? (
+        <>
+          <LedgerKpiStrip analytics={a} loading={aLoading} error={aError} compare={c.compare} vsLabel={`vs ${c.previousLabel.toLowerCase()}`} theme={theme} />
+          <div className="flex flex-wrap gap-3.5">
+            <TrendChartPanel analytics={a} loading={aLoading} error={aError} theme={theme} compare={c.compare} previousLabel={c.previousLabel} />
+            <CategoryDonutPanel analytics={a} loading={aLoading} error={aError} theme={theme} compare={c.compare} />
           </div>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Income</h1>
-            <p className="text-muted-foreground">The gym&apos;s revenue ledger — membership fees, training, sales, and other income.</p>
+          <div className="flex flex-wrap gap-3.5">
+            <LedgerBranchComparePanel analytics={a} loading={aLoading} error={aError} theme={theme} compare={c.compare} />
+            <TopEntriesPanel analytics={a} loading={aLoading} error={aError} theme={theme} />
           </div>
-        </div>
-        {canManage ? (
-          <Button size="sm" onClick={openCreate}>
-            <Plus className="size-4" /> Add income
-          </Button>
-        ) : null}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchBar
-          containerClassName="max-w-xs"
-          placeholder="Search description…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-        <select
-          className={selectClassName}
-          value={category}
-          onChange={(e) => {
-            setCategory(e.target.value as IncomeCategory | '');
-            setPage(1);
-          }}
-          aria-label="Filter by category"
-        >
-          <option value="">All categories</option>
-          <option value="MEMBERSHIP_FEE">Membership Fee</option>
-          <option value="PERSONAL_TRAINING">Personal Training</option>
-          <option value="PRODUCT_SALES">Product Sales</option>
-          <option value="OTHER">Other</option>
-        </select>
-        <Input type="date" aria-label="From date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setPage(1); }} />
-        <Input type="date" aria-label="To date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setPage(1); }} />
-        <Button variant="outline" size="sm" onClick={() => void financeService.exportIncomeCsv(params)}>
-          <Upload className="size-4" /> CSV
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => void financeService.exportIncomeExcel(params)}>
-          <Download className="size-4" /> Excel
-        </Button>
-      </div>
-
-      <DataTable columns={columns} rows={items} rowKey={(i) => i.id} loading={income.isPending} error={income.error} onRetry={() => income.refetch()} emptyMessage="No income entries match these filters." />
-
-      {data ? (
-        <Pagination page={page} totalPages={data.totalPages} onPageChange={setPage} totalItems={data.total} pageSize={20} />
+        </>
       ) : null}
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add income</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={submitForm} className="space-y-4">
-            {formError ? (
-              <p role="alert" className="text-sm text-destructive">
-                {formError}
-              </p>
-            ) : null}
-            <IncomeFormFields value={form} onChange={setForm} disabled={createIncome.isPending} />
-            <Button type="submit" className="w-full" disabled={createIncome.isPending}>
-              {createIncome.isPending ? 'Saving…' : 'Add income'}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+      <LedgerFiltersBar
+        search={c.search}
+        onSearch={c.changeSearch}
+        dateFrom={c.range.from}
+        dateTo={c.range.to}
+        onDates={c.setDates}
+        categoryMeta={INCOME_CATEGORY_META}
+        category={c.category}
+        onCategory={c.changeCategory}
+        counts={a?.categories}
+        onReset={c.reset}
+      />
+
+      <LedgerTable
+        title="All income"
+        columns={columns}
+        data={income.data}
+        loading={income.isPending}
+        error={income.error}
+        onRetry={() => void income.refetch()}
+        page={c.page}
+        onPage={c.setPage}
+        pageSize={PAGE_SIZE}
+        emptyMessage="No income entries match these filters."
+      />
+
+      <AddIncomeDialog open={createOpen} onOpenChange={setCreateOpen} />
 
       <ConfirmDialog
         open={!!confirmDelete}
         onOpenChange={(open) => !open && setConfirmDelete(null)}
-        title={confirmDelete ? `Delete this income entry?` : ''}
+        title="Delete this income entry?"
         description="This soft-deletes the entry — it stays in the database for audit history but is hidden from the ledger."
         destructive
         loading={deleteIncome.isPending}

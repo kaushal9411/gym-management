@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
+import '../models/branch_comparison_row.dart';
 import '../models/revenue_trend_point.dart';
 import '../models/trend_point.dart';
 
@@ -93,6 +94,34 @@ class AnalyticsRepository {
       final list = response.data!['data'] as List;
       return list
           .map((e) => TrendPoint.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /analytics/branch-comparison` (perm `analytics:view`). With
+  /// [from]/[to] revenue + attendance cover exactly that range; without,
+  /// the server defaults to month-to-date. `members` is always the current
+  /// ACTIVE count.
+  Future<List<BranchComparisonRow>> branchComparison({
+    DateTime? from,
+    DateTime? to,
+    String? branchId,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/analytics/branch-comparison',
+        queryParameters: {
+          if (from != null) 'dateFrom': _iso(from),
+          if (to != null) 'dateTo': _iso(to),
+          if (branchId != null) 'branchId': branchId,
+        },
+      );
+      final list = response.data!['data'] as List;
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(BranchComparisonRow.fromJson)
           .toList();
     } on DioException catch (e) {
       throw _mapError(e);

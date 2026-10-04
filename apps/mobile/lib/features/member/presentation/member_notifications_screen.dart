@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -11,6 +13,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../models/tenant_notification.dart';
 import '../../../repositories/member_notification_repository.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/list_filters.dart';
 
 const _categoryIcons = {
   'MEMBERSHIP': Icons.card_membership_outlined,
@@ -25,40 +28,80 @@ const _categoryIcons = {
 /// Member-plane counterpart to the staff `NotificationsScreen` — same
 /// `GET .../notifications` + mark-read/read-all shape, over
 /// `/portal/notifications*` instead. Always `AppRole.member` themed (lime →
-/// teal), never the staff coral/violet. No filter pills here (unlike
-/// staff's All/Payments/Members) — a member's own history is short enough
-/// that a flat list is simpler and sufficient.
-class MemberNotificationsScreen extends StatelessWidget {
+/// teal), never the staff coral/violet. Filter chips (All / Unread plus the
+/// categories a member actually receives) use the server's `unreadOnly` and
+/// `category` params — never filtered client-side after pagination. The
+/// app-bar unread figure is the server's `unreadCount`, not a count of the
+/// loaded page.
+///
+/// Dropped vs the staff screen: per-chip count badges and the period
+/// insights header — the member endpoints return only a single unread total,
+/// no per-category counts or stats.
+class MemberNotificationsScreen extends StatefulWidget {
   const MemberNotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return BlocProvider<PaginatedListCubit<TenantNotification>>(
-      create: (_) => PaginatedListCubit<TenantNotification>(
-        (page) => getIt<MemberNotificationRepository>().list(page: page),
-      )..load(),
-      child: const _MemberNotificationsView(),
-    );
-  }
+  State<MemberNotificationsScreen> createState() =>
+      _MemberNotificationsScreenState();
 }
 
-class _MemberNotificationsView extends StatefulWidget {
-  const _MemberNotificationsView();
+/// Chip values: 'ALL', 'UNREAD', or a server category.
+const _filterOptions = <FilterChipOption<String>>[
+  FilterChipOption('ALL', 'All'),
+  FilterChipOption('UNREAD', 'Unread'),
+  FilterChipOption('MEMBERSHIP', 'Membership'),
+  FilterChipOption('PAYMENT', 'Payments'),
+  FilterChipOption('WORKOUT', 'Workout'),
+  FilterChipOption('DIET', 'Diet'),
+  FilterChipOption('ATTENDANCE', 'Attendance'),
+  FilterChipOption('ANNOUNCEMENT', 'Announcements'),
+];
+
+class _MemberNotificationsScreenState extends State<MemberNotificationsScreen> {
+  String _filter = 'ALL';
+  int? _unread;
+  bool _markingAll = false;
+  late final PaginatedListCubit<TenantNotification> _list =
+      PaginatedListCubit<TenantNotification>(
+    (page) => getIt<MemberNotificationRepository>().list(
+      page: page,
+      unreadOnly: _filter == 'UNREAD',
+      category: _filter == 'ALL' || _filter == 'UNREAD' ? null : _filter,
+    ),
+  )..load();
 
   @override
-  State<_MemberNotificationsView> createState() =>
-      _MemberNotificationsViewState();
-}
+  void initState() {
+    super.initState();
+    _refreshUnread();
+  }
 
-class _MemberNotificationsViewState extends State<_MemberNotificationsView> {
-  bool _markingAll = false;
+  @override
+  void dispose() {
+    _list.close();
+    super.dispose();
+  }
+
+  Future<void> _refreshUnread() async {
+    try {
+      final n = await getIt<MemberNotificationRepository>().unreadCount();
+      if (mounted) setState(() => _unread = n);
+    } on ApiException {
+      // Non-fatal — the title just omits the number.
+    }
+  }
+
+  Future<void> _reload() async {
+    unawaited(_refreshUnread());
+    await _list.load();
+  }
 
   Future<void> _markAllRead() async {
     setState(() => _markingAll = true);
     try {
       await getIt<MemberNotificationRepository>().markAllRead();
       if (!mounted) return;
-      context.read<PaginatedListCubit<TenantNotification>>().load();
+      await _reload();
     } on ApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
@@ -73,7 +116,7 @@ class _MemberNotificationsViewState extends State<_MemberNotificationsView> {
       try {
         await getIt<MemberNotificationRepository>().markRead(n.id);
         if (!mounted) return;
-        context.read<PaginatedListCubit<TenantNotification>>().load();
+        await _reload();
       } on ApiException {
         // Non-fatal — the notification stays visible either way.
       }
@@ -87,21 +130,13 @@ class _MemberNotificationsViewState extends State<_MemberNotificationsView> {
       appBar: AppBar(
         backgroundColor: AppColors.bg,
         elevation: 0,
-        title: BlocBuilder<PaginatedListCubit<TenantNotification>,
-            PaginatedListState<TenantNotification>>(
-          builder: (context, state) {
-            final unread = state is PaginatedListLoaded<TenantNotification>
-                ? state.items.where((n) => n.isUnread).length
-                : 0;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('$unread unread', style: AppText.eyebrow()),
-                Text('Notifications', style: AppText.display(size: 18)),
-              ],
-            );
-          },
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('${_unread ?? 0} unread', style: AppText.eyebrow()),
+            Text('Notifications', style: AppText.display(size: 18)),
+          ],
         ),
         actions: [
           TextButton(
@@ -117,43 +152,86 @@ class _MemberNotificationsViewState extends State<_MemberNotificationsView> {
           ),
         ],
       ),
-      body: BlocBuilder<PaginatedListCubit<TenantNotification>,
-          PaginatedListState<TenantNotification>>(
-        builder: (context, state) {
-          return switch (state) {
-            PaginatedListLoading() =>
-              const AppLoadingView(role: AppRole.member),
-            PaginatedListError(:final message) => AppErrorView(
-                message: message,
-                role: AppRole.member,
-                onRetry: () => context
-                    .read<PaginatedListCubit<TenantNotification>>()
-                    .load(),
-              ),
-            PaginatedListLoaded(:final items) when items.isEmpty =>
-              const AppEmptyState(
-                icon: Icons.notifications_none_rounded,
-                title: 'No notifications yet',
-                message: 'Updates about your membership, payments, workouts '
-                    'and gym announcements will show up here.',
-              ),
-            PaginatedListLoaded(:final items) => RefreshIndicator(
-                color: AppColors.memberB,
-                backgroundColor: AppColors.surface2,
-                onRefresh: () => context
-                    .read<PaginatedListCubit<TenantNotification>>()
-                    .load(),
-                child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
-                  itemCount: items.length,
-                  itemBuilder: (context, i) => _MemberNotificationTile(
-                    notification: items[i],
-                    onTap: () => _tapNotification(items[i]),
-                  ),
-                ),
-              ),
-          };
-        },
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 8),
+            child: FilterChipsRow<String>(
+              options: _filterOptions,
+              selected: _filter,
+              role: AppRole.member,
+              onSelected: (v) {
+                if (v == _filter) return;
+                setState(() => _filter = v);
+                _list.load();
+              },
+            ),
+          ),
+          Expanded(
+            child: BlocBuilder<PaginatedListCubit<TenantNotification>,
+                PaginatedListState<TenantNotification>>(
+              bloc: _list,
+              builder: (context, state) {
+                return switch (state) {
+                  PaginatedListLoading() =>
+                    const AppLoadingView(role: AppRole.member),
+                  PaginatedListError(:final message) => AppErrorView(
+                      message: message,
+                      role: AppRole.member,
+                      onRetry: _list.load,
+                    ),
+                  PaginatedListLoaded(:final items) when items.isEmpty =>
+                    AppEmptyState(
+                      icon: Icons.notifications_none_rounded,
+                      title: _filter == 'ALL'
+                          ? 'No notifications yet'
+                          : 'Nothing here',
+                      message: _filter == 'ALL'
+                          ? 'Updates about your membership, payments, '
+                              'workouts and gym announcements will show up '
+                              'here.'
+                          : 'No notifications match this filter.',
+                    ),
+                  PaginatedListLoaded(
+                    :final items,
+                    :final hasMore,
+                    :final loadingMore,
+                  ) =>
+                    RefreshIndicator(
+                      color: AppColors.memberB,
+                      backgroundColor: AppColors.surface2,
+                      onRefresh: _reload,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(18, 4, 18, 24),
+                        itemCount: items.length + (hasMore ? 1 : 0),
+                        itemBuilder: (context, i) {
+                          if (i == items.length) {
+                            return Center(
+                              child: loadingMore
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(12),
+                                      child: CircularProgressIndicator(
+                                        color: AppColors.memberB,
+                                      ),
+                                    )
+                                  : TextButton(
+                                      onPressed: _list.loadMore,
+                                      child: const Text('Load more'),
+                                    ),
+                            );
+                          }
+                          return _MemberNotificationTile(
+                            notification: items[i],
+                            onTap: () => _tapNotification(items[i]),
+                          );
+                        },
+                      ),
+                    ),
+                };
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

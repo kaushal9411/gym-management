@@ -1,7 +1,10 @@
 import { apiClient } from '@/features/auth/services/api-client';
 import type {
   CreateNotificationInput,
+  NotificationListParams,
   NotificationListResult,
+  NotificationStats,
+  NotificationStatsParams,
   NotificationTemplate,
   NotificationTemplateType,
   TenantNotification,
@@ -15,8 +18,13 @@ interface ApiEnvelope<T> {
 }
 
 class NotificationService {
-  async list(params: { unreadOnly?: boolean; page?: number; limit?: number } = {}): Promise<NotificationListResult> {
+  async list(params: NotificationListParams = {}): Promise<NotificationListResult> {
     const res = await apiClient.get<ApiEnvelope<NotificationListResult>>('/notifications', { params });
+    return res.data.data;
+  }
+
+  async stats(params: NotificationStatsParams): Promise<NotificationStats> {
+    const res = await apiClient.get<ApiEnvelope<NotificationStats>>('/notifications/stats', { params });
     return res.data.data;
   }
 

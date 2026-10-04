@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../models/report_summary.dart';
 import '../../../models/branch_option.dart';
 import '../../../models/expense_report_row.dart';
 import '../../../repositories/analytics_repository.dart';
@@ -17,6 +18,7 @@ import '../../owner/presentation/widgets/trend_chart.dart';
 import 'widgets/donut_chart.dart';
 import 'widgets/load_more_button.dart';
 import 'widgets/report_filter_bar.dart';
+import 'widgets/report_summary_header.dart';
 
 const _categoryColors = [
   AppColors.staffB,
@@ -199,6 +201,15 @@ class _ExpenseReportScreenState extends State<ExpenseReportScreen> {
                 onBranchChanged: _onBranchChanged,
                 dateRange: _range,
                 onDateRangeTap: _pickDateRange,
+              ),
+            ),
+            ReportSummaryHeader(
+              type: 'expenses',
+              invertDeltas: true,
+              filters: ReportSummaryFilters(
+                from: _range.start,
+                to: _range.end,
+                branchId: _branchId,
               ),
             ),
             Expanded(

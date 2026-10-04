@@ -2,6 +2,10 @@ import type { Prisma } from '@prisma/client';
 
 import type { TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import type { ListExpensesQuery } from '../dto/finance.dto';
+import type { LedgerRaw } from '../utils/ledger-analytics.util';
+import type { DateRange } from '../utils/payments-analytics.util';
+
+const dayStr = (d: Date): string => d.toISOString().slice(0, 10);
 
 const INCLUDE = {
   branch: { select: { id: true, name: true } },
@@ -51,8 +55,111 @@ export class ExpenseRepository {
     return { items, total };
   }
 
+  /** Total + count over the FULL filtered set (same where as `list`, ignoring pagination) — backs the list `summary`. */
+  async summary(tenantId: string, query: Partial<ListExpensesQuery>, restrictToBranchIds?: string[]): Promise<{ total: number; count: number }> {
+    const r = await this.db.expense.aggregate({
+      where: buildWhere(tenantId, query, restrictToBranchIds),
+      _sum: { amount: true },
+      _count: { _all: true },
+    });
+    return { total: Number(r._sum.amount ?? 0), count: r._count._all };
+  }
+
+  /** Grouped aggregates for the analytics endpoint — same branch scoping + soft-delete rules as `list`; no rows are loaded beyond the top 5. */
+  async analyticsRaw(
+    tenantId: string,
+    range: DateRange,
+    previousRange: DateRange,
+    branchId: string | undefined,
+    restrictToBranchIds: string[] | undefined,
+    otherTotal: { current: number; previous: number },
+  ): Promise<LedgerRaw> {
+    const scoped = (r: DateRange) => buildWhere(tenantId, { branchId, dateFrom: r.from, dateTo: r.to }, restrictToBranchIds);
+    const curWhere = scoped(range);
+    const prevWhere = scoped(previousRange);
+    const spanWhere = buildWhere(tenantId, { branchId, dateFrom: previousRange.from, dateTo: range.to }, restrictToBranchIds);
+    const sums = { _sum: { amount: true }, _count: { _all: true } } as const;
+
+    const [days, catCur, catPrev, brCur, brPrev, top] = await Promise.all([
+      this.db.expense.groupBy({ by: ['expenseDate'], where: spanWhere, ...sums }),
+      this.db.expense.groupBy({ by: ['category'], where: curWhere, ...sums }),
+      this.db.expense.groupBy({ by: ['category'], where: prevWhere, ...sums }),
+      this.db.expense.groupBy({
+        by: ['branchId'],
+        where: { AND: [curWhere, { branchId: { not: null } }] },
+        _sum: { amount: true },
+      }),
+      this.db.expense.groupBy({
+        by: ['branchId'],
+        where: { AND: [prevWhere, { branchId: { not: null } }] },
+        _sum: { amount: true },
+      }),
+      this.db.expense.findMany({
+        where: curWhere,
+        orderBy: [{ amount: 'desc' }, { expenseDate: 'desc' }, { id: 'asc' }],
+        take: 5,
+        select: { id: true, description: true, category: true, amount: true, expenseDate: true },
+      }),
+    ]);
+
+    const branchIds = [...new Set([...brCur, ...brPrev].map((b) => b.branchId).filter((id): id is string => id !== null))];
+    const branchRows = branchIds.length
+      ? await this.db.branch.findMany({
+          where: { tenantId, id: { in: branchIds } },
+          select: { id: true, name: true },
+        })
+      : [];
+    const nameOf = new Map(branchRows.map((b) => [b.id, b.name]));
+    const curMap = new Map(brCur.map((b) => [b.branchId, Number(b._sum.amount ?? 0)]));
+    const prevMap = new Map(brPrev.map((b) => [b.branchId, Number(b._sum.amount ?? 0)]));
+    const catRow = (r: (typeof catCur)[number]) => ({
+      category: r.category as string,
+      amount: Number(r._sum.amount ?? 0),
+      count: r._count._all,
+    });
+
+    return {
+      kind: 'expense',
+      range,
+      previousRange,
+      dayRows: days.map((r) => ({
+        date: dayStr(r.expenseDate),
+        amount: Number(r._sum.amount ?? 0),
+        count: r._count._all,
+      })),
+      categoriesCurrent: catCur.map(catRow),
+      categoriesPrevious: catPrev.map(catRow),
+      branches: branchIds.map((id) => ({
+        branchId: id,
+        name: nameOf.get(id) ?? 'Unknown',
+        total: curMap.get(id) ?? 0,
+        previousTotal: prevMap.get(id) ?? 0,
+      })),
+      topEntries: top.map((e) => ({
+        id: e.id,
+        description: e.description,
+        category: e.category as string,
+        amount: Number(e.amount),
+        date: dayStr(e.expenseDate),
+      })),
+      otherTotal,
+    };
+  }
+
+  /** Total of this ledger for a range with the same branch scoping — used for the opposite page's netProfit. */
+  async scopedTotal(tenantId: string, range: DateRange, branchId: string | undefined, restrictToBranchIds?: string[]): Promise<number> {
+    const r = await this.db.expense.aggregate({
+      where: buildWhere(tenantId, { branchId, dateFrom: range.from, dateTo: range.to }, restrictToBranchIds),
+      _sum: { amount: true },
+    });
+    return Number(r._sum.amount ?? 0);
+  }
+
   async findById(tenantId: string, id: string, opts?: { includeDeleted?: boolean }): Promise<ExpenseRow | null> {
-    return this.db.expense.findFirst({ where: { tenantId, id, ...(opts?.includeDeleted ? {} : { deletedAt: null }) }, include: INCLUDE });
+    return this.db.expense.findFirst({
+      where: { tenantId, id, ...(opts?.includeDeleted ? {} : { deletedAt: null }) },
+      include: INCLUDE,
+    });
   }
 
   async create(data: Prisma.ExpenseUncheckedCreateInput): Promise<ExpenseRow> {

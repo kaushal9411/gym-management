@@ -3,10 +3,11 @@
 import Link from 'next/link';
 
 import { Badge } from '@/components/ui/badge';
-import { DataTable, type DataTableColumn } from '@/components/ui/data-table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MEMBER_PORTAL_ROUTES } from '../constants';
+import { usePortalMoney } from '../lib/format';
+import { ListRow, PortalList, StatusChip } from './kit/list';
+import { SheetModal } from './kit/sheet-modal';
 import type { MemberPortalAttendanceItem, MemberPortalInvoice, MemberPortalProfile, MemberPortalWorkout } from '../services/member-portal.service';
 import { PayInvoiceButton } from './pay-invoice-button';
 
@@ -43,17 +44,12 @@ function daysUntil(dateIso: string): number {
 /** Same "every dashboard tile is clickable, opening a modal with the real records behind the number" pattern as the staff dashboard's `DashboardCardDetailModal` — here every tile's data was already fetched by the dashboard page itself (member-portal's generous default page sizes cover it), so this modal takes it as props instead of re-querying. */
 export function MemberDashboardDetailModal({ kind, onClose, membership, attendanceItems, workout, invoices }: MemberDashboardDetailModalProps) {
   return (
-    <Dialog open={kind !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{kind ? TITLES[kind] : ''}</DialogTitle>
-        </DialogHeader>
-        {kind === 'membership' ? <MembershipDetail membership={membership} /> : null}
-        {kind === 'attendance' ? <AttendanceDetail items={attendanceItems} /> : null}
-        {kind === 'workout' ? <WorkoutDetail workout={workout} /> : null}
-        {kind === 'outstanding' ? <OutstandingDetail invoices={invoices} /> : null}
-      </DialogContent>
-    </Dialog>
+    <SheetModal open={kind !== null} onOpenChange={(open) => !open && onClose()} title={kind ? TITLES[kind] : 'Details'} className="max-w-2xl">
+      {kind === 'membership' ? <MembershipDetail membership={membership} /> : null}
+      {kind === 'attendance' ? <AttendanceDetail items={attendanceItems} /> : null}
+      {kind === 'workout' ? <WorkoutDetail workout={workout} /> : null}
+      {kind === 'outstanding' ? <OutstandingDetail invoices={invoices} /> : null}
+    </SheetModal>
   );
 }
 
@@ -89,15 +85,18 @@ function MembershipDetail({ membership }: { membership: MemberPortalProfile['cur
 }
 
 function AttendanceDetail({ items }: { items: MemberPortalAttendanceItem[] }) {
-  const columns: DataTableColumn<MemberPortalAttendanceItem>[] = [
-    { key: 'date', header: 'Date', render: (a) => new Date(a.attendanceDate).toLocaleDateString() },
-    { key: 'branch', header: 'Branch', render: (a) => a.branch.name },
-    { key: 'checkIn', header: 'Check-in', render: (a) => new Date(a.checkInTime).toLocaleTimeString() },
-    { key: 'checkOut', header: 'Check-out', render: (a) => (a.checkOutTime ? new Date(a.checkOutTime).toLocaleTimeString() : '—') },
-  ];
+  if (items.length === 0) return <EmptyState title="No visits recorded yet." />;
   return (
     <div className="space-y-3">
-      <DataTable columns={columns} rows={items.slice(0, 20)} rowKey={(a) => a.id} emptyMessage="No visits recorded yet." />
+      <PortalList className="-mx-1 rounded-xl border">
+        {items.slice(0, 20).map((a) => (
+          <ListRow
+            key={a.id}
+            title={new Date(a.attendanceDate).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}
+            subtitle={`${a.branch.name} · ${new Date(a.checkInTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}${a.checkOutTime ? ` - ${new Date(a.checkOutTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}`}
+          />
+        ))}
+      </PortalList>
       {items.length > 20 ? <p className="text-xs text-muted-foreground">Showing 20 of {items.length}.</p> : null}
       <ViewAllLink href={MEMBER_PORTAL_ROUTES.attendance} />
     </div>
@@ -109,47 +108,49 @@ function WorkoutDetail({ workout }: { workout: MemberPortalWorkout | null }) {
     return <EmptyState title="No workout plan assigned" description="Ask your trainer to assign you one." />;
   }
   const progressByExercise = new Map(workout.progress.map((p) => [p.exerciseId, p.status]));
-  const columns: DataTableColumn<MemberPortalWorkout['workoutPlan']['exercises'][number]>[] = [
-    { key: 'name', header: 'Exercise', render: (e) => e.name },
-    { key: 'day', header: 'Day', render: (e) => e.dayOfWeek },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (e) => {
-        const status = progressByExercise.get(e.exerciseId) ?? 'PENDING';
-        return <Badge variant={status === 'COMPLETED' ? 'success' : status === 'SKIPPED' ? 'secondary' : 'outline'}>{status}</Badge>;
-      },
-    },
-  ];
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
         {workout.workoutPlan.name} ({workout.status})
       </p>
-      <DataTable columns={columns} rows={workout.workoutPlan.exercises} rowKey={(e) => e.exerciseId} emptyMessage="No exercises on this plan." />
+      {workout.workoutPlan.exercises.length === 0 ? (
+        <EmptyState title="No exercises on this plan." />
+      ) : (
+        <PortalList className="-mx-1 rounded-xl border">
+          {workout.workoutPlan.exercises.map((e) => {
+            const status = progressByExercise.get(e.exerciseId) ?? 'PENDING';
+            return <ListRow key={e.exerciseId} title={e.name} subtitle={e.dayOfWeek} trailing={<StatusChip tone={status === 'COMPLETED' ? 'success' : 'muted'}>{status}</StatusChip>} />;
+          })}
+        </PortalList>
+      )}
       <ViewAllLink href={MEMBER_PORTAL_ROUTES.workout} />
     </div>
   );
 }
 
-const STATUS_TONE: Record<string, 'destructive' | 'warning' | 'secondary'> = {
-  OVERDUE: 'destructive',
-  PARTIALLY_PAID: 'warning',
-  UNPAID: 'warning',
-};
-
 function OutstandingDetail({ invoices }: { invoices: MemberPortalInvoice[] }) {
+  const money = usePortalMoney();
   const outstanding = invoices.filter((i) => i.status !== 'PAID');
-  const columns: DataTableColumn<MemberPortalInvoice>[] = [
-    { key: 'invoice', header: 'Invoice', render: (i) => i.invoiceNumber },
-    { key: 'due', header: 'Due', render: (i) => new Date(i.dueDate).toLocaleDateString() },
-    { key: 'status', header: 'Status', render: (i) => <Badge variant={STATUS_TONE[i.status] ?? 'secondary'}>{i.status.replace('_', ' ')}</Badge> },
-    { key: 'amount', header: 'Amount', render: (i) => `₹${Number(i.totalAmount).toLocaleString('en-IN')}` },
-    { key: 'action', header: '', render: (i) => <PayInvoiceButton invoiceId={i.id} invoiceNumber={i.invoiceNumber} /> },
-  ];
   return (
     <div className="space-y-3">
-      <DataTable columns={columns} rows={outstanding} rowKey={(i) => i.id} emptyMessage="Nothing outstanding — all invoices are settled." />
+      {outstanding.length === 0 ? (
+        <EmptyState title="Nothing outstanding — all invoices are settled." />
+      ) : (
+        <ul className="space-y-2">
+          {outstanding.map((i) => (
+            <li key={i.id} className="flex items-center gap-3 rounded-xl border p-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{i.invoiceNumber}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  Due {new Date(i.dueDate).toLocaleDateString()} · <StatusChip tone={i.status === 'OVERDUE' ? 'danger' : 'warning'}>{i.status.replace('_', ' ')}</StatusChip>
+                </p>
+              </div>
+              <span className="shrink-0 text-sm font-semibold tabular-nums">{money.format(i.totalAmount)}</span>
+              <PayInvoiceButton invoiceId={i.id} invoiceNumber={i.invoiceNumber} />
+            </li>
+          ))}
+        </ul>
+      )}
       <ViewAllLink href={MEMBER_PORTAL_ROUTES.invoices} />
     </div>
   );

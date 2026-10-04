@@ -8,10 +8,18 @@ import type {
   FinanceDashboard,
   GenerateInvoicePayload,
   Income,
+  IncomeAnalytics,
+  ExpenseAnalytics,
+  LedgerListResponse,
   ListExpensesParams,
   ListIncomeParams,
   ListInvoicesParams,
   ListPaymentsParams,
+  PaymentAnalytics,
+  PaymentListResponse,
+  AnalyticsParams,
+  InvoiceAnalytics,
+  InvoiceListResponse,
   MemberInvoiceDetail,
   MemberInvoiceListItem,
   MemberPaymentDetail,
@@ -50,8 +58,13 @@ class FinanceService {
 
   // ── Payments ───────────────────────────────────────────────────────────
 
-  async listPayments(params: ListPaymentsParams): Promise<Paginated<MemberPaymentListItem>> {
-    const res = await apiClient.get<ApiEnvelope<Paginated<MemberPaymentListItem>>>('/payments', { params });
+  async listPayments(params: ListPaymentsParams): Promise<PaymentListResponse> {
+    const res = await apiClient.get<ApiEnvelope<PaymentListResponse>>('/payments', { params });
+    return res.data.data;
+  }
+
+  async getPaymentAnalytics(params: AnalyticsParams): Promise<PaymentAnalytics> {
+    const res = await apiClient.get<ApiEnvelope<PaymentAnalytics>>('/payments/analytics', { params });
     return res.data.data;
   }
 
@@ -107,8 +120,13 @@ class FinanceService {
 
   // ── Invoices ───────────────────────────────────────────────────────────
 
-  async listInvoices(params: ListInvoicesParams): Promise<Paginated<MemberInvoiceListItem>> {
-    const res = await apiClient.get<ApiEnvelope<Paginated<MemberInvoiceListItem>>>('/invoices', { params });
+  async listInvoices(params: ListInvoicesParams): Promise<InvoiceListResponse> {
+    const res = await apiClient.get<ApiEnvelope<InvoiceListResponse>>('/invoices', { params });
+    return res.data.data;
+  }
+
+  async getInvoiceAnalytics(params: AnalyticsParams): Promise<InvoiceAnalytics> {
+    const res = await apiClient.get<ApiEnvelope<InvoiceAnalytics>>('/invoices/analytics', { params });
     return res.data.data;
   }
 
@@ -139,8 +157,13 @@ class FinanceService {
 
   // ── Income ─────────────────────────────────────────────────────────────
 
-  async listIncome(params: ListIncomeParams): Promise<Paginated<Income>> {
-    const res = await apiClient.get<ApiEnvelope<Paginated<Income>>>('/income', { params });
+  async listIncome(params: ListIncomeParams): Promise<LedgerListResponse<Income>> {
+    const res = await apiClient.get<ApiEnvelope<LedgerListResponse<Income>>>('/income', { params });
+    return res.data.data;
+  }
+
+  async getIncomeAnalytics(params: AnalyticsParams): Promise<IncomeAnalytics> {
+    const res = await apiClient.get<ApiEnvelope<IncomeAnalytics>>('/income/analytics', { params });
     return res.data.data;
   }
 
@@ -170,8 +193,13 @@ class FinanceService {
 
   // ── Expenses ───────────────────────────────────────────────────────────
 
-  async listExpenses(params: ListExpensesParams): Promise<Paginated<Expense>> {
-    const res = await apiClient.get<ApiEnvelope<Paginated<Expense>>>('/expenses', { params });
+  async listExpenses(params: ListExpensesParams): Promise<LedgerListResponse<Expense>> {
+    const res = await apiClient.get<ApiEnvelope<LedgerListResponse<Expense>>>('/expenses', { params });
+    return res.data.data;
+  }
+
+  async getExpenseAnalytics(params: AnalyticsParams): Promise<ExpenseAnalytics> {
+    const res = await apiClient.get<ApiEnvelope<ExpenseAnalytics>>('/expenses/analytics', { params });
     return res.data.data;
   }
 

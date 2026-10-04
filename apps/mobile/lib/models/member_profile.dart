@@ -6,6 +6,7 @@ class MemberProfile {
     required this.name,
     required this.email,
     required this.status,
+    this.profilePhotoUrl,
   });
 
   final String id;
@@ -13,6 +14,26 @@ class MemberProfile {
   final String name;
   final String? email;
   final String status;
+
+  /// Not returned by login — filled in once the member opens/edits their
+  /// profile (`SessionCubit.memberProfileChanged`) and cached with the rest.
+  final String? profilePhotoUrl;
+
+  MemberProfile copyWith({
+    String? name,
+    String? email,
+    String? profilePhotoUrl,
+    bool clearPhoto = false,
+  }) =>
+      MemberProfile(
+        id: id,
+        memberId: memberId,
+        name: name ?? this.name,
+        email: email ?? this.email,
+        status: status,
+        profilePhotoUrl:
+            clearPhoto ? null : (profilePhotoUrl ?? this.profilePhotoUrl),
+      );
 
   String get initials {
     final words =
@@ -32,6 +53,7 @@ class MemberProfile {
         name: json['name'] as String? ?? '',
         email: json['email'] as String?,
         status: json['status'] as String? ?? '',
+        profilePhotoUrl: json['profilePhotoUrl'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -40,5 +62,6 @@ class MemberProfile {
         'name': name,
         'email': email,
         'status': status,
+        'profilePhotoUrl': profilePhotoUrl,
       };
 }

@@ -1,11 +1,26 @@
-import { actionButton, codeBlock, footnote, infoBox, renderEmailLayout, secondaryLink, toneAccent, type EmailBranding, type HeroTone } from './base-layout';
+import {
+  actionButton,
+  codeBlock,
+  footnote,
+  infoBox,
+  renderEmailLayout,
+  secondaryLink,
+  toneAccent,
+  type EmailBranding,
+  type HeroTone,
+} from './base-layout';
 
 export function welcomeEmail(branding: EmailBranding, ownerName: string, verifyUrl: string) {
   return {
     subject: `Welcome to ${branding.tenantName} on FitCloud`,
     html: renderEmailLayout(
       branding,
-      { icon: '🎉', title: `Welcome, ${ownerName}!`, categoryLabel: 'Welcome', preheader: `Verify your email to activate ${branding.tenantName} and start your free trial.` },
+      {
+        icon: '🎉',
+        title: `Welcome, ${ownerName}!`,
+        categoryLabel: 'Welcome',
+        preheader: `Verify your email to activate ${branding.tenantName} and start your free trial.`,
+      },
       `<p>Your gym <strong>${branding.tenantName}</strong> is set up and ready on FitCloud. Verify your email to activate your account and kick off your 14-day free trial — full access, no card charged until it ends.</p>
        ${actionButton(verifyUrl, 'Verify email address', branding.primaryColor)}
        ${secondaryLink(verifyUrl, 'Or paste this link into your browser')}
@@ -19,7 +34,12 @@ export function verifyEmailEmail(branding: EmailBranding, name: string, verifyUr
     subject: 'Verify your email address',
     html: renderEmailLayout(
       branding,
-      { icon: '✉️', title: 'Verify Your Email', categoryLabel: 'Account Security', preheader: 'Confirm your email address to activate your account.' },
+      {
+        icon: '✉️',
+        title: 'Verify Your Email',
+        categoryLabel: 'Account Security',
+        preheader: 'Confirm your email address to activate your account.',
+      },
       `<p>Hi ${name}, please confirm your email address to activate your ${branding.tenantName} account.</p>
        ${actionButton(verifyUrl, 'Verify email address', branding.primaryColor)}
        ${secondaryLink(verifyUrl, 'Or paste this link into your browser')}
@@ -33,7 +53,12 @@ export function passwordResetEmail(branding: EmailBranding, name: string, resetU
     subject: 'Reset your password',
     html: renderEmailLayout(
       branding,
-      { icon: '🔒', title: 'Reset Your Password', categoryLabel: 'Account Security', preheader: 'Reset your password — this link expires in 30 minutes.' },
+      {
+        icon: '🔒',
+        title: 'Reset Your Password',
+        categoryLabel: 'Account Security',
+        preheader: 'Reset your password — this link expires in 30 minutes.',
+      },
       `<p>Hi ${name}, we received a request to reset your ${branding.tenantName} password. Click below to choose a new one.</p>
        ${actionButton(resetUrl, 'Reset password', branding.primaryColor)}
        ${secondaryLink(resetUrl, 'Or paste this link into your browser')}
@@ -47,7 +72,13 @@ export function passwordChangedEmail(branding: EmailBranding, name: string) {
     subject: 'Your password was changed',
     html: renderEmailLayout(
       branding,
-      { icon: '✅', title: 'Password Changed', categoryLabel: 'Account Security', tone: 'success', preheader: 'Your password was just changed.' },
+      {
+        icon: '✅',
+        title: 'Password Changed',
+        categoryLabel: 'Account Security',
+        tone: 'success',
+        preheader: 'Your password was just changed.',
+      },
       `<p>Hi ${name}, this confirms your ${branding.tenantName} password was just changed. For your security, every other device has been signed out.</p>
        ${footnote('If you didn’t make this change, contact your gym owner immediately.')}`,
     ),
@@ -59,7 +90,12 @@ export function otpCodeEmail(branding: EmailBranding, name: string, code: string
     subject: `Your verification code: ${code}`,
     html: renderEmailLayout(
       branding,
-      { icon: '🔑', title: 'Your Verification Code', categoryLabel: 'Verification', preheader: `Your verification code is ${code}.` },
+      {
+        icon: '🔑',
+        title: 'Your Verification Code',
+        categoryLabel: 'Verification',
+        preheader: `Your verification code is ${code}.`,
+      },
       `<p>Hi ${name}, use this code to continue signing in to ${branding.tenantName}:</p>
        ${codeBlock(code, branding.primaryColor)}
        <p style="font-size:13px;color:#6b7280;">This code expires in <strong>${expiresInMinutes} minutes</strong>. Never share it with anyone.</p>`,
@@ -67,17 +103,17 @@ export function otpCodeEmail(branding: EmailBranding, name: string, code: string
   };
 }
 
-export function invitationEmail(
-  branding: EmailBranding,
-  inviterName: string,
-  roleLabel: string,
-  acceptUrl: string,
-) {
+export function invitationEmail(branding: EmailBranding, inviterName: string, roleLabel: string, acceptUrl: string) {
   return {
     subject: `You're invited to join ${branding.tenantName}`,
     html: renderEmailLayout(
       branding,
-      { icon: '👋', title: 'You’re Invited!', categoryLabel: 'Team Invite', preheader: `${inviterName} invited you to join ${branding.tenantName} as a ${roleLabel}.` },
+      {
+        icon: '👋',
+        title: 'You’re Invited!',
+        categoryLabel: 'Team Invite',
+        preheader: `${inviterName} invited you to join ${branding.tenantName} as a ${roleLabel}.`,
+      },
       `<p><strong>${inviterName}</strong> invited you to join <strong>${branding.tenantName}</strong> on FitCloud as a <strong>${roleLabel}</strong>.</p>
        ${actionButton(acceptUrl, 'Accept invitation', branding.primaryColor)}
        ${secondaryLink(acceptUrl, 'Or paste this link into your browser')}
@@ -92,7 +128,12 @@ export function memberPortalInviteEmail(branding: EmailBranding, memberName: str
     subject: `Activate your ${branding.tenantName} member portal`,
     html: renderEmailLayout(
       branding,
-      { icon: '👋', title: 'You’re Invited!', categoryLabel: 'Member Portal', preheader: `${branding.tenantName} enabled your member portal access — activate it now.` },
+      {
+        icon: '👋',
+        title: 'You’re Invited!',
+        categoryLabel: 'Member Portal',
+        preheader: `${branding.tenantName} enabled your member portal access — activate it now.`,
+      },
       `<p>Hi ${memberName}, <strong>${branding.tenantName}</strong> has enabled portal access for you — set a password to check your own attendance, workout &amp; diet plans, invoices, and class bookings any time.</p>
        ${actionButton(acceptUrl, 'Activate my account', branding.primaryColor)}
        ${secondaryLink(acceptUrl, 'Or paste this link into your browser')}
@@ -145,8 +186,33 @@ export function subscriptionAlertEmail(
     subject: copy.subject,
     html: renderEmailLayout(
       branding,
-      { icon: copy.icon, title: copy.title, categoryLabel: copy.categoryLabel, tone: copy.tone, preheader: copy.subject },
+      {
+        icon: copy.icon,
+        title: copy.title,
+        categoryLabel: copy.categoryLabel,
+        tone: copy.tone,
+        preheader: copy.subject,
+      },
       infoBox(`<p style="margin:0;">${copy.body}</p>`, toneAccent(branding, copy.tone)),
+    ),
+  };
+}
+
+/** Sent to the PREVIOUS address when a member changes their own email — informational, no action link. */
+export function memberEmailChangedEmail(branding: EmailBranding, name: string) {
+  return {
+    subject: 'Your email address was changed',
+    html: renderEmailLayout(
+      branding,
+      {
+        icon: '✉️',
+        title: 'Email Address Changed',
+        categoryLabel: 'Account Security',
+        tone: 'success',
+        preheader: 'The email on your gym profile was just changed.',
+      },
+      `<p>Hi ${name}, this is to let you know that the email address on your ${branding.tenantName} member profile was just changed. You will no longer receive messages at this address.</p>
+       ${footnote('If you didn’t make this change, contact your gym immediately.')}`,
     ),
   };
 }
