@@ -3,13 +3,19 @@ import type { Request, Response } from 'express';
 import { sendSuccess } from '../../../core/http/response';
 import type { UpsertPlanInput } from '../repositories/admin-plan.repository';
 import { adminPlanService } from '../services/admin-plan.service';
+import { planInsightsService } from '../services/plan-insights.service';
 
 type ParamsDictionary = Record<string, string>;
 type TypedBodyRequest<Body> = Request<ParamsDictionary, unknown, Body>;
 
 export class AdminPlanController {
-  async list(_req: Request, res: Response): Promise<void> {
-    sendSuccess(res, await adminPlanService.list());
+  async list(req: Request, res: Response): Promise<void> {
+    sendSuccess(
+      res,
+      await planInsightsService.listWithStats(
+        req.query as { search?: string; status?: 'active' | 'inactive' },
+      ),
+    );
   }
 
   async getById(req: Request, res: Response): Promise<void> {
@@ -27,12 +33,22 @@ export class AdminPlanController {
   }
 
   async update(req: TypedBodyRequest<Partial<UpsertPlanInput>>, res: Response): Promise<void> {
-    const plan = await adminPlanService.update(req.params.planId!, req.body, req.admin!.sub, req.admin!.role);
+    const plan = await adminPlanService.update(
+      req.params.planId!,
+      req.body,
+      req.admin!.sub,
+      req.admin!.role,
+    );
     sendSuccess(res, plan, 'Plan updated.');
   }
 
   async setActive(req: TypedBodyRequest<{ isActive: boolean }>, res: Response): Promise<void> {
-    const plan = await adminPlanService.setActive(req.params.planId!, req.body.isActive, req.admin!.sub, req.admin!.role);
+    const plan = await adminPlanService.setActive(
+      req.params.planId!,
+      req.body.isActive,
+      req.admin!.sub,
+      req.admin!.role,
+    );
     sendSuccess(res, plan, req.body.isActive ? 'Plan enabled.' : 'Plan disabled.');
   }
 

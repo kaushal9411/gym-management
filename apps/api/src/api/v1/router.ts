@@ -23,6 +23,7 @@ import { adminTicketRouter } from '../../modules/admin-support/routes/admin-tick
 import { adminTemplateRouter } from '../../modules/admin-templates/routes/admin-template.routes';
 import { adminTenantBillingRouter } from '../../modules/admin-tenants/routes/admin-tenant-billing.routes';
 import { adminTenantRouter } from '../../modules/admin-tenants/routes/admin-tenant.routes';
+import { adminTenantDetailRouter } from '../../modules/admin-tenants/routes/tenant-detail.routes';
 import { aiAssistantRouter } from '../../modules/ai-assistant/routes/ai-assistant.routes';
 import { announcementRouter } from '../../modules/announcements/routes/announcement.routes';
 import { attendanceRouter } from '../../modules/attendance/routes/attendance.routes';
@@ -89,6 +90,7 @@ v1Router.use('/admin/ai', adminAiAssistantRouter);
 v1Router.use('/admin/dashboard', adminDashboardRouter);
 v1Router.use('/admin/tenants', adminTenantRouter);
 v1Router.use('/admin/tenants', adminTenantBillingRouter);
+v1Router.use('/admin/tenants', adminTenantDetailRouter);
 v1Router.use('/admin/plans', adminPlanRouter);
 v1Router.use('/admin/coupons', adminCouponRouter);
 v1Router.use('/admin/payments', adminPaymentRouter);

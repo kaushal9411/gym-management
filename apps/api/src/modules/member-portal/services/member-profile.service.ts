@@ -3,12 +3,12 @@ import { ErrorCode } from '../../../core/errors/error-codes';
 import { logger } from '../../../core/logging/logger';
 import { deleteStoredMemberPhoto, uploadDataUrl } from '../../../core/storage/storage.service';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
+import { loadEmailBranding } from '../../../infrastructure/mail/branding';
 import { memberEmailChangedEmail } from '../../../infrastructure/mail/templates/auth-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import { MemberAuthService } from '../../member-auth/services/member-auth.service';
 import { MemberRepository } from '../../members/repositories/member.repository';
-import { tenantService } from '../../tenants/service/tenant.service';
 import { toMemberProfileDto, type MemberProfileDto } from '../dto/member-profile.dto';
 import {
   assertEmailChangeAuthorized,
@@ -22,7 +22,6 @@ export interface ProfileRequestContext {
   userAgent?: string;
 }
 
-const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /**
  * Member self-service profile. Every method takes the member's OWN id (from
@@ -147,15 +146,8 @@ export class MemberProfileService {
   /** Informational, best-effort — never fails the save. */
   private async notifyOldEmail(oldEmail: string, firstName: string): Promise<void> {
     try {
-      const tenant = await tenantService.resolveById(this.tenantId);
-      const branding = tenant
-        ? {
-            tenantName: tenant.name,
-            primaryColor: tenant.branding.primaryColor,
-            logoUrl: tenant.branding.emailLogoUrl ?? tenant.branding.logoUrl,
-          }
-        : { tenantName: 'FitCloud' };
-      const template = memberEmailChangedEmail(branding, escapeHtml(firstName));
+      const branding = await loadEmailBranding(this.tenantId);
+      const template = memberEmailChangedEmail(branding, firstName);
       await enqueueEmail({ to: oldEmail, subject: template.subject, html: template.html });
     } catch (error) {
       logger.warn('Could not queue the email-changed notice', {

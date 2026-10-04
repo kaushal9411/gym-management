@@ -24,6 +24,16 @@ export interface Plan {
   sortOrder: number;
   features: PlanFeature[];
   _count?: { subscriptions: number };
+  /** Per-plan live stats (GET /admin/plans) — mrr is a Decimal string in the plan's own currency. */
+  stats?: PlanStats;
+}
+
+export interface PlanStats {
+  activeSubscribers: number;
+  trialSubscribers: number;
+  pastDueSubscribers: number;
+  mrr: string;
+  share: number;
 }
 
 export interface PlanSubscriber {

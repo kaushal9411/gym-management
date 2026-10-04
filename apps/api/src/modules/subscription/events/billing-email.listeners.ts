@@ -28,12 +28,16 @@ export function registerBillingEmailListeners(): void {
     currency: string;
   }>('billing.subscription_activated', async (payload) => {
     const branding = { tenantName: payload.tenantName };
-    const activated = subscriptionActivatedEmail(branding, 'there', payload.planName, payload.action);
-    await enqueueEmail({ to: payload.email, subject: activated.subject, html: activated.html });
-
     const tenant = await prisma.tenant.findUnique({ where: { id: payload.tenantId } });
     const downloadUrl = tenant ? portalPath(tenant.slug, `/billing/invoices/${payload.invoiceId}`) : '#';
+    const billingUrl = tenant ? portalPath(tenant.slug, '/billing') : undefined;
     const totalFormatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: payload.currency }).format(payload.total);
+    const activated = subscriptionActivatedEmail(branding, 'there', payload.planName, payload.action, {
+      invoiceNumber: payload.invoiceNumber,
+      total: totalFormatted,
+      billingUrl,
+    });
+    await enqueueEmail({ to: payload.email, subject: activated.subject, html: activated.html });
     const invoice = invoiceEmail(branding, 'there', payload.invoiceNumber, totalFormatted, downloadUrl);
     await enqueueEmail({ to: payload.email, subject: invoice.subject, html: invoice.html });
 
@@ -46,7 +50,7 @@ export function registerBillingEmailListeners(): void {
     const owner = await prisma.user.findFirst({ where: { tenantId: payload.tenantId }, orderBy: { createdAt: 'asc' } });
     if (!owner) return;
 
-    const template = subscriptionAlertEmail({ tenantName: tenant.name }, owner.name, 'payment_failed');
+    const template = subscriptionAlertEmail({ tenantName: tenant.name }, owner.name, 'payment_failed', { billingUrl: portalPath(tenant.slug, '/billing') });
     await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
 
     await tenantNotificationService.notifyTenant(payload.tenantId, 'SUBSCRIPTION', template.subject, 'We could not process your last payment. Please update your billing details.');

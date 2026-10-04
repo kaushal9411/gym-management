@@ -44,10 +44,27 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '12re
     onChange(ref.current?.innerHTML ?? '');
   };
 
-  const addLink = () => {
-    const url = window.prompt('Link URL (https://...)');
+  // Inline link bar (replaces window.prompt): remember the selection, then re-apply it when the URL is confirmed.
+  const [linkOpen, setLinkOpen] = React.useState(false);
+  const [linkUrl, setLinkUrl] = React.useState('');
+  const savedRange = React.useRef<Range | null>(null);
+  const linkInput = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => { if (linkOpen) linkInput.current?.focus(); }, [linkOpen]);
+
+  const openLink = () => {
+    const sel = window.getSelection();
+    savedRange.current = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
+    setLinkUrl('');
+    setLinkOpen(true);
+  };
+
+  const applyLink = () => {
+    const url = linkUrl.trim();
+    setLinkOpen(false);
     if (!url) return;
     ref.current?.focus();
+    const sel = window.getSelection();
+    if (sel && savedRange.current) { sel.removeAllRanges(); sel.addRange(savedRange.current); }
     document.execCommand('createLink', false, url);
     onChange(ref.current?.innerHTML ?? '');
   };
@@ -69,10 +86,26 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = '12re
             <t.icon className="size-3.5" />
           </Button>
         ))}
-        <Button type="button" variant="ghost" size="icon" className="size-7 rounded-md" title="Link" aria-label="Insert link" onClick={addLink}>
+        <Button type="button" variant="ghost" size="icon" className="size-7 rounded-md" title="Link" aria-label="Insert link" onClick={openLink}>
           <LinkIcon className="size-3.5" />
         </Button>
       </div>
+      {linkOpen ? (
+        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/20 p-1.5">
+          <input
+            ref={linkInput}
+            type="url"
+            aria-label="Link URL"
+            placeholder="https://…"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyLink(); } if (e.key === 'Escape') setLinkOpen(false); }}
+            className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <Button type="button" size="sm" onClick={applyLink}>Apply</Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setLinkOpen(false)}>Cancel</Button>
+        </div>
+      ) : null}
       <div
         ref={ref}
         contentEditable

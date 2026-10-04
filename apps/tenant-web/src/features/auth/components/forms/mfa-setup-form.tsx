@@ -4,11 +4,10 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { CheckCircle2, Copy, KeyRound, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Copy, KeyRound, ShieldCheck, ShieldPlus } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { LoadingButton } from '@/components/ui/loading-button';
@@ -17,7 +16,7 @@ import { useConfirmMfaSetup, toAuthError } from '../../hooks/use-auth';
 import { otpSchema } from '../../schemas';
 import { authService } from '../../services/auth.service';
 import type { TwoFactorSetup } from '../../types';
-import { AuthHeader } from '../auth-header';
+import { AuthPanel, PanelSpinner } from '../auth-panel';
 import { FormAlert } from '../form-alert';
 import { OtpInput } from '../otp-input';
 
@@ -99,100 +98,102 @@ export function MfaSetupForm({ email, setupToken }: MfaSetupFormProps) {
     toast.success('Backup codes copied to clipboard');
   };
 
+  const stepLabels = ['Scan & verify', 'Save backup codes'];
+
   if (backupCodes) {
     return (
       <div className="space-y-6">
-        <AuthHeader title="Save your backup codes" subtitle="Each code works once — use one if you ever lose access to your authenticator app." />
-        <Card>
-          <CardContent className="space-y-5 p-6 sm:p-8">
-            <div className="grid grid-cols-2 gap-2 rounded-lg border bg-muted/40 p-4 font-mono text-sm">
-              {backupCodes.map((c) => (
-                <span key={c}>{c}</span>
-              ))}
-            </div>
-            <Button type="button" variant="outline" className="w-full" onClick={copyBackupCodes}>
-              <Copy aria-hidden /> Copy codes
-            </Button>
-            <label htmlFor="saved-confirm" className="flex items-start gap-2 text-sm">
-              <Checkbox id="saved-confirm" checked={savedConfirmed} onCheckedChange={(c) => setSavedConfirmed(c === true)} className="mt-0.5" />
-              <span>I&apos;ve saved these codes somewhere safe. They won&apos;t be shown again.</span>
-            </label>
-            <Button type="button" className="w-full" disabled={!savedConfirmed} onClick={() => router.push(POST_LOGIN_REDIRECT)}>
-              <CheckCircle2 aria-hidden /> Continue to dashboard
-            </Button>
-          </CardContent>
-        </Card>
+        <AuthPanel
+          icon={ShieldCheck}
+          tone="success"
+          steps={{ labels: stepLabels, current: 1 }}
+          title="Save your backup codes"
+          subtitle="Two-factor authentication is on. Each code works once — use one if you ever lose access to your authenticator app."
+        >
+          <div className="grid grid-cols-2 gap-2 rounded-xl border bg-muted/40 p-4 font-mono text-sm" aria-label="Backup codes">
+            {backupCodes.map((c) => (
+              <span key={c} className="rounded-md bg-background px-2 py-1.5 text-center tabular-nums">{c}</span>
+            ))}
+          </div>
+          <Button type="button" variant="outline" size="lg" className="w-full" onClick={copyBackupCodes}>
+            <Copy aria-hidden /> Copy codes
+          </Button>
+          <label htmlFor="saved-confirm" className="flex min-h-11 items-start gap-3 text-sm">
+            <Checkbox id="saved-confirm" checked={savedConfirmed} onCheckedChange={(c) => setSavedConfirmed(c === true)} className="mt-0.5" />
+            <span>I&apos;ve saved these codes somewhere safe. They won&apos;t be shown again.</span>
+          </label>
+          <Button type="button" size="lg" className="w-full" disabled={!savedConfirmed} onClick={() => router.push(POST_LOGIN_REDIRECT)}>
+            <CheckCircle2 aria-hidden /> Continue to dashboard
+          </Button>
+        </AuthPanel>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <AuthHeader
+      <AuthPanel
+        icon={ShieldPlus}
+        steps={{ labels: stepLabels, current: 0 }}
         title="Set up two-factor authentication"
         subtitle="Your gym now requires 2FA for this role. Scan the QR code with an authenticator app (Google Authenticator, Authy, 1Password, …), then enter the 6-digit code it shows."
-      />
+      >
+        <FormAlert variant="error" message={error ?? (beginSetup.status === 'error' ? beginSetup.message : null)} />
 
-      <Card>
-        <CardContent className="space-y-5 p-6 sm:p-8">
-          <FormAlert variant="error" message={error ?? (beginSetup.status === 'error' ? beginSetup.message : null)} />
-
-          {beginSetup.status !== 'success' ? (
-            <div className="flex items-center justify-center py-10">
-              {beginSetup.status === 'pending' ? (
-                <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" aria-label="Loading" />
-              ) : null}
-            </div>
-          ) : (
-            <>
-              <div className="flex justify-center">
+        {beginSetup.status !== 'success' ? (
+          beginSetup.status === 'pending' ? <PanelSpinner label="Generating your secure setup code…" /> : null
+        ) : (
+          <>
+            <div className="flex justify-center">
+              <div className="rounded-2xl border bg-white p-3 shadow-sm">
                 {/* eslint-disable-next-line @next/next/no-img-element -- a one-time base64 data-URL from the API, not a static/optimizable asset */}
-                <img src={beginSetup.data.qrDataUrl} alt="Scan this QR code with your authenticator app" className="size-48 rounded-lg border p-2" />
+                <img src={beginSetup.data.qrDataUrl} alt="Scan this QR code with your authenticator app" className="size-44 sm:size-48" />
               </div>
-              <details className="text-center text-xs text-muted-foreground">
-                <summary className="cursor-pointer select-none">Can&apos;t scan? Enter this code manually</summary>
-                <p className="mt-2 break-all rounded-lg border bg-muted/40 p-2 font-mono">{beginSetup.data.secret}</p>
-              </details>
+            </div>
+            <details className="text-center text-xs text-muted-foreground">
+              <summary className="mx-auto flex min-h-11 w-fit cursor-pointer select-none items-center px-2">Can&apos;t scan? Enter this code manually</summary>
+              <p className="mt-1 break-all rounded-lg border bg-muted/40 p-2 font-mono">{beginSetup.data.secret}</p>
+            </details>
 
-              <motion.div
-                key={shake}
-                animate={shake > 0 ? { x: [0, -8, 8, -6, 6, -3, 3, 0] } : undefined}
-                transition={{ duration: 0.4 }}
-              >
-                <OtpInput
-                  value={code}
-                  onChange={(next) => {
-                    setCode(next);
-                    if (error) setError(null);
-                  }}
-                  onComplete={submit}
-                  disabled={confirmSetup.isPending}
-                  invalid={!!error}
-                />
-              </motion.div>
+            <motion.div
+              key={shake}
+              animate={shake > 0 ? { x: [0, -8, 8, -6, 6, -3, 3, 0] } : undefined}
+              transition={{ duration: 0.4 }}
+            >
+              <OtpInput
+                value={code}
+                onChange={(next) => {
+                  setCode(next);
+                  if (error) setError(null);
+                }}
+                onComplete={submit}
+                disabled={confirmSetup.isPending}
+                invalid={!!error}
+              />
+            </motion.div>
 
-              <LoadingButton
-                type="button"
-                className="w-full"
-                onClick={() => submit(code)}
-                disabled={code.length !== OTP_LENGTH}
-                loading={confirmSetup.isPending}
-                loadingText="Verifying…"
-              >
-                <ShieldCheck aria-hidden />
-                Enable 2FA
-              </LoadingButton>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            <LoadingButton
+              type="button"
+              size="lg"
+              className="w-full"
+              onClick={() => submit(code)}
+              disabled={code.length !== OTP_LENGTH}
+              loading={confirmSetup.isPending}
+              loadingText="Verifying…"
+            >
+              <ShieldCheck aria-hidden />
+              Enable 2FA
+            </LoadingButton>
+          </>
+        )}
+      </AuthPanel>
 
       <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
         <KeyRound className="size-3.5" aria-hidden />
         Signed in as {email}
       </p>
       <p className="text-center text-sm">
-        <Button asChild variant="link" className="h-auto p-0 text-sm">
+        <Button asChild variant="link" className="h-11 px-3 text-sm">
           <Link href={AUTH_ROUTES.login}>Cancel and use a different account</Link>
         </Button>
       </p>

@@ -23,17 +23,32 @@ export class AdminTenantController {
   }
 
   async activate(req: Request, res: Response): Promise<void> {
-    await adminTenantService.setStatus(req.params.tenantId!, 'ACTIVE', req.admin!.sub, req.admin!.role);
+    await adminTenantService.setStatus(
+      req.params.tenantId!,
+      'ACTIVE',
+      req.admin!.sub,
+      req.admin!.role,
+    );
     sendSuccess(res, null, 'Tenant activated.');
   }
 
   async suspend(req: Request, res: Response): Promise<void> {
-    await adminTenantService.setStatus(req.params.tenantId!, 'SUSPENDED', req.admin!.sub, req.admin!.role);
+    await adminTenantService.setStatus(
+      req.params.tenantId!,
+      'SUSPENDED',
+      req.admin!.sub,
+      req.admin!.role,
+    );
     sendSuccess(res, null, 'Tenant suspended.');
   }
 
   async reactivate(req: Request, res: Response): Promise<void> {
-    await adminTenantService.setStatus(req.params.tenantId!, 'ACTIVE', req.admin!.sub, req.admin!.role);
+    await adminTenantService.setStatus(
+      req.params.tenantId!,
+      'ACTIVE',
+      req.admin!.sub,
+      req.admin!.role,
+    );
     sendSuccess(res, null, 'Tenant reactivated.');
   }
 
@@ -43,13 +58,55 @@ export class AdminTenantController {
   }
 
   async resetOwnerPassword(req: Request, res: Response): Promise<void> {
-    const result = await adminTenantService.resetOwnerPassword(req.params.tenantId!, req.admin!.sub, req.admin!.role);
+    const result = await adminTenantService.resetOwnerPassword(
+      req.params.tenantId!,
+      req.admin!.sub,
+      req.admin!.role,
+    );
     sendSuccess(res, result, 'Password reset email sent.');
   }
 
   async impersonate(req: Request, res: Response): Promise<void> {
-    const result = await adminTenantService.impersonate(req.params.tenantId!, req.admin!.sub, req.admin!.role);
+    const result = await adminTenantService.impersonate(
+      req.params.tenantId!,
+      req.admin!.sub,
+      req.admin!.role,
+    );
     sendSuccess(res, result);
+  }
+
+  async extendTrial(req: Request, res: Response): Promise<void> {
+    const result = await adminTenantService.extendTrial(
+      req.params.tenantId!,
+      req.body as { days: number; reason?: string },
+      req.admin!.sub,
+      req.admin!.role,
+    );
+    sendSuccess(res, result, 'Trial extended.');
+  }
+
+  async maintenance(req: Request, res: Response): Promise<void> {
+    const body = req.body as { enabled: boolean; reason?: string };
+    const result = await adminTenantService.setMaintenance(
+      req.params.tenantId!,
+      body,
+      req.admin!.sub,
+      req.admin!.role,
+    );
+    sendSuccess(
+      res,
+      result,
+      body.enabled ? 'Maintenance mode enabled.' : 'Maintenance mode disabled.',
+    );
+  }
+
+  async forceLogout(req: Request, res: Response): Promise<void> {
+    const result = await adminTenantService.forceLogout(
+      req.params.tenantId!,
+      req.admin!.sub,
+      req.admin!.role,
+    );
+    sendSuccess(res, result, 'All tenant sessions revoked.');
   }
 
   async subscription(req: Request, res: Response): Promise<void> {

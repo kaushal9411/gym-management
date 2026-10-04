@@ -4,86 +4,95 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ────────────────────────────────────────────────────────────────────
-   Design tokens. Unlike tenant-web, this app serves exactly one internal
+   Design tokens (professional teal/graphite theme). Unlike tenant-web, this app serves exactly one internal
    organization — --primary/--ring are fixed constants here, not overridden
    per tenant at runtime (no inline <body> style, see app/layout.tsx).
    ──────────────────────────────────────────────────────────────────── */
 :root {
   --radius: 0.625rem;
-  --background: oklch(0.985 0.002 275);
-  --foreground: oklch(0.16 0.01 275);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.16 0.01 275);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.16 0.01 275);
-  --primary: oklch(0.51 0.23 277);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.955 0.005 275);
-  --secondary-foreground: oklch(0.25 0.02 275);
-  --muted: oklch(0.955 0.005 275);
-  --muted-foreground: oklch(0.52 0.015 275);
-  --accent: oklch(0.94 0.01 275);
-  --accent-foreground: oklch(0.25 0.02 275);
-  --destructive: oklch(0.577 0.245 27.3);
-  --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.62 0.17 150);
-  --success-foreground: oklch(0.985 0 0);
-  --warning: oklch(0.75 0.16 75);
-  --warning-foreground: oklch(0.2 0.05 75);
-  --border: oklch(0.9 0.007 275);
-  --input: oklch(0.9 0.007 275);
-  --ring: oklch(0.51 0.23 277);
+  --background: #f1f3f6;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #0f766e;
+  --primary-foreground: #ffffff;
+  --brand-accent: #14b8a6;
+  --secondary: #eaeef3;
+  --secondary-foreground: #1e293b;
+  --muted: #eef1f5;
+  --muted-foreground: #556275;
+  --accent: #e7edf3;
+  --accent-foreground: #0f172a;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --success: #15803d;
+  --success-foreground: #ffffff;
+  --warning: #d97706;
+  --warning-foreground: #78350f;
+  --border: #e2e8f0;
+  --input: #cbd5e1;
+  --ring: #14b8a6;
 
-  /* Categorical accent palette: slot 1 = live --primary, slots 2-8 a fixed
-     CVD-validated hex order (validated against this app's own card surface
-     #ffffff — identical to tenant-web's, so the same validated values are
-     reused verbatim). Never reorder these slots or reuse a status hue
-     (--success/--warning/--destructive) for a categorical accent. */
-  --chart-1: var(--primary);
-  --chart-2: #eb6834; /* orange */
-  --chart-3: #1baf7a; /* aqua */
-  --chart-4: #eda100; /* yellow */
-  --chart-5: #e87ba4; /* magenta */
-  --chart-6: #008300; /* green */
-  --chart-7: #4a3aa7; /* violet */
-  --chart-8: #e34948; /* red */
+  /* Graphite sidebar (stays dark in both themes). */
+  --sidebar: #0f172a;
+  --sidebar-foreground: #cbd5e1;
+  --sidebar-muted: #94a3b8;
+  --sidebar-border: #1e293b;
+  --sidebar-accent: #1e293b;
+  --sidebar-active: rgba(20, 184, 166, 0.16);
+  --sidebar-active-foreground: #5eead4;
+
+  /* Chart palette: teal, blue, violet, amber, red, green, slate, pink. Slot 1 is the brand teal.
+     Status hues (amber/red/green) are also reused by the dashboard for semantic series. */
+  --chart-1: #0f766e;
+  --chart-2: #2563eb;
+  --chart-3: #7c3aed;
+  --chart-4: #d97706;
+  --chart-5: #dc2626;
+  --chart-6: #16a34a;
+  --chart-7: #94a3b8;
+  --chart-8: #db2777;
 }
 
 .dark {
-  --background: oklch(0.15 0.012 275);
-  --foreground: oklch(0.96 0.005 275);
-  --card: oklch(0.19 0.014 275);
-  --card-foreground: oklch(0.96 0.005 275);
-  --popover: oklch(0.19 0.014 275);
-  --popover-foreground: oklch(0.96 0.005 275);
-  --primary: oklch(0.62 0.2 277);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.25 0.015 275);
-  --secondary-foreground: oklch(0.96 0.005 275);
-  --muted: oklch(0.25 0.015 275);
-  --muted-foreground: oklch(0.68 0.015 275);
-  --accent: oklch(0.28 0.018 275);
-  --accent-foreground: oklch(0.96 0.005 275);
-  --destructive: oklch(0.65 0.22 27.3);
-  --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.66 0.15 150);
-  --success-foreground: oklch(0.14 0.03 150);
-  --warning: oklch(0.78 0.14 75);
-  --warning-foreground: oklch(0.2 0.05 75);
-  --border: oklch(0.29 0.015 275);
-  --input: oklch(0.32 0.015 275);
-  --ring: oklch(0.62 0.2 277);
+  --background: #0b1220;
+  --foreground: #e2e8f0;
+  --card: #111a2b;
+  --card-foreground: #e2e8f0;
+  --popover: #131d30;
+  --popover-foreground: #e2e8f0;
+  --primary: #14b8a6;
+  --primary-foreground: #04211e;
+  --brand-accent: #2dd4bf;
+  --secondary: #1a2538;
+  --secondary-foreground: #e2e8f0;
+  --muted: #162033;
+  --muted-foreground: #94a3b8;
+  --accent: #1c283d;
+  --accent-foreground: #e2e8f0;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --success: #4ade80;
+  --success-foreground: #052e16;
+  --warning: #fbbf24;
+  --warning-foreground: #fde68a;
+  --border: #1f2b40;
+  --input: #2a3850;
+  --ring: #2dd4bf;
 
-  /* Same categorical order, stepped for the dark surface (validated
-     against dark card surface #12131a, identical to tenant-web's). */
-  --chart-1: var(--primary);
-  --chart-2: #d95926; /* orange */
-  --chart-3: #199e70; /* aqua */
-  --chart-4: #c98500; /* yellow */
-  --chart-5: #d55181; /* magenta */
-  --chart-6: #008300; /* green */
-  --chart-7: #9085e9; /* violet */
-  --chart-8: #e66767; /* red */
+  --sidebar: #0a101d;
+  --sidebar-border: #182235;
+
+  --chart-1: #2dd4bf;
+  --chart-2: #60a5fa;
+  --chart-3: #a78bfa;
+  --chart-4: #fbbf24;
+  --chart-5: #f87171;
+  --chart-6: #4ade80;
+  --chart-7: #94a3b8;
+  --chart-8: #f472b6;
 }
 
 @theme inline {
@@ -110,6 +119,12 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-brand-accent: var(--brand-accent);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -122,9 +137,8 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    'Noto Sans', sans-serif;
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 @layer base {

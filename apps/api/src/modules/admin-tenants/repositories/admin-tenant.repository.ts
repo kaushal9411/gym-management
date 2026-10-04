@@ -13,7 +13,12 @@ export class AdminTenantRepository {
       deletedAt: null,
       ...(params.status ? { status: params.status } : {}),
       ...(params.search
-        ? { OR: [{ name: { contains: params.search, mode: 'insensitive' as const } }, { slug: { contains: params.search, mode: 'insensitive' as const } }] }
+        ? {
+            OR: [
+              { name: { contains: params.search, mode: 'insensitive' as const } },
+              { slug: { contains: params.search, mode: 'insensitive' as const } },
+            ],
+          }
         : {}),
     };
     const [total, items] = await Promise.all([
@@ -42,7 +47,11 @@ export class AdminTenantRepository {
         limits: true,
         usage: true,
         domains: true,
-        subscriptions: { orderBy: { createdAt: 'desc' }, take: 1, include: { plan: true, coupon: true } },
+        subscriptions: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: { plan: true, coupon: true },
+        },
         users: { where: { status: { not: 'DEACTIVATED' } }, orderBy: { createdAt: 'asc' } },
         // Same ordering convention as `BranchRepository.list()` — default branch first, then alphabetical.
         branches: { where: { deletedAt: null }, orderBy: [{ isDefault: 'desc' }, { name: 'asc' }] },
@@ -50,20 +59,83 @@ export class AdminTenantRepository {
     });
   }
 
-  async updateStatus(tenantId: string, status: TenantStatus, extra: { suspendedAt?: Date | null } = {}) {
+  async updateStatus(
+    tenantId: string,
+    status: TenantStatus,
+    extra: { suspendedAt?: Date | null } = {},
+  ) {
     return prisma.tenant.update({ where: { id: tenantId }, data: { status, ...extra } });
   }
 
   async softDelete(tenantId: string) {
-    return prisma.tenant.update({ where: { id: tenantId }, data: { deletedAt: new Date(), status: 'SUSPENDED' } });
+    return prisma.tenant.update({
+      where: { id: tenantId },
+      data: { deletedAt: new Date(), status: 'SUSPENDED' },
+    });
   }
 
   async findOwner(tenantId: string) {
-    return prisma.user.findFirst({ where: { tenantId, deletedAt: null }, orderBy: { createdAt: 'asc' } });
+    return prisma.user.findFirst({
+      where: { tenantId, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 
   async auditLogs(tenantId: string, take = 50) {
     return prisma.auditLog.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' }, take });
+  }
+  async findBare(tenantId: string) {
+    return prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        id: true,
+        slug: true,
+        status: true,
+        trialEndsAt: true,
+        maintenanceMode: true,
+        deletedAt: true,
+      },
+    });
+  }
+
+  /** Extends the tenant trial and the live TRIALING subscription's trial/period end in one transaction. */
+  async extendTrial(tenantId: string, newEnd: Date) {
+    return prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.update({
+        where: { id: tenantId },
+        data: { trialEndsAt: newEnd },
+        select: { id: true, status: true, trialEndsAt: true },
+      });
+      await tx.subscription.updateMany({
+        where: { tenantId, status: 'TRIALING' },
+        data: { trialEndsAt: newEnd, currentPeriodEnd: newEnd },
+      });
+      return tenant;
+    });
+  }
+
+  async setMaintenance(tenantId: string, enabled: boolean) {
+    return prisma.tenant.update({
+      where: { id: tenantId },
+      data: { maintenanceMode: enabled },
+      select: { id: true, maintenanceMode: true },
+    });
+  }
+
+  /** Revokes every active refresh token + session of every user in the tenant; returns the number of sessions revoked. */
+  async revokeAllSessions(tenantId: string): Promise<number> {
+    const now = new Date();
+    return prisma.$transaction(async (tx) => {
+      await tx.refreshToken.updateMany({
+        where: { tenantId, revokedAt: null },
+        data: { revokedAt: now },
+      });
+      const sessions = await tx.userSession.updateMany({
+        where: { tenantId, revokedAt: null },
+        data: { revokedAt: now },
+      });
+      return sessions.count;
+    });
   }
 }
 

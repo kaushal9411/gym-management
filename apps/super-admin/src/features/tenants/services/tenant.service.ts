@@ -77,6 +77,33 @@ class AdminTenantService {
     }
   }
 
+  async extendTrial(tenantId: string, input: { days: number; reason?: string }): Promise<unknown> {
+    try {
+      const res = await apiClient.post<ApiEnvelope<unknown>>(`/admin/tenants/${tenantId}/extend-trial`, input);
+      return res.data.data;
+    } catch (error) {
+      throw toAdminServiceError(error);
+    }
+  }
+
+  async setMaintenance(tenantId: string, input: { enabled: boolean; reason?: string }): Promise<unknown> {
+    try {
+      const res = await apiClient.post<ApiEnvelope<unknown>>(`/admin/tenants/${tenantId}/maintenance`, input);
+      return res.data.data;
+    } catch (error) {
+      throw toAdminServiceError(error);
+    }
+  }
+
+  async forceLogout(tenantId: string): Promise<unknown> {
+    try {
+      const res = await apiClient.post<ApiEnvelope<unknown>>(`/admin/tenants/${tenantId}/force-logout`);
+      return res.data.data;
+    } catch (error) {
+      throw toAdminServiceError(error);
+    }
+  }
+
   async auditLogs(tenantId: string) {
     try {
       const res = await apiClient.get<ApiEnvelope<unknown[]>>(`/admin/tenants/${tenantId}/audit-logs`);

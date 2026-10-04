@@ -1,6 +1,6 @@
 import { env } from '../../../config/env';
 import { AuthEvents, eventBus } from '../../../core/events/event-bus';
-import { logger } from '../../../core/logging/logger';
+import { loadEmailBranding } from '../../../infrastructure/mail/branding';
 import {
   invitationEmail as buildInvitationEmail,
   otpCodeEmail,
@@ -18,17 +18,11 @@ function portalUrl(tenantSlug: string, path: string): string {
   return `http://${tenantSlug}.${env.platformDomain}${path}`;
 }
 
-/** Real per-tenant branding for emails, resolved by id and cached (see TenantService). */
+/** Real per-tenant branding for emails (cached tenant + the gym's contact details). */
 async function brandingFor(tenantId: string): Promise<{ branding: EmailBranding; slug: string }> {
+  const branding = await loadEmailBranding(tenantId);
   const tenant = await tenantService.resolveById(tenantId);
-  if (!tenant) {
-    logger.warn('Email branding requested for unknown tenant — using platform defaults', { tenantId });
-    return { branding: { tenantName: 'FitCloud' }, slug: '' };
-  }
-  return {
-    branding: { tenantName: tenant.name, primaryColor: tenant.branding.primaryColor, logoUrl: tenant.branding.emailLogoUrl ?? tenant.branding.logoUrl },
-    slug: tenant.slug,
-  };
+  return { branding, slug: tenant?.slug ?? '' };
 }
 
 /**
@@ -48,7 +42,7 @@ export function registerAuthEmailListeners(): void {
     isResend?: boolean;
   }>(AuthEvents.UserRegistered, async (payload) => {
     // tenantSlug is already known at registration time (fresher than any cache read).
-    const branding: EmailBranding = { tenantName: payload.tenantSlug || 'FitCloud' };
+    const { branding } = await brandingFor(payload.tenantId);
     const verifyUrl = portalUrl(payload.tenantSlug, `/verify-email?token=${payload.verificationToken}`);
     const template = payload.isResend
       ? verifyEmailEmail(branding, payload.name, verifyUrl)

@@ -1,7 +1,10 @@
-import { AppError, ConflictError } from '../../../core/errors/app-error';
+import { Prisma } from '@prisma/client';
+
+import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
 import { adminPlanRepository, type UpsertPlanInput } from '../repositories/admin-plan.repository';
+import { deleteBlockers } from '../utils/plan-insights.util';
 
 export class AdminPlanService {
   async list() {
@@ -16,14 +19,33 @@ export class AdminPlanService {
 
   async create(input: UpsertPlanInput, adminUserId: string, adminRole: string) {
     const plan = await adminPlanRepository.create(input);
-    await adminAuditLogRepository.record({ adminUserId, actorRole: adminRole, action: 'admin.plan_created', entityType: 'SubscriptionPlan', entityId: plan.id, after: input });
+    await adminAuditLogRepository.record({
+      adminUserId,
+      actorRole: adminRole,
+      action: 'admin.plan_created',
+      entityType: 'SubscriptionPlan',
+      entityId: plan.id,
+      after: input,
+    });
     return plan;
   }
 
-  async update(id: string, input: Partial<UpsertPlanInput>, adminUserId: string, adminRole: string) {
+  async update(
+    id: string,
+    input: Partial<UpsertPlanInput>,
+    adminUserId: string,
+    adminRole: string,
+  ) {
     await this.getById(id);
     const plan = await adminPlanRepository.update(id, input);
-    await adminAuditLogRepository.record({ adminUserId, actorRole: adminRole, action: 'admin.plan_updated', entityType: 'SubscriptionPlan', entityId: id, after: input });
+    await adminAuditLogRepository.record({
+      adminUserId,
+      actorRole: adminRole,
+      action: 'admin.plan_updated',
+      entityType: 'SubscriptionPlan',
+      entityId: id,
+      after: input,
+    });
     return plan;
   }
 
@@ -49,12 +71,41 @@ export class AdminPlanService {
 
   async remove(id: string, adminUserId: string, adminRole: string): Promise<void> {
     await this.getById(id);
-    const activeCount = await adminPlanRepository.countActiveSubscriptions(id);
-    if (activeCount > 0) {
-      throw new ConflictError(ErrorCode.CONFLICT, `Cannot delete a plan with ${activeCount} active subscription(s). Disable it instead.`);
+    const counts = await adminPlanRepository.subscriptionCountsByStatus(id);
+    const blockers = deleteBlockers(counts);
+    if (blockers.blocked) {
+      throw new AppError(ErrorCode.CONFLICT, blockers.message, 409, {
+        subscriptionsByStatus: counts,
+      });
     }
-    await adminPlanRepository.remove(id);
-    await adminAuditLogRepository.record({ adminUserId, actorRole: adminRole, action: 'admin.plan_deleted', entityType: 'SubscriptionPlan', entityId: id });
+    try {
+      await adminPlanRepository.remove(id);
+    } catch (error) {
+      // Subscription.plan is onDelete: Restrict — a SUSPENDED/CANCELED/EXPIRED row (or a race) still references the plan.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        (error.code === 'P2003' || error.code === 'P2014')
+      ) {
+        const fresh = await adminPlanRepository.subscriptionCountsByStatus(id);
+        const detail = Object.entries(fresh)
+          .map(([status, n]) => `${status}: ${n}`)
+          .join(', ');
+        throw new AppError(
+          ErrorCode.CONFLICT,
+          `Cannot delete a plan that still has subscription records (${detail || 'unknown'}). Disable it instead.`,
+          409,
+          { subscriptionsByStatus: fresh },
+        );
+      }
+      throw error;
+    }
+    await adminAuditLogRepository.record({
+      adminUserId,
+      actorRole: adminRole,
+      action: 'admin.plan_deleted',
+      entityType: 'SubscriptionPlan',
+      entityId: id,
+    });
   }
 }
 

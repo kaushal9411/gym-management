@@ -3,10 +3,13 @@ import nodemailer, { type Transporter } from 'nodemailer';
 import { env } from '../../config/env';
 import { logger } from '../../core/logging/logger';
 
+import { htmlToText } from './templates/base-layout';
+
 export interface SendMailInput {
   to: string;
   subject: string;
   html: string;
+  text?: string;
   fromName?: string;
   fromAddress?: string;
 }
@@ -22,6 +25,9 @@ class Mailer {
 
   constructor() {
     this.transporter = nodemailer.createTransport({
+      // Pooled: reuses SMTP connections, so bursts (e.g. a broadcast) pay the handshake once, not per message.
+      pool: true,
+      maxConnections: 2,
       host: env.mail.host,
       port: env.mail.port,
       secure: env.mail.secure,
@@ -43,6 +49,7 @@ class Mailer {
       to: input.to,
       subject: input.subject,
       html: input.html,
+      text: input.text ?? htmlToText(input.html),
     });
 
     logger.info('Email sent', { to: input.to, subject: input.subject });

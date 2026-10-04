@@ -1,7 +1,7 @@
 import { env } from '../../../config/env';
 import { eventBus } from '../../../core/events/event-bus';
 import { logger } from '../../../core/logging/logger';
-import type { EmailBranding } from '../../../infrastructure/mail/templates/base-layout';
+import { loadEmailBranding } from '../../../infrastructure/mail/branding';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { buildInvitationEmail } from '../../authentication/events/auth-email.listeners';
 import { tenantService } from '../../tenants/service/tenant.service';
@@ -25,11 +25,7 @@ export function registerStaffEmailListeners(): void {
         logger.warn('Staff activation email requested for unknown tenant', { tenantId: payload.tenantId });
         return;
       }
-      const branding: EmailBranding = {
-        tenantName: tenant.name,
-        primaryColor: tenant.branding.primaryColor,
-        logoUrl: tenant.branding.emailLogoUrl ?? tenant.branding.logoUrl,
-      };
+      const branding = await loadEmailBranding(payload.tenantId);
       const acceptUrl = `http://${tenant.slug}.${env.platformDomain}/staff-activation/${payload.token}`;
       const template = buildInvitationEmail(branding, payload.invitedByName, payload.roleLabel, acceptUrl);
       await enqueueEmail({ to: payload.email, subject: template.subject, html: template.html });

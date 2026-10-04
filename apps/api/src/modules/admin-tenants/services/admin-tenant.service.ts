@@ -13,6 +13,11 @@ import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-au
 import { VerificationRepository } from '../../authentication/repositories/verification.repository';
 import { tenantService } from '../../tenants/service/tenant.service';
 import { adminTenantRepository } from '../repositories/admin-tenant.repository';
+import {
+  assertMaintenanceChange,
+  assertTrialExtendable,
+  computeExtendedTrialEnd,
+} from '../utils/tenant-controls.util';
 
 const PASSWORD_RESET_TOKEN_BYTES = 32;
 const IMPERSONATION_TTL = '10m';
@@ -24,7 +29,12 @@ function portalUrl(tenantSlug: string, path: string): string {
 export class AdminTenantService {
   async list(params: { search?: string; status?: TenantStatus; page: number; limit: number }) {
     const skip = (params.page - 1) * params.limit;
-    const { total, items } = await adminTenantRepository.list({ search: params.search, status: params.status, skip, take: params.limit });
+    const { total, items } = await adminTenantRepository.list({
+      search: params.search,
+      status: params.status,
+      skip,
+      take: params.limit,
+    });
     return {
       items: items.map((t) => ({
         id: t.id,
@@ -50,7 +60,12 @@ export class AdminTenantService {
     return tenant;
   }
 
-  async setStatus(tenantId: string, status: TenantStatus, adminUserId: string, adminRole: string): Promise<void> {
+  async setStatus(
+    tenantId: string,
+    status: TenantStatus,
+    adminUserId: string,
+    adminRole: string,
+  ): Promise<void> {
     const before = await this.getById(tenantId);
     const extra = status === 'SUSPENDED' ? { suspendedAt: new Date() } : { suspendedAt: null };
     await adminTenantRepository.updateStatus(tenantId, status, extra);
@@ -76,21 +91,37 @@ export class AdminTenantService {
     const before = await this.getById(tenantId);
     await adminTenantRepository.softDelete(tenantId);
     await tenantService.invalidateCache(before.slug, tenantId);
-    await adminAuditLogRepository.record({ adminUserId, actorRole: adminRole, action: 'admin.tenant_deleted', entityType: 'Tenant', entityId: tenantId });
+    await adminAuditLogRepository.record({
+      adminUserId,
+      actorRole: adminRole,
+      action: 'admin.tenant_deleted',
+      entityType: 'Tenant',
+      entityId: tenantId,
+    });
   }
 
-  async resetOwnerPassword(tenantId: string, adminUserId: string, adminRole: string): Promise<{ email: string }> {
+  async resetOwnerPassword(
+    tenantId: string,
+    adminUserId: string,
+    adminRole: string,
+  ): Promise<{ email: string }> {
     const tenant = await this.getById(tenantId);
     const owner = await adminTenantRepository.findOwner(tenantId);
-    if (!owner) throw new AppError(ErrorCode.NOT_FOUND, 'No owner account found for this tenant', 404);
+    if (!owner)
+      throw new AppError(ErrorCode.NOT_FOUND, 'No owner account found for this tenant', 404);
 
     const db = getTenantScopedClient(tenantId);
     const verificationRepository = new VerificationRepository(db);
     const resetTokenPlain = generateOpaqueToken(PASSWORD_RESET_TOKEN_BYTES);
-    await verificationRepository.createPasswordReset(tenantId, owner.id, hashToken(resetTokenPlain), new Date(Date.now() + 30 * 60_000));
+    await verificationRepository.createPasswordReset(
+      tenantId,
+      owner.id,
+      hashToken(resetTokenPlain),
+      new Date(Date.now() + 30 * 60_000),
+    );
 
     const resetUrl = portalUrl(tenant.slug, `/reset-password?token=${resetTokenPlain}`);
-    const template = passwordResetEmail({ tenantName: tenant.name }, owner.name, resetUrl);
+    const template = passwordResetEmail({ tenantName: tenant.name }, owner.name, resetUrl, { byAdmin: true });
     await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
 
     await adminAuditLogRepository.record({
@@ -111,10 +142,15 @@ export class AdminTenantService {
    * shows up in a log, and recorded in BOTH audit logs (admin + tenant)
    * since the gym owner should be able to see this happened on their side too.
    */
-  async impersonate(tenantId: string, adminUserId: string, adminRole: string): Promise<{ accessToken: string; expiresAt: string; portalUrl: string }> {
+  async impersonate(
+    tenantId: string,
+    adminUserId: string,
+    adminRole: string,
+  ): Promise<{ accessToken: string; expiresAt: string; portalUrl: string }> {
     const tenant = await this.getById(tenantId);
     const owner = await adminTenantRepository.findOwner(tenantId);
-    if (!owner) throw new AppError(ErrorCode.NOT_FOUND, 'No owner account found for this tenant', 404);
+    if (!owner)
+      throw new AppError(ErrorCode.NOT_FOUND, 'No owner account found for this tenant', 404);
 
     const db = getTenantScopedClient(tenantId);
     const session = await db.userSession.create({
@@ -140,11 +176,92 @@ export class AdminTenantService {
       entityId: tenantId,
     });
     await db.auditLog.create({
-      data: { tenantId, actorRole: 'SUPER_ADMIN', action: 'admin_impersonation_started', entityType: 'Tenant', entityId: tenantId },
+      data: {
+        tenantId,
+        actorRole: 'SUPER_ADMIN',
+        action: 'admin_impersonation_started',
+        entityType: 'Tenant',
+        entityId: tenantId,
+      },
     });
-    securityLogger.warn('Admin impersonation started', { tenantId, adminUserId, ownerUserId: owner.id });
+    securityLogger.warn('Admin impersonation started', {
+      tenantId,
+      adminUserId,
+      ownerUserId: owner.id,
+    });
 
-    return { accessToken: access.token, expiresAt: access.expiresAt.toISOString(), portalUrl: portalUrl(tenant.slug, '/dashboard') };
+    return {
+      accessToken: access.token,
+      expiresAt: access.expiresAt.toISOString(),
+      portalUrl: portalUrl(tenant.slug, '/dashboard'),
+    };
+  }
+
+  private async getBare(tenantId: string) {
+    const tenant = await adminTenantRepository.findBare(tenantId);
+    if (!tenant || tenant.deletedAt)
+      throw new AppError(ErrorCode.NOT_FOUND, 'Tenant not found', 404);
+    return tenant;
+  }
+
+  async extendTrial(
+    tenantId: string,
+    input: { days: number; reason?: string },
+    adminUserId: string,
+    adminRole: string,
+  ) {
+    const before = await this.getBare(tenantId);
+    assertTrialExtendable(before);
+    const newEnd = computeExtendedTrialEnd(before.trialEndsAt, input.days);
+    const updated = await adminTenantRepository.extendTrial(tenantId, newEnd);
+    await tenantService.invalidateCache(before.slug, tenantId);
+    await adminAuditLogRepository.record({
+      adminUserId,
+      actorRole: adminRole,
+      action: 'admin.tenant_trial_extended',
+      entityType: 'Tenant',
+      entityId: tenantId,
+      before: { trialEndsAt: before.trialEndsAt },
+      after: { trialEndsAt: updated.trialEndsAt, days: input.days, reason: input.reason ?? null },
+    });
+    return { id: updated.id, status: updated.status, trialEndsAt: updated.trialEndsAt };
+  }
+
+  async setMaintenance(
+    tenantId: string,
+    input: { enabled: boolean; reason?: string },
+    adminUserId: string,
+    adminRole: string,
+  ) {
+    const before = await this.getBare(tenantId);
+    assertMaintenanceChange(before.maintenanceMode, input.enabled);
+    const updated = await adminTenantRepository.setMaintenance(tenantId, input.enabled);
+    await tenantService.invalidateCache(before.slug, tenantId);
+    await adminAuditLogRepository.record({
+      adminUserId,
+      actorRole: adminRole,
+      action: 'admin.tenant_maintenance_changed',
+      entityType: 'Tenant',
+      entityId: tenantId,
+      before: { maintenanceMode: before.maintenanceMode },
+      after: { maintenanceMode: updated.maintenanceMode, reason: input.reason ?? null },
+    });
+    return { id: updated.id, maintenanceMode: updated.maintenanceMode };
+  }
+
+  async forceLogout(tenantId: string, adminUserId: string, adminRole: string) {
+    const tenant = await this.getBare(tenantId);
+    const revokedSessions = await adminTenantRepository.revokeAllSessions(tenantId);
+    await tenantService.invalidateCache(tenant.slug, tenantId);
+    await adminAuditLogRepository.record({
+      adminUserId,
+      actorRole: adminRole,
+      action: 'admin.tenant_force_logout',
+      entityType: 'Tenant',
+      entityId: tenantId,
+      after: { revokedSessions },
+    });
+    return { revokedSessions };
   }
 
   async subscription(tenantId: string) {

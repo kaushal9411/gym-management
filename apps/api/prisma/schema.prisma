@@ -207,6 +207,8 @@ model Tenant {
   domains               TenantDomain[]
   branches              Branch[]
   modules               TenantModule[]
+  adminNotes            TenantAdminNote[]
+  adminTags             TenantAdminTags?
   usage                 TenantUsage[]
   subscriptions         Subscription[]
   subscriptionHistory   SubscriptionHistory[]
@@ -2590,12 +2592,14 @@ model Branch {
 /// chosen plan's features at provisioning time. A future admin screen
 /// could override individual toggles without changing the plan.
 model TenantModule {
-  id        String   @id @default(uuid()) @db.Uuid
-  tenantId  String   @map("tenant_id") @db.Uuid
-  key       String   @db.VarChar(60)
-  enabled   Boolean  @default(true)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  key           String   @db.VarChar(60)
+  enabled       Boolean  @default(true)
+  /// True when a super admin forced `enabled` away from the plan default — plan changes then leave this row alone.
+  adminOverride Boolean  @default(false) @map("admin_override")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -2616,6 +2620,9 @@ model TenantLimit {
   maxStaff         Int      @default(0) @map("max_staff")
   maxMembers       Int      @map("max_members")
   maxStorageMb     Int      @map("max_storage_mb")
+  /// Super-admin overrides `{ [maxKey]: number }` — the max* columns above always hold the EFFECTIVE value
+  /// (override ?? plan), this records which keys were forced so plan changes re-apply them instead of overwriting.
+  overrides        Json     @default("{}")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -3771,4 +3778,31 @@ model TenantAiSettings {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_ai_settings")
+}
+
+/// ADMIN-ONLY internal note about a tenant (super-admin "control center"). Has a tenant_id for cascade-delete, but the
+/// RLS policy only admits sessions with `app.admin_plane = 'on'` — tenant/member sessions can never read it.
+model TenantAdminNote {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  authorAdminId String?  @map("author_admin_id") @db.Uuid
+  authorName    String   @map("author_name") @db.VarChar(120)
+  body          String
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("tenant_admin_notes")
+}
+
+/// ADMIN-ONLY tag set for a tenant (one row per tenant). Same admin-plane RLS as `TenantAdminNote`.
+model TenantAdminTags {
+  tenantId  String   @id @map("tenant_id") @db.Uuid
+  tags      String[]
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_admin_tags")
 }

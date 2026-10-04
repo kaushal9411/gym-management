@@ -3,12 +3,11 @@ import type { AnnouncementAudience } from '@prisma/client';
 import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { prisma } from '../../../infrastructure/database/prisma';
-import { renderEmailLayout } from '../../../infrastructure/mail/templates/base-layout';
+import { PLATFORM_BRANDING } from '../../../infrastructure/mail/templates/base-layout';
+import { platformAnnouncementEmail } from '../../../infrastructure/mail/templates/notification-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
 import { tenantNotificationService } from '../../tenant-notifications/services/tenant-notification.service';
-
-const PLATFORM_BRANDING = { tenantName: 'FitCloud' };
 
 async function tenantsForAudience(audience: AnnouncementAudience) {
   const statusFilter = audience === 'TRIAL' ? { status: 'TRIAL' as const } : audience === 'ACTIVE' ? { status: 'ACTIVE' as const } : {};
@@ -30,11 +29,7 @@ export async function dispatchNotification(notification: { id: string; title: st
   const tenants = await tenantsForAudience(notification.audience);
 
   if (notification.channel === 'EMAIL') {
-    const html = renderEmailLayout(
-      PLATFORM_BRANDING,
-      { icon: '📣', title: notification.title, categoryLabel: 'Platform announcement', preheader: notification.body },
-      `<p>${notification.body}</p>`,
-    );
+    const { html } = platformAnnouncementEmail(PLATFORM_BRANDING, notification.title, notification.body);
     for (const tenant of tenants) {
       const owner = tenant.users[0];
       if (owner) await enqueueEmail({ to: owner.email, subject: notification.title, html });

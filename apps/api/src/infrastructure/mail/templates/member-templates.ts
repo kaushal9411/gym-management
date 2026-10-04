@@ -1,4 +1,22 @@
-import { detailRow, detailTable, footnote, formatMoney, infoBox, renderEmailLayout, statusBadge, toneAccent, type EmailBranding } from './base-layout';
+import {
+  alertBox,
+  detailRow,
+  detailTable,
+  escapeHtml,
+  footnote,
+  formatDate,
+  formatMoney,
+  keyFacts,
+  paragraph,
+  renderEmailLayout,
+  sectionTitle,
+  signature,
+  statusBadge,
+  stepList,
+  strong,
+  toneAccent,
+  type EmailBranding,
+} from './base-layout';
 
 /** Human-readable labels for `MemberPaymentMethod` — CASH/UPI/CREDIT_CARD/DEBIT_CARD/BANK_TRANSFER/CHEQUE/ONLINE_GATEWAY. */
 export const PAYMENT_METHOD_LABEL: Record<string, string> = {
@@ -11,7 +29,22 @@ export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   ONLINE_GATEWAY: 'Online Payment',
 };
 
-/** "Email Invoice" from Member Detail — no PDF-attachment support in the mail infra, so this sends a summary with the key details rather than the PDF itself. */
+export interface InvoiceLineItem {
+  description: string;
+  quantity: number | string;
+  /** Pre-formatted amount (e.g. "₹1,500.00"). */
+  amount: string;
+}
+
+/** Itemised lines card: description (× qty) and amount per row. */
+function lineItemsTable(items: InvoiceLineItem[]): string {
+  const rows = items.map((it) => detailRow('', `${it.description}${Number(it.quantity) > 1 ? ` × ${it.quantity}` : ''}`, escapeHtml(it.amount))).join('');
+  return detailTable(rows);
+}
+
+const PAY_HINT = (tenant: string) => `You can pay at the front desk of ${tenant}, or ask the team there about other payment options.`;
+
+/** "Email Invoice" from Member Detail — no PDF attachment support, so this sends an itemised summary. */
 export function memberInvoiceSummaryEmail(
   branding: EmailBranding,
   memberName: string,
@@ -21,29 +54,46 @@ export function memberInvoiceSummaryEmail(
   status: 'PAID' | 'UNPAID' | 'PARTIALLY_PAID' | 'OVERDUE',
   dueDate: string,
   planDescription?: string | null,
+  opts?: { lineItems?: InvoiceLineItem[] },
 ) {
   const paid = status === 'PAID';
+  const overdue = status === 'OVERDUE';
+  const statusLabel = paid ? 'Paid' : overdue ? 'Overdue' : status === 'PARTIALLY_PAID' ? 'Partially paid' : 'Unpaid';
+  const tone = paid ? 'success' : overdue ? 'danger' : 'warning';
+  const due = formatDate(dueDate);
   return {
     subject: `Invoice ${invoiceNumber}`,
     html: renderEmailLayout(
       branding,
       {
         icon: paid ? '✅' : '🧾',
-        title: paid ? 'Payment Successful!' : 'Your Invoice is Ready',
-        categoryLabel: paid ? 'Payment' : 'Invoice',
-        tone: paid ? 'success' : 'brand',
-        preheader: paid ? `Invoice ${invoiceNumber} — paid.` : `Invoice ${invoiceNumber} — due ${dueDate}.`,
+        title: paid ? 'Invoice paid' : 'Your invoice is ready',
+        subtitle: `Invoice ${invoiceNumber} from ${branding.tenantName}`,
+        categoryLabel: 'Invoice',
+        tone: paid ? 'success' : overdue ? 'danger' : 'brand',
+        preheader: paid ? `Invoice ${invoiceNumber} — paid.` : `Invoice ${invoiceNumber} — due ${due}.`,
+        footerHint: 'preferences',
       },
-      `<p>Hi ${memberName}, here's your invoice from ${branding.tenantName}.</p>
+      `${paragraph(`Hi ${escapeHtml(memberName)}, here’s your invoice from ${strong(branding.tenantName)}.`)}
+       ${keyFacts([
+         { icon: '💰', label: 'Total', value: total },
+         { icon: '📌', label: 'Status', value: statusLabel, color: paid ? '#15803d' : overdue ? '#dc2626' : '#b45309' },
+         { icon: '📅', label: paid ? 'Due date' : 'Pay by', value: due },
+       ])}
+       ${opts?.lineItems?.length ? `${sectionTitle('Items')}${lineItemsTable(opts.lineItems)}` : ''}
+       ${sectionTitle('Invoice details')}
        ${detailTable(
-         detailRow('👤', 'Member', memberName) +
-           detailRow('📄', 'Invoice number', invoiceNumber) +
-           detailRow('📅', 'Invoice date', invoiceDate) +
-           (planDescription ? detailRow('🏷️', 'Membership', planDescription) : '') +
-           detailRow('💰', 'Total', total, { emphasize: true }) +
-           detailRow('📌', 'Status', paid ? statusBadge('Paid', 'success') : statusBadge(`Due ${dueDate}`, 'warning')),
+         detailRow('👤', 'Member', escapeHtml(memberName)) +
+           detailRow('📄', 'Invoice number', escapeHtml(invoiceNumber)) +
+           detailRow('🗓️', 'Invoice date', escapeHtml(formatDate(invoiceDate))) +
+           (planDescription ? detailRow('🏷️', 'Membership', escapeHtml(planDescription)) : '') +
+           detailRow('💰', 'Total', escapeHtml(total), { emphasize: true, color: toneAccent(branding, paid ? 'success' : 'brand') }) +
+           detailRow('📌', 'Status', statusBadge(paid ? 'Paid' : `${statusLabel} · due ${due}`, tone)),
        )}
-       ${footnote('Sign in to your member portal any time to view the full details.')}`,
+       ${paid ? alertBox('success', 'Nothing to pay', 'This invoice is settled. Keep this email for your records.') : alertBox('info', 'How to pay', escapeHtml(PAY_HINT(branding.tenantName)))}
+       ${paid ? '' : `${sectionTitle('What happens next')}${stepList([{ title: `Pay ${total} by ${due}`, body: 'At the front desk, or via any payment option the gym offers.' }, { title: 'You’ll receive a receipt by email', body: 'It is sent as soon as the payment is recorded.' }])}`}
+       ${signature(branding)}
+       ${footnote('You can also view your invoices any time in your member portal.')}`,
     ),
   };
 }
@@ -56,18 +106,35 @@ export function paymentDueReminderEmail(
   dueDate: string,
   planDescription?: string | null,
 ) {
+  const due = formatDate(dueDate);
   return {
     subject: `Payment reminder — invoice ${invoiceNumber}`,
     html: renderEmailLayout(
       branding,
-      { icon: '⏰', title: 'Payment Reminder', categoryLabel: 'Payment Reminder', tone: 'warning', preheader: `Invoice ${invoiceNumber} for ${total} is due ${dueDate}.` },
-      `<p>Hi ${memberFirstName}, a friendly heads-up that your invoice at ${branding.tenantName} is coming due.</p>
+      {
+        icon: '⏰',
+        title: 'Payment reminder',
+        subtitle: `${total} due on ${due}`,
+        categoryLabel: 'Payment Reminder',
+        tone: 'warning',
+        preheader: `Invoice ${invoiceNumber} for ${total} is due ${due}.`,
+        footerHint: 'preferences',
+      },
+      `${paragraph(`Hi ${escapeHtml(memberFirstName)}, a friendly heads-up that your invoice at ${strong(branding.tenantName)} is coming due.`)}
+       ${keyFacts([
+         { icon: '💰', label: 'Amount due', value: total, color: '#b45309' },
+         { icon: '📅', label: 'Due date', value: due },
+       ])}
        ${detailTable(
-         detailRow('📄', 'Invoice number', invoiceNumber) +
-           (planDescription ? detailRow('🏷️', 'Membership', planDescription) : '') +
-           detailRow('💰', 'Amount due', total, { emphasize: true }) +
-           detailRow('📅', 'Due date', dueDate),
-       )}`,
+         detailRow('📄', 'Invoice number', escapeHtml(invoiceNumber)) +
+           (planDescription ? detailRow('🏷️', 'Membership', escapeHtml(planDescription)) : '') +
+           detailRow('📌', 'Status', statusBadge('Upcoming', 'warning')),
+       )}
+       ${alertBox('info', 'How to pay', escapeHtml(PAY_HINT(branding.tenantName)))}
+       ${sectionTitle('What happens next')}
+       ${stepList([{ title: `Pay ${total} by ${due}`, body: 'At the front desk, or via any payment option the gym offers.' }, { title: 'You’ll receive a receipt by email', body: 'It is sent as soon as the payment is recorded.' }])}
+       ${signature(branding)}
+       ${footnote('Already paid? Thank you — please ignore this reminder.')}`,
     ),
   };
 }
@@ -80,34 +147,43 @@ export function paymentOverdueReminderEmail(
   dueDate: string,
   planDescription?: string | null,
 ) {
+  const due = formatDate(dueDate);
   return {
     subject: `Outstanding balance — invoice ${invoiceNumber}`,
     html: renderEmailLayout(
       branding,
-      { icon: '⚠️', title: 'Payment Required', categoryLabel: 'Past Due', tone: 'danger', preheader: `Invoice ${invoiceNumber} for ${total} is overdue (was due ${dueDate}).` },
-      `<p>Hi ${memberFirstName}, your invoice at ${branding.tenantName} is now overdue. Please settle it at your earliest convenience.</p>
-       ${infoBox(
-         `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${
-           detailRow('📄', 'Invoice number', invoiceNumber) +
-           (planDescription ? detailRow('🏷️', 'Membership', planDescription) : '') +
-           detailRow('💰', 'Amount due', total, { emphasize: true }) +
-           detailRow('📅', 'Was due', dueDate)
-         }</table>`,
-         toneAccent(branding, 'danger'),
-       )}`,
+      {
+        icon: '⚠️',
+        title: 'Payment required',
+        subtitle: `${total} was due on ${due}`,
+        categoryLabel: 'Past Due',
+        tone: 'danger',
+        preheader: `Invoice ${invoiceNumber} for ${total} is overdue (was due ${due}).`,
+        footerHint: 'preferences',
+      },
+      `${paragraph(`Hi ${escapeHtml(memberFirstName)}, your invoice at ${strong(branding.tenantName)} is now overdue. Please settle it at your earliest convenience so your membership isn’t interrupted.`)}
+       ${keyFacts([
+         { icon: '💰', label: 'Outstanding', value: total, color: '#dc2626' },
+         { icon: '📅', label: 'Was due', value: due },
+       ])}
+       ${detailTable(
+         detailRow('📄', 'Invoice number', escapeHtml(invoiceNumber)) +
+           (planDescription ? detailRow('🏷️', 'Membership', escapeHtml(planDescription)) : '') +
+           detailRow('📌', 'Status', statusBadge('Overdue', 'danger')),
+       )}
+       ${alertBox('danger', 'Please pay soon', escapeHtml(PAY_HINT(branding.tenantName)))}
+       ${sectionTitle('What happens next')}
+       ${stepList([{ title: `Pay ${total} at your earliest convenience`, body: 'At the front desk, or via any payment option the gym offers.' }, { title: 'You’ll receive a receipt by email', body: 'It is sent as soon as the payment is recorded.' }, { title: 'Already paid or something looks wrong?', body: 'Tell the gym and they will check the invoice.' }])}
+       ${signature(branding)}
+       ${footnote('Already paid? Thank you — please ignore this reminder; it may have crossed with your payment.')}`,
     ),
   };
 }
 
 /**
- * Full payment receipt sent the moment a member payment succeeds (cash/UPI/
- * card/bank transfer/cheque, or a settled online-gateway link) — the detailed
- * counterpart to the short customizable `PAYMENT_SUCCESS` in-app notice.
- * Always shows what was actually paid this transaction (`amountPaid`)
- * alongside the running total for the membership (`totalPaid`) and whatever
- * is still owed (`dueAmount`) — a gym's membership fee is very often paid in
- * installments (advance + balance), so "paid today" and "still due" are two
- * different, both-important numbers rather than one.
+ * Full payment receipt sent the moment a member payment succeeds. Shows what was paid this transaction
+ * (`amountPaid`) alongside the running total (`totalPaid`) and whatever is still owed (`dueAmount`) — gym fees
+ * are often paid in instalments, so "paid today" and "still due" are two different, both-important numbers.
  */
 export function memberPaymentReceiptEmail(
   branding: EmailBranding,
@@ -132,22 +208,18 @@ export function memberPaymentReceiptEmail(
   const fullyPaid = params.dueAmount <= 0;
 
   const rows =
-    detailRow('👤', 'Member Name', params.memberName) +
-    detailRow('🧾', 'Receipt No.', params.paymentNumber) +
-    detailRow('📅', 'Payment Date', params.paymentDate) +
-    detailRow('💳', 'Mode of Payment', methodLabel) +
-    (params.membershipPlanName ? detailRow('🏷️', 'Membership Plan', params.membershipPlanName) : '') +
-    (params.membershipValidTill ? detailRow('📆', 'Valid Till', params.membershipValidTill) : '') +
-    (params.transactionReference ? detailRow('🔖', 'Transaction Ref.', params.transactionReference) : '') +
-    (params.discount ? detailRow('🏷️', 'Discount', `− ${money(params.discount)}`) : '') +
-    (params.tax ? detailRow('➕', 'Tax', money(params.tax)) : '') +
-    detailRow('💰', 'Amount Paid', money(params.amountPaid), { emphasize: true }) +
-    detailRow('📊', 'Total Paid Till Date', money(params.totalPaid)) +
-    detailRow(
-      fullyPaid ? '✅' : '⚠️',
-      'Due Amount',
-      fullyPaid ? statusBadge('Fully Paid', 'success') : statusBadge(money(params.dueAmount), 'warning'),
-    );
+    detailRow('👤', 'Member name', escapeHtml(params.memberName)) +
+    detailRow('🧾', 'Receipt no.', escapeHtml(params.paymentNumber)) +
+    detailRow('📅', 'Payment date', escapeHtml(formatDate(params.paymentDate))) +
+    detailRow('💳', 'Mode of payment', escapeHtml(methodLabel)) +
+    (params.membershipPlanName ? detailRow('🏷️', 'Membership plan', escapeHtml(params.membershipPlanName)) : '') +
+    (params.membershipValidTill ? detailRow('📆', 'Valid till', escapeHtml(formatDate(params.membershipValidTill))) : '') +
+    (params.transactionReference ? detailRow('🔖', 'Transaction ref.', escapeHtml(params.transactionReference)) : '') +
+    (params.discount ? detailRow('🎟️', 'Discount', `− ${escapeHtml(money(params.discount))}`) : '') +
+    (params.tax ? detailRow('➕', 'Tax', escapeHtml(money(params.tax))) : '') +
+    detailRow('💰', 'Amount paid', escapeHtml(money(params.amountPaid)), { emphasize: true, color: toneAccent(branding, 'success') }) +
+    detailRow('📊', 'Total paid to date', escapeHtml(money(params.totalPaid))) +
+    detailRow('📌', 'Balance', fullyPaid ? statusBadge('Fully paid', 'success') : statusBadge(money(params.dueAmount), 'warning'));
 
   return {
     subject: `Payment Receipt — ${params.paymentNumber}`,
@@ -155,18 +227,24 @@ export function memberPaymentReceiptEmail(
       branding,
       {
         icon: '✅',
-        title: 'Payment Successful!',
+        title: 'Payment received',
+        subtitle: `${money(params.amountPaid)} · receipt ${params.paymentNumber}`,
         categoryLabel: 'Payment Receipt',
         tone: 'success',
         preheader: `We received ${money(params.amountPaid)} from ${params.memberName}.`,
+        footerHint: 'preferences',
       },
-      `<p>Hi ${params.memberName}, thank you! We've successfully received your payment at ${branding.tenantName}. Here are your receipt details:</p>
+      `${paragraph(`Hi ${escapeHtml(params.memberName)}, thank you! ${strong(branding.tenantName)} has successfully received your payment.`)}
+       ${keyFacts([
+         { icon: '💰', label: 'Paid today', value: money(params.amountPaid), color: '#15803d' },
+         { icon: '📊', label: fullyPaid ? 'Status' : 'Balance due', value: fullyPaid ? 'Fully paid' : money(params.dueAmount), color: fullyPaid ? '#15803d' : '#b45309' },
+       ])}
+       ${sectionTitle('Receipt details')}
        ${detailTable(rows)}
-       ${
-         fullyPaid
-           ? footnote('Your membership payment is fully settled. Keep this receipt for your records.')
-           : footnote(`A balance of ${money(params.dueAmount)} remains — please clear it at your earliest convenience.`)
-       }`,
+       ${fullyPaid ? alertBox('success', 'All settled', 'Your membership payment is fully paid. Keep this receipt for your records.') : alertBox('warning', `Balance of ${money(params.dueAmount)} remains`, escapeHtml(PAY_HINT(branding.tenantName)))}
+       ${sectionTitle('What happens next')}
+       ${stepList(fullyPaid ? [{ title: 'Nothing more to pay', body: 'Your membership payment is settled.' }, { title: 'Keep this email as your receipt' }] : [{ title: `Pay the remaining ${money(params.dueAmount)}`, body: 'At the front desk, or via any payment option the gym offers.' }, { title: 'A new receipt is emailed after each payment' }])}
+       ${signature(branding, 'Thank you,')}`,
     ),
   };
 }

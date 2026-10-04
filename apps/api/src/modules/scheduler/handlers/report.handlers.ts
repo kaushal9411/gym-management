@@ -1,5 +1,5 @@
 import { prisma } from '../../../infrastructure/database/prisma';
-import { detailRow, detailTable, muted, renderEmailLayout } from '../../../infrastructure/mail/templates/base-layout';
+import { scheduledReportEmail } from '../../../infrastructure/mail/templates/notification-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { ScheduledReportRepository } from '../../reports/repositories/scheduled-report.repository';
 import { ReportExportService } from '../../reports/services/report-export.service';
@@ -41,15 +41,14 @@ async function runOne(schedule: Awaited<ReturnType<typeof ScheduledReportReposit
     filters,
   );
 
-  const subject = `${schedule.name} — scheduled report (${schedule.frequency.toLowerCase()})`;
-  const html = renderEmailLayout(
-    { tenantName: schedule.tenant.name },
-    { icon: '📊', title: 'Your Report is Ready', categoryLabel: 'Scheduled report', preheader: `Your ${schedule.name} report is ready.` },
-    `<p>Your report <strong>${schedule.name}</strong> (${schedule.reportType}) is ready.</p>
-     ${detailTable(detailRow('🏢', 'Branch', schedule.branch?.name ?? 'All branches') + detailRow('🔁', 'Frequency', schedule.frequency))}
-     <pre style="margin-top:20px;padding:14px 16px;background:#f8f9fc;border-radius:8px;font-family:'SF Mono',Consolas,Menlo,monospace;font-size:11.5px;line-height:1.5;color:#374151;white-space:pre-wrap;word-break:break-word;">${content.slice(0, 4000)}</pre>
-     ${muted(`CSV attachments aren't supported yet — this email contains the full data inline. File: ${filename}`)}`,
-  );
+  const { subject, html } = scheduledReportEmail({ tenantName: schedule.tenant.name }, {
+    scheduleName: schedule.name,
+    reportType: schedule.reportType,
+    frequency: schedule.frequency,
+    branchName: schedule.branch?.name ?? null,
+    csv: content,
+    filename,
+  });
 
   for (const to of schedule.recipientEmails) {
     // eslint-disable-next-line no-await-in-loop -- a handful of recipients per schedule, sequential is simplest and matches this codebase's other reminder-email loops

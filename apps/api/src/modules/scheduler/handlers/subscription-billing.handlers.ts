@@ -1,3 +1,4 @@
+import { env } from '../../../config/env';
 import { logger } from '../../../core/logging/logger';
 import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
@@ -10,6 +11,9 @@ import { tenantNotificationService } from '../../tenant-notifications/services/t
 import type { JobHandler } from '../types';
 
 const REMINDER_WINDOW_DAYS = 3;
+
+const billingUrlFor = (slug: string) => `http://${slug}.${env.platformDomain}/billing`;
+const isoDay = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : null);
 const GRACE_PERIOD_DAYS = 3;
 const EXPIRE_AFTER_SUSPENDED_DAYS = 7;
 const DAY_MS = 86_400_000;
@@ -50,7 +54,7 @@ async function remindTrialsEndingSoon(): Promise<void> {
     // eslint-disable-next-line no-await-in-loop -- sequential across a small, infrequent (daily) batch; no throughput requirement justifies parallelizing
     if (await cache.get(dedupeKey)) continue;
 
-    const template = subscriptionAlertEmail({ tenantName: tenant.name }, owner.name, 'trial_ending');
+    const template = subscriptionAlertEmail({ tenantName: tenant.name }, owner.name, 'trial_ending', { billingUrl: billingUrlFor(tenant.slug), date: isoDay(tenant.trialEndsAt) });
     // eslint-disable-next-line no-await-in-loop
     await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
     // eslint-disable-next-line no-await-in-loop
@@ -74,7 +78,7 @@ async function remindRenewalsDueSoon(): Promise<void> {
     // eslint-disable-next-line no-await-in-loop -- see remindTrialsEndingSoon
     if (await cache.get(dedupeKey)) continue;
 
-    const template = subscriptionAlertEmail({ tenantName: subscription.tenant.name }, owner.name, 'renewal_reminder');
+    const template = subscriptionAlertEmail({ tenantName: subscription.tenant.name }, owner.name, 'renewal_reminder', { billingUrl: billingUrlFor(subscription.tenant.slug), date: isoDay(subscription.currentPeriodEnd) });
     // eslint-disable-next-line no-await-in-loop
     await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
     // eslint-disable-next-line no-await-in-loop
@@ -149,7 +153,7 @@ async function remindGracePeriod(): Promise<void> {
     if (await cache.get(dedupeKey)) continue;
 
     const daysRemaining = Math.max(1, Math.ceil((subscription.graceEndsAt.getTime() - Date.now()) / DAY_MS));
-    const template = gracePeriodReminderEmail({ tenantName: subscription.tenant.name }, owner.name, daysRemaining);
+    const template = gracePeriodReminderEmail({ tenantName: subscription.tenant.name }, owner.name, daysRemaining, { billingUrl: billingUrlFor(subscription.tenant.slug), graceEndsAt: isoDay(subscription.graceEndsAt) ?? undefined });
     // eslint-disable-next-line no-await-in-loop
     await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
     // eslint-disable-next-line no-await-in-loop
@@ -185,7 +189,7 @@ async function expireSuspended(): Promise<void> {
 
     const owner = subscription.tenant.users[0];
     if (!owner) continue;
-    const template = subscriptionExpiredEmail({ tenantName: subscription.tenant.name }, owner.name);
+    const template = subscriptionExpiredEmail({ tenantName: subscription.tenant.name }, owner.name, { billingUrl: billingUrlFor(subscription.tenant.slug) });
     // eslint-disable-next-line no-await-in-loop
     await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
     // eslint-disable-next-line no-await-in-loop

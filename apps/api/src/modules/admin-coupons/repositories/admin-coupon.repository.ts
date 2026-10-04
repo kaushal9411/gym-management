@@ -18,11 +18,23 @@ export interface UpsertCouponInput {
 
 export class AdminCouponRepository {
   async list() {
-    return prisma.coupon.findMany({ orderBy: { createdAt: 'desc' }, include: { _count: { select: { redemptions: true } } } });
+    return prisma.coupon.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: { _count: { select: { redemptions: true } } },
+    });
   }
 
   async findById(id: string) {
-    return prisma.coupon.findUnique({ where: { id }, include: { redemptions: { orderBy: { redeemedAt: 'desc' }, take: 50, include: { tenant: { select: { name: true, slug: true } } } } } });
+    return prisma.coupon.findUnique({
+      where: { id },
+      include: {
+        redemptions: {
+          orderBy: { redeemedAt: 'desc' },
+          take: 50,
+          include: { tenant: { select: { name: true, slug: true } } },
+        },
+      },
+    });
   }
 
   async create(input: UpsertCouponInput) {
@@ -30,7 +42,14 @@ export class AdminCouponRepository {
   }
 
   async update(id: string, input: Partial<UpsertCouponInput>) {
-    return prisma.coupon.update({ where: { id }, data: input.code ? { ...input, code: input.code.toUpperCase() } : input });
+    return prisma.coupon.update({
+      where: { id },
+      data: input.code ? { ...input, code: input.code.toUpperCase() } : input,
+    });
+  }
+
+  async countRedemptions(id: string): Promise<number> {
+    return prisma.couponRedemption.count({ where: { couponId: id } });
   }
 
   async remove(id: string): Promise<void> {

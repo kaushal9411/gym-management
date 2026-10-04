@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 
 /** `/dashboard`, `/members*`, the four Staff & Access list pages (`/users`, `/roles`, `/permissions`, `/invitations`), and the Staff-through-Body-Measurements sidebar section (`/staff`, `/branches`, `/memberships`, `/attendance`, `/attendance-devices`, `/workout-plans`, `/classes`, `/diet-plans`, `/measurements`, incl. their detail/new sub-routes) use the full content width with a 10px gutter instead of the padded `max-w-7xl` shell. */
 const WIDE_PAGE_PATTERN =
-  /^\/(?:members(?:\/[^/]+)?|dashboard|users(?:\/new)?|roles|permissions|invitations|staff(?:\/[^/]+)?|branches(?:\/[^/]+)?|memberships(?:\/[^/]+)?|attendance(?:\/[^/]+)?|attendance-devices|workout-plans(?:\/[^/]+)?|classes(?:\/[^/]+)?|diet-plans(?:\/[^/]+)?|measurements(?:\/[^/]+)?|payments(?:\/[^/]+)?|invoices(?:\/[^/]+)?|income|expenses(?:\/[^/]+)?|billing(?:\/[^/]+)?|reports(?:\/[^/]+)?|analytics|notifications(?:\/[^/]+)?|announcements(?:\/[^/]+)?|gym-settings(?:\/[^/]+)?|support|settings|profile)$/;
+  /^\/(?:members(?:\/[^/]+)?|dashboard|users(?:\/[^/]+)?|roles(?:\/[^/]+)?|permissions|invitations|staff(?:\/[^/]+)?|branches(?:\/[^/]+)?|memberships(?:\/[^/]+)?|attendance(?:\/[^/]+)?|attendance-devices|workout-plans(?:\/[^/]+)?|classes(?:\/[^/]+)?|diet-plans(?:\/[^/]+)?|measurements(?:\/[^/]+)?|payments(?:\/[^/]+)?|invoices(?:\/[^/]+)?|income|expenses(?:\/[^/]+)?|billing(?:\/[^/]+)?|reports(?:\/[^/]+)?|analytics|notifications(?:\/[^/]+)?|announcements(?:\/[^/]+)?|gym-settings(?:\/[^/]+)?|support|settings|profile)$/;
 
 /** Consistent max-width/padding shell for every portal page's main content. */
 function PageContainer({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

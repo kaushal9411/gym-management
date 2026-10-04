@@ -88,7 +88,7 @@ export function OtpInput({
 
   return (
     <div
-      className="flex justify-center gap-2"
+      className="flex justify-center gap-1.5 sm:gap-2.5"
       role="group"
       aria-label={`${length}-digit verification code`}
     >
@@ -112,8 +112,9 @@ export function OtpInput({
           aria-label={`Digit ${index + 1} of ${length}`}
           aria-invalid={invalid || undefined}
           className={cn(
-            'size-11 rounded-lg border border-input bg-background text-center text-lg font-semibold shadow-xs transition-all duration-150 sm:size-12',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-ring focus-visible:scale-105',
+            'h-11 w-10 min-[400px]:size-12 rounded-xl border-2 border-input bg-background text-center text-xl font-bold shadow-xs transition-all duration-150 sm:size-14',
+            digit && 'border-primary/60 bg-primary/5',
+            'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 focus-visible:border-primary focus-visible:scale-110',
             'disabled:cursor-not-allowed disabled:opacity-50',
             invalid && 'border-destructive focus-visible:ring-destructive',
           )}

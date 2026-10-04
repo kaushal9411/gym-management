@@ -21,6 +21,15 @@ export function useSchedulerJobs(params: { category?: JobCategory; page: number;
   return useQuery({ queryKey: ['admin', 'scheduler', 'jobs', params], queryFn: () => adminSchedulerService.listJobs(params), refetchInterval: POLL_MS });
 }
 
+/** Latest executions across every job (API max page size 100) — feeds the overview charts. */
+export function useSchedulerRecentRuns() {
+  return useQuery({
+    queryKey: ['admin', 'scheduler', 'history', 'recent'],
+    queryFn: () => adminSchedulerService.getJobHistory({ page: 1, limit: 100 }),
+    refetchInterval: POLL_MS * 6,
+  });
+}
+
 export function useSchedulerJob(name: string) {
   return useQuery({
     queryKey: ['admin', 'scheduler', 'jobs', name],

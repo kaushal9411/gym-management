@@ -7,6 +7,7 @@ import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { eventBus } from '../../../core/events/event-bus';
 import type { TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
+import { applyOverridesToPlan, parseOverrides } from '../../admin-tenants/utils/tenant-limits.util';
 import { BillingAddressRepository } from '../../billing/repositories/billing-address.repository';
 import { CouponService } from '../../coupon/services/coupon.service';
 import { createOrder, verifyOrderPaymentSignature } from '../../finance/services/razorpay-gateway.service';
@@ -370,29 +371,30 @@ export class SubscriptionService {
     // kept an empty `featureFlags`, hiding most of the app). Upsert rather
     // than update — this tenant may have no TenantLimit/TenantModule rows
     // yet if it never went through onboarding provisioning.
+    // Super-admin overrides (limits + module toggles) survive a plan change — see TenantControlsService.
+    const existingLimit = await this.db.tenantLimit.findUnique({ where: { tenantId } });
+    const limits = applyOverridesToPlan(
+      {
+        maxBranches: plan.maxBranches,
+        maxManagers: plan.maxManagers,
+        maxTrainers: plan.maxTrainers,
+        maxReceptionists: plan.maxReceptionists,
+        maxStaff: plan.maxStaff,
+        maxMembers: plan.maxMembers,
+        maxStorageMb: plan.maxStorageMb,
+      },
+      parseOverrides(existingLimit?.overrides),
+    );
     await this.db.tenantLimit.upsert({
       where: { tenantId },
-      create: {
-        tenantId,
-        maxBranches: plan.maxBranches,
-        maxManagers: plan.maxManagers,
-        maxTrainers: plan.maxTrainers,
-        maxReceptionists: plan.maxReceptionists,
-        maxStaff: plan.maxStaff,
-        maxMembers: plan.maxMembers,
-        maxStorageMb: plan.maxStorageMb,
-      },
-      update: {
-        maxBranches: plan.maxBranches,
-        maxManagers: plan.maxManagers,
-        maxTrainers: plan.maxTrainers,
-        maxReceptionists: plan.maxReceptionists,
-        maxStaff: plan.maxStaff,
-        maxMembers: plan.maxMembers,
-        maxStorageMb: plan.maxStorageMb,
-      },
+      create: { tenantId, ...limits },
+      update: limits,
     });
+    const forcedModules = new Set(
+      (await this.db.tenantModule.findMany({ where: { tenantId, adminOverride: true }, select: { key: true } })).map((m) => m.key),
+    );
     for (const feature of plan.features) {
+      if (forcedModules.has(feature.key)) continue;
       // eslint-disable-next-line no-await-in-loop -- plan feature lists are small (~25 rows) and this is not a request-path hot loop
       await this.db.tenantModule.upsert({
         where: { tenantId_key: { tenantId, key: feature.key } },

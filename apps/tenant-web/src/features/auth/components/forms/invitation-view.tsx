@@ -4,20 +4,19 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { CheckCircle2, MailX, UserPlus } from 'lucide-react';
+import { CheckCircle2, MailX, Phone, User, UserPlus } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useTenant } from '@/features/tenant/tenant-provider';
 import { AUTH_ROUTES } from '../../constants';
 import { toAuthError, useAcceptInvitation, useInvitation } from '../../hooks/use-auth';
 import { acceptInvitationSchema, type AcceptInvitationFormValues } from '../../schemas';
+import { AuthPanel, PanelSpinner } from '../auth-panel';
 import { FormAlert } from '../form-alert';
+import { IconField } from '../icon-field';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { PasswordInput } from '../password-input';
 import { PasswordStrengthMeter } from '../password-strength-meter';
@@ -48,15 +47,9 @@ export function InvitationView({ token }: { token: string }) {
 
   if (invitation.isPending) {
     return (
-      <Card>
-        <CardContent className="space-y-4 p-8">
-          <Skeleton className="mx-auto size-16 rounded-full" />
-          <Skeleton className="mx-auto h-5 w-56" />
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-10 w-full" />
-          <span className="sr-only" role="status">Loading invitation…</span>
-        </CardContent>
-      </Card>
+      <div className="rounded-2xl border bg-card p-6 shadow-sm sm:p-8">
+        <PanelSpinner label="Loading invitation…" />
+      </div>
     );
   }
 
@@ -120,90 +113,94 @@ export function InvitationView({ token }: { token: string }) {
   const fieldError = (name: keyof AcceptInvitationFormValues) => form.formState.errors[name]?.message;
 
   return (
-    <Card>
-      <CardHeader className="items-center text-center">
-        <div className="mb-1 flex size-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <UserPlus className="size-7" aria-hidden />
-        </div>
-        <CardTitle>Join {tenant.name}</CardTitle>
-        <CardDescription>
+    <AuthPanel
+      icon={UserPlus}
+      title={`Join ${tenant.name}`}
+      subtitle={
+        <>
           {invite.invitedBy} invited you to join as{' '}
           <span className="font-medium text-foreground">{ROLE_LABELS[invite.role] ?? invite.role}</span>{' '}
           ({invite.inviteeEmail}).
-        </CardDescription>
-      </CardHeader>
+        </>
+      }
+    >
+      <FormAlert variant="error" message={serverError} />
 
-      <CardContent className="space-y-4">
-        <FormAlert variant="error" message={serverError} />
+      <form onSubmit={onSubmit} noValidate className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="name">Full name</Label>
+          <IconField
+            id="name"
+            icon={User}
+            autoComplete="name"
+            placeholder="Your full name"
+            invalid={!!fieldError('name')}
+            disabled={isSubmitting}
+            aria-describedby={fieldError('name') ? 'name-error' : undefined}
+            {...form.register('name')}
+          />
+          {fieldError('name') ? (
+            <p id="name-error" role="alert" className="text-xs text-destructive">{fieldError('name')}</p>
+          ) : null}
+        </div>
 
-        <form onSubmit={onSubmit} noValidate className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Full name</Label>
-            <Input
-              id="name"
-              autoComplete="name"
-              placeholder="Your full name"
-              invalid={!!fieldError('name')}
-              disabled={isSubmitting}
-              {...form.register('name')}
-            />
-            {fieldError('name') ? (
-              <p role="alert" className="text-xs text-destructive">{fieldError('name')}</p>
-            ) : null}
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="phone">
+            Phone <span className="text-muted-foreground">(optional)</span>
+          </Label>
+          <IconField
+            id="phone"
+            icon={Phone}
+            type="tel"
+            autoComplete="tel"
+            placeholder="+91 98765 43210"
+            invalid={!!fieldError('phone')}
+            disabled={isSubmitting}
+            aria-describedby={fieldError('phone') ? 'phone-error' : undefined}
+            {...form.register('phone')}
+          />
+          {fieldError('phone') ? (
+            <p id="phone-error" role="alert" className="text-xs text-destructive">{fieldError('phone')}</p>
+          ) : null}
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="phone">
-              Phone <span className="text-muted-foreground">(optional)</span>
-            </Label>
-            <Input
-              id="phone"
-              type="tel"
-              autoComplete="tel"
-              placeholder="+91 98765 43210"
-              invalid={!!fieldError('phone')}
-              disabled={isSubmitting}
-              {...form.register('phone')}
-            />
-            {fieldError('phone') ? (
-              <p role="alert" className="text-xs text-destructive">{fieldError('phone')}</p>
-            ) : null}
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">Create password</Label>
+          <PasswordInput
+            id="password"
+            autoComplete="new-password"
+            className="h-12 text-[15px]"
+            invalid={!!fieldError('password')}
+            disabled={isSubmitting}
+            aria-describedby={fieldError('password') ? 'password-error' : undefined}
+            {...form.register('password')}
+          />
+          <PasswordStrengthMeter password={passwordValue} />
+          {fieldError('password') ? (
+            <p id="password-error" role="alert" className="text-xs text-destructive">{fieldError('password')}</p>
+          ) : null}
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password">Create password</Label>
-            <PasswordInput
-              id="password"
-              autoComplete="new-password"
-              invalid={!!fieldError('password')}
-              disabled={isSubmitting}
-              {...form.register('password')}
-            />
-            <PasswordStrengthMeter password={passwordValue} />
-            {fieldError('password') ? (
-              <p role="alert" className="text-xs text-destructive">{fieldError('password')}</p>
-            ) : null}
-          </div>
+        <div className="space-y-2">
+          <Label htmlFor="confirmPassword">Confirm password</Label>
+          <PasswordInput
+            id="confirmPassword"
+            autoComplete="new-password"
+            className="h-12 text-[15px]"
+            invalid={!!fieldError('confirmPassword')}
+            disabled={isSubmitting}
+            aria-describedby={fieldError('confirmPassword') ? 'confirm-error' : undefined}
+            {...form.register('confirmPassword')}
+          />
+          {fieldError('confirmPassword') ? (
+            <p id="confirm-error" role="alert" className="text-xs text-destructive">{fieldError('confirmPassword')}</p>
+          ) : null}
+        </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm password</Label>
-            <PasswordInput
-              id="confirmPassword"
-              autoComplete="new-password"
-              invalid={!!fieldError('confirmPassword')}
-              disabled={isSubmitting}
-              {...form.register('confirmPassword')}
-            />
-            {fieldError('confirmPassword') ? (
-              <p role="alert" className="text-xs text-destructive">{fieldError('confirmPassword')}</p>
-            ) : null}
-          </div>
-
-          <LoadingButton type="submit" className="w-full" loading={isSubmitting} loadingText="Setting up your account…">
-            Accept invitation
-          </LoadingButton>
-        </form>
-      </CardContent>
-    </Card>
+        <LoadingButton type="submit" size="lg" className="w-full" loading={isSubmitting} loadingText="Setting up your account…">
+          Accept invitation
+        </LoadingButton>
+      </form>
+    </AuthPanel>
   );
 }

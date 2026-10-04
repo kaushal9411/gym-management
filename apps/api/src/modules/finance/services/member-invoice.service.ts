@@ -1,5 +1,6 @@
 import { NotFoundError, ValidationError } from '../../../core/errors/app-error';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
+import { loadEmailBranding } from '../../../infrastructure/mail/branding';
 import { formatMoney } from '../../../infrastructure/mail/templates/base-layout';
 import { memberInvoiceSummaryEmail } from '../../../infrastructure/mail/templates/member-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
@@ -243,14 +244,7 @@ export class MemberInvoiceService {
     const to = overrideEmail ?? member?.email;
     if (!to) throw new ValidationError('This member has no email on file — provide one explicitly.');
 
-    const tenant = await tenantService.resolveById(this.tenantId);
-    const branding = tenant
-      ? {
-          tenantName: tenant.name,
-          primaryColor: tenant.branding.primaryColor,
-          logoUrl: tenant.branding.emailLogoUrl ?? tenant.branding.logoUrl,
-        }
-      : { tenantName: 'FitCloud' };
+    const branding = await loadEmailBranding(this.tenantId);
     const settings = await this.db.tenantSettings.findUnique({
       where: { tenantId: this.tenantId },
     });
@@ -264,6 +258,7 @@ export class MemberInvoiceService {
       invoice.status === 'CANCELLED' ? 'UNPAID' : invoice.status,
       invoice.dueDate,
       invoice.items[0]?.description ?? null,
+      { lineItems: invoice.items.map((item) => ({ description: item.description, quantity: item.quantity, amount: formatMoney(Number(item.amount), currencySymbol) })) },
     );
     await enqueueEmail({ to, subject: mail.subject, html: mail.html });
     await this.audit(actor, 'member_invoice.emailed', id);

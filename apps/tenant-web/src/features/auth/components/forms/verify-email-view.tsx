@@ -6,12 +6,11 @@ import { BadgeCheck, MailQuestion, MailWarning, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import { OTP_RESEND_COOLDOWN_SECONDS, AUTH_ROUTES } from '../../constants';
 import { useResendVerification, useVerifyEmail } from '../../hooks/use-auth';
 import { useCountdown } from '../../hooks/use-countdown';
 import { maskEmail } from '../../utils/mask';
+import { CountdownRing, PanelSpinner } from '../auth-panel';
 import { StatusScreen } from '../status-screen';
 
 interface VerifyEmailViewProps {
@@ -41,7 +40,7 @@ function ResendButton({ email }: { email: string }) {
       onClick={handleResend}
       disabled={resend.isPending || countdown.isRunning}
     >
-      <Send aria-hidden />
+      {countdown.isRunning ? <CountdownRing remaining={countdown.secondsLeft} total={OTP_RESEND_COOLDOWN_SECONDS} /> : <Send aria-hidden />}
       {countdown.isRunning ? `Resend in ${countdown.formatted}` : 'Resend verification email'}
     </Button>
   );
@@ -62,6 +61,11 @@ export function VerifyEmailView({ token, status, email }: VerifyEmailViewProps) 
             ? `We sent a verification link to ${maskEmail(email)}. Click it to activate your account.`
             : 'We sent you a verification link. Click it to activate your account.'
         }
+        steps={[
+          { label: 'Open the email we sent', hint: 'Check spam or promotions if you don\'t see it', state: 'active' },
+          { label: 'Click the verification link', state: 'pending' },
+          { label: 'Sign in to your account', state: 'pending' },
+        ]}
         footnote="The link expires in 24 hours."
       >
         {email ? <ResendButton email={email} /> : null}
@@ -74,14 +78,9 @@ export function VerifyEmailView({ token, status, email }: VerifyEmailViewProps) 
 
   if (verification.isPending) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center gap-4 p-8">
-          <Skeleton className="size-16 rounded-full" />
-          <Skeleton className="h-5 w-48" />
-          <Skeleton className="h-4 w-64" />
-          <span className="sr-only" role="status">Verifying your email…</span>
-        </CardContent>
-      </Card>
+      <div className="rounded-2xl border bg-card p-6 shadow-sm sm:p-8">
+        <PanelSpinner label="Verifying your email…" />
+      </div>
     );
   }
 

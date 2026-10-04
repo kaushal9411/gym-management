@@ -2,8 +2,9 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle, LogIn, ShieldCheck } from 'lucide-react';
 
+import { Button } from '@/components/ui/button';
 import { StatusScreen } from '@/features/auth/components/status-screen';
 import { POST_LOGIN_REDIRECT } from '@/features/auth/constants';
 import { authService } from '@/features/auth/services/auth.service';
@@ -62,17 +63,21 @@ export function OnboardingHandoff() {
   if (error) {
     return (
       <StatusScreen icon={AlertTriangle} tone="destructive" title="Couldn't finish signing you in" description={error}>
-        <a href="/login" className="text-sm font-medium text-primary underline-offset-4 hover:underline">
-          Go to sign in
-        </a>
+        <Button asChild size="lg" className="w-full sm:w-auto">
+          <a href="/login">
+            <LogIn aria-hidden /> Go to sign in
+          </a>
+        </Button>
       </StatusScreen>
     );
   }
 
   return (
-    <div className="flex flex-col items-center gap-4 py-10 text-center">
-      <Loader2 className="size-8 animate-spin text-primary" aria-hidden />
-      <p className="text-sm text-muted-foreground">Signing you in to your new gym portal…</p>
-    </div>
+    <StatusScreen
+      icon={ShieldCheck}
+      tone="neutral"
+      title="Signing you in…"
+      description="Securing your session and opening your new gym portal. This only takes a moment."
+    />
   );
 }

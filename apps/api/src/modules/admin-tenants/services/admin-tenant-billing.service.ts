@@ -19,6 +19,7 @@ import { addBillingPeriod } from '../../onboarding/utils/billing-period';
 import { SubscriptionRepository } from '../../subscription/repositories/subscription.repository';
 import { tenantService } from '../../tenants/service/tenant.service';
 import { adminTenantRepository } from '../repositories/admin-tenant.repository';
+import { applyOverridesToPlan, parseOverrides } from '../utils/tenant-limits.util';
 
 export type ChangePlanMode = 'manual' | 'payment_link';
 
@@ -436,9 +437,11 @@ export class AdminTenantBillingService {
     // updates it, so an upgrade/downgrade previously had zero effect on the
     // tenant's actual enforced caps. Mirrors provisioning's own logic
     // (update in place instead of create, since the row already exists).
-    await this.db.tenantLimit.update({
-      where: { tenantId: this.tenantId },
-      data: {
+    // Super-admin limit overrides / module toggles (Tenant control center) SURVIVE plan changes: plan values are
+    // written, then overrides re-applied on top; modules flagged `adminOverride` are left untouched.
+    const limitRow = await this.db.tenantLimit.findUnique({ where: { tenantId: this.tenantId } });
+    const limits = applyOverridesToPlan(
+      {
         maxBranches: targetPlan.maxBranches,
         maxManagers: targetPlan.maxManagers,
         maxTrainers: targetPlan.maxTrainers,
@@ -447,13 +450,19 @@ export class AdminTenantBillingService {
         maxMembers: targetPlan.maxMembers,
         maxStorageMb: targetPlan.maxStorageMb,
       },
-    });
+      parseOverrides(limitRow?.overrides),
+    );
+    await this.db.tenantLimit.update({ where: { tenantId: this.tenantId }, data: limits });
 
     // Same gap for feature-gated module visibility (`TenantModule.enabled`,
     // read by tenantService as `ResolvedTenant.featureFlags`) — upsert
     // rather than update since a target plan could reference a feature key
     // that predates this tenant's TenantModule rows.
+    const forcedModules = new Set(
+      (await this.db.tenantModule.findMany({ where: { tenantId: this.tenantId, adminOverride: true }, select: { key: true } })).map((m) => m.key),
+    );
     for (const feature of targetPlan.features) {
+      if (forcedModules.has(feature.key)) continue;
       // eslint-disable-next-line no-await-in-loop -- plan feature lists are small (~25 rows) and this only runs on the rare admin plan-change action, not a request-path hot loop
       await this.db.tenantModule.upsert({
         where: { tenantId_key: { tenantId: this.tenantId, key: feature.key } },

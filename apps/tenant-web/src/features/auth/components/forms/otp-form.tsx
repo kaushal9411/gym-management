@@ -3,12 +3,11 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck } from 'lucide-react';
+import { KeyRound, MailCheck, ShieldCheck, Smartphone } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { AUTH_ROUTES, OTP_LENGTH, OTP_RESEND_COOLDOWN_SECONDS, POST_LOGIN_REDIRECT } from '../../constants';
 import { toAuthError, useResendOtp, useVerifyOtp } from '../../hooks/use-auth';
@@ -16,7 +15,7 @@ import { useCountdown } from '../../hooks/use-countdown';
 import { otpSchema } from '../../schemas';
 import type { OtpFlow } from '../../types';
 import { maskEmail } from '../../utils/mask';
-import { AuthHeader } from '../auth-header';
+import { AuthPanel, CountdownRing } from '../auth-panel';
 import { FormAlert } from '../form-alert';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { OtpInput } from '../otp-input';
@@ -94,17 +93,16 @@ export function OtpForm({ email, flow, variant = 'otp' }: OtpFormProps) {
 
   return (
     <div className="space-y-6">
-      <AuthHeader
+      <AuthPanel
+        icon={variant === '2fa' ? (useBackupCode ? KeyRound : Smartphone) : MailCheck}
         title={variant === '2fa' ? 'Two-factor authentication' : 'Enter the verification code'}
         subtitle={
           variant === '2fa'
             ? 'Enter the 6-digit code from your authenticator app.'
             : `We sent a ${OTP_LENGTH}-digit code to ${maskEmail(email)}. It expires in 5 minutes.`
         }
-      />
-
-      <Card>
-        <CardContent className="space-y-5 p-6 sm:p-8">
+      >
+        <div className="space-y-5">
           <FormAlert variant="error" message={error} />
 
           {variant === '2fa' && useBackupCode ? (
@@ -121,7 +119,8 @@ export function OtpForm({ email, flow, variant = 'otp' }: OtpFormProps) {
                 autoFocus
                 disabled={verifyOtp.isPending}
                 aria-invalid={!!error}
-                className="text-center font-mono tracking-wider"
+                aria-label="Backup code"
+                className="h-12 text-center font-mono tracking-wider"
               />
               <LoadingButton type="submit" className="w-full" disabled={!backupCode.trim()} loading={verifyOtp.isPending} loadingText="Verifying…">
                 <ShieldCheck aria-hidden />
@@ -162,27 +161,30 @@ export function OtpForm({ email, flow, variant = 'otp' }: OtpFormProps) {
           )}
 
           {variant === 'otp' ? (
-            <p className="text-center text-sm text-muted-foreground" aria-live="polite">
+            <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground">
               {countdown.isRunning ? (
-                <>Resend available in <span className="font-medium tabular-nums">{countdown.formatted}</span></>
+                <>
+                  <CountdownRing remaining={countdown.secondsLeft} total={OTP_RESEND_COOLDOWN_SECONDS} />
+                  <span>Resend available in <span className="font-medium tabular-nums text-foreground">{countdown.formatted}</span></span>
+                </>
               ) : (
                 <Button
                   type="button"
                   variant="link"
-                  className="h-auto p-0 text-sm"
+                  className="h-11 px-3 text-sm"
                   onClick={handleResend}
                   disabled={resendOtp.isPending}
                 >
                   {resendOtp.isPending ? 'Sending…' : "Didn't get the code? Resend"}
                 </Button>
               )}
-            </p>
+            </div>
           ) : (
             <p className="text-center text-xs text-muted-foreground">
               <Button
                 type="button"
                 variant="link"
-                className="h-auto p-0 text-xs"
+                className="h-11 px-3 text-xs"
                 onClick={() => {
                   setUseBackupCode((v) => !v);
                   setError(null);
@@ -194,11 +196,11 @@ export function OtpForm({ email, flow, variant = 'otp' }: OtpFormProps) {
               </Button>
             </p>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </AuthPanel>
 
       <p className="text-center text-sm">
-        <Button asChild variant="link" className="h-auto p-0 text-sm">
+        <Button asChild variant="link" className="h-11 px-3 text-sm">
           <Link href={AUTH_ROUTES.login}>Use a different account</Link>
         </Button>
       </p>

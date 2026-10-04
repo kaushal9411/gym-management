@@ -17,6 +17,20 @@ export interface Coupon {
   isActive: boolean;
   createdAt: string;
   _count?: { redemptions: number };
+  /** Added by the list/detail endpoints (insights). */
+  computed?: CouponComputed;
+}
+
+export type CouponStatus = 'active' | 'disabled' | 'expired' | 'exhausted' | 'scheduled';
+
+export interface CouponComputed {
+  status: CouponStatus;
+  /** CouponRedemption rows (can drift from `timesRedeemed`, which is what validate enforces). */
+  redemptions: number;
+  remaining: number | null;
+  usagePct: number | null;
+  discountGiven: string;
+  lastRedeemedAt: string | null;
 }
 
 export interface UpsertCouponInput {

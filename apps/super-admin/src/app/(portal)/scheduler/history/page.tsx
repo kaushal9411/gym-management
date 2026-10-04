@@ -2,101 +2,78 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Clock } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { DataTable, type DataTableColumn } from '@/components/data-table';
-import { Pagination } from '@/components/pagination';
 import { ADMIN_ROUTES } from '@/constants/routes';
-import { SchedulerSubNav } from '@/features/scheduler/components/scheduler-sub-nav';
-import { StatusBadge } from '@/features/scheduler/components/status-badge';
-import { useSchedulerJobHistory } from '@/features/scheduler/hooks/use-scheduler';
-import type { JobExecution, JobRunStatus } from '@/features/scheduler/types';
+import { EmptyNote, Panel } from '@/features/dashboard/components/ui';
+import { RunChip, STATUS_COLOR, SchedulerFrame, fmtDT, fmtMs } from '@/features/scheduler/components/kit';
+import { toSchedulerError, useSchedulerJobHistory } from '@/features/scheduler/hooks/use-scheduler';
+import type { JobRunStatus } from '@/features/scheduler/types';
+import { CountChips, ErrorNote, MixBar, PagerBar, Stat, StatRow, TableScroll, tdClass, thClass } from '@/features/tenants/components/detail/tabs/_shared/kit';
 
-const STATUSES: JobRunStatus[] = ['PENDING', 'SCHEDULED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED', 'PAUSED'];
+const STATUSES: JobRunStatus[] = ['COMPLETED', 'FAILED', 'RUNNING', 'PENDING', 'SCHEDULED', 'CANCELLED', 'PAUSED'];
 
 export default function SchedulerHistoryPage() {
   const [jobName, setJobName] = React.useState('');
   const [status, setStatus] = React.useState<JobRunStatus | ''>('');
   const [page, setPage] = React.useState(1);
+  const { data, isLoading, isError, error, refetch } = useSchedulerJobHistory({ jobName: jobName || undefined, status: status || undefined, page, limit: 20 });
 
-  const { data, isLoading } = useSchedulerJobHistory({ jobName: jobName || undefined, status: status || undefined, page, limit: 20 });
-
-  const columns: DataTableColumn<JobExecution>[] = [
-    {
-      key: 'job',
-      header: 'Job',
-      render: (e) => (
-        <Link href={`${ADMIN_ROUTES.scheduler}/jobs/${e.jobName}`} className="font-medium text-primary hover:underline">
-          {e.jobName}
-        </Link>
-      ),
-    },
-    { key: 'status', header: 'Status', render: (e) => <StatusBadge status={e.status} /> },
-    { key: 'trigger', header: 'Trigger', render: (e) => <span className="capitalize">{e.trigger.toLowerCase()}</span> },
-    { key: 'attempt', header: 'Attempt', render: (e) => e.attempt },
-    { key: 'started', header: 'Started', render: (e) => new Date(e.startedAt).toLocaleString() },
-    { key: 'finished', header: 'Finished', render: (e) => (e.finishedAt ? new Date(e.finishedAt).toLocaleString() : '—') },
-    { key: 'duration', header: 'Duration', render: (e) => (e.durationMs != null ? `${e.durationMs} ms` : '—') },
-  ];
+  const items = data?.items ?? [];
+  const timed = items.filter((e) => e.durationMs !== null);
+  const avg = timed.length ? timed.reduce((a, e) => a + (e.durationMs ?? 0), 0) / timed.length : null;
+  const slow = timed.reduce((a, e) => Math.max(a, e.durationMs ?? 0), 0);
+  const failed = items.filter((e) => e.status === 'FAILED').length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl"
-          style={{
-            backgroundColor: 'color-mix(in oklch, var(--chart-4) 16%, transparent)',
-            color: 'var(--chart-4)',
-            boxShadow: '0 0 0 1px color-mix(in oklch, var(--chart-4) 18%, transparent)',
-          }}
-        >
-          <Clock className="size-5" aria-hidden />
-        </div>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Job History</h1>
-          <p className="text-muted-foreground">Complete execution history across every job — scheduled, manual, and retry runs.</p>
-        </div>
-      </div>
-
-      <SchedulerSubNav />
-
+    <SchedulerFrame title="Job history" subtitle="Every execution across all jobs: scheduled, manual and retry runs, newest first.">
       <div className="flex flex-wrap items-center gap-3">
-        <Input
-          placeholder="Filter by job name…"
-          value={jobName}
-          onChange={(e) => {
-            setJobName(e.target.value);
-            setPage(1);
-          }}
-          className="max-w-xs"
-        />
-        <select
-          value={status}
-          onChange={(e) => {
-            setStatus(e.target.value as JobRunStatus | '');
-            setPage(1);
-          }}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm"
-        >
-          <option value="">All statuses</option>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+        <Input placeholder="Filter by job name…" aria-label="Filter by job name" value={jobName} onChange={(e) => { setJobName(e.target.value); setPage(1); }} className="h-9 max-w-xs rounded-[9px] bg-card" />
+        <CountChips label="Status" value={status} onChange={(v) => { setStatus(v); setPage(1); }} options={[{ value: '' as JobRunStatus | '', label: 'All' }, ...STATUSES.map((s) => ({ value: s as JobRunStatus | '', label: s.charAt(0) + s.slice(1).toLowerCase() }))]} />
       </div>
 
+      {isError ? <ErrorNote what="execution history" message={toSchedulerError(error).message} onRetry={() => void refetch()} /> : null}
       {isLoading || !data ? (
-        <Skeleton className="h-72 rounded-xl" />
+        <Skeleton className="h-72 rounded-[14px]" />
       ) : (
         <>
-          <DataTable columns={columns} rows={data.items} rowKey={(e) => e.id} emptyMessage="No execution history yet." />
-          <Pagination page={data.page} totalPages={data.totalPages} onPageChange={setPage} />
+          <StatRow>
+            <Stat index={0} label="Matching executions" value={String(data.total)} caption="all pages" />
+            <Stat index={1} label="Failed on this page" value={String(failed)} caption={`of ${items.length} shown`} tone={failed ? 'bad' : undefined} />
+            <Stat index={2} label="Avg duration" value={fmtMs(avg)} caption="this page" />
+            <Stat index={3} label="Slowest run" value={fmtMs(timed.length ? slow : null)} caption="this page" />
+          </StatRow>
+          <Panel title="Outcomes on this page" index={1}>
+            {items.length === 0 ? <EmptyNote>No execution history{jobName || status ? ' matches these filters' : ' yet'}.</EmptyNote> : (
+              <MixBar label="Outcomes" items={STATUSES.map((s) => ({ label: s.charAt(0) + s.slice(1).toLowerCase(), value: items.filter((e) => e.status === s).length, color: STATUS_COLOR[s] })).filter((x) => x.value > 0)} />
+            )}
+          </Panel>
+          {items.length > 0 ? (
+            <Panel title="Executions" index={2} hint={`page ${data.page} of ${data.totalPages}`}>
+              <TableScroll label="Execution history">
+                <table className="w-full min-w-[720px] border-collapse">
+                  <thead><tr>{['Job', 'Status', 'Trigger', 'Attempt', 'Started', 'Finished', 'Duration'].map((h) => <th key={h} className={thClass}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {items.map((e) => (
+                      <tr key={e.id}>
+                        <td className={tdClass}><Link href={`${ADMIN_ROUTES.scheduler}/jobs/${e.jobName}`} className="font-medium text-primary hover:underline">{e.jobName}</Link></td>
+                        <td className={tdClass}><RunChip status={e.status} /></td>
+                        <td className={`${tdClass} capitalize`}>{e.trigger.toLowerCase()}</td>
+                        <td className={`${tdClass} tabular-nums`}>{e.attempt}</td>
+                        <td className={`${tdClass} whitespace-nowrap`}>{fmtDT(e.startedAt)}</td>
+                        <td className={`${tdClass} whitespace-nowrap`}>{fmtDT(e.finishedAt)}</td>
+                        <td className={`${tdClass} tabular-nums`}>{fmtMs(e.durationMs)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </TableScroll>
+              <PagerBar page={data.page} totalPages={data.totalPages} total={data.total} onPage={setPage} />
+            </Panel>
+          ) : null}
         </>
       )}
-    </div>
+    </SchedulerFrame>
   );
 }

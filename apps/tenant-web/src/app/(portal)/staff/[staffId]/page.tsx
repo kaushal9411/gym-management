@@ -3,22 +3,26 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, KeyRound, Mail } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { AlertTriangle, Briefcase, GitBranch, KeyRound, Lock, Mail, MapPin, MoreHorizontal, ShieldCheck, StickyNote, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { AvatarUpload } from '@/features/iam/components/avatar-upload';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { UserStatusBadge } from '@/features/iam/components/status-badge';
+import { PanelCard } from '@/features/members/components/detail/detail-ui';
+import { useMotionSafe } from '@/features/reports/lib/motion';
+import { StaffDetailHero, StaffDetailKpis, roleLabel } from '@/features/staff/components/staff-detail-hero';
 import { UnsavedChangesBar } from '@/features/gym-settings/components/unsaved-changes-bar';
 import { EmploymentInfoFields, type EmploymentInfoValue } from '@/features/staff/components/employment-info-fields';
 import { StaffBranchesEditor } from '@/features/staff/components/staff-branches-editor';
-import { StaffRoleSelect } from '@/features/staff/components/staff-role-select';
+import { STAFF_ROLE_OPTIONS, StaffRoleSelect } from '@/features/staff/components/staff-role-select';
 import {
   toStaffError,
   useAssignStaffBranches,
@@ -88,6 +92,7 @@ export default function StaffDetailPage() {
   const params = useParams<{ staffId: string }>();
   const { hasPermission } = usePermissions();
   const staffId = params.staffId;
+  const m = useMotionSafe();
 
   const staffMember = useStaffDetail(staffId);
   const updateStaff = useUpdateStaff();
@@ -124,17 +129,35 @@ export default function StaffDetailPage() {
     }
   }, [staffMember.data, form, role, branchSelection]);
 
-  if (staffMember.isPending || !form) {
+  if (staffMember.isError) {
     return (
-      <div className="mx-auto max-w-3xl space-y-4">
-        <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-64 w-full" />
+      <div className="mx-auto max-w-2xl space-y-4 rounded-3xl border bg-card p-8 text-center shadow-xs">
+        <span className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-destructive/10 text-destructive">
+          <AlertTriangle className="size-6" aria-hidden />
+        </span>
+        <h1 className="text-xl font-bold">Staff member not found</h1>
+        <p className="text-sm text-muted-foreground">Couldn&apos;t load this staff member — they may not exist, or you may not have access. Try refreshing.</p>
+        <div className="flex justify-center gap-2">
+          <Button variant="outline" onClick={() => void staffMember.refetch()}>Retry</Button>
+          <Button asChild><Link href="/staff">Back to staff</Link></Button>
+        </div>
       </div>
     );
   }
 
-  if (staffMember.isError) {
-    return <p className="text-sm text-destructive">Couldn&apos;t load this staff member — try refreshing.</p>;
+  if (staffMember.isPending || !form) {
+    return (
+      <div className="space-y-5" aria-busy="true">
+        <Skeleton className="h-44 w-full rounded-3xl" />
+        <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+        </div>
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <Skeleton className="h-96 rounded-2xl" />
+          <Skeleton className="h-96 rounded-2xl" />
+        </div>
+      </div>
+    );
   }
 
   const data = staffMember.data;
@@ -232,242 +255,228 @@ export default function StaffDetailPage() {
     );
   };
 
-  return (
-    <div className="mx-auto max-w-3xl space-y-5">
-      <Button variant="ghost" size="sm" asChild>
-        <Link href="/staff">
-          <ArrowLeft className="size-4" /> Back to staff
-        </Link>
-      </Button>
+  const inactive = !!data.deletedAt || data.status === 'SUSPENDED' || data.status === 'DEACTIVATED';
+  const showLifecycle = !inactive && canActivate;
+  const showDelete = !data.deletedAt && canDelete;
+  const roleInfo = STAFF_ROLE_OPTIONS.find((o) => o.value === (role ?? data.role));
+  const fieldSelect =
+    'h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50';
+  const field = (id: keyof FormState, label: string, props: React.ComponentProps<typeof Input> = {}, required = false) => (
+    <div className="min-w-0 space-y-2">
+      <Label htmlFor={id} required={required}>{label}</Label>
+      <Input id={id} value={form[id] as string} disabled={!canUpdate} onChange={(e) => set(id, e.target.value as never)} {...props} />
+    </div>
+  );
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{data.name}</h1>
-          <p className="text-muted-foreground">
-            {data.role} · {data.employeeId || 'No employee ID'}
-          </p>
+  const actions = (
+    <>
+      {canInvite && data.status === 'PENDING_VERIFICATION' ? (
+        <Button size="sm" variant="outline" disabled={resendActivation.isPending} onClick={handleResendActivation}>
+          <Mail className="size-4" /> {resendActivation.isPending ? 'Resending…' : 'Resend activation'}
+        </Button>
+      ) : null}
+      {inactive && canRestore ? (
+        <Button variant="success" size="sm" onClick={() => setConfirmStatusAction(data.deletedAt ? 'restore' : 'activate')}>
+          {data.deletedAt ? 'Restore' : 'Activate'}
+        </Button>
+      ) : null}
+      {canUpdate || showLifecycle || showDelete ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline" aria-label="More actions">
+              <MoreHorizontal className="size-4" /> More
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-48">
+            {canUpdate ? (
+              <DropdownMenuItem onSelect={() => setConfirmResetPassword(true)}>
+                <KeyRound className="size-4" /> Reset password
+              </DropdownMenuItem>
+            ) : null}
+            {showLifecycle ? (
+              <>
+                <DropdownMenuItem onSelect={() => setConfirmStatusAction('suspend')}>Suspend</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setConfirmStatusAction('deactivate')}>Deactivate</DropdownMenuItem>
+              </>
+            ) : null}
+            {showDelete ? (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setConfirmStatusAction('delete')}>
+                  Delete
+                </DropdownMenuItem>
+              </>
+            ) : null}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
+    </>
+  );
+
+  return (
+    <div className="mx-auto w-full min-w-0 max-w-7xl space-y-5">
+      <StaffDetailHero data={data} avatarUrl={form.avatarUrl} actions={actions} />
+
+      {canUpdate ? (
+        // Sticks below the app header (the bar's own `top-0` would hide it behind the header).
+        <div className="sticky top-[4.5rem] z-20">
+          <UnsavedChangesBar isDirty={isDirty} saving={updateStaff.isPending} onSave={handleSave} onCancel={handleCancel} />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <UserStatusBadge status={data.status} deleted={!!data.deletedAt} />
-          {canInvite && data.status === 'PENDING_VERIFICATION' ? (
-            <Button variant="outline" size="sm" disabled={resendActivation.isPending} onClick={handleResendActivation}>
-              <Mail className="size-4" /> {resendActivation.isPending ? 'Resending…' : 'Resend activation'}
-            </Button>
-          ) : null}
-          {canUpdate ? (
-            <Button variant="outline" size="sm" onClick={() => setConfirmResetPassword(true)}>
-              <KeyRound className="size-4" /> Reset password
-            </Button>
-          ) : null}
-          {data.deletedAt || data.status === 'SUSPENDED' || data.status === 'DEACTIVATED' ? (
-            canRestore ? (
-              <Button variant="success" size="sm" onClick={() => setConfirmStatusAction(data.deletedAt ? 'restore' : 'activate')}>
-                {data.deletedAt ? 'Restore' : 'Activate'}
+      ) : null}
+
+      <StaffDetailKpis data={data} />
+
+      <div className="grid min-w-0 items-start gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-5">
+          <PanelCard icon={UserRound} accent="primary" title="Personal details" delay={0.1}>
+            <AvatarUpload name={data.name} value={form.avatarUrl} onChange={(v) => set('avatarUrl', v)} disabled={!canUpdate} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              {field('firstName', 'First name', {}, true)}
+              {field('lastName', 'Last name', {}, true)}
+              {field('email', 'Email', { type: 'email' }, true)}
+              {field('phone', 'Phone', { type: 'tel' })}
+              {field('employeeId', 'Employee ID')}
+              <div className="space-y-2">
+                <Label htmlFor="gender">Gender</Label>
+                <select id="gender" className={fieldSelect} value={form.gender} disabled={!canUpdate} onChange={(e) => set('gender', e.target.value)}>
+                  <option value="">Not specified</option>
+                  <option value="MALE">Male</option>
+                  <option value="FEMALE">Female</option>
+                  <option value="OTHER">Other</option>
+                  <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
+                </select>
+              </div>
+              {field('dateOfBirth', 'Date of birth', { type: 'date' })}
+            </div>
+          </PanelCard>
+
+          <PanelCard icon={MapPin} accent="aqua" title="Address & emergency contact" delay={0.16}>
+            {field('addressLine', 'Address')}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {field('city', 'City')}
+              {field('state', 'State')}
+              {field('country', 'Country')}
+              {field('postalCode', 'Postal code')}
+            </div>
+            <p className="border-t pt-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">Emergency contact</p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {field('emergencyContactName', 'Name')}
+              {field('emergencyContactPhone', 'Phone', { type: 'tel' })}
+              {field('emergencyContactRelation', 'Relation')}
+            </div>
+          </PanelCard>
+
+          <PanelCard icon={Briefcase} accent="violet" title="Employment" delay={0.22}>
+            <EmploymentInfoFields value={form.employment} onChange={(v) => set('employment', v)} disabled={!canUpdate} />
+          </PanelCard>
+
+          <PanelCard icon={StickyNote} accent="warning" title="Notes" delay={0.28}>
+            <textarea
+              id="notes"
+              aria-label="Notes"
+              className="flex min-h-24 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50"
+              value={form.notes}
+              disabled={!canUpdate}
+              onChange={(e) => set('notes', e.target.value)}
+            />
+          </PanelCard>
+        </div>
+
+        <div className="min-w-0 space-y-5">
+          <PanelCard icon={ShieldCheck} accent="primary" title="Role" delay={0.14}>
+            <div className="space-y-3">
+              <StaffRoleSelect id="role" value={role ?? data.role} onChange={setRole} disabled={!canAssignRole} />
+              {roleInfo ? <p className="rounded-xl bg-muted/60 p-3 text-sm text-muted-foreground"><b className="text-foreground">{roleInfo.label}</b> — {roleInfo.description}</p> : null}
+              {canAssignRole ? (
+                <Button size="sm" disabled={assignRole.isPending || role === data.role} onClick={handleSaveRole}>
+                  {assignRole.isPending ? 'Saving…' : 'Save role'}
+                </Button>
+              ) : null}
+            </div>
+          </PanelCard>
+
+          <PanelCard icon={GitBranch} accent="aqua" title="Assigned branches" delay={0.2}>
+            <StaffBranchesEditor
+              branchIds={branchSelection?.branchIds ?? []}
+              primaryBranchId={branchSelection?.primaryBranchId ?? null}
+              onChange={setBranchSelection}
+              disabled={!canAssignBranch}
+            />
+            {canAssignBranch ? (
+              <Button size="sm" disabled={assignBranches.isPending} onClick={handleSaveBranches}>
+                {assignBranches.isPending ? 'Saving…' : 'Save branch assignments'}
               </Button>
-            ) : null
-          ) : canActivate ? (
-            <>
-              <Button variant="warning" size="sm" onClick={() => setConfirmStatusAction('suspend')}>
-                Suspend
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setConfirmStatusAction('deactivate')}>
-                Deactivate
-              </Button>
-            </>
-          ) : null}
-          {!data.deletedAt && canDelete ? (
-            <Button variant="destructive" size="sm" onClick={() => setConfirmStatusAction('delete')}>
-              Delete
-            </Button>
+            ) : null}
+          </PanelCard>
+
+          <PanelCard icon={Lock} accent="success" title="Account & security" delay={0.26}>
+            <dl className="space-y-2.5 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground">Account status</dt>
+                <dd><UserStatusBadge status={data.status} deleted={!!data.deletedAt} /></dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground">Activation</dt>
+                <dd className="font-medium">{data.status === 'PENDING_VERIFICATION' ? 'Awaiting activation' : 'Activated'}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground">Last sign-in</dt>
+                <dd className="text-right font-medium">{data.lastLoginAt ? new Date(data.lastLoginAt).toLocaleString() : 'Never'}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground">Profile updated</dt>
+                <dd className="font-medium">{new Date(data.updatedAt).toLocaleDateString()}</dd>
+              </div>
+            </dl>
+            {(canInvite && data.status === 'PENDING_VERIFICATION') || canUpdate ? (
+              <div className="flex flex-wrap gap-2 border-t pt-4">
+                {canInvite && data.status === 'PENDING_VERIFICATION' ? (
+                  <Button variant="outline" size="sm" disabled={resendActivation.isPending} onClick={handleResendActivation}>
+                    <Mail className="size-4" /> {resendActivation.isPending ? 'Resending…' : 'Resend activation'}
+                  </Button>
+                ) : null}
+                {canUpdate ? (
+                  <Button variant="outline" size="sm" onClick={() => setConfirmResetPassword(true)}>
+                    <KeyRound className="size-4" /> Reset password
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+          </PanelCard>
+
+          {showLifecycle || showDelete ? (
+            <motion.section
+              initial={m.reduce ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.32 }}
+              className="overflow-hidden rounded-2xl border border-destructive/25 bg-card shadow-xs"
+            >
+              <header className="flex items-center gap-3 border-b border-destructive/15 bg-destructive/5 px-5 py-3.5">
+                <span className="flex size-8 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+                  <AlertTriangle className="size-4" aria-hidden />
+                </span>
+                <h2 className="text-base font-semibold tracking-tight">Danger zone</h2>
+              </header>
+              <div className="space-y-3 p-5">
+                <p className="text-sm text-muted-foreground">
+                  {roleLabel(data.role)} access to FitCloud can be paused or removed. Every step asks for confirmation and deleted accounts can be restored.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {showLifecycle ? (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => setConfirmStatusAction('deactivate')}>Deactivate</Button>
+                      <Button variant="outline" size="sm" className="border-warning/50 text-warning" onClick={() => setConfirmStatusAction('suspend')}>Suspend</Button>
+                    </>
+                  ) : null}
+                  {showDelete ? (
+                    <Button variant="destructive" size="sm" onClick={() => setConfirmStatusAction('delete')}>Delete</Button>
+                  ) : null}
+                </div>
+              </div>
+            </motion.section>
           ) : null}
         </div>
       </div>
-
-      {canUpdate ? (
-        <UnsavedChangesBar isDirty={isDirty} saving={updateStaff.isPending} onSave={handleSave} onCancel={handleCancel} />
-      ) : null}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Profile photo</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <AvatarUpload name={data.name} value={form.avatarUrl} onChange={(v) => set('avatarUrl', v)} disabled={!canUpdate} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Basic information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="firstName" required>First name</Label>
-              <Input id="firstName" value={form.firstName} disabled={!canUpdate} onChange={(e) => set('firstName', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName" required>Last name</Label>
-              <Input id="lastName" value={form.lastName} disabled={!canUpdate} onChange={(e) => set('lastName', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email" required>Email</Label>
-              <Input id="email" type="email" value={form.email} disabled={!canUpdate} onChange={(e) => set('email', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" type="tel" value={form.phone} disabled={!canUpdate} onChange={(e) => set('phone', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="employeeId">Employee ID</Label>
-              <Input id="employeeId" value={form.employeeId} disabled={!canUpdate} onChange={(e) => set('employeeId', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="gender">Gender</Label>
-              <select
-                id="gender"
-                className="h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
-                value={form.gender}
-                disabled={!canUpdate}
-                onChange={(e) => set('gender', e.target.value)}
-              >
-                <option value="">Not specified</option>
-                <option value="MALE">Male</option>
-                <option value="FEMALE">Female</option>
-                <option value="OTHER">Other</option>
-                <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="dateOfBirth">Date of birth</Label>
-              <Input id="dateOfBirth" type="date" value={form.dateOfBirth} disabled={!canUpdate} onChange={(e) => set('dateOfBirth', e.target.value)} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Address</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="addressLine">Address</Label>
-            <Input id="addressLine" value={form.addressLine} disabled={!canUpdate} onChange={(e) => set('addressLine', e.target.value)} />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-4">
-            <div className="space-y-2">
-              <Label htmlFor="city">City</Label>
-              <Input id="city" value={form.city} disabled={!canUpdate} onChange={(e) => set('city', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="state">State</Label>
-              <Input id="state" value={form.state} disabled={!canUpdate} onChange={(e) => set('state', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="country">Country</Label>
-              <Input id="country" value={form.country} disabled={!canUpdate} onChange={(e) => set('country', e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="postalCode">Postal code</Label>
-              <Input id="postalCode" value={form.postalCode} disabled={!canUpdate} onChange={(e) => set('postalCode', e.target.value)} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Emergency contact</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="emergencyContactName">Name</Label>
-            <Input
-              id="emergencyContactName"
-              value={form.emergencyContactName}
-              disabled={!canUpdate}
-              onChange={(e) => set('emergencyContactName', e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="emergencyContactPhone">Phone</Label>
-            <Input
-              id="emergencyContactPhone"
-              type="tel"
-              value={form.emergencyContactPhone}
-              disabled={!canUpdate}
-              onChange={(e) => set('emergencyContactPhone', e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="emergencyContactRelation">Relation</Label>
-            <Input
-              id="emergencyContactRelation"
-              value={form.emergencyContactRelation}
-              disabled={!canUpdate}
-              onChange={(e) => set('emergencyContactRelation', e.target.value)}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Employment information</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <EmploymentInfoFields value={form.employment} onChange={(v) => set('employment', v)} disabled={!canUpdate} />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Notes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <textarea
-            id="notes"
-            className="flex min-h-20 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs disabled:cursor-not-allowed disabled:opacity-50"
-            value={form.notes}
-            disabled={!canUpdate}
-            onChange={(e) => set('notes', e.target.value)}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Assigned branches</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <StaffBranchesEditor
-            branchIds={branchSelection?.branchIds ?? []}
-            primaryBranchId={branchSelection?.primaryBranchId ?? null}
-            onChange={setBranchSelection}
-            disabled={!canAssignBranch}
-          />
-          {canAssignBranch ? (
-            <Button size="sm" disabled={assignBranches.isPending} onClick={handleSaveBranches}>
-              {assignBranches.isPending ? 'Saving…' : 'Save branch assignments'}
-            </Button>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Role</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-center gap-3">
-          <StaffRoleSelect id="role" value={role ?? data.role} onChange={setRole} disabled={!canAssignRole} />
-          {canAssignRole ? (
-            <Button size="sm" disabled={assignRole.isPending || role === data.role} onClick={handleSaveRole}>
-              {assignRole.isPending ? 'Saving…' : 'Save role'}
-            </Button>
-          ) : null}
-        </CardContent>
-      </Card>
 
       <ConfirmDialog
         open={confirmStatusAction !== null}

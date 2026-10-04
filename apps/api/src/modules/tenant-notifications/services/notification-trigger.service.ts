@@ -1,10 +1,10 @@
 import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
+import { loadEmailBranding } from '../../../infrastructure/mail/branding';
 import type { EmailBranding } from '../../../infrastructure/mail/templates/base-layout';
 import { memberPaymentReceiptEmail } from '../../../infrastructure/mail/templates/member-templates';
 import { tenantNotificationEmail } from '../../../infrastructure/mail/templates/notification-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
-import { tenantService } from '../../tenants/service/tenant.service';
 import { renderTemplate } from '../constants/default-templates';
 
 import { notificationTemplateService } from './notification-template.service';
@@ -60,10 +60,7 @@ async function fireTemplated(
     await tenantNotificationService.notifyTenant(tenantId, opts.category, title, body);
   }
   if (template.channels.includes('EMAIL') && opts.recipientEmail) {
-    const tenant = await tenantService.resolveById(tenantId);
-    const branding = tenant
-      ? { tenantName: tenant.name, primaryColor: tenant.branding.primaryColor, logoUrl: tenant.branding.emailLogoUrl ?? tenant.branding.logoUrl }
-      : { tenantName: 'FitCloud' };
+    const branding = await loadEmailBranding(tenantId);
     const mail = opts.richEmail ? opts.richEmail(branding) : tenantNotificationEmail(branding, title, body);
     await enqueueEmail({ to: opts.recipientEmail, subject: mail.subject, html: mail.html });
   }
