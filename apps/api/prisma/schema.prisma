@@ -52,6 +52,11 @@ enum OtpPurpose {
   LOGIN_MFA
   EMAIL_VERIFICATION
   TWO_FACTOR
+  /// Primary-factor login via phone number instead of password — replaces
+  /// password verification only; `LOGIN_MFA`'s 2FA-after-password semantics
+  /// still apply afterward if the account has 2FA enabled (see
+  /// `AuthService#completeLoginAfterPrimaryFactor`).
+  MOBILE_LOGIN
 
   @@map("otp_purpose")
 }
@@ -251,6 +256,9 @@ model Tenant {
   scheduledReports      ScheduledReport[]
   tenantAnnouncements   TenantAnnouncement[]
   notificationTemplates NotificationTemplate[]
+  notificationChannelLimit TenantNotificationChannelLimit?
+  notificationUsage        TenantNotificationUsage[]
+  notificationDeliveryLogs NotificationDeliveryLog[]
   aiConversations       AiConversation[]
   aiMessages            AiMessage[]
   aiRequestLogs         AiRequestLog[]
@@ -260,6 +268,7 @@ model Tenant {
   staffDeviceTokens     StaffDeviceToken[]
   memberDeviceTokens    MemberDeviceToken[]
   memberVerifications   MemberVerification[]
+  memberOtpCodes        MemberOtpCode[]
   groupClasses          GroupClass[]
   groupClassSchedules   GroupClassSchedule[]
   classSessions         ClassSession[]
@@ -299,13 +308,18 @@ model TenantSettings {
   weekStartDay                 Int             @default(0) @map("week_start_day")
   measurementUnit              MeasurementUnit @default(METRIC) @map("measurement_unit")
   /// Notification Preferences (tenant-wide channel defaults — distinct from
-  /// each user's own notificationPreferences on the User model).
+  /// each user's own notificationPreferences on the User model). The
+  /// tenant's own on/off switch for each paid channel — the super-admin-set
+  /// ceiling above it lives on `TenantNotificationChannelLimit` instead
+  /// (both must allow a send for it to actually fire; see
+  /// `channel-gate.service.ts`).
   emailNotificationsEnabled    Boolean         @default(true) @map("email_notifications_enabled")
   pushNotificationsEnabled     Boolean         @default(true) @map("push_notifications_enabled")
-  /// SMS is configuration-only — no provider is wired up (matches the
-  /// no-op Pusher / sandboxed-gateway pattern elsewhere): this just
-  /// records intent + provider config for when a real SMS provider ships.
   smsNotificationsEnabled      Boolean         @default(false) @map("sms_notifications_enabled")
+  whatsappNotificationsEnabled Boolean         @default(false) @map("whatsapp_notifications_enabled")
+  /// Legacy placeholder from before real SMS sending shipped — superseded by
+  /// `PlatformNotificationCredential` (platform-wide, admin-managed). Kept
+  /// only so an old row doesn't fail to deserialize; no code reads it.
   smsProviderConfig            Json?           @map("sms_provider_config")
   /// Security policy (Prompt 42) — system role NAMES (e.g. `["OWNER","MANAGER"]`)
   /// that must have `User.mfaEnabled` before they can complete login. Checked
@@ -938,6 +952,7 @@ model Member {
   credential       MemberCredential?
   sessions         MemberSession[]
   verifications    MemberVerification[]
+  otpCodes         MemberOtpCode[]
   classBookings    ClassBooking[]
   guestVisits      GuestVisit[]
   ptSessionLogs    PtSessionLog[]
@@ -1044,6 +1059,39 @@ model MemberVerification {
 
   @@index([memberId])
   @@map("member_verifications")
+}
+
+enum MemberOtpPurpose {
+  /// Primary-factor login via phone number instead of password — the member
+  /// plane has no 2FA concept, so unlike the staff `OtpPurpose.MOBILE_LOGIN`
+  /// this is the entire login, not just a password replacement.
+  MOBILE_LOGIN
+
+  @@map("member_otp_purpose")
+}
+
+/// Mirrors the staff plane's `OtpCode` shape exactly (same
+/// attempts/maxAttempts/channel fields), just FK'd to `Member` instead of
+/// `User` — the member plane had no OTP concept before this, so it gets its
+/// own parallel table rather than `OtpCode` growing a nullable second FK.
+model MemberOtpCode {
+  id          String            @id @default(uuid()) @db.Uuid
+  tenantId    String            @map("tenant_id") @db.Uuid
+  memberId    String            @map("member_id") @db.Uuid
+  codeHash    String            @map("code_hash")
+  purpose     MemberOtpPurpose
+  channel     OtpChannel        @default(EMAIL)
+  attempts    Int               @default(0)
+  maxAttempts Int               @default(5) @map("max_attempts")
+  expiresAt   DateTime          @map("expires_at")
+  consumedAt  DateTime?         @map("consumed_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([memberId, purpose])
+  @@map("member_otp_codes")
 }
 
 /// One row per membership period — renewals/upgrades create a NEW row
@@ -3162,6 +3210,34 @@ model SystemSetting {
   @@map("system_settings")
 }
 
+/// Singleton — the real sender credentials a super-admin enters once for the
+/// whole platform (not tenant-scoped, no RLS, same plane as `SystemSetting`/
+/// `FeatureFlag`). Secrets are encrypted at rest exactly like
+/// `TenantAiSettings.apiKeyEncrypted` (AES-256-GCM via
+/// `core/security/encryption.util.ts`'s `encryptSecret`/`decryptSecret`) —
+/// `*Encrypted` fields are never returned as plaintext by the admin API,
+/// only a masked preview (`maskSecret`). Absence of this row (or of any one
+/// field on it) falls back to `apps/api/.env`'s `SMTP_*` vars for email —
+/// there is no env-var fallback for Twilio, since it never had one before
+/// this feature shipped.
+model PlatformNotificationCredential {
+  id                       String   @id @default(uuid())  @db.Uuid
+  smtpHost                 String?  @map("smtp_host")
+  smtpPort                 Int?     @map("smtp_port")
+  smtpUser                 String?  @map("smtp_user")
+  smtpPasswordEncrypted    String?  @map("smtp_password_encrypted")
+  smtpFromName             String?  @map("smtp_from_name")
+  smtpFromAddress          String?  @map("smtp_from_address")
+  twilioAccountSid         String?  @map("twilio_account_sid")
+  twilioAuthTokenEncrypted String?  @map("twilio_auth_token_encrypted")
+  twilioSmsFromNumber      String?  @map("twilio_sms_from_number")
+  twilioWhatsappFromNumber String?  @map("twilio_whatsapp_from_number")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+  updatedBy                String?  @map("updated_by") @db.Uuid
+
+  @@map("platform_notification_credentials")
+}
+
 /// Global module toggles (Attendance, Workout, Diet, Reports, Analytics,
 /// Chat, Inventory, POS, White Label, Custom Domain, + future-ready Video
 /// Training/AI Coach/Marketplace) — distinct from per-tenant `TenantModule`
@@ -3628,6 +3704,89 @@ model NotificationTemplate {
 
   @@unique([tenantId, type])
   @@map("notification_templates")
+}
+
+/// Super-admin-set ceiling per tenant for the 3 paid send channels —
+/// IN_APP/PUSH aren't here (free/platform-configured, never gated). One row
+/// per tenant, created lazily on the first super-admin edit; a missing row
+/// means every paid channel is off (safe default — a tenant that's never
+/// been explicitly granted SMS/WhatsApp/Email sending can't send any).
+/// Distinct from `TenantSettings.{channel}NotificationsEnabled`, which is
+/// the TENANT's own on/off switch sitting below this ceiling — both must
+/// allow a send (see `channel-gate.service.ts`).
+model TenantNotificationChannelLimit {
+  id                   String   @id @default(uuid()) @db.Uuid
+  tenantId             String   @unique @map("tenant_id") @db.Uuid
+  emailEnabled         Boolean  @default(true) @map("email_enabled")
+  /// Messages per calendar month; `null` = unlimited.
+  emailMonthlyLimit    Int?     @map("email_monthly_limit")
+  smsEnabled           Boolean  @default(false) @map("sms_enabled")
+  smsMonthlyLimit      Int?     @map("sms_monthly_limit")
+  whatsappEnabled      Boolean  @default(false) @map("whatsapp_enabled")
+  whatsappMonthlyLimit Int?     @map("whatsapp_monthly_limit")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_notification_channel_limits")
+}
+
+/// Monthly send counter — one row per tenant+channel+calendar-month,
+/// created lazily on that month's first send. A new month is simply a new
+/// row (no value to zero), so this "resets" every month with no cron job
+/// needed — deliberately not reusing `TenantUsage`, which is a live
+/// cumulative gauge (members/branches/storage) that's never meant to reset.
+model TenantNotificationUsage {
+  id        String                     @id @default(uuid()) @db.Uuid
+  tenantId  String                     @map("tenant_id") @db.Uuid
+  channel   TenantNotificationChannel
+  /// "2026-10" — the calendar month this row counts, in the server's own
+  /// UTC calendar (not each tenant's local timezone; a precise per-tenant
+  /// billing-cycle-aligned period was explicitly scoped out).
+  periodKey String                     @map("period_key") @db.VarChar(7)
+  sentCount Int                        @default(0) @map("sent_count")
+  updatedAt DateTime                   @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, channel, periodKey])
+  @@map("tenant_notification_usage")
+}
+
+enum NotificationDeliveryStatus {
+  SENT
+  FAILED
+  /// The super-admin ceiling or the tenant's own toggle was off.
+  SKIPPED_DISABLED
+  /// This month's `TenantNotificationChannelLimit` quota was already used up.
+  SKIPPED_QUOTA
+
+  @@map("notification_delivery_status")
+}
+
+/// Tenant-facing send log for the 3 paid channels only (never IN_APP/PUSH)
+/// — one row per actual attempt, written by the channel's own queue worker
+/// (or, for a skip, by `channel-gate.service.ts` itself) once the outcome
+/// is known for certain.
+model NotificationDeliveryLog {
+  id           String                     @id @default(uuid()) @db.Uuid
+  tenantId     String                     @map("tenant_id") @db.Uuid
+  channel      TenantNotificationChannel
+  /// Email address or E.164 phone — whichever the channel used.
+  recipient    String                     @db.VarChar(255)
+  /// Email only — SMS/WhatsApp have no separate subject line.
+  subject      String?                    @db.VarChar(200)
+  content      String
+  status       NotificationDeliveryStatus
+  /// Twilio message SID / nodemailer messageId — absent for a skip.
+  providerRef  String?                    @map("provider_ref")
+  errorMessage String?                    @map("error_message")
+  createdAt    DateTime                   @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, channel, createdAt])
+  @@map("notification_delivery_logs")
 }
 
 /// Android/iOS/web push-target platform for a registered device token — only

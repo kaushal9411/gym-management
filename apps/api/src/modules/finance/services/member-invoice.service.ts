@@ -3,12 +3,12 @@ import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrast
 import { loadEmailBranding } from '../../../infrastructure/mail/branding';
 import { formatMoney } from '../../../infrastructure/mail/templates/base-layout';
 import { memberInvoiceSummaryEmail } from '../../../infrastructure/mail/templates/member-templates';
-import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { assertBranchAccess, getBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
 import { decryptMemberContactNullable } from '../../members/utils/member-pii.util';
 import { TenantInvoiceSettingsRepository } from '../../settings/repositories/tenant-invoice-settings.repository';
+import { CHANNEL_GATE_DENIAL_MESSAGE, sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import { tenantService } from '../../tenants/service/tenant.service';
 import type { GenerateInvoiceInput, InvoiceAnalyticsDto, InvoiceAnalyticsQuery, InvoiceItemDto, InvoiceItemInput, ListInvoicesQuery, MemberInvoiceDetailDto, MemberInvoiceListItemDto } from '../dto/finance.dto';
 import { MemberInvoiceRepository, type MemberInvoiceDetailRow, type MemberInvoiceListRow } from '../repositories/member-invoice.repository';
@@ -260,7 +260,8 @@ export class MemberInvoiceService {
       invoice.items[0]?.description ?? null,
       { lineItems: invoice.items.map((item) => ({ description: item.description, quantity: item.quantity, amount: formatMoney(Number(item.amount), currencySymbol) })) },
     );
-    await enqueueEmail({ to, subject: mail.subject, html: mail.html });
+    const gate = await sendGatedEmail(this.tenantId, { to, subject: mail.subject, html: mail.html });
+    if (!gate.allowed) throw new ValidationError(CHANNEL_GATE_DENIAL_MESSAGE[gate.reason!]);
     await this.audit(actor, 'member_invoice.emailed', id);
   }
 

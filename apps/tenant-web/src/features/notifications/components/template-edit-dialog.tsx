@@ -14,11 +14,12 @@ import type { NotificationChannel, NotificationTemplate } from '../types';
 const CHANNEL_OPTIONS: Array<{ value: NotificationChannel; label: string; disabled?: boolean }> = [
   { value: 'IN_APP', label: 'In-App' },
   { value: 'EMAIL', label: 'Email' },
-  { value: 'PUSH', label: 'Push (Future)', disabled: true },
-  { value: 'SMS', label: 'SMS (Future)', disabled: true },
+  { value: 'PUSH', label: 'Push' },
+  { value: 'SMS', label: 'SMS' },
+  { value: 'WHATSAPP', label: 'WhatsApp' },
 ];
 
-/** Edit dialog: same fields, validation (none) and PUSH/SMS 'Future' disabled behaviour as before, in the gradient-header family of RefundDialog. */
+/** Edit dialog: same fields and validation (none), in the gradient-header family of RefundDialog. */
 export function TemplateEditDialog({ template, onClose }: { template: NotificationTemplate | null; onClose: () => void }) {
   const updateTemplate = useUpdateNotificationTemplate();
   const [channels, setChannels] = React.useState<NotificationChannel[]>([]);

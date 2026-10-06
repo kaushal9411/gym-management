@@ -8,6 +8,22 @@ export interface EmailJobData {
   html: string;
   fromName?: string;
   fromAddress?: string;
+  /**
+   * The tenant this send belongs to — its presence is what tells
+   * `email.worker.ts` to write a `NotificationDeliveryLog` row (tenant-facing
+   * Message Log). Set by every tenant-scoped call site EXCEPT the two
+   * account-security families that must never be blocked by a tenant's own
+   * email quota or show up as "just another notification": login OTP
+   * (`auth.otp_issued`, member `OtpIssued`, `onboarding.otp_issued`) and
+   * password reset/changed (`PasswordResetRequested`, `PasswordChanged`,
+   * admin's `reset-owner-password`). Left undefined for the public contact
+   * form and the pre-tenant onboarding OTP, which have no tenant to attach
+   * to. Logging here is independent of quota enforcement — only
+   * `notification-trigger.service.ts`'s `fireTemplated` EMAIL branch goes
+   * through `channel-gate.service.ts` first; every other call site below
+   * just gets recorded as `SENT`/`FAILED`, never `SKIPPED_*`.
+   */
+  notificationTenantId?: string;
 }
 
 /**

@@ -38,6 +38,54 @@ class MemberAuthRepository {
     }
   }
 
+  // ── Phone-number login (OTP, delivered by email for now) ───────────────
+
+  Future<void> requestPhoneOtp({required String phone}) async {
+    try {
+      await _dio.post<void>(
+        '/member/auth/phone-login/request-otp',
+        data: {'phone': phone},
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<MemberAuthSuccess> verifyPhoneOtp({
+    required String phone,
+    required String code,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/member/auth/phone-login/verify-otp',
+        data: {'phone': phone, 'code': code},
+      );
+      final result = MemberAuthSuccess.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+      await _storage.saveSession(
+        actorType: ActorType.member,
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      );
+      await _storage.saveMemberProfile(result.member.toJson());
+      return result;
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<void> resendPhoneOtp({required String phone}) async {
+    try {
+      await _dio.post<void>(
+        '/member/auth/phone-login/resend-otp',
+        data: {'phone': phone},
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   /// Cold-start restore — see [SecureStorage.saveMemberProfile] for why this
   /// reads a cache instead of calling an endpoint.
   Future<MemberProfile?> restoreCachedProfile() async {

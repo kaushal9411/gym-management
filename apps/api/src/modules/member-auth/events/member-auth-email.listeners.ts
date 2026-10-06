@@ -2,8 +2,9 @@ import { env } from '../../../config/env';
 import { eventBus } from '../../../core/events/event-bus';
 import { logger } from '../../../core/logging/logger';
 import { loadEmailBranding } from '../../../infrastructure/mail/branding';
-import { memberPortalInviteEmail, passwordResetEmail } from '../../../infrastructure/mail/templates/auth-templates';
+import { memberPortalInviteEmail, otpCodeEmail, passwordResetEmail } from '../../../infrastructure/mail/templates/auth-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
+import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import { tenantService } from '../../tenants/service/tenant.service';
 import { MemberAuthEvents } from '../services/member-auth.service';
 
@@ -22,7 +23,7 @@ export function registerMemberAuthEmailListeners(): void {
     const branding = await loadEmailBranding(payload.tenantId);
     const acceptUrl = portalUrl(tenant.slug, `/portal/activate/${payload.token}`);
     const template = memberPortalInviteEmail(branding, payload.name, acceptUrl);
-    await enqueueEmail({ to: payload.email, subject: template.subject, html: template.html });
+    await sendGatedEmail(payload.tenantId, { to: payload.email, subject: template.subject, html: template.html });
   });
 
   eventBus.onEvent<{ tenantId: string; email: string; name: string; token: string }>(MemberAuthEvents.PasswordResetRequested, async (payload) => {
@@ -36,4 +37,13 @@ export function registerMemberAuthEmailListeners(): void {
     const template = passwordResetEmail(branding, payload.name, resetUrl);
     await enqueueEmail({ to: payload.email, subject: template.subject, html: template.html });
   });
+
+  eventBus.onEvent<{ tenantId: string; memberId: string; name: string; email: string; code: string; expiresInMinutes: number }>(
+    MemberAuthEvents.OtpIssued,
+    async (payload) => {
+      const branding = await loadEmailBranding(payload.tenantId);
+      const template = otpCodeEmail(branding, payload.name, payload.code, payload.expiresInMinutes);
+      await enqueueEmail({ to: payload.email, subject: template.subject, html: template.html });
+    },
+  );
 }

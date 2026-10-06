@@ -7,11 +7,12 @@ import { eventBus } from '../../../core/events/event-bus';
 import { authLogger, securityLogger } from '../../../core/logging/logger';
 import { memberJwtService } from '../../../core/security/member-jwt.service';
 import { assertPasswordPolicy, passwordService } from '../../../core/security/password.service';
-import { generateOpaqueToken, hashToken } from '../../../core/security/token.util';
+import { generateNumericOtp, generateOpaqueToken, hashToken } from '../../../core/security/token.util';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
-import { decryptMemberContactNullable } from '../../members/utils/member-pii.util';
+import { decryptMemberContactNullable, hashPhone } from '../../members/utils/member-pii.util';
 import { MemberCredentialRepository } from '../repositories/member-credential.repository';
+import { MemberOtpRepository } from '../repositories/member-otp.repository';
 import { MemberSessionRepository } from '../repositories/member-session.repository';
 import { MemberVerificationRepository } from '../repositories/member-verification.repository';
 import type { DeviceInfo, MemberAuthSuccess, MemberProfileDto } from '../types/member-auth.types';
@@ -23,6 +24,7 @@ const PASSWORD_RESET_TTL_MINUTES = 30;
 export const MemberAuthEvents = {
   ActivationRequested: 'member_auth.activation_requested',
   PasswordResetRequested: 'member_auth.password_reset_requested',
+  OtpIssued: 'member_auth.otp_issued',
 } as const;
 
 /**
@@ -38,6 +40,7 @@ export class MemberAuthService {
   private readonly credentials: MemberCredentialRepository;
   private readonly sessions: MemberSessionRepository;
   private readonly verifications: MemberVerificationRepository;
+  private readonly otps: MemberOtpRepository;
   private readonly auditLog: AuditLogRepository;
 
   constructor(private readonly tenantId: string) {
@@ -45,6 +48,7 @@ export class MemberAuthService {
     this.credentials = new MemberCredentialRepository(this.db);
     this.sessions = new MemberSessionRepository(this.db);
     this.verifications = new MemberVerificationRepository(this.db);
+    this.otps = new MemberOtpRepository(this.db);
     this.auditLog = new AuditLogRepository(this.db);
   }
 
@@ -95,6 +99,72 @@ export class MemberAuthService {
       userAgent: device.userAgent,
     });
     authLogger.info('Member portal login succeeded', { memberId: member.id });
+
+    return { member: this.toProfileDto(member), ...tokens };
+  }
+
+  // ── Phone-number login (OTP, delivered by email for now) ───────────────
+
+  /** Never reveals whether the phone matches an account — same silent-success contract as `forgotPassword`. */
+  async requestPhoneLoginOtp(phone: string): Promise<void> {
+    const member = await this.findMemberByPhone(phone);
+    if (!member || !member.email) return; // nothing to deliver the code to yet
+    const credential = await this.credentials.findByMemberId(this.tenantId, member.id);
+    if (!credential || credential.status !== 'ACTIVE') return;
+    if (credential.lockedUntil && credential.lockedUntil.getTime() > Date.now()) return;
+
+    await this.issueOtp(member.id, member.email, `${member.firstName} ${member.lastName}`.trim());
+  }
+
+  async resendPhoneLoginOtp(phone: string): Promise<void> {
+    const member = await this.findMemberByPhone(phone);
+    if (!member || !member.email) return;
+
+    const lastIssuedAt = await this.otps.getLatestOtpIssuedAt(this.tenantId, member.id, 'MOBILE_LOGIN');
+    if (lastIssuedAt && Date.now() - lastIssuedAt.getTime() < env.security.otpResendCooldownSeconds * 1000) {
+      throw new AppError(ErrorCode.RATE_LIMITED, 'Please wait before requesting another code.', 429);
+    }
+
+    await this.issueOtp(member.id, member.email, `${member.firstName} ${member.lastName}`.trim());
+  }
+
+  /** Same shape as `login()`'s tail — the member plane has no 2FA cascade to honor, so a valid OTP goes straight to a session. */
+  async verifyPhoneLoginOtp(phone: string, code: string, device: DeviceInfo): Promise<MemberAuthSuccess> {
+    const member = await this.findMemberByPhone(phone);
+    if (!member) throw new AppError(ErrorCode.OTP_INVALID, 'Incorrect code. Check and try again.', 401);
+
+    const result = await this.otps.verifyOtp(this.tenantId, member.id, 'MOBILE_LOGIN', hashToken(code));
+    if (result === 'expired') throw new AppError(ErrorCode.OTP_EXPIRED, 'This code has expired. Request a new one.', 401);
+    if (result === 'max_attempts') {
+      throw new AppError(ErrorCode.OTP_INVALID, 'Too many incorrect attempts. Request a new code.', 401);
+    }
+    if (result === 'invalid') throw new AppError(ErrorCode.OTP_INVALID, 'Incorrect code. Check and try again.', 401);
+
+    const credential = await this.credentials.findByMemberId(this.tenantId, member.id);
+    if (!credential) throw new AppError(ErrorCode.NOT_FOUND, 'Portal access is not set up for this member.', 404);
+    if (credential.lockedUntil && credential.lockedUntil.getTime() > Date.now()) {
+      throw new AppError(ErrorCode.ACCOUNT_LOCKED, 'Too many failed attempts. This account is temporarily locked.', 423);
+    }
+    if (credential.status !== 'ACTIVE') {
+      throw new AppError(ErrorCode.ACCOUNT_SUSPENDED, 'Portal access is not active for this account.', 403);
+    }
+
+    await this.credentials.resetFailedLogins(credential.id);
+    await this.credentials.touchLastLogin(credential.id);
+
+    const tokens = await this.issueTokens(member.id, device);
+
+    await this.auditLog.record({
+      tenantId: this.tenantId,
+      actorUserId: null,
+      actorRole: 'MEMBER',
+      action: 'member_auth.login_succeeded',
+      entityType: 'member',
+      entityId: member.id,
+      ipAddress: device.ipAddress,
+      userAgent: device.userAgent,
+    });
+    authLogger.info('Member portal phone login succeeded', { memberId: member.id });
 
     return { member: this.toProfileDto(member), ...tokens };
   }
@@ -363,6 +433,28 @@ export class MemberAuthService {
   }
 
   // ── internals ───────────────────────────────────────────────────────────
+
+  private async findMemberByPhone(phone: string) {
+    return decryptMemberContactNullable(
+      await this.db.member.findFirst({
+        where: { tenantId: this.tenantId, phoneHash: hashPhone(phone), deletedAt: null },
+      }),
+    );
+  }
+
+  private async issueOtp(memberId: string, email: string, name: string): Promise<void> {
+    const code = generateNumericOtp(env.security.otpLength);
+    const expiresAt = new Date(Date.now() + env.security.otpTtlSeconds * 1000);
+    await this.otps.createOtp(this.tenantId, memberId, hashToken(code), 'MOBILE_LOGIN', expiresAt);
+    eventBus.emitEvent(MemberAuthEvents.OtpIssued, {
+      tenantId: this.tenantId,
+      memberId,
+      name,
+      email,
+      code,
+      expiresInMinutes: Math.round(env.security.otpTtlSeconds / 60),
+    });
+  }
 
   private async issueTokens(memberId: string, device: DeviceInfo) {
     const refreshPlain = generateOpaqueToken(REFRESH_TOKEN_BYTES);

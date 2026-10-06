@@ -5,8 +5,14 @@ import type { EmailBranding } from '../../../infrastructure/mail/templates/base-
 import { memberPaymentReceiptEmail } from '../../../infrastructure/mail/templates/member-templates';
 import { tenantNotificationEmail } from '../../../infrastructure/mail/templates/notification-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
+import { enqueueSms } from '../../../infrastructure/queue/sms.queue';
+import { enqueueWhatsApp } from '../../../infrastructure/queue/whatsapp.queue';
+import { toE164 } from '../../../infrastructure/sms/phone.util';
+import { decryptMemberField } from '../../members/utils/member-pii.util';
 import { renderTemplate } from '../constants/default-templates';
+import { recordNotificationDelivery } from '../repositories/notification-delivery-log.repository';
 
+import { checkAndConsumeChannelQuota, type GatedChannel } from './channel-gate.service';
 import { notificationTemplateService } from './notification-template.service';
 import { tenantNotificationService } from './tenant-notification.service';
 
@@ -60,13 +66,66 @@ async function fireTemplated(
     await tenantNotificationService.notifyTenant(tenantId, opts.category, title, body);
   }
   if (template.channels.includes('EMAIL') && opts.recipientEmail) {
-    const branding = await loadEmailBranding(tenantId);
-    const mail = opts.richEmail ? opts.richEmail(branding) : tenantNotificationEmail(branding, title, body);
-    await enqueueEmail({ to: opts.recipientEmail, subject: mail.subject, html: mail.html });
+    const gate = await checkAndConsumeChannelQuota(tenantId, 'EMAIL');
+    if (gate.allowed) {
+      const branding = await loadEmailBranding(tenantId);
+      const mail = opts.richEmail ? opts.richEmail(branding) : tenantNotificationEmail(branding, title, body);
+      await enqueueEmail({ to: opts.recipientEmail, subject: mail.subject, html: mail.html, notificationTenantId: tenantId });
+    } else {
+      await recordSkipped(tenantId, 'EMAIL', opts.recipientEmail, title, body, gate.reason!);
+    }
   }
   if (template.channels.includes('PUSH') && opts.recipientMemberId) {
     await tenantNotificationService.notifyMember(tenantId, opts.recipientMemberId, opts.category, title, body);
   }
+  if (template.channels.includes('SMS') && opts.recipientMemberId) {
+    const phone = await resolveMemberPhone(tenantId, opts.recipientMemberId);
+    if (phone) {
+      const gate = await checkAndConsumeChannelQuota(tenantId, 'SMS');
+      if (gate.allowed) {
+        await enqueueSms({ tenantId, to: toE164(phone), body: `${title}\n${body}` });
+      } else {
+        await recordSkipped(tenantId, 'SMS', toE164(phone), null, `${title}\n${body}`, gate.reason!);
+      }
+    }
+  }
+  if (template.channels.includes('WHATSAPP') && opts.recipientMemberId) {
+    const phone = await resolveMemberPhone(tenantId, opts.recipientMemberId);
+    if (phone) {
+      const gate = await checkAndConsumeChannelQuota(tenantId, 'WHATSAPP');
+      if (gate.allowed) {
+        await enqueueWhatsApp({ tenantId, to: toE164(phone), body: `${title}\n${body}` });
+      } else {
+        await recordSkipped(tenantId, 'WHATSAPP', toE164(phone), null, `${title}\n${body}`, gate.reason!);
+      }
+    }
+  }
+}
+
+/** SMS/WhatsApp share the same member-lookup — this file's own existing convention is a raw cross-tenant `prisma` query with a manual `tenantId` filter (see `notifyNewMemberRegistration`'s `prisma.tenant.findUnique` a few lines down), not `getTenantScopedClient`. */
+async function resolveMemberPhone(tenantId: string, memberId: string): Promise<string | null> {
+  const member = await prisma.member.findFirst({ where: { tenantId, id: memberId }, select: { phone: true } });
+  return member?.phone ? decryptMemberField(member.phone) : null;
+}
+
+/** Writes the delivery-log row directly — a skip never reaches a queue/worker, so this is the only place its outcome is ever recorded. */
+async function recordSkipped(
+  tenantId: string,
+  channel: GatedChannel,
+  recipient: string,
+  subject: string | null,
+  content: string,
+  reason: 'disabled_platform' | 'disabled_tenant' | 'quota_exceeded',
+): Promise<void> {
+  await recordNotificationDelivery({
+    tenantId,
+    channel,
+    recipient,
+    subject,
+    content,
+    status: reason === 'quota_exceeded' ? 'SKIPPED_QUOTA' : 'SKIPPED_DISABLED',
+    errorMessage: reason,
+  });
 }
 
 export async function notifyNewMemberRegistration(

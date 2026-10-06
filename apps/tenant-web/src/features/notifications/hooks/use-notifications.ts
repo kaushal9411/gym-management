@@ -6,7 +6,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useAppDispatch } from '@/store/hooks';
 import { notificationService } from '../services/notification.service';
 import { unreadCountSet } from '../store/notification-slice';
-import type { CreateNotificationInput, NotificationListParams, NotificationStatsParams, NotificationTemplateType, UpdateNotificationTemplateInput } from '../types';
+import type { CreateNotificationInput, MessageLogListParams, NotificationListParams, NotificationStatsParams, NotificationTemplateType, UpdateNotificationTemplateInput } from '../types';
 
 export function useNotifications(params: NotificationListParams = {}) {
   const dispatch = useAppDispatch();
@@ -100,5 +100,13 @@ export function useUpdateNotificationTemplate() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['notifications', 'templates'] });
     },
+  });
+}
+
+export function useMessageLog(params: MessageLogListParams = {}) {
+  return useQuery({
+    queryKey: ['notifications', 'message-log', params],
+    queryFn: () => notificationService.listMessageLog(params),
+    placeholderData: keepPreviousData,
   });
 }

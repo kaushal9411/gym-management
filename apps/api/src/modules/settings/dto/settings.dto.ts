@@ -134,6 +134,7 @@ export interface NotificationSettingsDto {
   emailNotificationsEnabled: boolean;
   pushNotificationsEnabled: boolean;
   smsNotificationsEnabled: boolean;
+  whatsappNotificationsEnabled: boolean;
   smsProviderConfig: Record<string, unknown> | null;
 }
 
@@ -141,6 +142,7 @@ export interface UpdateNotificationSettingsInput {
   emailNotificationsEnabled?: boolean;
   pushNotificationsEnabled?: boolean;
   smsNotificationsEnabled?: boolean;
+  whatsappNotificationsEnabled?: boolean;
   smsProviderConfig?: Record<string, unknown> | null;
 }
 

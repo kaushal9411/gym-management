@@ -5,8 +5,8 @@ import { prisma } from '../../../infrastructure/database/prisma';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { subscriptionAlertEmail } from '../../../infrastructure/mail/templates/auth-templates';
 import { gracePeriodReminderEmail, subscriptionExpiredEmail } from '../../../infrastructure/mail/templates/billing-templates';
-import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { SubscriptionService } from '../../subscription/services/subscription.service';
+import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import { tenantNotificationService } from '../../tenant-notifications/services/tenant-notification.service';
 import type { JobHandler } from '../types';
 
@@ -56,7 +56,7 @@ async function remindTrialsEndingSoon(): Promise<void> {
 
     const template = subscriptionAlertEmail({ tenantName: tenant.name }, owner.name, 'trial_ending', { billingUrl: billingUrlFor(tenant.slug), date: isoDay(tenant.trialEndsAt) });
     // eslint-disable-next-line no-await-in-loop
-    await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
+    await sendGatedEmail(tenant.id, { to: owner.email, subject: template.subject, html: template.html });
     // eslint-disable-next-line no-await-in-loop
     await tenantNotificationService.notifyTenant(tenant.id, 'SUBSCRIPTION', template.subject, template.subject);
     // eslint-disable-next-line no-await-in-loop
@@ -80,7 +80,7 @@ async function remindRenewalsDueSoon(): Promise<void> {
 
     const template = subscriptionAlertEmail({ tenantName: subscription.tenant.name }, owner.name, 'renewal_reminder', { billingUrl: billingUrlFor(subscription.tenant.slug), date: isoDay(subscription.currentPeriodEnd) });
     // eslint-disable-next-line no-await-in-loop
-    await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
+    await sendGatedEmail(subscription.tenantId, { to: owner.email, subject: template.subject, html: template.html });
     // eslint-disable-next-line no-await-in-loop
     await tenantNotificationService.notifyTenant(subscription.tenantId, 'SUBSCRIPTION', template.subject, template.subject);
     // eslint-disable-next-line no-await-in-loop
@@ -155,7 +155,7 @@ async function remindGracePeriod(): Promise<void> {
     const daysRemaining = Math.max(1, Math.ceil((subscription.graceEndsAt.getTime() - Date.now()) / DAY_MS));
     const template = gracePeriodReminderEmail({ tenantName: subscription.tenant.name }, owner.name, daysRemaining, { billingUrl: billingUrlFor(subscription.tenant.slug), graceEndsAt: isoDay(subscription.graceEndsAt) ?? undefined });
     // eslint-disable-next-line no-await-in-loop
-    await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
+    await sendGatedEmail(subscription.tenantId, { to: owner.email, subject: template.subject, html: template.html });
     // eslint-disable-next-line no-await-in-loop
     await tenantNotificationService.notifyTenant(subscription.tenantId, 'SUBSCRIPTION', template.subject, template.subject);
     // eslint-disable-next-line no-await-in-loop
@@ -191,7 +191,7 @@ async function expireSuspended(): Promise<void> {
     if (!owner) continue;
     const template = subscriptionExpiredEmail({ tenantName: subscription.tenant.name }, owner.name, { billingUrl: billingUrlFor(subscription.tenant.slug) });
     // eslint-disable-next-line no-await-in-loop
-    await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
+    await sendGatedEmail(subscription.tenantId, { to: owner.email, subject: template.subject, html: template.html });
     // eslint-disable-next-line no-await-in-loop
     await tenantNotificationService.notifyTenant(subscription.tenantId, 'SUBSCRIPTION', template.subject, template.subject);
   }

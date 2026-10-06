@@ -88,10 +88,11 @@ export default function BusinessSettingsPage() {
     }
   };
 
-  const channels: { id: 'emailNotificationsEnabled' | 'pushNotificationsEnabled' | 'smsNotificationsEnabled'; label: string; note?: string }[] = [
+  const channels: { id: 'emailNotificationsEnabled' | 'pushNotificationsEnabled' | 'smsNotificationsEnabled' | 'whatsappNotificationsEnabled'; label: string }[] = [
     { id: 'emailNotificationsEnabled', label: 'Email notifications' },
     { id: 'pushNotificationsEnabled', label: 'Push notifications' },
-    { id: 'smsNotificationsEnabled', label: 'SMS notifications', note: 'configuration only' },
+    { id: 'smsNotificationsEnabled', label: 'SMS notifications' },
+    { id: 'whatsappNotificationsEnabled', label: 'WhatsApp notifications' },
   ];
 
   return (
@@ -180,8 +181,8 @@ export default function BusinessSettingsPage() {
                 </div>
               </SectionCard>
 
-              <SectionCard tone="staff" icon={Bell} title="Notification preferences" subtitle="Tenant-wide channel defaults. SMS is configuration-only — no provider is connected yet.">
-                <div className="grid gap-3 sm:grid-cols-3">
+              <SectionCard tone="staff" icon={Bell} title="Notification preferences" subtitle="Tenant-wide channel defaults — each is still capped by the plan's platform-set quota.">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {channels.map((c) => {
                     const on = notificationForm[c.id];
                     return (
@@ -189,7 +190,6 @@ export default function BusinessSettingsPage() {
                         <Checkbox id={c.id} checked={on} disabled={!canManage} onCheckedChange={(checked) => setNotificationForm({ ...notificationForm, [c.id]: checked === true })} />
                         <Label htmlFor={c.id} className="flex-1 cursor-pointer font-semibold">
                           {c.label}
-                          {c.note ? <span className="block text-xs font-normal text-muted-foreground">({c.note})</span> : null}
                         </Label>
                         <StatusChip tone={on ? 'good' : 'muted'}>{on ? 'On' : 'Off'}</StatusChip>
                       </div>

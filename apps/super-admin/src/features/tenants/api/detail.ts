@@ -75,6 +75,9 @@ export interface LimitRow { key: string; label: string; planValue: number | null
 export interface ModuleRow { key: string; label: string; planDefault: boolean; enabled: boolean; overridden: boolean; platformEnabled: boolean; guarded: boolean }
 export interface AdminNote { id: string; body: string; authorId: string; authorName: string; createdAt: string; canDelete: boolean }
 
+export type NotificationChannel = 'EMAIL' | 'SMS' | 'WHATSAPP';
+export interface NotificationChannelRow { channel: NotificationChannel; enabled: boolean; monthlyLimit: number | null; usedThisMonth: number }
+
 /* ───────────── keys ───────────── */
 
 const base = (id: string) => ['admin', 'tenants', id] as const;
@@ -116,6 +119,13 @@ export function useTenantNotes(tenantId: string) {
 export function useTenantTags(tenantId: string) {
   return useQuery({ queryKey: [...base(tenantId), 'tags'], queryFn: () => get<{ tags: string[] }>(`/admin/tenants/${tenantId}/tags`), enabled: !!tenantId });
 }
+export function useTenantNotificationChannels(tenantId: string) {
+  return useQuery({
+    queryKey: [...base(tenantId), 'notification-channels'],
+    queryFn: () => get<NotificationChannelRow[]>(`/admin/tenants/${tenantId}/notification-channels`),
+    enabled: !!tenantId,
+  });
+}
 
 /* ───────────── mutations (call with mutateAsync from click handlers) ───────────── */
 
@@ -144,6 +154,17 @@ export function useDeleteNote(tenantId: string) {
 export function useSaveTags(tenantId: string) {
   const inv = useInvalidateDetail(tenantId);
   return useMutation({ mutationFn: (tags: string[]) => send<{ tags: string[] }>('put', `/admin/tenants/${tenantId}/tags`, { tags }), onSuccess: () => inv(['tags', 'overview']) });
+}
+export function useSaveNotificationChannel(tenantId: string) {
+  const inv = useInvalidateDetail(tenantId);
+  return useMutation({
+    mutationFn: (v: { channel: NotificationChannel; enabled: boolean; monthlyLimit: number | null }) =>
+      send<NotificationChannelRow>('put', `/admin/tenants/${tenantId}/notification-channels/${v.channel}`, {
+        enabled: v.enabled,
+        monthlyLimit: v.monthlyLimit,
+      }),
+    onSuccess: () => inv(['notification-channels', 'overview']),
+  });
 }
 
 /** Invalidate everything a tenant action (status/maintenance/plan…) can change — used by the control panel after actions that go through the legacy hooks. */

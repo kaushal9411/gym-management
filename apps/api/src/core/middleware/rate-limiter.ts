@@ -91,3 +91,23 @@ export function passwordResetRateLimiter() {
     keyGenerator: (req) => `${req.tenant?.id ?? 'platform'}:${String(req.body?.email ?? req.ip).toLowerCase()}`,
   });
 }
+
+/** Phone-keyed sibling of `otpRateLimiter` — backs phone-login's request/resend-otp endpoints (staff plane). */
+export function phoneOtpRateLimiter() {
+  return createRateLimiter({
+    windowMs: 60_000,
+    max: 3,
+    prefix: 'phone-otp',
+    keyGenerator: (req) => `${req.tenant?.id ?? 'platform'}:${String(req.body?.phone ?? req.ip)}`,
+  });
+}
+
+/** Phone-keyed sibling of `loginRateLimiter` — backs phone-login's verify-otp endpoint (staff plane). */
+export function phoneLoginRateLimiter() {
+  return createRateLimiter({
+    windowMs: 15 * 60_000,
+    max: 10,
+    prefix: 'phone-login',
+    keyGenerator: (req) => `${req.tenant?.id ?? 'platform'}:${String(req.body?.phone ?? req.ip)}`,
+  });
+}

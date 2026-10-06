@@ -70,6 +70,49 @@ class AuthRepository {
     }
   }
 
+  // ── Phone-number login (OTP, delivered by email for now) ───────────────
+
+  Future<void> requestPhoneOtp({required String phone}) async {
+    try {
+      await _dio.post<void>(
+        '/auth/phone-login/request-otp',
+        data: {'phone': phone},
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<StaffLoginResult> verifyPhoneOtp({
+    required String phone,
+    required String code,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/auth/phone-login/verify-otp',
+        data: {'phone': phone, 'code': code},
+      );
+      final result = StaffLoginResult.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+      if (result is StaffLoginSuccess) await _persist(result);
+      return result;
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<void> resendPhoneOtp({required String phone}) async {
+    try {
+      await _dio.post<void>(
+        '/auth/phone-login/resend-otp',
+        data: {'phone': phone},
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   Future<MfaSetupChallenge> mfaSetupBegin({required String setupToken}) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(

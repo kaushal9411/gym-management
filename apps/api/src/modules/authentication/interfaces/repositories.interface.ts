@@ -11,6 +11,8 @@ export interface CreateUserInput {
 
 export interface IUserRepository {
   findByEmail(tenantId: string, email: string): Promise<User | null>;
+  /** Plain exact-match — `User.phone` isn't encrypted/hashed (unlike `Member.phone`). Backs phone-number login. */
+  findByPhone(tenantId: string, phone: string): Promise<User | null>;
   findById(tenantId: string, userId: string): Promise<User | null>;
   create(input: CreateUserInput): Promise<User>;
   updatePasswordHash(tenantId: string, userId: string, passwordHash: string): Promise<void>;

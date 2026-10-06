@@ -1,12 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { Bell, Settings2 } from 'lucide-react';
+import { Bell, ScrollText, Settings2 } from 'lucide-react';
 
 import { ReportsHero, type ReportsHeroStat } from '@/features/reports/components/ui';
 import { COMM_ACCENT } from '../constants';
 
-/** Hero shared by /notifications and /notifications/settings: route tabs Inbox / Settings (Settings only offered to `notifications:manage`). */
+/** Hero shared by /notifications, /notifications/settings and /notifications/log: route tabs Inbox / Settings / Message log (Settings and Message log only offered to `notifications:manage`/`notifications:view` respectively). */
 export function NotificationsHero({
   active,
   title,
@@ -18,8 +18,9 @@ export function NotificationsHero({
   backHref,
   backLabel,
   showSettingsTab = true,
+  showLogTab = true,
 }: {
-  active: 'inbox' | 'settings';
+  active: 'inbox' | 'settings' | 'log';
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   eyebrow?: string;
@@ -29,6 +30,7 @@ export function NotificationsHero({
   backHref?: string;
   backLabel?: string;
   showSettingsTab?: boolean;
+  showLogTab?: boolean;
 }) {
   return (
     <ReportsHero
@@ -45,6 +47,7 @@ export function NotificationsHero({
       activeTab={active}
       tabs={[
         { value: 'inbox', label: 'Inbox', icon: Bell, href: '/notifications' },
+        ...(showLogTab ? [{ value: 'log', label: 'Message log', icon: ScrollText, href: '/notifications/log' }] : []),
         ...(showSettingsTab ? [{ value: 'settings', label: 'Settings', icon: Settings2, href: '/notifications/settings' }] : []),
       ]}
     />

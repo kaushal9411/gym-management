@@ -47,6 +47,9 @@ function buildFakes() {
     async findByEmail(_tenantId, email) {
       return (Array.from(users.values()).find((u) => u.email === email) as never) ?? null;
     },
+    async findByPhone(_tenantId, phone) {
+      return (Array.from(users.values()).find((u) => u.phone === phone) as never) ?? null;
+    },
     async findById(_tenantId, userId) {
       return (users.get(userId) as never) ?? null;
     },

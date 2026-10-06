@@ -11,6 +11,7 @@ import {
 } from '../../../infrastructure/mail/templates/auth-templates';
 import type { EmailBranding } from '../../../infrastructure/mail/templates/base-layout';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
+import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import { tenantService } from '../../tenants/service/tenant.service';
 
 /** Public tenant-web URL a given tenant's links should point at. */
@@ -47,7 +48,7 @@ export function registerAuthEmailListeners(): void {
     const template = payload.isResend
       ? verifyEmailEmail(branding, payload.name, verifyUrl)
       : welcomeEmail(branding, payload.name, verifyUrl);
-    await enqueueEmail({ to: payload.email, subject: template.subject, html: template.html });
+    await sendGatedEmail(payload.tenantId, { to: payload.email, subject: template.subject, html: template.html });
   });
 
   eventBus.onEvent<{ tenantId: string; userId: string; name: string; email: string; resetToken: string }>(

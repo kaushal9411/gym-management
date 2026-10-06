@@ -1,6 +1,8 @@
 import { apiClient } from '@/features/auth/services/api-client';
 import type {
   CreateNotificationInput,
+  MessageLogListParams,
+  MessageLogListResult,
   NotificationListParams,
   NotificationListResult,
   NotificationStats,
@@ -62,6 +64,11 @@ class NotificationService {
 
   async updateTemplate(type: NotificationTemplateType, input: UpdateNotificationTemplateInput): Promise<NotificationTemplate> {
     const res = await apiClient.patch<ApiEnvelope<NotificationTemplate>>(`/notifications/templates/${type}`, input);
+    return res.data.data;
+  }
+
+  async listMessageLog(params: MessageLogListParams = {}): Promise<MessageLogListResult> {
+    const res = await apiClient.get<ApiEnvelope<MessageLogListResult>>('/notifications/message-log', { params });
     return res.data.data;
   }
 }

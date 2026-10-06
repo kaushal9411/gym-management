@@ -20,6 +20,23 @@ export class MemberAuthController {
     sendSuccess(res, result, 'Login successful');
   }
 
+  // ── Phone-number login (OTP, delivered by email for now) ───────────────
+
+  async requestPhoneLoginOtp(req: TypedBodyRequest<{ phone: string }>, res: Response): Promise<void> {
+    await serviceFor(req).requestPhoneLoginOtp(req.body.phone);
+    sendSuccess(res, null, 'If a matching account exists, a code has been sent.');
+  }
+
+  async verifyPhoneLoginOtp(req: TypedBodyRequest<{ phone: string; code: string }>, res: Response): Promise<void> {
+    const result = await serviceFor(req).verifyPhoneLoginOtp(req.body.phone, req.body.code, deviceInfo(req));
+    sendSuccess(res, result, 'Login successful');
+  }
+
+  async resendPhoneLoginOtp(req: TypedBodyRequest<{ phone: string }>, res: Response): Promise<void> {
+    await serviceFor(req).resendPhoneLoginOtp(req.body.phone);
+    sendSuccess(res, null, 'If the account exists, a new code has been sent.');
+  }
+
   async refresh(req: TypedBodyRequest<{ refreshToken: string }>, res: Response): Promise<void> {
     const result = await serviceFor(req).refreshTokens(req.body.refreshToken, deviceInfo(req));
     sendSuccess(res, result);

@@ -58,6 +58,23 @@ export const moduleBodySchema = z.object({
   enabled: z.boolean({ message: 'enabled must be true or false' }),
 });
 
+export const notificationChannelParamSchema = z.object({
+  tenantId: z.string().uuid(),
+  channel: z.enum(['EMAIL', 'SMS', 'WHATSAPP'], {
+    message: 'channel must be one of EMAIL, SMS, WHATSAPP',
+  }),
+});
+
+export const notificationChannelBodySchema = z.object({
+  enabled: z.boolean({ message: 'enabled must be true or false' }),
+  monthlyLimit: z
+    .number({ message: 'monthlyLimit must be a whole number (or null for unlimited)' })
+    .int('monthlyLimit must be a whole number')
+    .min(0, 'monthlyLimit cannot be negative')
+    .max(LIMIT_MAX_VALUE, `monthlyLimit cannot exceed ${LIMIT_MAX_VALUE}`)
+    .nullable(),
+});
+
 export const NOTE_MAX_LENGTH = 2000;
 export const noteBodySchema = z.object({
   body: z

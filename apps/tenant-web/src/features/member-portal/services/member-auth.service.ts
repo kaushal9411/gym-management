@@ -18,6 +18,34 @@ export const memberAuthService = {
     }
   },
 
+  // ── Phone-number login (OTP, delivered by email for now) ───────────────
+
+  async requestPhoneOtp(phone: string): Promise<void> {
+    try {
+      await memberApiClient.post('/member/auth/phone-login/request-otp', { phone });
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async verifyPhoneOtp(phone: string, code: string): Promise<{ member: MemberProfile; tokens: MemberSessionTokens }> {
+    try {
+      const res = await memberApiClient.post<Envelope<{ member: MemberProfile } & MemberSessionTokens>>('/member/auth/phone-login/verify-otp', { phone, code });
+      const { member, ...tokens } = res.data.data;
+      return { member, tokens };
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async resendPhoneOtp(phone: string): Promise<void> {
+    try {
+      await memberApiClient.post('/member/auth/phone-login/resend-otp', { phone });
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
   async logout(refreshToken: string): Promise<void> {
     try {
       await memberApiClient.post('/member/auth/logout', { refreshToken });

@@ -15,6 +15,8 @@ import type {
   loginSchema,
   mfaSetupBeginSchema,
   mfaSetupConfirmSchema,
+  phoneLoginRequestSchema,
+  phoneLoginVerifySchema,
   refreshSchema,
   registerGymSchema,
   resendOtpSchema,
@@ -119,6 +121,36 @@ export class AuthController {
     const tenant = requireTenant(req);
     const authService = buildAuthModule(tenant.id);
     await authService.resendOtp(req.body.email, req.body.purpose);
+    sendSuccess(res, null, 'If the account exists, a new code has been sent.');
+  }
+
+  // ── Phone-number login (OTP, delivered by email for now) ───────────────
+
+  async requestPhoneLoginOtp(req: TypedBodyRequest<z.infer<typeof phoneLoginRequestSchema>>, res: Response): Promise<void> {
+    const tenant = requireTenant(req);
+    const authService = buildAuthModule(tenant.id);
+    await authService.requestPhoneLoginOtp(req.body.phone);
+    sendSuccess(res, null, 'If a matching account exists, a code has been sent.');
+  }
+
+  async verifyPhoneLoginOtp(req: TypedBodyRequest<z.infer<typeof phoneLoginVerifySchema>>, res: Response): Promise<void> {
+    const tenant = requireTenant(req);
+    const authService = buildAuthModule(tenant.id);
+    const result = await authService.verifyPhoneLoginOtp(req.body.phone, req.body.code, deviceInfo(req));
+
+    if ('challenge' in result) {
+      sendSuccess(res, result, 'Verification code required', 200);
+      return;
+    }
+
+    setRefreshCookie(res, result.refreshToken, new Date(Date.now() + env.jwt.refreshTtlDays * 86_400_000));
+    sendSuccess(res, result, 'Login successful');
+  }
+
+  async resendPhoneLoginOtp(req: TypedBodyRequest<z.infer<typeof phoneLoginRequestSchema>>, res: Response): Promise<void> {
+    const tenant = requireTenant(req);
+    const authService = buildAuthModule(tenant.id);
+    await authService.resendPhoneLoginOtp(req.body.phone);
     sendSuccess(res, null, 'If the account exists, a new code has been sent.');
   }
 

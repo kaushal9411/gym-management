@@ -12,6 +12,7 @@ import { publicCmsRouter } from '../../modules/admin-cms/routes/public-cms.route
 import { adminCouponRouter } from '../../modules/admin-coupons/routes/admin-coupon.routes';
 import { adminDashboardRouter } from '../../modules/admin-dashboard/routes/admin-dashboard.routes';
 import { adminFeatureFlagRouter } from '../../modules/admin-feature-flags/routes/admin-feature-flag.routes';
+import { adminNotificationSettingsRouter } from '../../modules/admin-notification-settings/routes/admin-notification-settings.routes';
 import { adminNotificationRouter } from '../../modules/admin-notifications/routes/admin-notification.routes';
 import { adminPaymentRouter } from '../../modules/admin-payments/routes/admin-payment.routes';
 import { adminPlanRouter } from '../../modules/admin-plans/routes/admin-plan.routes';
@@ -72,6 +73,7 @@ import { staffRouter } from '../../modules/staff/routes/staff.routes';
 import { subscriptionRouter } from '../../modules/subscription/routes/subscription.routes';
 import { ticketRouter } from '../../modules/support/routes/ticket.routes';
 import { tenantAnnouncementRouter } from '../../modules/tenant-announcements/routes/tenant-announcement.routes';
+import { messageLogRouter } from '../../modules/tenant-notifications/routes/message-log.routes';
 import { notificationTemplateRouter } from '../../modules/tenant-notifications/routes/notification-template.routes';
 import { tenantNotificationRouter } from '../../modules/tenant-notifications/routes/tenant-notification.routes';
 import { tenantService } from '../../modules/tenants/service/tenant.service';
@@ -97,6 +99,7 @@ v1Router.use('/admin/payments', adminPaymentRouter);
 v1Router.use('/admin/revenue', adminRevenueRouter);
 v1Router.use('/admin/support/tickets', adminTicketRouter);
 v1Router.use('/admin/feature-flags', adminFeatureFlagRouter);
+v1Router.use('/admin/notification-settings', adminNotificationSettingsRouter);
 v1Router.use('/admin/cms', adminCmsRouter);
 v1Router.use('/admin/notifications', adminNotificationRouter);
 v1Router.use('/admin/settings', adminSettingsRouter);
@@ -131,6 +134,7 @@ v1Router.use('/bookings', classBookingRouter);
 // pre-existing platform-plane consumption-only endpoint), see
 // BACKEND-GUIDE.md §Notifications & Communication for the naming rationale.
 v1Router.use('/notifications/templates', notificationTemplateRouter);
+v1Router.use('/notifications/message-log', messageLogRouter);
 v1Router.use('/notifications', tenantNotificationRouter);
 v1Router.use('/announcements', announcementRouter);
 v1Router.use('/tenant-announcements', tenantAnnouncementRouter);

@@ -9,6 +9,8 @@ import {
   memberForgotPasswordSchema,
   memberLoginSchema,
   memberLogoutSchema,
+  memberPhoneLoginRequestSchema,
+  memberPhoneLoginVerifySchema,
   memberRefreshSchema,
   memberResetPasswordSchema,
 } from '../validators/member-auth.validators';
@@ -35,8 +37,41 @@ const forgotPasswordRateLimiter = () =>
     prefix: 'member-pwreset',
     keyGenerator: (req) => `${req.tenant?.id ?? 'platform'}:${String(req.body?.memberId ?? req.ip).toLowerCase()}`,
   });
+const phoneOtpRateLimiter = () =>
+  createRateLimiter({
+    windowMs: 60_000,
+    max: 3,
+    prefix: 'member-phone-otp',
+    keyGenerator: (req) => `${req.tenant?.id ?? 'platform'}:${String(req.body?.phone ?? req.ip)}`,
+  });
+const phoneLoginRateLimiter = () =>
+  createRateLimiter({
+    windowMs: 15 * 60_000,
+    max: 10,
+    prefix: 'member-phone-login',
+    keyGenerator: (req) => `${req.tenant?.id ?? 'platform'}:${String(req.body?.phone ?? req.ip)}`,
+  });
 
 memberAuthRouter.post('/login', loginRateLimiter(), validate({ body: memberLoginSchema }), asyncHandler(memberAuthController.login.bind(memberAuthController)));
+
+memberAuthRouter.post(
+  '/phone-login/request-otp',
+  phoneOtpRateLimiter(),
+  validate({ body: memberPhoneLoginRequestSchema }),
+  asyncHandler(memberAuthController.requestPhoneLoginOtp.bind(memberAuthController)),
+);
+memberAuthRouter.post(
+  '/phone-login/verify-otp',
+  phoneLoginRateLimiter(),
+  validate({ body: memberPhoneLoginVerifySchema }),
+  asyncHandler(memberAuthController.verifyPhoneLoginOtp.bind(memberAuthController)),
+);
+memberAuthRouter.post(
+  '/phone-login/resend-otp',
+  phoneOtpRateLimiter(),
+  validate({ body: memberPhoneLoginRequestSchema }),
+  asyncHandler(memberAuthController.resendPhoneLoginOtp.bind(memberAuthController)),
+);
 memberAuthRouter.post('/refresh', validate({ body: memberRefreshSchema }), asyncHandler(memberAuthController.refresh.bind(memberAuthController)));
 memberAuthRouter.post('/logout', validate({ body: memberLogoutSchema }), asyncHandler(memberAuthController.logout.bind(memberAuthController)));
 

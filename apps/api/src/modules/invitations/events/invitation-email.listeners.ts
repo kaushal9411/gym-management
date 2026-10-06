@@ -2,8 +2,8 @@ import { env } from '../../../config/env';
 import { eventBus } from '../../../core/events/event-bus';
 import { logger } from '../../../core/logging/logger';
 import { loadEmailBranding } from '../../../infrastructure/mail/branding';
-import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { buildInvitationEmail } from '../../authentication/events/auth-email.listeners';
+import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import { tenantService } from '../../tenants/service/tenant.service';
 import { InvitationEvents } from '../services/invitation.service';
 
@@ -20,7 +20,7 @@ export function registerInvitationEmailListeners(): void {
       const branding = await loadEmailBranding(payload.tenantId);
       const acceptUrl = `http://${tenant.slug}.${env.platformDomain}/invitation/${payload.token}`;
       const template = buildInvitationEmail(branding, payload.inviterName, payload.roleLabel, acceptUrl);
-      await enqueueEmail({ to: payload.email, subject: template.subject, html: template.html });
+      await sendGatedEmail(payload.tenantId, { to: payload.email, subject: template.subject, html: template.html });
     },
   );
 }

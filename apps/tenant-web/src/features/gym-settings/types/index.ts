@@ -129,5 +129,6 @@ export interface NotificationSettings {
   emailNotificationsEnabled: boolean;
   pushNotificationsEnabled: boolean;
   smsNotificationsEnabled: boolean;
+  whatsappNotificationsEnabled: boolean;
   smsProviderConfig: Record<string, unknown> | null;
 }

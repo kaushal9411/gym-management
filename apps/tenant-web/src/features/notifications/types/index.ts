@@ -78,6 +78,36 @@ export interface UpdateNotificationTemplateInput {
   isActive: boolean;
 }
 
+export type MessageLogChannel = 'EMAIL' | 'SMS' | 'WHATSAPP';
+export type MessageLogStatus = 'SENT' | 'FAILED' | 'SKIPPED_DISABLED' | 'SKIPPED_QUOTA';
+
+export interface MessageLogItem {
+  id: string;
+  channel: MessageLogChannel;
+  recipient: string;
+  subject: string | null;
+  content: string;
+  status: MessageLogStatus;
+  providerRef: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
+export interface MessageLogListParams {
+  channel?: MessageLogChannel;
+  status?: MessageLogStatus;
+  page?: number;
+  limit?: number;
+}
+
+export interface MessageLogListResult {
+  items: MessageLogItem[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
 export interface NotificationStatsParams {
   dateFrom: string;
   dateTo: string;

@@ -60,6 +60,11 @@ export const unifiedLoginSchema = z.object({
   rememberMe: z.boolean(),
 });
 
+/** Role is picked separately (a small pill toggle, not part of this schema) — phone numbers don't self-disambiguate staff vs. member the way email/Member-ID do. */
+export const phoneLoginSchema = z.object({
+  phone: phoneSchema,
+});
+
 export const registerGymSchema = z
   .object({
     gymName: z.string().trim().min(2, 'Gym name is required').max(80),
@@ -128,6 +133,7 @@ export const acceptInvitationSchema = z
 // ── Inferred form types ─────────────────────────────────────────────────
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type UnifiedLoginFormValues = z.infer<typeof unifiedLoginSchema>;
+export type PhoneLoginFormValues = z.infer<typeof phoneLoginSchema>;
 export type RegisterGymFormValues = z.infer<typeof registerGymSchema>;
 export type UnifiedForgotPasswordFormValues = z.infer<typeof unifiedForgotPasswordSchema>;
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;

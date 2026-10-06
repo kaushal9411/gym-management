@@ -86,6 +86,36 @@ export function useResendOtp() {
   return useMutation({ mutationFn: authService.resendOtp.bind(authService) });
 }
 
+// ── Phone-number login ──────────────────────────────────────────────────
+
+export function useRequestPhoneOtp() {
+  return useMutation({ mutationFn: authService.requestPhoneOtp.bind(authService) });
+}
+
+/** Same success/challenge handling as `useLogin` — a 2FA-enabled account still challenges after a successful phone OTP. */
+export function useVerifyPhoneOtp() {
+  const dispatch = useAppDispatch();
+  return useMutation({
+    mutationFn: ({ phone, code }: { phone: string; code: string }) => authService.verifyPhoneOtp(phone, code),
+    onMutate: () => dispatch(authStarted()),
+    onSuccess: (result) => {
+      if (result.kind === 'success') {
+        dispatch(sessionEstablished({ user: result.user, permissions: result.permissions, tokens: result.tokens }));
+      } else if (result.kind === 'otp_required') {
+        dispatch(otpChallengeIssued({ email: result.email, flow: result.flow }));
+      }
+    },
+    onError: (error) => {
+      const { code, message } = toAuthError(error);
+      dispatch(authFailed({ code, message }));
+    },
+  });
+}
+
+export function useResendPhoneOtp() {
+  return useMutation({ mutationFn: authService.resendPhoneOtp.bind(authService) });
+}
+
 export function useInvitation(token: string) {
   return useQuery({
     queryKey: ['auth', 'invitation', token],

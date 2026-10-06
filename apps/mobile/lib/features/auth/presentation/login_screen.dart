@@ -21,6 +21,7 @@ import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/brand_mark.dart';
 import '../../../shared/widgets/role_toggle.dart';
 import 'forgot_password_screen.dart';
+import 'phone_login_screen.dart';
 import 'staff_mfa_setup_screen.dart';
 import 'staff_otp_screen.dart';
 
@@ -198,6 +199,11 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
 
+  void _loginWithPhone() => context.push(
+        AppRoutes.phoneLogin,
+        extra: PhoneLoginScreenArgs(role: _role, tenant: widget.args.tenant),
+      );
+
   @override
   Widget build(BuildContext context) {
     final role = _role;
@@ -281,6 +287,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       role: role,
                       loading: _loading,
                       onPressed: _submit,
+                    ),
+                    const SizedBox(height: 10),
+                    AppButton(
+                      label: 'Log in with phone number instead',
+                      role: role,
+                      variant: AppButtonVariant.ghost,
+                      onPressed: _loginWithPhone,
                     ),
                   ],
                 ),

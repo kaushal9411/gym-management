@@ -142,7 +142,6 @@ export default function NotificationSettingsPage() {
           {extra.length ? (
             <ChartCard title={<span className="inline-flex items-center gap-2"><Bell className="size-4" aria-hidden /> Other</span>}>{renderCards(extra, 'analytics')}</ChartCard>
           ) : null}
-          {/* Push, SMS and WhatsApp are not delivered yet: shown as 'soon' chips on each card, disabled (PUSH/SMS) in the edit dialog. */}
         </>
       )}
 

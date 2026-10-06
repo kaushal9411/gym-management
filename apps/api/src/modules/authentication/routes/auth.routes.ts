@@ -4,6 +4,8 @@ import {
   loginRateLimiter,
   otpRateLimiter,
   passwordResetRateLimiter,
+  phoneLoginRateLimiter,
+  phoneOtpRateLimiter,
   registrationRateLimiter,
 } from '../../../core/middleware/rate-limiter';
 import { validate } from '../../../core/middleware/validate.middleware';
@@ -16,6 +18,8 @@ import {
   logoutSchema,
   mfaSetupBeginSchema,
   mfaSetupConfirmSchema,
+  phoneLoginRequestSchema,
+  phoneLoginVerifySchema,
   refreshSchema,
   registerGymSchema,
   resendOtpSchema,
@@ -154,6 +158,78 @@ authRouter.post(
   otpRateLimiter(),
   validate({ body: resendOtpSchema }),
   asyncHandler(authController.resendOtp.bind(authController)),
+);
+
+/**
+ * @openapi
+ * /auth/phone-login/request-otp:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Request an OTP to log in by phone number instead of password
+ *     description: Always returns 200 — never reveals whether the phone matches an account. The code is emailed to the account's address for now (SMS is a future channel swap, see `OtpChannel`).
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [phone], properties: { phone: { type: string, example: "+1 555 0100" } } }
+ *     responses:
+ *       200: { description: "If a matching account exists, a code has been sent." }
+ *       429: { $ref: '#/components/responses/RateLimited' }
+ */
+authRouter.post(
+  '/phone-login/request-otp',
+  phoneOtpRateLimiter(),
+  validate({ body: phoneLoginRequestSchema }),
+  asyncHandler(authController.requestPhoneLoginOtp.bind(authController)),
+);
+
+/**
+ * @openapi
+ * /auth/phone-login/verify-otp:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Complete phone-number login with the emailed OTP
+ *     description: Replaces the password step only — returns the same AuthSuccess/OTP-challenge/MFA-setup-challenge shape as `/auth/login`, so an account with mandatory 2FA still gets challenged afterward.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [phone, code]
+ *             properties: { phone: { type: string }, code: { type: string, example: "123456" } }
+ *     responses:
+ *       200: { content: { application/json: { schema: { $ref: '#/components/schemas/AuthSuccess' } } } }
+ *       401: { description: "Code invalid or expired" }
+ *       429: { $ref: '#/components/responses/RateLimited' }
+ */
+authRouter.post(
+  '/phone-login/verify-otp',
+  phoneLoginRateLimiter(),
+  validate({ body: phoneLoginVerifySchema }),
+  asyncHandler(authController.verifyPhoneLoginOtp.bind(authController)),
+);
+
+/**
+ * @openapi
+ * /auth/phone-login/resend-otp:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Resend the phone-login OTP
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [phone], properties: { phone: { type: string } } }
+ *     responses:
+ *       200: { description: "If the account exists, a new code has been sent." }
+ *       429: { $ref: '#/components/responses/RateLimited' }
+ */
+authRouter.post(
+  '/phone-login/resend-otp',
+  phoneOtpRateLimiter(),
+  validate({ body: phoneLoginRequestSchema }),
+  asyncHandler(authController.resendPhoneLoginOtp.bind(authController)),
 );
 
 /**

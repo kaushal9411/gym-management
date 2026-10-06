@@ -5,8 +5,8 @@ import { ErrorCode } from '../../../core/errors/error-codes';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { PLATFORM_BRANDING } from '../../../infrastructure/mail/templates/base-layout';
 import { platformAnnouncementEmail } from '../../../infrastructure/mail/templates/notification-templates';
-import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
+import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import { tenantNotificationService } from '../../tenant-notifications/services/tenant-notification.service';
 
 async function tenantsForAudience(audience: AnnouncementAudience) {
@@ -32,7 +32,7 @@ export async function dispatchNotification(notification: { id: string; title: st
     const { html } = platformAnnouncementEmail(PLATFORM_BRANDING, notification.title, notification.body);
     for (const tenant of tenants) {
       const owner = tenant.users[0];
-      if (owner) await enqueueEmail({ to: owner.email, subject: notification.title, html });
+      if (owner) await sendGatedEmail(tenant.id, { to: owner.email, subject: notification.title, html });
     }
   }
   await tenantNotificationService.broadcast(tenants.map((t) => t.id), notification.title, notification.body, notification.id);

@@ -3,9 +3,9 @@ import { prisma } from '../../../infrastructure/database/prisma';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { formatMoney } from '../../../infrastructure/mail/templates/base-layout';
 import { paymentDueReminderEmail, paymentOverdueReminderEmail } from '../../../infrastructure/mail/templates/member-templates';
-import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { MemberInvoiceRepository } from '../../finance/repositories/member-invoice.repository';
 import { decryptMemberContact } from '../../members/utils/member-pii.util';
+import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import { notifyPaymentFailed } from '../../tenant-notifications/services/notification-trigger.service';
 import type { JobHandler } from '../types';
 
@@ -41,7 +41,7 @@ export const paymentReminder: JobHandler = async () => {
         invoice.dueDate.toISOString().slice(0, 10),
         invoice.items[0]?.description ?? null,
       );
-      await enqueueEmail({ to: invoice.member.email, subject: mail.subject, html: mail.html });
+      await sendGatedEmail(invoice.tenantId, { to: invoice.member.email, subject: mail.subject, html: mail.html });
     }
     // eslint-disable-next-line no-await-in-loop
     await cache.set(dedupeKey, true, DEDUPE_TTL_SECONDS);
@@ -161,7 +161,7 @@ export const outstandingPaymentReminder: JobHandler = async () => {
         invoice.dueDate.toISOString().slice(0, 10),
         invoice.items[0]?.description ?? null,
       );
-      await enqueueEmail({ to: invoice.member.email, subject: mail.subject, html: mail.html });
+      await sendGatedEmail(invoice.tenantId, { to: invoice.member.email, subject: mail.subject, html: mail.html });
     }
     // eslint-disable-next-line no-await-in-loop
     await cache.set(dedupeKey, true, 7 * 86_400);

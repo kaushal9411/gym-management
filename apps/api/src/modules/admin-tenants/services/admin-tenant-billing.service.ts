@@ -9,7 +9,6 @@ import { eventBus } from '../../../core/events/event-bus';
 import { presignGetUrl, uploadDataUrl } from '../../../core/storage/storage.service';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { invoiceEmail } from '../../../infrastructure/mail/templates/billing-templates';
-import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
 import { adminPaymentRepository } from '../../admin-payments/repositories/admin-payment.repository';
 import { adminPlanRepository } from '../../admin-plans/repositories/admin-plan.repository';
@@ -17,6 +16,7 @@ import { createPaymentLink, fetchPaymentLink, notifyPaymentLink } from '../../fi
 import { InvoiceService } from '../../invoice/services/invoice.service';
 import { addBillingPeriod } from '../../onboarding/utils/billing-period';
 import { SubscriptionRepository } from '../../subscription/repositories/subscription.repository';
+import { CHANNEL_GATE_DENIAL_MESSAGE, sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import { tenantService } from '../../tenants/service/tenant.service';
 import { adminTenantRepository } from '../repositories/admin-tenant.repository';
 import { applyOverridesToPlan, parseOverrides } from '../utils/tenant-limits.util';
@@ -314,7 +314,8 @@ export class AdminTenantBillingService {
     const totalFormatted = new Intl.NumberFormat('en-US', { style: 'currency', currency: invoice.currency }).format(Number(invoice.total));
     const downloadUrl = portalPath(tenant.slug, `/billing/invoices/${invoice.id}`);
     const template = invoiceEmail({ tenantName: tenant.name }, owner?.name ?? 'there', invoice.invoiceNumber, totalFormatted, downloadUrl);
-    await enqueueEmail({ to, subject: template.subject, html: template.html });
+    const gate = await sendGatedEmail(this.tenantId, { to, subject: template.subject, html: template.html });
+    if (!gate.allowed) throw new ValidationError(CHANNEL_GATE_DENIAL_MESSAGE[gate.reason!]);
 
     await adminAuditLogRepository.record({ adminUserId, actorRole: adminRole, action: 'admin.tenant_invoice_emailed', entityType: 'Tenant', entityId: this.tenantId });
   }

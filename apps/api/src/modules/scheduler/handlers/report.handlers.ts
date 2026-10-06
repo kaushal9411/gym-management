@@ -1,9 +1,9 @@
 import { prisma } from '../../../infrastructure/database/prisma';
 import { scheduledReportEmail } from '../../../infrastructure/mail/templates/notification-templates';
-import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { ScheduledReportRepository } from '../../reports/repositories/scheduled-report.repository';
 import { ReportExportService } from '../../reports/services/report-export.service';
 import { computeNextRunAt } from '../../reports/services/scheduled-report.service';
+import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import type { JobHandler } from '../types';
 
 const DAY_MS = 86_400_000;
@@ -52,7 +52,7 @@ async function runOne(schedule: Awaited<ReturnType<typeof ScheduledReportReposit
 
   for (const to of schedule.recipientEmails) {
     // eslint-disable-next-line no-await-in-loop -- a handful of recipients per schedule, sequential is simplest and matches this codebase's other reminder-email loops
-    await enqueueEmail({ to, subject, html });
+    await sendGatedEmail(schedule.tenantId, { to, subject, html });
   }
 
   await prisma.scheduledReport.update({

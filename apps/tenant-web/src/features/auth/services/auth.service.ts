@@ -32,6 +32,13 @@ export interface AuthService {
   resendVerificationEmail(email: string): Promise<void>;
   verifyOtp(payload: VerifyOtpPayload): Promise<EstablishedSession>;
   resendOtp(email: string): Promise<void>;
+
+  // ── Phone-number login (OTP, delivered by email for now) ───────────────
+  requestPhoneOtp(phone: string): Promise<void>;
+  /** Same discriminated-union shape as `login()` — a 2FA-enabled account still returns `otp_required`/`mfa_setup_required` here, keyed by its real email. */
+  verifyPhoneOtp(phone: string, code: string): Promise<LoginResult>;
+  resendPhoneOtp(phone: string): Promise<void>;
+
   getInvitation(token: string): Promise<Invitation>;
   acceptInvitation(payload: AcceptInvitationPayload): Promise<void>;
   /** Re-fetches the current profile from the token already attached by the axios client. */
@@ -221,6 +228,41 @@ class HttpAuthService implements AuthService {
   async resendOtp(email: string): Promise<void> {
     try {
       await apiClient.post('/auth/resend-otp', { email, purpose: 'login' });
+    } catch (error) {
+      throw toAuthServiceError(error);
+    }
+  }
+
+  // ── Phone-number login ──────────────────────────────────────────────
+
+  async requestPhoneOtp(phone: string): Promise<void> {
+    try {
+      await apiClient.post('/auth/phone-login/request-otp', { phone });
+    } catch (error) {
+      throw toAuthServiceError(error);
+    }
+  }
+
+  async verifyPhoneOtp(phone: string, code: string): Promise<LoginResult> {
+    try {
+      const res = await apiClient.post<ApiEnvelope<AuthSuccessDto | OtpChallengeDto | MfaSetupRequiredDto>>(
+        '/auth/phone-login/verify-otp',
+        { phone, code },
+      );
+      const data = res.data.data;
+      if ('challenge' in data) {
+        if (data.challenge === 'mfa_setup_required') return { kind: 'mfa_setup_required', email: data.email, setupToken: data.setupToken };
+        return { kind: 'otp_required', email: data.email, flow: data.purpose };
+      }
+      return { kind: 'success', ...toSession(data) };
+    } catch (error) {
+      throw toAuthServiceError(error);
+    }
+  }
+
+  async resendPhoneOtp(phone: string): Promise<void> {
+    try {
+      await apiClient.post('/auth/phone-login/resend-otp', { phone });
     } catch (error) {
       throw toAuthServiceError(error);
     }
@@ -419,6 +461,21 @@ class MockAuthService implements AuthService {
   }
 
   async resendOtp(): Promise<void> {
+    await delay(LATENCY_MS);
+  }
+
+  async requestPhoneOtp(): Promise<void> {
+    await delay(LATENCY_MS);
+  }
+
+  async verifyPhoneOtp(_phone: string, code: string): Promise<LoginResult> {
+    await delay(LATENCY_MS);
+    if (code === '000000') throw new AuthServiceError('OTP_EXPIRED', 'This code has expired. Request a new one.');
+    if (code !== MOCK_VALID_OTP) throw new AuthServiceError('OTP_INVALID', 'Incorrect code. Check and try again.');
+    return { kind: 'success', ...mockSession('owner@example.com') };
+  }
+
+  async resendPhoneOtp(): Promise<void> {
     await delay(LATENCY_MS);
   }
 

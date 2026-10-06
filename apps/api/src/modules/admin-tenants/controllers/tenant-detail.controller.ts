@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
+import type { GatedChannel } from '../../tenant-notifications/services/channel-gate.service';
 import { tenantControlsService } from '../services/tenant-controls.service';
 import { tenantDetailService } from '../services/tenant-detail.service';
 import { tenantNotesService } from '../services/tenant-notes.service';
@@ -45,6 +46,24 @@ export class TenantDetailController {
       res,
       await tenantControlsService.setModule(id(req), req.params.key!, body.enabled, admin(req)),
       'Module updated.',
+    );
+  }
+
+  async getNotificationChannels(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await tenantControlsService.getNotificationChannels(id(req)));
+  }
+
+  async putNotificationChannel(req: Request, res: Response): Promise<void> {
+    const body = req.body as { enabled: boolean; monthlyLimit: number | null };
+    sendSuccess(
+      res,
+      await tenantControlsService.putNotificationChannel(
+        id(req),
+        req.params.channel as GatedChannel,
+        body,
+        admin(req),
+      ),
+      'Notification channel updated.',
     );
   }
 

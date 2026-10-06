@@ -133,6 +133,15 @@ export class AuthService {
       throw new AppError(ErrorCode.INVALID_CREDENTIALS, 'Incorrect email or password', 401);
     }
 
+    await this.assertAccountEligibleForLogin(user, email, device);
+
+    return this.completeLoginAfterPrimaryFactor(user, device);
+  }
+
+  /** Shared by `login()` (post-password) and the phone-OTP flow (post-OTP) — the same account-status gate applies regardless of which primary factor was just proven. */
+  private async assertAccountEligibleForLogin(user: { id: string; status: string; lockedUntil: Date | null }, email: string, device: DeviceInfo): Promise<void> {
+    const tenantId = this.deps.tenantId;
+
     if (user.status === 'LOCKED' && user.lockedUntil && user.lockedUntil.getTime() > Date.now()) {
       await this.recordLoginFailure(tenantId, user.id, email, 'ACCOUNT_LOCKED', device);
       throw new AppError(
@@ -151,6 +160,19 @@ export class AuthService {
       await this.recordLoginFailure(tenantId, user.id, email, 'EMAIL_NOT_VERIFIED', device);
       throw new AppError(ErrorCode.EMAIL_NOT_VERIFIED, 'Please verify your email address first.', 403);
     }
+  }
+
+  /**
+   * Everything that happens once the primary factor (password, or a phone
+   * OTP) has already been proven — clears lockout state, then cascades
+   * through the same 2FA checks either entry point must honor: a real
+   * `mfaEnabled` account still gets the `otp_required`(2fa) challenge, an
+   * account whose role mandates 2FA but hasn't set it up yet still gets
+   * `mfa_setup_required`. Only once both are clear does a real session issue.
+   */
+  private async completeLoginAfterPrimaryFactor(user: { id: string; email: string; mfaEnabled: boolean }, device: DeviceInfo): Promise<LoginResultDto> {
+    const tenantId = this.deps.tenantId;
+    const email = user.email;
 
     // Success — clear any lockout state accumulated from prior attempts.
     await this.deps.userRepository.resetFailedLogins(tenantId, user.id);
@@ -159,13 +181,13 @@ export class AuthService {
       // TOTP codes are computed live in the authenticator app, never emailed — nothing to issue here.
       await this.recordLoginFailure(tenantId, user.id, email, undefined, device, true);
       authLogger.info('Login requires 2FA', { tenantId, userId: user.id });
-      return { challenge: 'otp_required', email: user.email, purpose: '2fa', expiresInSeconds: 600 };
+      return { challenge: 'otp_required', email, purpose: '2fa', expiresInSeconds: 600 };
     }
 
-    // Password correct, 2FA not yet set up — if the account's role requires
-    // it (TenantSettings.mfaRequiredRoles), block issuing a real session
-    // until setup completes, via a short-lived grace token that proves the
-    // password check already passed without granting actual access.
+    // Primary factor correct, 2FA not yet set up — if the account's role
+    // requires it (TenantSettings.mfaRequiredRoles), block issuing a real
+    // session until setup completes, via a short-lived grace token that
+    // proves the primary factor already passed without granting actual access.
     const roleNames = await this.deps.roleRepository.getRoleNamesForUser(tenantId, user.id);
     const requiredRoles = await this.deps.mfaRepository.getMfaRequiredRoles(tenantId);
     if (requiredRoles.some((r) => roleNames.includes(r))) {
@@ -174,7 +196,7 @@ export class AuthService {
       await this.deps.mfaRepository.createSetupToken(tenantId, user.id, hashToken(setupToken), expiresAt);
       await this.recordLoginFailure(tenantId, user.id, email, undefined, device, true);
       authLogger.info('Login blocked pending mandatory 2FA setup', { tenantId, userId: user.id });
-      return { challenge: 'mfa_setup_required', email: user.email, setupToken, expiresInSeconds: MFA_SETUP_TOKEN_TTL_MINUTES * 60 };
+      return { challenge: 'mfa_setup_required', email, setupToken, expiresInSeconds: MFA_SETUP_TOKEN_TTL_MINUTES * 60 };
     }
 
     const tokens = await this.issueSessionTokens(user.id, device);
@@ -185,6 +207,48 @@ export class AuthService {
     authLogger.info('Login succeeded', { tenantId, userId: user.id });
 
     return { user: await this.toProfileDto(user.id), ...this.toAuthSuccessShape(tokens) };
+  }
+
+  // ── Phone-number login (OTP, delivered by email for now) ───────────────
+
+  /** Never reveals whether the phone matches an account — same "always silently succeeds" contract as `forgotPassword`. */
+  async requestPhoneLoginOtp(phone: string): Promise<void> {
+    const user = await this.deps.userRepository.findByPhone(this.deps.tenantId, phone);
+    if (!user) return;
+    if (user.status === 'SUSPENDED' || user.status === 'PENDING_VERIFICATION') return;
+    if (user.status === 'LOCKED' && user.lockedUntil && user.lockedUntil.getTime() > Date.now()) return;
+
+    await this.issueOtp(user.id, 'MOBILE_LOGIN');
+  }
+
+  async resendPhoneLoginOtp(phone: string): Promise<void> {
+    const user = await this.deps.userRepository.findByPhone(this.deps.tenantId, phone);
+    if (!user) return; // never reveal account existence
+
+    const lastIssuedAt = await this.deps.verificationRepository.getLatestOtpIssuedAt(this.deps.tenantId, user.id, 'MOBILE_LOGIN');
+    if (lastIssuedAt && Date.now() - lastIssuedAt.getTime() < env.security.otpResendCooldownSeconds * 1000) {
+      throw new AppError(ErrorCode.RATE_LIMITED, 'Please wait before requesting another code.', 429);
+    }
+
+    await this.issueOtp(user.id, 'MOBILE_LOGIN');
+  }
+
+  /** Mirrors `login()` shape-for-shape past the primary-factor check — same account-status gate, same 2FA cascade, same `LoginResultDto`. */
+  async verifyPhoneLoginOtp(phone: string, code: string, device: DeviceInfo): Promise<LoginResultDto> {
+    const tenantId = this.deps.tenantId;
+    const user = await this.deps.userRepository.findByPhone(tenantId, phone);
+    if (!user) throw new AppError(ErrorCode.OTP_INVALID, 'Incorrect code. Check and try again.', 401);
+
+    const result = await this.deps.verificationRepository.verifyOtp(tenantId, user.id, 'MOBILE_LOGIN', hashToken(code));
+    if (result === 'expired') throw new AppError(ErrorCode.OTP_EXPIRED, 'This code has expired. Request a new one.', 401);
+    if (result === 'max_attempts') {
+      throw new AppError(ErrorCode.OTP_INVALID, 'Too many incorrect attempts. Request a new code.', 401);
+    }
+    if (result === 'invalid') throw new AppError(ErrorCode.OTP_INVALID, 'Incorrect code. Check and try again.', 401);
+
+    await this.assertAccountEligibleForLogin(user, user.email, device);
+
+    return this.completeLoginAfterPrimaryFactor(user, device);
   }
 
   async verifyOtpAndCompleteLogin(email: string, code: string, purpose: 'login' | '2fa'): Promise<AuthSuccessDto> {

@@ -14,6 +14,8 @@ interface OtpInputProps {
   invalid?: boolean;
   length?: number;
   autoFocus?: boolean;
+  /** Override the box's color classes (idle/filled/focus/invalid) — for a fixed-dark surface (e.g. the login page's neon shell) where the default theme tokens would render as light boxes. Layout/sizing/transition classes always apply regardless. */
+  className?: string;
 }
 
 /**
@@ -31,6 +33,7 @@ export function OtpInput({
   invalid,
   length = OTP_LENGTH,
   autoFocus = true,
+  className,
 }: OtpInputProps) {
   const refs = React.useRef<Array<HTMLInputElement | null>>([]);
   const digits = Array.from({ length }, (_, i) => value[i] ?? '');
@@ -112,11 +115,13 @@ export function OtpInput({
           aria-label={`Digit ${index + 1} of ${length}`}
           aria-invalid={invalid || undefined}
           className={cn(
-            'h-11 w-10 min-[400px]:size-12 rounded-xl border-2 border-input bg-background text-center text-xl font-bold shadow-xs transition-all duration-150 sm:size-14',
-            digit && 'border-primary/60 bg-primary/5',
-            'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25 focus-visible:border-primary focus-visible:scale-110',
+            'h-11 w-10 min-[400px]:size-12 rounded-xl border-2 text-center text-xl font-bold shadow-xs transition-all duration-150 sm:size-14',
+            'focus-visible:outline-none focus-visible:ring-4 focus-visible:scale-110',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            invalid && 'border-destructive focus-visible:ring-destructive',
+            className ?? 'border-input bg-background focus-visible:ring-primary/25 focus-visible:border-primary',
+            className && digit && 'border-orange-400/60 bg-orange-400/5',
+            !className && digit && 'border-primary/60 bg-primary/5',
+            invalid && (className ? 'border-red-400 focus-visible:ring-red-400/30' : 'border-destructive focus-visible:ring-destructive'),
           )}
         />
       ))}

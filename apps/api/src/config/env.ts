@@ -43,6 +43,12 @@ const envSchema = z.object({
   MAIL_FROM_NAME: z.string().default('FitCloud'),
   MAIL_FROM_ADDRESS: z.string().email().default('no-reply@fitcloud.local'),
 
+  /** Platform-wide Twilio credentials — env vars are only the bootstrap fallback; a super-admin normally sets these via the Notification Providers settings page instead (`PlatformNotificationCredential`, encrypted at rest). Unlike SMTP, there's no built-in default here — Twilio has never been configured any other way. */
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_SMS_FROM_NUMBER: z.string().optional(),
+  TWILIO_WHATSAPP_FROM_NUMBER: z.string().optional(),
+
   PUSHER_APP_ID: z.string().optional(),
   PUSHER_KEY: z.string().optional(),
   PUSHER_SECRET: z.string().optional(),
@@ -184,6 +190,17 @@ export const env = {
     },
     get isConfigured() {
       return this.serviceAccountJson !== null;
+    },
+  },
+
+  /** Env-var fallback only — `resolvePlatformNotificationCredential()` (admin-notification-settings module) checks `PlatformNotificationCredential` first and falls back to this when that row (or a given field on it) is absent, same precedent as `mail` above. No real secret should normally live here once a super-admin has filled in the settings page. */
+  twilio: {
+    accountSid: raw.TWILIO_ACCOUNT_SID,
+    authToken: raw.TWILIO_AUTH_TOKEN,
+    smsFromNumber: raw.TWILIO_SMS_FROM_NUMBER,
+    whatsappFromNumber: raw.TWILIO_WHATSAPP_FROM_NUMBER,
+    get isConfigured() {
+      return Boolean(raw.TWILIO_ACCOUNT_SID && raw.TWILIO_AUTH_TOKEN);
     },
   },
 

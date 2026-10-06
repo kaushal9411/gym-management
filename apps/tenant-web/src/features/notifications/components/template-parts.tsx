@@ -22,12 +22,12 @@ export interface TemplateGroup {
 const CHANNEL_META: Record<NotificationChannel, { label: string; icon: LucideIcon; live: boolean }> = {
   IN_APP: { label: 'In-app', icon: BellRing, live: true },
   EMAIL: { label: 'Email', icon: Mail, live: true },
-  PUSH: { label: 'Push', icon: Smartphone, live: false },
-  SMS: { label: 'SMS', icon: MessageSquare, live: false },
-  WHATSAPP: { label: 'WhatsApp', icon: MessageCircle, live: false },
+  PUSH: { label: 'Push', icon: Smartphone, live: true },
+  SMS: { label: 'SMS', icon: MessageSquare, live: true },
+  WHATSAPP: { label: 'WhatsApp', icon: MessageCircle, live: true },
 };
-const LIVE: NotificationChannel[] = ['IN_APP', 'EMAIL'];
-const SOON: NotificationChannel[] = ['PUSH', 'SMS', 'WHATSAPP'];
+const LIVE: NotificationChannel[] = ['IN_APP', 'EMAIL', 'PUSH', 'SMS', 'WHATSAPP'];
+const SOON: NotificationChannel[] = [];
 
 /** `{{placeholder}}` tokens rendered as tinted code chips inside a template preview. */
 function Preview({ text, className }: { text: string; className?: string }) {

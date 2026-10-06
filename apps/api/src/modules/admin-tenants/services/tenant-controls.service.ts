@@ -3,6 +3,7 @@ import { ErrorCode } from '../../../core/errors/error-codes';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
+import { currentPeriodKey, readLimit, type GatedChannel } from '../../tenant-notifications/services/channel-gate.service';
 import { tenantService } from '../../tenants/service/tenant.service';
 import {
   applyOverrideChanges,
@@ -189,6 +190,66 @@ export class TenantControlsService {
     });
     return { ...current, enabled, overridden: adminOverride };
   }
+
+  /**
+   * Super-admin ceiling for the 3 paid notification channels (Email/SMS/WhatsApp — IN_APP/PUSH are never gated, see
+   * `TenantNotificationChannelLimit`'s doc comment). A missing row reads as every channel disabled/zero usage, the
+   * same safe default `channel-gate.service.ts` falls back to — nothing is created here until the first PUT.
+   */
+  async getNotificationChannels(tenantId: string) {
+    await loadTenant(tenantId);
+    const db = getTenantScopedClient(tenantId);
+    const periodKey = currentPeriodKey();
+    const [limit, usageRows] = await Promise.all([
+      db.tenantNotificationChannelLimit.findUnique({ where: { tenantId } }),
+      db.tenantNotificationUsage.findMany({ where: { tenantId, periodKey } }),
+    ]);
+    const used = new Map(usageRows.map((u) => [u.channel, u.sentCount]));
+    return (['EMAIL', 'SMS', 'WHATSAPP'] as const).map((channel) => ({
+      channel,
+      ...readLimit(limit, channel),
+      usedThisMonth: used.get(channel) ?? 0,
+    }));
+  }
+
+  async putNotificationChannel(
+    tenantId: string,
+    channel: GatedChannel,
+    input: { enabled: boolean; monthlyLimit: number | null },
+    admin: AdminActor,
+  ) {
+    const tenant = await loadTenant(tenantId);
+    const db = getTenantScopedClient(tenantId);
+    const periodKey = currentPeriodKey();
+    const [existing, usage] = await Promise.all([
+      db.tenantNotificationChannelLimit.findUnique({ where: { tenantId } }),
+      db.tenantNotificationUsage.findUnique({ where: { tenantId_channel_periodKey: { tenantId, channel, periodKey } } }),
+    ]);
+    const before = readLimit(existing, channel);
+    const data = channelLimitFields(channel, input.enabled, input.monthlyLimit);
+
+    const row = existing
+      ? await db.tenantNotificationChannelLimit.update({ where: { tenantId }, data })
+      : await db.tenantNotificationChannelLimit.create({ data: { tenantId, ...data } });
+
+    await tenantService.invalidateCache(tenant.slug, tenantId);
+    await adminAuditLogRepository.record({
+      adminUserId: admin.sub,
+      actorRole: admin.role,
+      action: 'admin.tenant_notification_channel_updated',
+      entityType: 'Tenant',
+      entityId: tenantId,
+      before: { channel, ...before },
+      after: { channel, enabled: input.enabled, monthlyLimit: input.monthlyLimit },
+    });
+    return { channel, ...readLimit(row, channel), usedThisMonth: usage?.sentCount ?? 0 };
+  }
+}
+
+function channelLimitFields(channel: GatedChannel, enabled: boolean, monthlyLimit: number | null) {
+  if (channel === 'EMAIL') return { emailEnabled: enabled, emailMonthlyLimit: monthlyLimit };
+  if (channel === 'SMS') return { smsEnabled: enabled, smsMonthlyLimit: monthlyLimit };
+  return { whatsappEnabled: enabled, whatsappMonthlyLimit: monthlyLimit };
 }
 
 export const tenantControlsService = new TenantControlsService();

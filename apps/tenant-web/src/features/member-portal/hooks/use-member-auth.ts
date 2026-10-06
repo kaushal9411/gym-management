@@ -44,3 +44,29 @@ export function useMemberLogout() {
 export function useMemberForgotPassword() {
   return useMutation({ mutationFn: memberAuthService.forgotPassword.bind(memberAuthService) });
 }
+
+// ── Phone-number login ──────────────────────────────────────────────────
+
+export function useMemberRequestPhoneOtp() {
+  return useMutation({ mutationFn: memberAuthService.requestPhoneOtp.bind(memberAuthService) });
+}
+
+export function useMemberVerifyPhoneOtp() {
+  const dispatch = useAppDispatch();
+  return useMutation({
+    mutationFn: async ({ phone, code }: { phone: string; code: string }) => {
+      dispatch(memberAuthStarted());
+      return memberAuthService.verifyPhoneOtp(phone, code);
+    },
+    onSuccess: ({ member, tokens }) => {
+      dispatch(memberSessionEstablished({ member, tokens }));
+    },
+    onError: (error: MemberAuthServiceError) => {
+      dispatch(memberAuthFailed({ code: error.code, message: error.message }));
+    },
+  });
+}
+
+export function useMemberResendPhoneOtp() {
+  return useMutation({ mutationFn: memberAuthService.resendPhoneOtp.bind(memberAuthService) });
+}

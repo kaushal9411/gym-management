@@ -9,7 +9,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { Bot, ChevronRight, RotateCcw } from 'lucide-react';
+import { Bot, ChevronRight, RotateCcw, Send } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -104,14 +104,24 @@ export default function SettingsPage() {
         <KpiCard index={3} label="Last updated" value={latest ? 1 : 0} format={() => (latest ? relTime(latest.updatedAt, now) || fmtDateTime(latest.updatedAt) : 'Never')} fallbackCaption={latest ? (KNOWN_SETTINGS.find((m) => m.key === latest.key)?.label ?? latest.key) : 'nothing saved yet'} color="var(--chart-2)" />
       </KpiGrid>
 
-      <Link href="/settings/ai" className="group flex items-center gap-3 rounded-[14px] border bg-card p-4 outline-none transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Bot className="size-5" aria-hidden /></span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold">AI Assistant</span>
-          <span className="block text-xs text-muted-foreground">Bring your own provider key for the platform team&apos;s AI assistant.</span>
-        </span>
-        <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
-      </Link>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Link href="/settings/ai" className="group flex items-center gap-3 rounded-[14px] border bg-card p-4 outline-none transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Bot className="size-5" aria-hidden /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">AI Assistant</span>
+            <span className="block text-xs text-muted-foreground">Bring your own provider key for the platform team&apos;s AI assistant.</span>
+          </span>
+          <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
+        </Link>
+        <Link href="/settings/notifications" className="group flex items-center gap-3 rounded-[14px] border bg-card p-4 outline-none transition-colors hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Send className="size-5" aria-hidden /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">Notification Providers</span>
+            <span className="block text-xs text-muted-foreground">Real SMTP and Twilio credentials for every tenant&apos;s Email, SMS and WhatsApp sends.</span>
+          </span>
+          <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
+        </Link>
+      </div>
 
       {settingsQ.isPending || !settings ? (
         <Skeleton className="h-96 rounded-[14px]" />

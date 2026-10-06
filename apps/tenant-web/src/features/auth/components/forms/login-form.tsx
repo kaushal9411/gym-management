@@ -7,22 +7,23 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Dumbbell, Lock, User } from 'lucide-react';
+import { Dumbbell, Lock, Phone, User } from 'lucide-react';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { cn } from '@/lib/utils';
 import { MEMBER_PORTAL_ROUTES } from '@/features/member-portal/constants';
-import { useMemberAuth, useMemberLogin } from '@/features/member-portal/hooks/use-member-auth';
+import { useMemberAuth, useMemberLogin, useMemberRequestPhoneOtp } from '@/features/member-portal/hooks/use-member-auth';
+import { toMemberAuthServiceError } from '@/features/member-portal/services/member-api-client';
 import { FindGymForm } from '@/features/tenant/components/find-gym-form';
 import { TenantLogo } from '@/features/tenant/components/tenant-logo';
 import { buildPlatformLoginUrl } from '@/features/tenant/subdomain-urls';
 import { useTenant } from '@/features/tenant/tenant-provider';
 import { useAppSelector } from '@/store/hooks';
 import { AUTH_ROUTES, POST_LOGIN_REDIRECT } from '../../constants';
-import { useLogin, toAuthError } from '../../hooks/use-auth';
-import { unifiedLoginSchema, type UnifiedLoginFormValues } from '../../schemas';
+import { useLogin, useRequestPhoneOtp, toAuthError } from '../../hooks/use-auth';
+import { phoneLoginSchema, unifiedLoginSchema, type PhoneLoginFormValues, type UnifiedLoginFormValues } from '../../schemas';
 import { looksLikeEmail } from '../../utils/identifier';
 import { getRememberedEmail, setRememberedEmail } from '../../utils/remember-me';
 import { FormAlert } from '../form-alert';
@@ -56,6 +57,8 @@ export function LoginForm() {
   const router = useRouter();
   const login = useLogin();
   const memberLogin = useMemberLogin();
+  const requestPhoneOtp = useRequestPhoneOtp();
+  const memberRequestPhoneOtp = useMemberRequestPhoneOtp();
   const { isAuthenticated: isMemberAuthenticated, isBootstrapping: isMemberBootstrapping } = useMemberAuth();
   const tenant = useTenant();
   const authenticatedUser = useAppSelector((state) => state.auth.user);
@@ -64,9 +67,18 @@ export function LoginForm() {
   const [ripples, setRipples] = React.useState<{ id: number; x: number; y: number }[]>([]);
   const rippleId = React.useRef(0);
 
+  // Phone numbers can't self-disambiguate staff vs. member the way email/Member-ID can — explicit pill, shown only in phone mode.
+  const [mode, setMode] = React.useState<'password' | 'phone'>('password');
+  const [phoneRole, setPhoneRole] = React.useState<'staff' | 'member'>('staff');
+
   const form = useForm<UnifiedLoginFormValues>({
     resolver: zodResolver(unifiedLoginSchema),
     defaultValues: { identifier: '', password: '', rememberMe: false },
+  });
+
+  const phoneForm = useForm<PhoneLoginFormValues>({
+    resolver: zodResolver(phoneLoginSchema),
+    defaultValues: { phone: '' },
   });
 
   // Prefill remembered email after mount (localStorage is client-only). Member logins are never remembered.
@@ -131,6 +143,17 @@ export function LoginForm() {
     );
   });
 
+  const onSubmitPhone = phoneForm.handleSubmit((values) => {
+    setInlineError(null);
+    const onSuccess = () => router.push(`${AUTH_ROUTES.verifyPhoneOtp}?phone=${encodeURIComponent(values.phone)}&role=${phoneRole}`);
+    const onError = (error: unknown) => {
+      const message = phoneRole === 'member' ? toMemberAuthServiceError(error).message : toAuthError(error).message;
+      setInlineError({ locked: false, message });
+    };
+    if (phoneRole === 'member') memberRequestPhoneOtp.mutate(values.phone, { onSuccess, onError });
+    else requestPhoneOtp.mutate(values.phone, { onSuccess, onError });
+  });
+
   // Already signed in (e.g. navigated back to /login manually) — bounce to whichever plane's dashboard.
   React.useEffect(() => {
     if (authenticatedUser) router.replace(POST_LOGIN_REDIRECT);
@@ -138,8 +161,15 @@ export function LoginForm() {
   }, [authenticatedUser, isMemberAuthenticated, isMemberBootstrapping, router]);
 
   const isSubmitting = login.isPending || memberLogin.isPending;
+  const isSendingPhoneOtp = requestPhoneOtp.isPending || memberRequestPhoneOtp.isPending;
   const identifierValue = form.watch('identifier');
   const passwordValue = form.watch('password');
+  const phoneValue = phoneForm.watch('phone');
+
+  function toggleMode() {
+    setInlineError(null);
+    setMode((m) => (m === 'password' ? 'phone' : 'password'));
+  }
 
   // Can't clear the remembered pick directly — it lives in the bare host's
   // localStorage, a different origin from this tenant subdomain page, and
@@ -247,6 +277,62 @@ export function LoginForm() {
                     message={inlineError?.message ?? null}
                   />
 
+                  {mode === 'phone' ? (
+                    <form onSubmit={onSubmitPhone} noValidate className="space-y-5" style={{ marginTop: inlineError?.message ? '1.25rem' : 0 }}>
+                      <div className="flex gap-1.5 rounded-lg border border-white/10 bg-white/4 p-1">
+                        {(['staff', 'member'] as const).map((r) => (
+                          <button
+                            key={r}
+                            type="button"
+                            onClick={() => setPhoneRole(r)}
+                            className={cn(
+                              'flex-1 rounded-md py-2 text-xs font-semibold uppercase tracking-wide transition-colors',
+                              phoneRole === r ? 'bg-orange-500/90 text-white shadow-sm' : 'text-white/50 hover:text-white/80',
+                            )}
+                          >
+                            {r === 'staff' ? 'Staff' : 'Member'}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="phone" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                          Mobile number
+                        </Label>
+                        <IconField
+                          id="phone"
+                          icon={Phone}
+                          type="tel"
+                          autoComplete="tel"
+                          placeholder="9876543210"
+                          invalid={!!phoneForm.formState.errors.phone}
+                          showSuccess={phoneForm.formState.touchedFields.phone && !!phoneValue}
+                          aria-describedby={phoneForm.formState.errors.phone ? 'phone-error' : undefined}
+                          disabled={isSendingPhoneOtp}
+                          iconClassName="text-white/40 group-focus-within:text-orange-400"
+                          glowClassName="shadow-[0_0_0_4px_rgba(255,138,61,0.18)]"
+                          className={DARK_FIELD_CLASS}
+                          {...phoneForm.register('phone')}
+                        />
+                        {phoneForm.formState.errors.phone ? (
+                          <p id="phone-error" role="alert" className="text-xs text-red-400">
+                            {phoneForm.formState.errors.phone.message}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <LoadingButton
+                        type="submit"
+                        onMouseDown={spawnRipple}
+                        loading={isSendingPhoneOtp}
+                        loadingText="Sending code…"
+                        disabled={!phoneValue}
+                        className="login-ripple-btn relative h-12 w-full overflow-hidden border-0 text-[15px] font-bold uppercase tracking-wide text-white"
+                      >
+                        Send code
+                      </LoadingButton>
+                    </form>
+                  ) : (
                   <form onSubmit={onSubmit} noValidate className="space-y-5" style={{ marginTop: inlineError?.message ? '1.25rem' : 0 }}>
                     <div className="space-y-2">
                       <Label htmlFor="identifier" className="text-xs font-medium uppercase tracking-wide text-white/60">
@@ -367,6 +453,17 @@ export function LoginForm() {
                       ))}
                     </LoadingButton>
                   </form>
+                  )}
+
+                  <p className="mt-5 text-center text-sm">
+                    <button
+                      type="button"
+                      onClick={toggleMode}
+                      className="font-medium text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 rounded-sm"
+                    >
+                      {mode === 'phone' ? 'Use email / member ID instead' : 'Use phone number instead'}
+                    </button>
+                  </p>
                 </>
               )}
             </motion.div>

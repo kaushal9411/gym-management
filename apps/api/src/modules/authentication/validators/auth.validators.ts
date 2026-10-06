@@ -69,6 +69,18 @@ export const resendOtpSchema = z.object({
   purpose: z.enum(['login', '2fa']).default('login'),
 });
 
+/** Loose — server remains the authority on real validity; this just rejects obvious junk. */
+export const phoneSchema = z.string().trim().min(7).max(20);
+
+export const phoneLoginRequestSchema = z.object({
+  phone: phoneSchema,
+});
+
+export const phoneLoginVerifySchema = z.object({
+  phone: phoneSchema,
+  code: otpCodeSchema,
+});
+
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1),

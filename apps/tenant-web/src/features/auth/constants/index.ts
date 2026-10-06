@@ -7,6 +7,7 @@ export const AUTH_ROUTES = {
   verifyEmail: '/verify-email',
   verifyOtp: '/verify-otp',
   resendOtp: '/resend-otp',
+  verifyPhoneOtp: '/verify-phone-otp',
   twoFactor: '/two-factor',
   mfaSetup: '/mfa-setup',
   invitation: '/invitation',

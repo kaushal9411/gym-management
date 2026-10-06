@@ -102,6 +102,7 @@ function toNotificationSettingsDto(settings: TenantSettings): NotificationSettin
     emailNotificationsEnabled: settings.emailNotificationsEnabled,
     pushNotificationsEnabled: settings.pushNotificationsEnabled,
     smsNotificationsEnabled: settings.smsNotificationsEnabled,
+    whatsappNotificationsEnabled: settings.whatsappNotificationsEnabled,
     smsProviderConfig: (settings.smsProviderConfig as Record<string, unknown> | null) ?? null,
   };
 }

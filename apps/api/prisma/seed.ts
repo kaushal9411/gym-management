@@ -498,6 +498,7 @@ const ADMIN_PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'scheduler:retry', description: 'Retry a failed job or re-enqueue an entire failed queue' },
   { key: 'scheduler:pause', description: 'Pause a job or a queue' },
   { key: 'app-releases:manage', description: 'Upload, activate, and delete mobile app (.apk) releases distributed to all users' },
+  { key: 'notification-settings:manage', description: 'Manage platform-wide SMTP/Twilio credentials for Email/SMS/WhatsApp sending' },
 ];
 
 const ADMIN_ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
@@ -517,6 +518,7 @@ const ADMIN_ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'scheduler:retry',
     'scheduler:pause',
     'app-releases:manage',
+    'notification-settings:manage',
   ],
 };
 

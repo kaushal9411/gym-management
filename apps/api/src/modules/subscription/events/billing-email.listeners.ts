@@ -3,7 +3,7 @@ import { eventBus } from '../../../core/events/event-bus';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { subscriptionAlertEmail } from '../../../infrastructure/mail/templates/auth-templates';
 import { invoiceEmail, subscriptionActivatedEmail } from '../../../infrastructure/mail/templates/billing-templates';
-import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
+import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import { tenantNotificationService } from '../../tenant-notifications/services/tenant-notification.service';
 
 function portalPath(tenantSlug: string, path: string): string {
@@ -37,9 +37,9 @@ export function registerBillingEmailListeners(): void {
       total: totalFormatted,
       billingUrl,
     });
-    await enqueueEmail({ to: payload.email, subject: activated.subject, html: activated.html });
+    await sendGatedEmail(payload.tenantId, { to: payload.email, subject: activated.subject, html: activated.html });
     const invoice = invoiceEmail(branding, 'there', payload.invoiceNumber, totalFormatted, downloadUrl);
-    await enqueueEmail({ to: payload.email, subject: invoice.subject, html: invoice.html });
+    await sendGatedEmail(payload.tenantId, { to: payload.email, subject: invoice.subject, html: invoice.html });
 
     await tenantNotificationService.notifyTenant(payload.tenantId, 'SUBSCRIPTION', activated.subject, `Your subscription is now on the ${payload.planName} plan.`);
   });
@@ -51,7 +51,7 @@ export function registerBillingEmailListeners(): void {
     if (!owner) return;
 
     const template = subscriptionAlertEmail({ tenantName: tenant.name }, owner.name, 'payment_failed', { billingUrl: portalPath(tenant.slug, '/billing') });
-    await enqueueEmail({ to: owner.email, subject: template.subject, html: template.html });
+    await sendGatedEmail(payload.tenantId, { to: owner.email, subject: template.subject, html: template.html });
 
     await tenantNotificationService.notifyTenant(payload.tenantId, 'SUBSCRIPTION', template.subject, 'We could not process your last payment. Please update your billing details.');
   });

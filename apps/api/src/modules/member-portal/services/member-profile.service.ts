@@ -5,10 +5,10 @@ import { deleteStoredMemberPhoto, uploadDataUrl } from '../../../core/storage/st
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { loadEmailBranding } from '../../../infrastructure/mail/branding';
 import { memberEmailChangedEmail } from '../../../infrastructure/mail/templates/auth-templates';
-import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import { MemberAuthService } from '../../member-auth/services/member-auth.service';
 import { MemberRepository } from '../../members/repositories/member.repository';
+import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import { toMemberProfileDto, type MemberProfileDto } from '../dto/member-profile.dto';
 import {
   assertEmailChangeAuthorized,
@@ -148,7 +148,7 @@ export class MemberProfileService {
     try {
       const branding = await loadEmailBranding(this.tenantId);
       const template = memberEmailChangedEmail(branding, firstName);
-      await enqueueEmail({ to: oldEmail, subject: template.subject, html: template.html });
+      await sendGatedEmail(this.tenantId, { to: oldEmail, subject: template.subject, html: template.html });
     } catch (error) {
       logger.warn('Could not queue the email-changed notice', {
         error: error instanceof Error ? error.message : String(error),

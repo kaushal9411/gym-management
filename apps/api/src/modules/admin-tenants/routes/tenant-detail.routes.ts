@@ -12,6 +12,8 @@ import {
   moduleKeyParamSchema,
   noteBodySchema,
   noteIdParamSchema,
+  notificationChannelBodySchema,
+  notificationChannelParamSchema,
   reportsQuerySchema,
   tagsBodySchema,
   ticketsQuerySchema,
@@ -142,6 +144,50 @@ adminTenantDetailRouter.put(
   write,
   validate({ params: moduleKeyParamSchema, body: moduleBodySchema }),
   h(c.putModule),
+);
+
+/**
+ * @openapi
+ * /admin/tenants/{tenantId}/notification-channels:
+ *   get:
+ *     tags: [Admin Tenants]
+ *     summary: Super-admin ceiling for the 3 paid notification channels — enabled flag, monthly quota, this month's usage
+ *     security: [{ bearerAuth: [] }]
+ *     parameters: [{ in: path, name: tenantId, required: true, schema: { type: string, format: uuid } }]
+ *     responses:
+ *       200: { description: "[{channel,enabled,monthlyLimit,usedThisMonth}]" }
+ */
+adminTenantDetailRouter.get(
+  '/:tenantId/notification-channels',
+  read,
+  params,
+  h(c.getNotificationChannels),
+);
+
+/**
+ * @openapi
+ * /admin/tenants/{tenantId}/notification-channels/{channel}:
+ *   put:
+ *     tags: [Admin Tenants]
+ *     summary: Enable/disable one paid channel for this tenant and set its monthly send quota (null = unlimited)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: tenantId, required: true, schema: { type: string, format: uuid } }
+ *       - { in: path, name: channel, required: true, schema: { type: string, enum: [EMAIL, SMS, WHATSAPP] } }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, required: [enabled, monthlyLimit], properties: { enabled: { type: boolean }, monthlyLimit: { type: integer, nullable: true } } }
+ *     responses:
+ *       200: { description: Updated channel row }
+ *       422: { description: Validation error }
+ */
+adminTenantDetailRouter.put(
+  '/:tenantId/notification-channels/:channel',
+  write,
+  validate({ params: notificationChannelParamSchema, body: notificationChannelBodySchema }),
+  h(c.putNotificationChannel),
 );
 
 /**

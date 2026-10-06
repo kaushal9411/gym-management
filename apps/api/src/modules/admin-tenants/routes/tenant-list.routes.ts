@@ -54,7 +54,7 @@ adminTenantListRouter.get(
  * /admin/tenants/insights:
  *   get:
  *     tags: [Admin Tenants]
- *     summary: Tenants page insight cards — growth, plan mix, health distribution, signups by source (null: not stored), renewals
+ *     summary: "Tenants page insight cards — growth, plan mix, health distribution, signups by source (null: not stored), renewals"
  *     security: [{ bearerAuth: [] }]
  *     responses:
  *       200: { description: "{ growth, planMix, healthDistribution, signupsBySource, renewals }" }

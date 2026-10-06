@@ -11,6 +11,10 @@ import { emailQueue } from './infrastructure/queue/email.queue';
 import { startEmailWorker, stopEmailWorker } from './infrastructure/queue/email.worker';
 import { pushQueue } from './infrastructure/queue/push.queue';
 import { startPushWorker, stopPushWorker } from './infrastructure/queue/push.worker';
+import { smsQueue } from './infrastructure/queue/sms.queue';
+import { startSmsWorker, stopSmsWorker } from './infrastructure/queue/sms.worker';
+import { whatsappQueue } from './infrastructure/queue/whatsapp.queue';
+import { startWhatsAppWorker, stopWhatsAppWorker } from './infrastructure/queue/whatsapp.worker';
 import { initSocketServer } from './infrastructure/realtime/socket-server';
 import { registerAuthEmailListeners } from './modules/authentication/events/auth-email.listeners';
 import { registerInvitationEmailListeners } from './modules/invitations/events/invitation-email.listeners';
@@ -45,6 +49,8 @@ async function bootstrap(): Promise<void> {
   registerMemberAuthEmailListeners();
   startEmailWorker();
   startPushWorker();
+  startSmsWorker();
+  startWhatsAppWorker();
   await initScheduler();
 
   const app = createApp();
@@ -63,9 +69,13 @@ async function bootstrap(): Promise<void> {
     server.close(async () => {
       await stopEmailWorker();
       await stopPushWorker();
+      await stopSmsWorker();
+      await stopWhatsAppWorker();
       await stopScheduler();
       await emailQueue.close();
       await pushQueue.close();
+      await smsQueue.close();
+      await whatsappQueue.close();
       await disconnectPrisma();
       await disconnectRedis();
       logger.info('Shutdown complete');

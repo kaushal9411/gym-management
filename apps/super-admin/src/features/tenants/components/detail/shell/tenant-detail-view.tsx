@@ -16,13 +16,14 @@ import { SubscriptionTab } from '../tabs/subscription-tab';
 import { SupportTab } from '../tabs/support-tab';
 import { UsersTab } from '../tabs/users-tab';
 import { ModulesTab } from '../modules-tab';
+import { NotificationChannelsTab } from '../notification-channels-tab';
 import { UsageLimitsTab } from '../usage-limits-tab';
 import { TabBar, type TabDef } from './tab-bar';
 import { TenantBanner } from './tenant-banner';
 
 const TABS: TabDef[] = [
   { id: 'overview', label: 'Overview' }, { id: 'reports', label: 'Reports' }, { id: 'subscription', label: 'Subscription' }, { id: 'usage', label: 'Usage & limits' },
-  { id: 'modules', label: 'Modules' }, { id: 'billing', label: 'Billing' }, { id: 'users', label: 'Users' }, { id: 'activity', label: 'Activity' }, { id: 'support', label: 'Support' },
+  { id: 'modules', label: 'Modules' }, { id: 'notifications', label: 'Notification channels' }, { id: 'billing', label: 'Billing' }, { id: 'users', label: 'Users' }, { id: 'activity', label: 'Activity' }, { id: 'support', label: 'Support' },
 ];
 const IDS = new Set(TABS.map((t) => t.id));
 
@@ -77,6 +78,7 @@ function View({ tenantId }: { tenantId: string }) {
       case 'subscription': return <SubscriptionTab {...props} />;
       case 'usage': return <UsageLimitsTab {...props} />;
       case 'modules': return <ModulesTab {...props} />;
+      case 'notifications': return <NotificationChannelsTab {...props} />;
       case 'billing': return <BillingTab {...props} />;
       case 'users': return <UsersTab {...props} />;
       case 'activity': return <ActivityTab {...props} />;

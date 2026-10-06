@@ -9,6 +9,8 @@ import '../../features/auth/presentation/find_gym_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/member_reset_password_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/phone_login_screen.dart';
+import '../../features/auth/presentation/phone_otp_screen.dart';
 import '../../features/auth/presentation/splash_screen.dart';
 import '../../features/auth/presentation/staff_mfa_setup_screen.dart';
 import '../../features/auth/presentation/staff_otp_screen.dart';
@@ -163,6 +165,8 @@ const _signedOutPaths = {
   AppRoutes.login,
   AppRoutes.otp,
   AppRoutes.mfaSetup,
+  AppRoutes.phoneLogin,
+  AppRoutes.phoneOtp,
   AppRoutes.forgotPassword,
   AppRoutes.memberResetPassword,
 };
@@ -231,6 +235,16 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         path: AppRoutes.mfaSetup,
         builder: (context, state) =>
             StaffMfaSetupScreen(args: state.extra as StaffMfaSetupScreenArgs),
+      ),
+      GoRoute(
+        path: AppRoutes.phoneLogin,
+        builder: (context, state) =>
+            PhoneLoginScreen(args: state.extra as PhoneLoginScreenArgs),
+      ),
+      GoRoute(
+        path: AppRoutes.phoneOtp,
+        builder: (context, state) =>
+            PhoneOtpScreen(args: state.extra as PhoneOtpScreenArgs),
       ),
       GoRoute(
         path: AppRoutes.forgotPassword,

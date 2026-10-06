@@ -160,6 +160,7 @@ export const updateNotificationSettingsSchema = z
     emailNotificationsEnabled: z.boolean().optional(),
     pushNotificationsEnabled: z.boolean().optional(),
     smsNotificationsEnabled: z.boolean().optional(),
+    whatsappNotificationsEnabled: z.boolean().optional(),
     smsProviderConfig: z.record(z.unknown()).nullable().optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'Provide at least one field to update' });

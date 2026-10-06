@@ -10,6 +10,10 @@ export class UserRepository implements IUserRepository {
     return this.db.user.findFirst({ where: { tenantId, email, deletedAt: null } });
   }
 
+  async findByPhone(tenantId: string, phone: string): Promise<User | null> {
+    return this.db.user.findFirst({ where: { tenantId, phone, deletedAt: null } });
+  }
+
   async findById(tenantId: string, userId: string): Promise<User | null> {
     return this.db.user.findFirst({ where: { id: userId, tenantId, deletedAt: null } });
   }

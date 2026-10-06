@@ -58,6 +58,16 @@ export const updateTemplateSchema = z.object({
   isActive: z.boolean().default(true),
 });
 
+const DELIVERY_CHANNELS = ['EMAIL', 'SMS', 'WHATSAPP'] as const;
+const DELIVERY_STATUSES = ['SENT', 'FAILED', 'SKIPPED_DISABLED', 'SKIPPED_QUOTA'] as const;
+
+export const listMessageLogQuerySchema = z.object({
+  channel: z.enum(DELIVERY_CHANNELS).optional(),
+  status: z.enum(DELIVERY_STATUSES).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+});
+
 export const notificationStatsQuerySchema = z
   .object({ dateFrom: isoDay.optional(), dateTo: isoDay.optional() })
   .refine((v) => !v.dateFrom || !v.dateTo || v.dateFrom <= v.dateTo, {
