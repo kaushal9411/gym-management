@@ -3,9 +3,9 @@
  * (`features/members/components/detail/member-hero.tsx`,
  * `.../list/member-card.tsx`) — prepends India's country code only when the
  * stored number looks like a bare 10-digit local number, leaves anything
- * else untouched rather than guessing. Twilio requires E.164 (`+` prefix),
- * which those two frontend call sites never needed (`wa.me`/`tel:` links
- * don't).
+ * else untouched rather than guessing. The messaging provider requires
+ * E.164 (`+` prefix), which those two frontend call sites never needed
+ * (`wa.me`/`tel:` links don't).
  */
 export function toE164(phone: string): string {
   const digits = phone.replace(/\D/g, '');

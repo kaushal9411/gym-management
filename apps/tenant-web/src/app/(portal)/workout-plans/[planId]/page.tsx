@@ -244,7 +244,7 @@ export default function WorkoutPlanDetailPage() {
 
       {canAssign && !data.deletedAt && data.isActive ? (
         <PanelCard icon={UserPlus} accent="aqua" title="Assign to a member" delay={0.1}>
-          <MemberCheckinSearch onSelect={setAssignMember} placeholder="Search member by name, email, or member ID…" />
+          <MemberCheckinSearch inline onSelect={setAssignMember} placeholder="Search member by name, email, or member ID…" />
           {assignMember ? (
             <div className="flex flex-wrap items-end gap-2">
               <span className="text-sm">

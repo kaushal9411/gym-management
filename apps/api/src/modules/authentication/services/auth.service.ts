@@ -656,6 +656,7 @@ export class AuthService {
         userId,
         name: user.name,
         email: user.email,
+        phone: user.phone,
         code,
         expiresInMinutes: Math.round(env.security.otpTtlSeconds / 60),
       });

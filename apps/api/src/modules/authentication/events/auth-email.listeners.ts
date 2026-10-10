@@ -11,6 +11,8 @@ import {
 } from '../../../infrastructure/mail/templates/auth-templates';
 import type { EmailBranding } from '../../../infrastructure/mail/templates/base-layout';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
+import { enqueueSms } from '../../../infrastructure/queue/sms.queue';
+import { toE164 } from '../../../infrastructure/sms/phone.util';
 import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import { tenantService } from '../../tenants/service/tenant.service';
 
@@ -75,12 +77,22 @@ export function registerAuthEmailListeners(): void {
     userId: string;
     name: string;
     email: string;
+    phone?: string | null;
     code: string;
     expiresInMinutes: number;
   }>('auth.otp_issued', async (payload) => {
     const { branding } = await brandingFor(payload.tenantId);
     const template = otpCodeEmail(branding, payload.name, payload.code, payload.expiresInMinutes);
     await enqueueEmail({ to: payload.email, subject: template.subject, html: template.html });
+    // Never gated by the tenant's SMS quota/toggle (same reasoning as the email leg above) — an OTP must always attempt to go out.
+    if (payload.phone) {
+      await enqueueSms({
+        tenantId: payload.tenantId,
+        to: toE164(payload.phone),
+        body: `${branding.tenantName}: your verification code is ${payload.code}. Valid for ${payload.expiresInMinutes} minutes.`,
+        skipDeliveryLog: true,
+      });
+    }
   });
 }
 

@@ -2,7 +2,7 @@ import { Worker, type Job } from 'bullmq';
 
 import { logger } from '../../core/logging/logger';
 import { recordNotificationDelivery } from '../../modules/tenant-notifications/repositories/notification-delivery-log.repository';
-import { twilioClient } from '../sms/twilio.client';
+import { kaleyraClient } from '../sms/kaleyra.client';
 
 import { createQueueConnection } from './connection';
 import type { WhatsAppJobData } from './whatsapp.queue';
@@ -13,15 +13,15 @@ export function startWhatsAppWorker(): Worker<WhatsAppJobData> {
   worker = new Worker<WhatsAppJobData>(
     'notifications-whatsapp',
     async (job: Job<WhatsAppJobData>) => {
-      const result = await twilioClient.sendWhatsApp({ to: job.data.to, body: job.data.body });
+      const result = await kaleyraClient.sendWhatsApp({ to: job.data.to, body: job.data.body });
       await recordNotificationDelivery({
         tenantId: job.data.tenantId,
         channel: 'WHATSAPP',
         recipient: job.data.to,
         content: job.data.body,
-        status: result ? 'SENT' : 'FAILED',
-        providerRef: result?.sid,
-        errorMessage: result ? undefined : 'Twilio is not configured.',
+        status: 'messageId' in result ? 'SENT' : 'FAILED',
+        providerRef: 'messageId' in result ? result.messageId : undefined,
+        errorMessage: 'messageId' in result ? undefined : result.error,
       });
     },
     { connection: createQueueConnection(), concurrency: 5 },

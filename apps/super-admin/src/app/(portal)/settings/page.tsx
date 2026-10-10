@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 const KNOWN_SETTINGS: Array<{ key: string; category: string; label: string; placeholder: string }> = [
   { key: 'company_info', category: 'company', label: 'Company Information', placeholder: '{ "name": "FitCloud Inc.", "supportEmail": "support@fitcloud.com" }' },
   { key: 'smtp', category: 'integrations', label: 'SMTP', placeholder: '{ "host": "smtp.example.com", "port": 587, "user": "...", "from": "no-reply@fitcloud.com" }' },
-  { key: 'sms_gateway', category: 'integrations', label: 'SMS Gateway', placeholder: '{ "provider": "twilio", "accountSid": "...", "from": "+1..." }' },
+  { key: 'sms_gateway', category: 'integrations', label: 'SMS Gateway', placeholder: '{ "provider": "kaleyra", "sid": "...", "from": "+1..." }' },
   { key: 'payment_gateway_keys', category: 'integrations', label: 'Payment Gateway Keys', placeholder: '{ "stripe": { "publishableKey": "..." }, "razorpay": { "keyId": "..." } }' },
   { key: 'storage_provider', category: 'infrastructure', label: 'Storage Provider', placeholder: '{ "provider": "s3", "bucket": "fitcloud-uploads" }' },
   { key: 'cloudflare', category: 'infrastructure', label: 'Cloudflare Settings', placeholder: '{ "zoneId": "...", "apiToken": "***" }' },
@@ -117,7 +117,7 @@ export default function SettingsPage() {
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Send className="size-5" aria-hidden /></span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold">Notification Providers</span>
-            <span className="block text-xs text-muted-foreground">Real SMTP and Twilio credentials for every tenant&apos;s Email, SMS and WhatsApp sends.</span>
+            <span className="block text-xs text-muted-foreground">Real SMTP and messaging credentials for every tenant&apos;s Email, SMS and WhatsApp sends.</span>
           </span>
           <ChevronRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
         </Link>

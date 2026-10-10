@@ -16,10 +16,10 @@ const asyncHandler =
 
 adminNotificationSettingsRouter.use(adminAuthenticateMiddleware, requireAdminPermission('notification-settings:manage'));
 
-/** @openapi { "/admin/notification-settings": { get: { tags: [Admin Notification Settings], summary: "Platform-wide SMTP/Twilio credentials (secrets masked)", security: [{bearerAuth: []}], responses: { 200: { description: Credentials view } } } } } */
+/** @openapi { "/admin/notification-settings": { get: { tags: [Admin Notification Settings], summary: "Platform-wide SMTP/Kaleyra credentials (secrets masked)", security: [{bearerAuth: []}], responses: { 200: { description: Credentials view } } } } } */
 adminNotificationSettingsRouter.get('/', asyncHandler(adminNotificationSettingsController.getCredentials.bind(adminNotificationSettingsController)));
 
-/** @openapi { "/admin/notification-settings": { patch: { tags: [Admin Notification Settings], summary: "Update platform-wide SMTP/Twilio credentials — omit a secret field to leave it untouched, send '' to clear it", security: [{bearerAuth: []}], responses: { 200: { description: Updated } } } } } */
+/** @openapi { "/admin/notification-settings": { patch: { tags: [Admin Notification Settings], summary: "Update platform-wide SMTP/Kaleyra credentials — omit a secret field to leave it untouched, send '' to clear it", security: [{bearerAuth: []}], responses: { 200: { description: Updated } } } } } */
 adminNotificationSettingsRouter.patch(
   '/',
   validate({ body: updatePlatformNotificationCredentialSchema }),

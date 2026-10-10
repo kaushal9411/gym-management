@@ -46,11 +46,11 @@ describe('PlatformNotificationCredentialService', () => {
   });
 
   it('getView never returns a plaintext secret — only a masked preview', async () => {
-    state.row = { id: 'row-1', twilioAuthTokenEncrypted: 'enc(sk_live_abcd1234)', smtpPasswordEncrypted: null };
+    state.row = { id: 'row-1', kaleyraApiKeyEncrypted: 'enc(sk_live_abcd1234)', smtpPasswordEncrypted: null };
     const service = new PlatformNotificationCredentialService();
     const view = await service.getView();
-    expect(view.hasTwilioAuthToken).toBe(true);
-    expect(view.twilioAuthTokenMasked).toBe('••••1234');
+    expect(view.hasKaleyraApiKey).toBe(true);
+    expect(view.kaleyraApiKeyMasked).toBe('••••1234');
     expect(JSON.stringify(view)).not.toContain('sk_live_abcd1234');
     expect(view.hasSmtpPassword).toBe(false);
     expect(view.smtpPasswordMasked).toBeNull();
@@ -58,25 +58,25 @@ describe('PlatformNotificationCredentialService', () => {
 
   it('update encrypts a new secret before persisting it', async () => {
     const service = new PlatformNotificationCredentialService();
-    await service.update({ twilioAuthToken: 'sk_live_newtoken' }, 'admin-1', 'SUPER_ADMIN');
+    await service.update({ kaleyraApiKey: 'sk_live_newtoken' }, 'admin-1', 'SUPER_ADMIN');
     expect(state.createCalls).toHaveLength(1);
-    expect(state.createCalls[0]!.twilioAuthTokenEncrypted).toBe('enc(sk_live_newtoken)');
+    expect(state.createCalls[0]!.kaleyraApiKeyEncrypted).toBe('enc(sk_live_newtoken)');
   });
 
   it('update with an empty string clears the secret back to null', async () => {
-    state.row = { id: 'row-1', twilioAuthTokenEncrypted: 'enc(old-token)' };
+    state.row = { id: 'row-1', kaleyraApiKeyEncrypted: 'enc(old-token)' };
     const service = new PlatformNotificationCredentialService();
-    await service.update({ twilioAuthToken: '' }, 'admin-1', 'SUPER_ADMIN');
+    await service.update({ kaleyraApiKey: '' }, 'admin-1', 'SUPER_ADMIN');
     expect(state.updateCalls).toHaveLength(1);
-    expect(state.updateCalls[0]!.data.twilioAuthTokenEncrypted).toBeNull();
+    expect(state.updateCalls[0]!.data.kaleyraApiKeyEncrypted).toBeNull();
   });
 
   it('update with the field omitted leaves the existing secret untouched', async () => {
-    state.row = { id: 'row-1', twilioAuthTokenEncrypted: 'enc(old-token)' };
+    state.row = { id: 'row-1', kaleyraApiKeyEncrypted: 'enc(old-token)' };
     const service = new PlatformNotificationCredentialService();
     await service.update({ smtpHost: 'smtp.sendgrid.net' }, 'admin-1', 'SUPER_ADMIN');
     expect(state.updateCalls).toHaveLength(1);
-    expect(state.updateCalls[0]!.data.twilioAuthTokenEncrypted).toBeUndefined();
+    expect(state.updateCalls[0]!.data.kaleyraApiKeyEncrypted).toBeUndefined();
     expect(state.updateCalls[0]!.data.smtpHost).toBe('smtp.sendgrid.net');
   });
 

@@ -3217,23 +3217,24 @@ model SystemSetting {
 /// `core/security/encryption.util.ts`'s `encryptSecret`/`decryptSecret`) —
 /// `*Encrypted` fields are never returned as plaintext by the admin API,
 /// only a masked preview (`maskSecret`). Absence of this row (or of any one
-/// field on it) falls back to `apps/api/.env`'s `SMTP_*` vars for email —
-/// there is no env-var fallback for Twilio, since it never had one before
-/// this feature shipped.
+/// field on it) falls back to `apps/api/.env`'s `SMTP_*`/`KALEYRA_*` vars.
 model PlatformNotificationCredential {
-  id                       String   @id @default(uuid())  @db.Uuid
-  smtpHost                 String?  @map("smtp_host")
-  smtpPort                 Int?     @map("smtp_port")
-  smtpUser                 String?  @map("smtp_user")
-  smtpPasswordEncrypted    String?  @map("smtp_password_encrypted")
-  smtpFromName             String?  @map("smtp_from_name")
-  smtpFromAddress          String?  @map("smtp_from_address")
-  twilioAccountSid         String?  @map("twilio_account_sid")
-  twilioAuthTokenEncrypted String?  @map("twilio_auth_token_encrypted")
-  twilioSmsFromNumber      String?  @map("twilio_sms_from_number")
-  twilioWhatsappFromNumber String?  @map("twilio_whatsapp_from_number")
-  updatedAt                DateTime @updatedAt @map("updated_at")
-  updatedBy                String?  @map("updated_by") @db.Uuid
+  id                     String   @id @default(uuid())  @db.Uuid
+  smtpHost               String?  @map("smtp_host")
+  smtpPort               Int?     @map("smtp_port")
+  smtpUser               String?  @map("smtp_user")
+  smtpPasswordEncrypted  String?  @map("smtp_password_encrypted")
+  smtpFromName           String?  @map("smtp_from_name")
+  smtpFromAddress        String?  @map("smtp_from_address")
+  /// Kaleyra account SID (same for every API key on the account).
+  kaleyraSid             String?  @map("kaleyra_sid")
+  kaleyraApiKeyEncrypted String?  @map("kaleyra_api_key_encrypted")
+  /// Region host, e.g. "api.in.kaleyra.io" — Kaleyra has no single global endpoint.
+  kaleyraApiDomain       String?  @map("kaleyra_api_domain")
+  kaleyraSmsSenderId     String?  @map("kaleyra_sms_sender_id")
+  kaleyraWhatsappNumber  String?  @map("kaleyra_whatsapp_number")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+  updatedBy              String?  @map("updated_by") @db.Uuid
 
   @@map("platform_notification_credentials")
 }
@@ -3778,7 +3779,7 @@ model NotificationDeliveryLog {
   subject      String?                    @db.VarChar(200)
   content      String
   status       NotificationDeliveryStatus
-  /// Twilio message SID / nodemailer messageId — absent for a skip.
+  /// Kaleyra message_id / nodemailer messageId — absent for a skip.
   providerRef  String?                    @map("provider_ref")
   errorMessage String?                    @map("error_message")
   createdAt    DateTime                   @default(now()) @map("created_at")

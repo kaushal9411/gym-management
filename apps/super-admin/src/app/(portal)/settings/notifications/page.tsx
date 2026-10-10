@@ -14,15 +14,24 @@ import { BackLink, Banner } from '@/features/payments/components/pay-kit';
 import { FIELD, Field, KpiGrid, SaveBar } from '@/features/shell/components/page-kit';
 import { ErrorNote } from '@/features/tenants/components/detail/tabs/_shared/kit';
 
+const API_DOMAINS = [
+  { value: '', label: 'Select a region…' },
+  { value: 'api.in.kaleyra.io', label: 'India (api.in.kaleyra.io)' },
+  { value: 'api.ap.kaleyra.io', label: 'Asia-Pacific (api.ap.kaleyra.io)' },
+  { value: 'api.eu.kaleyra.io', label: 'Europe (api.eu.kaleyra.io)' },
+  { value: 'api.na.kaleyra.io', label: 'North America (api.na.kaleyra.io)' },
+];
+
 interface NotificationSettingsForm {
   smtpHost: string;
   smtpPort: string;
   smtpUser: string;
   smtpFromName: string;
   smtpFromAddress: string;
-  twilioAccountSid: string;
-  twilioSmsFromNumber: string;
-  twilioWhatsappFromNumber: string;
+  kaleyraSid: string;
+  kaleyraApiDomain: string;
+  kaleyraSmsSenderId: string;
+  kaleyraWhatsappNumber: string;
 }
 
 export default function NotificationProvidersSettingsPage() {
@@ -34,8 +43,8 @@ export default function NotificationProvidersSettingsPage() {
   const [form, setForm] = React.useState<NotificationSettingsForm | null>(null);
   const [smtpPasswordInput, setSmtpPasswordInput] = React.useState('');
   const [clearSmtpPassword, setClearSmtpPassword] = React.useState(false);
-  const [twilioAuthTokenInput, setTwilioAuthTokenInput] = React.useState('');
-  const [clearTwilioAuthToken, setClearTwilioAuthToken] = React.useState(false);
+  const [apiKeyInput, setApiKeyInput] = React.useState('');
+  const [clearApiKey, setClearApiKey] = React.useState(false);
 
   React.useEffect(() => {
     if (settings.data && !form) {
@@ -45,9 +54,10 @@ export default function NotificationProvidersSettingsPage() {
         smtpUser: settings.data.smtpUser ?? '',
         smtpFromName: settings.data.smtpFromName ?? '',
         smtpFromAddress: settings.data.smtpFromAddress ?? '',
-        twilioAccountSid: settings.data.twilioAccountSid ?? '',
-        twilioSmsFromNumber: settings.data.twilioSmsFromNumber ?? '',
-        twilioWhatsappFromNumber: settings.data.twilioWhatsappFromNumber ?? '',
+        kaleyraSid: settings.data.kaleyraSid ?? '',
+        kaleyraApiDomain: settings.data.kaleyraApiDomain ?? '',
+        kaleyraSmsSenderId: settings.data.kaleyraSmsSenderId ?? '',
+        kaleyraWhatsappNumber: settings.data.kaleyraWhatsappNumber ?? '',
       });
     }
   }, [settings.data, form]);
@@ -61,16 +71,17 @@ export default function NotificationProvidersSettingsPage() {
         smtpUser: form.smtpUser,
         smtpFromName: form.smtpFromName,
         smtpFromAddress: form.smtpFromAddress,
-        twilioAccountSid: form.twilioAccountSid,
-        twilioSmsFromNumber: form.twilioSmsFromNumber,
-        twilioWhatsappFromNumber: form.twilioWhatsappFromNumber,
+        kaleyraSid: form.kaleyraSid,
+        kaleyraApiDomain: form.kaleyraApiDomain,
+        kaleyraSmsSenderId: form.kaleyraSmsSenderId,
+        kaleyraWhatsappNumber: form.kaleyraWhatsappNumber,
         ...(smtpPasswordInput.trim() ? { smtpPassword: smtpPasswordInput.trim() } : clearSmtpPassword ? { smtpPassword: '' } : {}),
-        ...(twilioAuthTokenInput.trim() ? { twilioAuthToken: twilioAuthTokenInput.trim() } : clearTwilioAuthToken ? { twilioAuthToken: '' } : {}),
+        ...(apiKeyInput.trim() ? { kaleyraApiKey: apiKeyInput.trim() } : clearApiKey ? { kaleyraApiKey: '' } : {}),
       });
       setSmtpPasswordInput('');
       setClearSmtpPassword(false);
-      setTwilioAuthTokenInput('');
-      setClearTwilioAuthToken(false);
+      setApiKeyInput('');
+      setClearApiKey(false);
       toast.success('Notification provider settings saved.');
     } catch (error) {
       toast.error(toAdminServiceError(error).message);
@@ -81,8 +92,9 @@ export default function NotificationProvidersSettingsPage() {
   const dirty = !!form && !!d && (
     form.smtpHost !== (d.smtpHost ?? '') || form.smtpPort !== (d.smtpPort != null ? String(d.smtpPort) : '') ||
     form.smtpUser !== (d.smtpUser ?? '') || form.smtpFromName !== (d.smtpFromName ?? '') || form.smtpFromAddress !== (d.smtpFromAddress ?? '') ||
-    form.twilioAccountSid !== (d.twilioAccountSid ?? '') || form.twilioSmsFromNumber !== (d.twilioSmsFromNumber ?? '') || form.twilioWhatsappFromNumber !== (d.twilioWhatsappFromNumber ?? '') ||
-    smtpPasswordInput.trim() !== '' || clearSmtpPassword || twilioAuthTokenInput.trim() !== '' || clearTwilioAuthToken
+    form.kaleyraSid !== (d.kaleyraSid ?? '') || form.kaleyraApiDomain !== (d.kaleyraApiDomain ?? '') ||
+    form.kaleyraSmsSenderId !== (d.kaleyraSmsSenderId ?? '') || form.kaleyraWhatsappNumber !== (d.kaleyraWhatsappNumber ?? '') ||
+    smtpPasswordInput.trim() !== '' || clearSmtpPassword || apiKeyInput.trim() !== '' || clearApiKey
   );
 
   return (
@@ -90,7 +102,7 @@ export default function NotificationProvidersSettingsPage() {
       <BackLink href="/settings">Back to Settings</BackLink>
       <Banner>
         <h1 className="text-2xl font-bold tracking-tight">Notification Providers</h1>
-        <p className="mt-0.5 text-[13px] text-teal-100">Real SMTP and Twilio credentials used to send every tenant&apos;s Email, SMS and WhatsApp notifications. Each tenant is still gated by its own enable/quota on the Tenant 360 view.</p>
+        <p className="mt-0.5 text-[13px] text-teal-100">Real SMTP and messaging credentials used to send every tenant&apos;s Email, SMS and WhatsApp notifications. Each tenant is still gated by its own enable/quota on the Tenant 360 view.</p>
       </Banner>
 
       {settings.isError ? <ErrorNote what="notification provider settings" message={settings.error?.message} onRetry={() => void settings.refetch()} /> : null}
@@ -98,8 +110,8 @@ export default function NotificationProvidersSettingsPage() {
       <KpiGrid>
         <KpiCard index={0} label="SMTP" value={1} format={() => (d?.smtpHost ? 'Configured' : 'Using .env default')} fallbackCaption={d?.smtpHost ?? 'no host saved here'} color="var(--chart-1)" />
         <KpiCard index={1} label="SMTP password" value={1} format={() => (d?.hasSmtpPassword ? 'Stored' : 'Env var')} fallbackCaption={d?.hasSmtpPassword ? `masked ${d.smtpPasswordMasked ?? ''}` : 'no password saved here'} color="var(--chart-2)" />
-        <KpiCard index={2} label="Twilio" value={1} format={() => (d?.twilioConfigured ? 'Configured' : 'Not configured')} fallbackCaption={d?.twilioAccountSid ?? 'no account SID saved here'} color="var(--chart-6)" />
-        <KpiCard index={3} label="Twilio auth token" value={1} format={() => (d?.hasTwilioAuthToken ? 'Stored' : 'Env var')} fallbackCaption={d?.hasTwilioAuthToken ? `masked ${d.twilioAuthTokenMasked ?? ''}` : 'no token saved here'} color="var(--chart-4)" />
+        <KpiCard index={2} label="Messaging" value={1} format={() => (d?.kaleyraConfigured ? 'Configured' : 'Not configured')} fallbackCaption={d?.kaleyraSid ?? 'no SID saved here'} color="var(--chart-6)" />
+        <KpiCard index={3} label="Messaging API key" value={1} format={() => (d?.hasKaleyraApiKey ? 'Stored' : 'Env var')} fallbackCaption={d?.hasKaleyraApiKey ? `masked ${d.kaleyraApiKeyMasked ?? ''}` : 'no key saved here'} color="var(--chart-4)" />
       </KpiGrid>
 
       {settings.isPending || !form ? (
@@ -151,41 +163,48 @@ export default function NotificationProvidersSettingsPage() {
             </div>
           </Panel>
 
-          <Panel title="Twilio (SMS & WhatsApp)" hint="WhatsApp reuses this same Twilio account" index={1}>
+          <Panel title="Messaging (SMS & WhatsApp)" hint="WhatsApp reuses this same account" index={1}>
             <div className="space-y-4">
-              <Field label="Account SID" htmlFor="twilioAccountSid">
-                <input id="twilioAccountSid" className={FIELD} placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" value={form.twilioAccountSid} disabled={!canManage} onChange={(e) => setForm({ ...form, twilioAccountSid: e.target.value })} />
-              </Field>
-              <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3 text-[13px]">
-                <span className="font-semibold">Auth token status</span>
-                <Chip tone={clearTwilioAuthToken ? 'amber' : d?.hasTwilioAuthToken ? 'green' : 'slate'}>{clearTwilioAuthToken ? 'Will be cleared on save' : d?.hasTwilioAuthToken ? `Saved (${d.twilioAuthTokenMasked})` : 'Using environment variable'}</Chip>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Account SID" htmlFor="kaleyraSid">
+                  <input id="kaleyraSid" className={FIELD} placeholder="Ac4XXXXXXXXXXXXXXXXXXXXXXXXXX21f" value={form.kaleyraSid} disabled={!canManage} onChange={(e) => setForm({ ...form, kaleyraSid: e.target.value })} />
+                </Field>
+                <Field label="API region" htmlFor="kaleyraApiDomain">
+                  <select id="kaleyraApiDomain" className={FIELD} value={form.kaleyraApiDomain} disabled={!canManage} onChange={(e) => setForm({ ...form, kaleyraApiDomain: e.target.value })}>
+                    {API_DOMAINS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                  </select>
+                </Field>
               </div>
-              <Field label="Auth token" htmlFor="twilioAuthToken" hint="Write-only — a saved token is never shown back.">
+              <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3 text-[13px]">
+                <span className="font-semibold">API key status</span>
+                <Chip tone={clearApiKey ? 'amber' : d?.hasKaleyraApiKey ? 'green' : 'slate'}>{clearApiKey ? 'Will be cleared on save' : d?.hasKaleyraApiKey ? `Saved (${d.kaleyraApiKeyMasked})` : 'Using environment variable'}</Chip>
+              </div>
+              <Field label="API key" htmlFor="kaleyraApiKey" hint="Write-only — a saved key is never shown back.">
                 <input
-                  id="twilioAuthToken"
+                  id="kaleyraApiKey"
                   type="password"
                   autoComplete="off"
                   className={FIELD}
-                  placeholder={clearTwilioAuthToken ? 'Will be cleared on save' : d?.hasTwilioAuthToken ? 'Enter a new token to replace the saved one' : 'Not set — using the environment variable token'}
-                  value={twilioAuthTokenInput}
-                  disabled={!canManage || clearTwilioAuthToken}
-                  onChange={(e) => setTwilioAuthTokenInput(e.target.value)}
+                  placeholder={clearApiKey ? 'Will be cleared on save' : d?.hasKaleyraApiKey ? 'Enter a new key to replace the saved one' : 'Not set — using the environment variable key'}
+                  value={apiKeyInput}
+                  disabled={!canManage || clearApiKey}
+                  onChange={(e) => setApiKeyInput(e.target.value)}
                 />
               </Field>
-              {d?.hasTwilioAuthToken && canManage ? (
-                <button type="button" className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground" onClick={() => { setClearTwilioAuthToken((v) => !v); setTwilioAuthTokenInput(''); }}>
-                  {clearTwilioAuthToken ? 'Cancel clearing token' : 'Clear stored token'}
+              {d?.hasKaleyraApiKey && canManage ? (
+                <button type="button" className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground" onClick={() => { setClearApiKey((v) => !v); setApiKeyInput(''); }}>
+                  {clearApiKey ? 'Cancel clearing key' : 'Clear stored key'}
                 </button>
               ) : null}
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="SMS from number" htmlFor="twilioSmsFromNumber">
-                  <input id="twilioSmsFromNumber" className={FIELD} placeholder="+15551234567" value={form.twilioSmsFromNumber} disabled={!canManage} onChange={(e) => setForm({ ...form, twilioSmsFromNumber: e.target.value })} />
+                <Field label="SMS sender id" htmlFor="kaleyraSmsSenderId">
+                  <input id="kaleyraSmsSenderId" className={FIELD} placeholder="FITCLD" value={form.kaleyraSmsSenderId} disabled={!canManage} onChange={(e) => setForm({ ...form, kaleyraSmsSenderId: e.target.value })} />
                 </Field>
-                <Field label="WhatsApp from number" htmlFor="twilioWhatsappFromNumber">
-                  <input id="twilioWhatsappFromNumber" className={FIELD} placeholder="+15551234567" value={form.twilioWhatsappFromNumber} disabled={!canManage} onChange={(e) => setForm({ ...form, twilioWhatsappFromNumber: e.target.value })} />
+                <Field label="WhatsApp number" htmlFor="kaleyraWhatsappNumber">
+                  <input id="kaleyraWhatsappNumber" className={FIELD} placeholder="+15551234567" value={form.kaleyraWhatsappNumber} disabled={!canManage} onChange={(e) => setForm({ ...form, kaleyraWhatsappNumber: e.target.value })} />
                 </Field>
               </div>
-              <p className="text-xs text-muted-foreground">A Twilio trial account can only message numbers verified in the Twilio console, and outgoing messages carry a &quot;sent from a trial account&quot; prefix until upgraded.</p>
+              <p className="text-xs text-muted-foreground">WhatsApp only accepts a free-form message when the recipient has messaged your WhatsApp number within the last 24 hours — otherwise an approved message template is required.</p>
             </div>
           </Panel>
         </div>

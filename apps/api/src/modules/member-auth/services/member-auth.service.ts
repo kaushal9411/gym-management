@@ -103,7 +103,7 @@ export class MemberAuthService {
     return { member: this.toProfileDto(member), ...tokens };
   }
 
-  // ── Phone-number login (OTP, delivered by email for now) ───────────────
+  // ── Phone-number login (OTP, delivered by email + SMS when a phone is on file) ───────────────
 
   /** Never reveals whether the phone matches an account — same silent-success contract as `forgotPassword`. */
   async requestPhoneLoginOtp(phone: string): Promise<void> {
@@ -113,7 +113,7 @@ export class MemberAuthService {
     if (!credential || credential.status !== 'ACTIVE') return;
     if (credential.lockedUntil && credential.lockedUntil.getTime() > Date.now()) return;
 
-    await this.issueOtp(member.id, member.email, `${member.firstName} ${member.lastName}`.trim());
+    await this.issueOtp(member.id, member.email, `${member.firstName} ${member.lastName}`.trim(), member.phone);
   }
 
   async resendPhoneLoginOtp(phone: string): Promise<void> {
@@ -125,7 +125,7 @@ export class MemberAuthService {
       throw new AppError(ErrorCode.RATE_LIMITED, 'Please wait before requesting another code.', 429);
     }
 
-    await this.issueOtp(member.id, member.email, `${member.firstName} ${member.lastName}`.trim());
+    await this.issueOtp(member.id, member.email, `${member.firstName} ${member.lastName}`.trim(), member.phone);
   }
 
   /** Same shape as `login()`'s tail — the member plane has no 2FA cascade to honor, so a valid OTP goes straight to a session. */
@@ -442,7 +442,7 @@ export class MemberAuthService {
     );
   }
 
-  private async issueOtp(memberId: string, email: string, name: string): Promise<void> {
+  private async issueOtp(memberId: string, email: string, name: string, phone: string | null): Promise<void> {
     const code = generateNumericOtp(env.security.otpLength);
     const expiresAt = new Date(Date.now() + env.security.otpTtlSeconds * 1000);
     await this.otps.createOtp(this.tenantId, memberId, hashToken(code), 'MOBILE_LOGIN', expiresAt);
@@ -451,6 +451,7 @@ export class MemberAuthService {
       memberId,
       name,
       email,
+      phone,
       code,
       expiresInMinutes: Math.round(env.security.otpTtlSeconds / 60),
     });

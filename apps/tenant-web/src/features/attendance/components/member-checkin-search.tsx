@@ -13,10 +13,12 @@ interface MemberCheckinSearchProps {
   onSelect: (member: MemberListItem) => void;
   placeholder?: string;
   className?: string;
+  /** Show results in the page flow instead of floating over it, for use inside a card that clips overflow. */
+  inline?: boolean;
 }
 
 /** Debounced "Manual Member Search" — search-as-you-type over the Member Management list, used by the Check-In/Check-Out manual flow. */
-export function MemberCheckinSearch({ onSelect, placeholder, className }: MemberCheckinSearchProps) {
+export function MemberCheckinSearch({ onSelect, placeholder, className, inline }: MemberCheckinSearchProps) {
   const [query, setQuery] = React.useState('');
   const [debounced, setDebounced] = React.useState('');
   const [open, setOpen] = React.useState(false);
@@ -46,7 +48,7 @@ export function MemberCheckinSearch({ onSelect, placeholder, className }: Member
         />
       </div>
       {open && debounced.length >= 2 ? (
-        <div className="absolute z-10 mt-1.5 max-h-72 w-full overflow-auto rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-md">
+        <div className={cn('mt-1.5 max-h-72 w-full overflow-auto rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-md', !inline && 'absolute z-10')}>
           {results.isPending ? (
             <p className="p-3 text-sm text-muted-foreground">Searching…</p>
           ) : items.length === 0 ? (

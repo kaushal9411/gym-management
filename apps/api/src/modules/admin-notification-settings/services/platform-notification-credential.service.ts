@@ -13,13 +13,14 @@ export interface PlatformNotificationCredentialView {
   smtpPasswordMasked: string | null;
   smtpFromName: string | null;
   smtpFromAddress: string | null;
-  twilioAccountSid: string | null;
-  hasTwilioAuthToken: boolean;
-  twilioAuthTokenMasked: string | null;
-  twilioSmsFromNumber: string | null;
-  twilioWhatsappFromNumber: string | null;
-  /** Whether Twilio is actually usable right now — this row's fields, or the `.env` fallback, combined. */
-  twilioConfigured: boolean;
+  kaleyraSid: string | null;
+  hasKaleyraApiKey: boolean;
+  kaleyraApiKeyMasked: string | null;
+  kaleyraApiDomain: string | null;
+  kaleyraSmsSenderId: string | null;
+  kaleyraWhatsappNumber: string | null;
+  /** Whether Kaleyra is actually usable right now — this row's fields, or the `.env` fallback, combined. */
+  kaleyraConfigured: boolean;
 }
 
 export interface UpdatePlatformNotificationCredentialInput {
@@ -30,10 +31,11 @@ export interface UpdatePlatformNotificationCredentialInput {
   smtpPassword?: string;
   smtpFromName?: string;
   smtpFromAddress?: string;
-  twilioAccountSid?: string;
-  twilioAuthToken?: string;
-  twilioSmsFromNumber?: string;
-  twilioWhatsappFromNumber?: string;
+  kaleyraSid?: string;
+  kaleyraApiKey?: string;
+  kaleyraApiDomain?: string;
+  kaleyraSmsSenderId?: string;
+  kaleyraWhatsappNumber?: string;
 }
 
 export interface ResolvedSmtpConfig {
@@ -46,11 +48,12 @@ export interface ResolvedSmtpConfig {
   fromAddress: string;
 }
 
-export interface ResolvedTwilioConfig {
-  accountSid: string;
-  authToken: string;
-  smsFromNumber?: string;
-  whatsappFromNumber?: string;
+export interface ResolvedMessagingConfig {
+  sid: string;
+  apiKey: string;
+  apiDomain: string;
+  smsSenderId?: string;
+  whatsappNumber?: string;
 }
 
 /** `''` clears a string field back to "use the `.env` fallback" (`null`); `undefined` (not present in the request) leaves it untouched. */
@@ -64,11 +67,11 @@ function stringField(value: string | undefined): string | null | undefined {
  * upsert against since there's no natural one for a true singleton). Secrets
  * follow `TenantAiSettings`'s exact encrypt-on-write/decrypt-only-at-send
  * shape (`core/security/encryption.util.ts`), just platform-wide instead of
- * per-tenant. `resolveSmtpConfig`/`resolveTwilioConfig` are the only methods
- * that ever decrypt anything, and only when a real send is about to happen
- * (`mailer.ts`/`infrastructure/sms/twilio.client.ts`) — never cached past
- * that one call, so an admin's credential update takes effect on the very
- * next send with no restart/cache-invalidation needed.
+ * per-tenant. `resolveSmtpConfig`/`resolveMessagingConfig` are the only
+ * methods that ever decrypt anything, and only when a real send is about to
+ * happen (`mailer.ts`/`infrastructure/sms/kaleyra.client.ts`) — never cached
+ * past that one call, so an admin's credential update takes effect on the
+ * very next send with no restart/cache-invalidation needed.
  */
 export class PlatformNotificationCredentialService {
   private async findRow() {
@@ -86,12 +89,17 @@ export class PlatformNotificationCredentialService {
       smtpPasswordMasked: row?.smtpPasswordEncrypted ? this.safeMask(row.smtpPasswordEncrypted) : null,
       smtpFromName: row?.smtpFromName ?? null,
       smtpFromAddress: row?.smtpFromAddress ?? null,
-      twilioAccountSid: row?.twilioAccountSid ?? null,
-      hasTwilioAuthToken: Boolean(row?.twilioAuthTokenEncrypted),
-      twilioAuthTokenMasked: row?.twilioAuthTokenEncrypted ? this.safeMask(row.twilioAuthTokenEncrypted) : null,
-      twilioSmsFromNumber: row?.twilioSmsFromNumber ?? null,
-      twilioWhatsappFromNumber: row?.twilioWhatsappFromNumber ?? null,
-      twilioConfigured: Boolean((row?.twilioAccountSid ?? env.twilio.accountSid) && (row?.twilioAuthTokenEncrypted ? true : env.twilio.authToken)),
+      kaleyraSid: row?.kaleyraSid ?? null,
+      hasKaleyraApiKey: Boolean(row?.kaleyraApiKeyEncrypted),
+      kaleyraApiKeyMasked: row?.kaleyraApiKeyEncrypted ? this.safeMask(row.kaleyraApiKeyEncrypted) : null,
+      kaleyraApiDomain: row?.kaleyraApiDomain ?? null,
+      kaleyraSmsSenderId: row?.kaleyraSmsSenderId ?? null,
+      kaleyraWhatsappNumber: row?.kaleyraWhatsappNumber ?? null,
+      kaleyraConfigured: Boolean(
+        (row?.kaleyraSid ?? env.kaleyra.sid) &&
+          (row?.kaleyraApiKeyEncrypted ? true : env.kaleyra.apiKey) &&
+          (row?.kaleyraApiDomain ?? env.kaleyra.apiDomain),
+      ),
     };
   }
 
@@ -104,16 +112,17 @@ export class PlatformNotificationCredentialService {
       smtpUser: stringField(input.smtpUser),
       smtpFromName: stringField(input.smtpFromName),
       smtpFromAddress: stringField(input.smtpFromAddress),
-      twilioAccountSid: stringField(input.twilioAccountSid),
-      twilioSmsFromNumber: stringField(input.twilioSmsFromNumber),
-      twilioWhatsappFromNumber: stringField(input.twilioWhatsappFromNumber),
+      kaleyraSid: stringField(input.kaleyraSid),
+      kaleyraApiDomain: stringField(input.kaleyraApiDomain),
+      kaleyraSmsSenderId: stringField(input.kaleyraSmsSenderId),
+      kaleyraWhatsappNumber: stringField(input.kaleyraWhatsappNumber),
       updatedBy: adminUserId,
     };
     if (input.smtpPassword !== undefined) {
       data.smtpPasswordEncrypted = input.smtpPassword === '' ? null : encryptSecret(input.smtpPassword);
     }
-    if (input.twilioAuthToken !== undefined) {
-      data.twilioAuthTokenEncrypted = input.twilioAuthToken === '' ? null : encryptSecret(input.twilioAuthToken);
+    if (input.kaleyraApiKey !== undefined) {
+      data.kaleyraApiKeyEncrypted = input.kaleyraApiKey === '' ? null : encryptSecret(input.kaleyraApiKey);
     }
 
     if (existing) {
@@ -154,17 +163,19 @@ export class PlatformNotificationCredentialService {
     };
   }
 
-  /** Throws when Twilio isn't configured anywhere (DB row nor `.env`) — `twilio.client.ts` catches this and no-ops, same "never required to boot" pattern as every other optional integration. */
-  async resolveTwilioConfig(): Promise<ResolvedTwilioConfig> {
+  /** Throws when Kaleyra isn't configured anywhere (DB row nor `.env`) — `kaleyra.client.ts` catches this and no-ops, same "never required to boot" pattern as every other optional integration. */
+  async resolveMessagingConfig(): Promise<ResolvedMessagingConfig> {
     const row = await this.findRow();
-    const accountSid = row?.twilioAccountSid ?? env.twilio.accountSid;
-    const authToken = row?.twilioAuthTokenEncrypted ? decryptSecret(row.twilioAuthTokenEncrypted) : env.twilio.authToken;
-    if (!accountSid || !authToken) throw new Error('Twilio is not configured.');
+    const sid = row?.kaleyraSid ?? env.kaleyra.sid;
+    const apiKey = row?.kaleyraApiKeyEncrypted ? decryptSecret(row.kaleyraApiKeyEncrypted) : env.kaleyra.apiKey;
+    const apiDomain = row?.kaleyraApiDomain ?? env.kaleyra.apiDomain;
+    if (!sid || !apiKey || !apiDomain) throw new Error('Kaleyra is not configured.');
     return {
-      accountSid,
-      authToken,
-      smsFromNumber: row?.twilioSmsFromNumber ?? env.twilio.smsFromNumber,
-      whatsappFromNumber: row?.twilioWhatsappFromNumber ?? env.twilio.whatsappFromNumber,
+      sid,
+      apiKey,
+      apiDomain,
+      smsSenderId: row?.kaleyraSmsSenderId ?? env.kaleyra.smsSenderId,
+      whatsappNumber: row?.kaleyraWhatsappNumber ?? env.kaleyra.whatsappNumber,
     };
   }
 }

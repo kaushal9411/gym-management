@@ -6,12 +6,13 @@ export interface PlatformNotificationCredentials {
   smtpPasswordMasked: string | null;
   smtpFromName: string | null;
   smtpFromAddress: string | null;
-  twilioAccountSid: string | null;
-  hasTwilioAuthToken: boolean;
-  twilioAuthTokenMasked: string | null;
-  twilioSmsFromNumber: string | null;
-  twilioWhatsappFromNumber: string | null;
-  twilioConfigured: boolean;
+  kaleyraSid: string | null;
+  hasKaleyraApiKey: boolean;
+  kaleyraApiKeyMasked: string | null;
+  kaleyraApiDomain: string | null;
+  kaleyraSmsSenderId: string | null;
+  kaleyraWhatsappNumber: string | null;
+  kaleyraConfigured: boolean;
 }
 
 export interface UpdatePlatformNotificationCredentialsInput {
@@ -21,8 +22,9 @@ export interface UpdatePlatformNotificationCredentialsInput {
   smtpPassword?: string;
   smtpFromName?: string;
   smtpFromAddress?: string;
-  twilioAccountSid?: string;
-  twilioAuthToken?: string;
-  twilioSmsFromNumber?: string;
-  twilioWhatsappFromNumber?: string;
+  kaleyraSid?: string;
+  kaleyraApiKey?: string;
+  kaleyraApiDomain?: string;
+  kaleyraSmsSenderId?: string;
+  kaleyraWhatsappNumber?: string;
 }

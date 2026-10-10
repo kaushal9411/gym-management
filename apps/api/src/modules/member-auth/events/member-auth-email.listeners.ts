@@ -4,6 +4,8 @@ import { logger } from '../../../core/logging/logger';
 import { loadEmailBranding } from '../../../infrastructure/mail/branding';
 import { memberPortalInviteEmail, otpCodeEmail, passwordResetEmail } from '../../../infrastructure/mail/templates/auth-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
+import { enqueueSms } from '../../../infrastructure/queue/sms.queue';
+import { toE164 } from '../../../infrastructure/sms/phone.util';
 import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import { tenantService } from '../../tenants/service/tenant.service';
 import { MemberAuthEvents } from '../services/member-auth.service';
@@ -38,12 +40,21 @@ export function registerMemberAuthEmailListeners(): void {
     await enqueueEmail({ to: payload.email, subject: template.subject, html: template.html });
   });
 
-  eventBus.onEvent<{ tenantId: string; memberId: string; name: string; email: string; code: string; expiresInMinutes: number }>(
+  eventBus.onEvent<{ tenantId: string; memberId: string; name: string; email: string; phone?: string | null; code: string; expiresInMinutes: number }>(
     MemberAuthEvents.OtpIssued,
     async (payload) => {
       const branding = await loadEmailBranding(payload.tenantId);
       const template = otpCodeEmail(branding, payload.name, payload.code, payload.expiresInMinutes);
       await enqueueEmail({ to: payload.email, subject: template.subject, html: template.html });
+      // Never gated by the tenant's SMS quota/toggle (same reasoning as the email leg above) — an OTP must always attempt to go out.
+      if (payload.phone) {
+        await enqueueSms({
+          tenantId: payload.tenantId,
+          to: toE164(payload.phone),
+          body: `${branding.tenantName}: your verification code is ${payload.code}. Valid for ${payload.expiresInMinutes} minutes.`,
+          skipDeliveryLog: true,
+        });
+      }
     },
   );
 }

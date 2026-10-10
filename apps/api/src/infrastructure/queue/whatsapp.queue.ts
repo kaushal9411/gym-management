@@ -8,7 +8,7 @@ export interface WhatsAppJobData {
   body: string;
 }
 
-/** Producer side of async WhatsApp delivery — same shape as `sms.queue.ts`, through the same Twilio account (`whatsapp:` prefix applied in `twilio.client.ts`). */
+/** Producer side of async WhatsApp delivery — same shape as `sms.queue.ts`, through the same Kaleyra account as SMS (`kaleyra.client.ts`'s `sendWhatsApp`). */
 export const whatsappQueue = new Queue<WhatsAppJobData, void, 'send'>('notifications-whatsapp', {
   connection: createQueueConnection(),
   defaultJobOptions: {

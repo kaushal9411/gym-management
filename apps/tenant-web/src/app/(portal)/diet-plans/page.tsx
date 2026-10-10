@@ -3,7 +3,7 @@
 import { useDebouncedValue } from '@/hooks/use-debounced-value';
 import * as React from 'react';
 import Link from 'next/link';
-import { Apple, Plus } from 'lucide-react';
+import { Apple, Plus, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -98,6 +98,13 @@ export default function DietPlansPage() {
                 <Apple className="size-4" /> Food library
               </Link>
             </Button>
+            {canCreate ? (
+              <Button variant="secondary" size="sm" asChild>
+                <Link href="/diet-plans/smart">
+                  <Sparkles className="size-4" /> Smart Diet Plan
+                </Link>
+              </Button>
+            ) : null}
             {canCreate ? (
               <Button size="sm" asChild data-solid className="border-0 bg-white text-indigo-700 shadow-lg hover:bg-white/90">
                 <Link href="/diet-plans/new">
