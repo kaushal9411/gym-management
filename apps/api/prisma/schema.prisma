@@ -252,6 +252,8 @@ model Tenant {
   memberPayments        MemberPayment[]
   memberPaymentRefunds  MemberPaymentRefund[]
   incomeEntries         Income[]
+  leads                 Lead[]
+  leadActivities        LeadActivity[]
   expenses              Expense[]
   scheduledReports      ScheduledReport[]
   tenantAnnouncements   TenantAnnouncement[]
@@ -406,6 +408,9 @@ model User {
   memberPaymentsRecorded       MemberPayment[]       @relation("MemberPaymentRecordedBy")
   memberPaymentRefundsIssued   MemberPaymentRefund[] @relation("MemberPaymentRefundedBy")
   incomeEntriesRecorded        Income[]              @relation("IncomeRecordedBy")
+  leadsAssigned                Lead[]                @relation("LeadAssignedTo")
+  leadsCreated                 Lead[]                @relation("LeadCreatedBy")
+  leadActivitiesCreated        LeadActivity[]        @relation("LeadActivityCreatedBy")
   expensesRecorded             Expense[]             @relation("ExpenseRecordedBy")
   scheduledReportsCreated      ScheduledReport[]     @relation("ScheduledReportCreatedBy")
   tenantAnnouncementsCreated   TenantAnnouncement[]  @relation("TenantAnnouncementCreatedBy")
@@ -830,6 +835,7 @@ model MembershipPlan {
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   memberships Membership[]
+  leads       Lead[]
 
   @@unique([tenantId, planCode])
   @@index([tenantId])
@@ -944,6 +950,7 @@ model Member {
   freezes          MembershipFreeze[]
   documents        MemberDocument[]
   bodyMeasurements BodyMeasurement[]
+  leadConversion   Lead?             @relation("LeadConvertedMember")
   attendances      Attendance[]
   workoutPlans     MemberWorkoutPlan[]
   dietPlans        MemberDietPlan[]
@@ -2624,6 +2631,7 @@ model Branch {
   invoices            MemberInvoice[]
   payments            MemberPayment[]
   incomeEntries       Income[]
+  leads               Lead[]
   expenses            Expense[]
   scheduledReports    ScheduledReport[]
   tenantAnnouncements TenantAnnouncement[]
@@ -3965,4 +3973,128 @@ model TenantAdminTags {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_admin_tags")
+}
+
+// ── Lead & Enquiry tracking (Prompt 129) ────────────────────────────────────
+
+enum LeadSource {
+  WALK_IN
+  PHONE_CALL
+  WEBSITE
+  SOCIAL_MEDIA
+  REFERRAL
+  ADVERTISEMENT
+  OTHER
+
+  @@map("lead_source")
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  VISIT_SCHEDULED
+  TRIAL_DONE
+  NEGOTIATION
+  CONVERTED
+  LOST
+
+  @@map("lead_status")
+}
+
+enum LeadLostReason {
+  PRICE_TOO_HIGH
+  NOT_INTERESTED
+  JOINED_COMPETITOR
+  LOCATION_TOO_FAR
+  TIMING_NOT_RIGHT
+  NO_RESPONSE
+  OTHER
+
+  @@map("lead_lost_reason")
+}
+
+enum LeadActivityType {
+  NOTE
+  CALL
+  WHATSAPP
+  EMAIL
+  VISIT
+  TRIAL
+  FOLLOW_UP
+  STATUS_CHANGE
+  ASSIGNMENT
+  CREATED
+  CONVERTED
+
+  @@map("lead_activity_type")
+}
+
+/// A prospect / walk-in enquiry. Phone/email are stored in plaintext (unlike
+/// `Member`) because the list searches them; `phoneKey` = last 10 digits of
+/// the phone, the normalised duplicate-detection key.
+model Lead {
+  id                String          @id @default(uuid()) @db.Uuid
+  tenantId          String          @map("tenant_id") @db.Uuid
+  branchId          String?         @map("branch_id") @db.Uuid
+  name              String          @db.VarChar(160)
+  phone             String          @db.VarChar(30)
+  phoneKey          String          @map("phone_key") @db.VarChar(15)
+  email             String?         @db.VarChar(200)
+  gender            Gender?
+  source            LeadSource      @default(WALK_IN)
+  sourceDetail      String?         @map("source_detail") @db.VarChar(200)
+  status            LeadStatus      @default(NEW)
+  interestedPlanId  String?         @map("interested_plan_id") @db.Uuid
+  interest          String?
+  assignedToUserId  String?         @map("assigned_to_user_id") @db.Uuid
+  nextFollowUpAt    DateTime?       @map("next_follow_up_at")
+  expectedJoinDate  DateTime?       @map("expected_join_date") @db.Date
+  lostReason        LeadLostReason? @map("lost_reason")
+  lostNote          String?         @map("lost_note")
+  lostAt            DateTime?       @map("lost_at")
+  notes             String?
+  convertedMemberId String?         @unique @map("converted_member_id") @db.Uuid
+  convertedAt       DateTime?       @map("converted_at")
+  lastActivityAt    DateTime        @default(now()) @map("last_activity_at")
+  createdByUserId   String?         @map("created_by_user_id") @db.Uuid
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+  deletedAt         DateTime?       @map("deleted_at")
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  interestedPlan  MembershipPlan?  @relation(fields: [interestedPlanId], references: [id], onDelete: SetNull)
+  assignedTo      User?            @relation("LeadAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  createdBy       User?            @relation("LeadCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  convertedMember Member?          @relation("LeadConvertedMember", fields: [convertedMemberId], references: [id], onDelete: SetNull)
+  activities      LeadActivity[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, assignedToUserId])
+  @@index([tenantId, nextFollowUpAt])
+  @@index([tenantId, phoneKey])
+  @@index([tenantId, branchId, createdAt])
+  @@map("leads")
+}
+
+model LeadActivity {
+  id              String           @id @default(uuid()) @db.Uuid
+  tenantId        String           @map("tenant_id") @db.Uuid
+  leadId          String           @map("lead_id") @db.Uuid
+  type            LeadActivityType
+  note            String?
+  outcome         String?          @db.VarChar(120)
+  fromStatus      LeadStatus?      @map("from_status")
+  toStatus        LeadStatus?      @map("to_status")
+  scheduledFor    DateTime?        @map("scheduled_for")
+  createdByUserId String?          @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lead      Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation("LeadActivityCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, leadId, createdAt])
+  @@map("lead_activities")
 }

@@ -33,7 +33,9 @@ export function errorHandlerMiddleware(
       }));
     }
 
-    sendError(res, err.httpStatus, err.message, errors);
+    // Optional structured payload (e.g. the matching records on a 409 duplicate) — only when the thrower opts in.
+    const responseData = (err.details?.responseData as Record<string, unknown> | undefined) ?? null;
+    sendError(res, err.httpStatus, err.message, errors, responseData);
     return;
   }
 

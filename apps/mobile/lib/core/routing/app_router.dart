@@ -119,6 +119,11 @@ import '../../features/settings/presentation/gym_settings_screen.dart';
 import '../../features/settings/presentation/invoice_settings_screen.dart';
 import '../../features/settings/presentation/security_policy_screen.dart';
 import '../../features/settings/presentation/sessions_screen.dart';
+import '../../features/leads/presentation/lead_detail_screen.dart';
+import '../../features/leads/presentation/lead_follow_ups_screen.dart';
+import '../../features/leads/presentation/lead_form_screen.dart';
+import '../../features/leads/presentation/lead_list_screen.dart';
+import '../../features/leads/presentation/leads_dashboard_screen.dart';
 import '../../features/support/presentation/support_ticket_detail_screen.dart';
 import '../../features/support/presentation/support_ticket_form_screen.dart';
 import '../../features/support/presentation/support_tickets_screen.dart';
@@ -458,6 +463,35 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         builder: (context, state) => ScheduleAnnouncementScreen(
           announcement: state.extra as Announcement,
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.leads,
+        builder: (context, state) => const LeadsDashboardScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.leadList,
+        builder: (context, state) => LeadListScreen(
+          args: state.extra is LeadListArgs
+              ? state.extra! as LeadListArgs
+              : const LeadListArgs(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.leadForm,
+        builder: (context, state) => LeadFormScreen(
+          args: state.extra is LeadFormArgs
+              ? state.extra! as LeadFormArgs
+              : const LeadFormArgs(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.leadDetail,
+        builder: (context, state) =>
+            LeadDetailScreen(leadId: state.extra! as String),
+      ),
+      GoRoute(
+        path: AppRoutes.leadFollowUps,
+        builder: (context, state) => const LeadFollowUpsScreen(),
       ),
       GoRoute(
         path: AppRoutes.support,

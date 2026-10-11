@@ -65,6 +65,11 @@ class AppRoutes {
   static const announcements = '/announcements';
   static const announcementForm = '/announcements/form';
   static const scheduleAnnouncement = '/announcements/schedule';
+  static const leads = '/leads';
+  static const leadList = '/leads/list';
+  static const leadForm = '/leads/form';
+  static const leadDetail = '/leads/detail';
+  static const leadFollowUps = '/leads/follow-ups';
   static const support = '/support';
   static const supportTicketForm = '/support/form';
   static const supportTicketDetail = '/support/detail';

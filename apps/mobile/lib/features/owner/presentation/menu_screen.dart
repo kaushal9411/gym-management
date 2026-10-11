@@ -32,6 +32,13 @@ const _sections = <String, List<MenuEntry>>{
   ],
   'People': [
     MenuEntry(
+      icon: Icons.person_search_outlined,
+      title: 'Leads & Enquiries',
+      subtitle: 'Pipeline, follow-ups, conversions',
+      route: AppRoutes.leads,
+      permissions: ['leads:view'],
+    ),
+    MenuEntry(
       icon: Icons.groups_outlined,
       title: 'Team & Access',
       subtitle: 'Staff, roles, permissions',

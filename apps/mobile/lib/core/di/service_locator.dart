@@ -41,6 +41,7 @@ import '../../repositories/reports_repository.dart';
 import '../../repositories/scheduled_report_repository.dart';
 import '../../repositories/search_repository.dart';
 import '../../repositories/staff_repository.dart';
+import '../../repositories/lead_repository.dart';
 import '../../repositories/support_ticket_repository.dart';
 import '../../repositories/tenant_notification_repository.dart';
 import '../../repositories/tenant_role_repository.dart';
@@ -119,6 +120,7 @@ void setupServiceLocator() {
   getIt.registerLazySingleton<AnnouncementRepository>(
     () => AnnouncementRepository(getIt()),
   );
+  getIt.registerLazySingleton<LeadRepository>(() => LeadRepository(getIt()));
   getIt.registerLazySingleton<SupportTicketRepository>(
     () => SupportTicketRepository(getIt()),
   );

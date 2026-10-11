@@ -49,6 +49,7 @@ import { memberPaymentRouter } from '../../modules/finance/routes/member-payment
 import { razorpayWebhookRouter } from '../../modules/finance/routes/razorpay-webhook.routes';
 import { invitationRouter } from '../../modules/invitations/routes/invitation.routes';
 import { invoiceRouter } from '../../modules/invoice/routes/invoice.routes';
+import { leadRouter } from '../../modules/leads/routes/lead.routes';
 import { measurementRouter } from '../../modules/measurements/routes/measurement.routes';
 import { memberAuthRouter } from '../../modules/member-auth/routes/member-auth.routes';
 import { memberPortalRouter } from '../../modules/member-portal/routes/member-portal.routes';
@@ -153,6 +154,7 @@ v1Router.use('/support/tickets', ticketRouter);
 v1Router.use('/members', memberRouter);
 v1Router.use('/membership-plans', membershipPlanRouter);
 v1Router.use('/measurements', measurementRouter);
+v1Router.use('/leads', leadRouter);
 // Mounted before the authenticated `/attendance-devices` CRUD router below —
 // this one has no `authenticateMiddleware` at all (a physical device/bridge
 // agent can't do an interactive login), same "no user JWT" reasoning as the

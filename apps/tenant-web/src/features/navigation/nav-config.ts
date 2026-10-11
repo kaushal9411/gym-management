@@ -23,6 +23,7 @@ import {
   Store,
   Ruler,
   Fingerprint,
+  Target,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -48,6 +49,15 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, section: 'Overview' },
   { key: 'members', label: 'Members', href: '/members', icon: Users, permission: 'members:view', featureFlag: 'members', section: 'People' },
+  {
+    // No featureFlag on purpose: leads are not a plan module, access is permission-only.
+    key: 'leads',
+    label: 'Leads',
+    href: '/leads',
+    icon: Target,
+    permission: 'leads:view',
+    section: 'People',
+  },
   { key: 'staff', label: 'Staff & Access', href: '/users', icon: UserCog, permission: 'users:read', featureFlag: 'staff', section: 'People' },
   {
     key: 'staff-management',

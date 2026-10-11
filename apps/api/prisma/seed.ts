@@ -205,6 +205,14 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'measurements:create', description: "Log a new body measurement entry for a member" },
   { key: 'measurements:update', description: 'Edit an existing body measurement entry' },
   { key: 'measurements:delete', description: 'Delete a body measurement entry' },
+  // Lead & Enquiry tracking (Prompt 129)
+  { key: 'leads:view', description: 'View leads and enquiries, follow-ups and lead analytics' },
+  { key: 'leads:create', description: 'Create a lead / log an enquiry' },
+  { key: 'leads:update', description: 'Edit a lead, change its status, log activities' },
+  { key: 'leads:delete', description: 'Soft-delete a lead' },
+  { key: 'leads:convert', description: 'Convert a lead into a member' },
+  { key: 'leads:assign', description: 'Assign or reassign a lead to a staff member' },
+  { key: 'leads:export', description: 'Export leads as CSV' },
 ];
 
 const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
@@ -241,6 +249,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'support:view', 'support:create', 'ai:use',
     'classes:view', 'classes:create', 'classes:update', 'classes:delete', 'classes:restore', 'bookings:manage',
     'measurements:view', 'measurements:create', 'measurements:update', 'measurements:delete',
+    'leads:view', 'leads:create', 'leads:update', 'leads:delete', 'leads:convert', 'leads:assign', 'leads:export',
   ],
   TRAINER: [
     'members:read', 'attendance:create', 'attendance:read',
@@ -311,6 +320,8 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     // Front-desk books/cancels members into class sessions — same tier as
     // recording payments or checking a member in/out.
     'classes:view', 'bookings:manage',
+    // Front-desk handles enquiries day-to-day; deleting, assigning and exporting leads stay Manager-only.
+    'leads:view', 'leads:create', 'leads:update', 'leads:convert',
   ],
   MEMBER: ['profile:read', 'profile:update', 'bookings:create', 'bookings:read', 'payments:read', 'chat:use', 'support:view', 'support:create'],
 };

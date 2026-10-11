@@ -51,7 +51,7 @@ export function MultiSeriesChart({ data, series, format = 'money', height = 300 
             </defs>
             <CartesianGrid vertical={false} stroke={GRID_STROKE} />
             <XAxis dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} minTickGap={20} />
-            <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} width={52} tickFormatter={(v: number) => fmt(v, true)} />
+            <YAxis allowDecimals={format !== 'number'} tick={AXIS_TICK} tickLine={false} axisLine={false} width={52} tickFormatter={(v: number) => fmt(v, true)} />
             <Tooltip cursor={{ fill: 'color-mix(in oklch, var(--muted) 60%, transparent)' }} content={<ChartTooltip format={fmt} />} />
             {defs.map((s) => {
               if (hidden.has(s.key)) return null;

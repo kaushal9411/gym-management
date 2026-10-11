@@ -29,6 +29,13 @@ import '../../../shared/widgets/user_avatar.dart';
 const _sections = <String, List<MenuEntry>>{
   'People': [
     MenuEntry(
+      icon: Icons.person_search_outlined,
+      title: 'Leads & Enquiries',
+      subtitle: 'Pipeline, follow-ups, conversions',
+      route: AppRoutes.leads,
+      permissions: ['leads:view'],
+    ),
+    MenuEntry(
       icon: Icons.storefront_outlined,
       title: 'Branches',
       subtitle: 'Locations & capacity',
