@@ -1,15 +1,26 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import '../storage/secure_storage.dart';
+
+const _defaultAppName = 'FitCloud';
+const _channelId = 'fitcloud_default';
 
 /// One shared channel for every FCM push — Android requires every
 /// notification belong to a channel (API 26+) or it's silently dropped, and
 /// this app shipped with none configured, which is why nothing ever showed.
 /// `Importance.high` + `playSound: true` is what actually produces a
 /// heads-up banner with sound, not just a silent tray entry.
-const _channel = AndroidNotificationChannel(
-  'fitcloud_default',
-  'FitCloud Notifications',
-  description: 'Membership, payment, and activity alerts from FitCloud.',
+///
+/// Not `const` (unlike the original) — its name/description embed the
+/// super-admin-configured platform name, resolved in [initLocalNotifications]
+/// and rebuilt there each call (idempotent either way, same as channel
+/// creation itself).
+AndroidNotificationChannel _channel = const AndroidNotificationChannel(
+  _channelId,
+  '$_defaultAppName Notifications',
+  description: 'Membership, payment, and activity alerts from $_defaultAppName.',
   importance: Importance.high,
   playSound: true,
 );
@@ -19,6 +30,20 @@ const _channel = AndroidNotificationChannel(
 /// to the main isolate's DI container or any other app state.
 final FlutterLocalNotificationsPlugin localNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
+
+/// Reads the platform name `main.dart` cached on a successful resolve.
+/// Constructs its own `SecureStorage`/`FlutterSecureStorage` directly
+/// (rather than via `getIt`) since the background isolate has no DI
+/// container — this is the one path that has to work from both.
+Future<String> _readAppName() async {
+  try {
+    final name =
+        await SecureStorage(const FlutterSecureStorage()).readAppName();
+    return (name != null && name.trim().isNotEmpty) ? name : _defaultAppName;
+  } catch (_) {
+    return _defaultAppName;
+  }
+}
 
 /// Idempotent — Android notification channel creation is a no-op if the
 /// channel already exists, so calling this from both the main isolate (at
@@ -35,6 +60,15 @@ final FlutterLocalNotificationsPlugin localNotificationsPlugin =
 Future<void> initLocalNotifications({
   void Function(NotificationResponse)? onTap,
 }) async {
+  final appName = await _readAppName();
+  _channel = AndroidNotificationChannel(
+    _channelId,
+    '$appName Notifications',
+    description: 'Membership, payment, and activity alerts from $appName.',
+    importance: Importance.high,
+    playSound: true,
+  );
+
   await localNotificationsPlugin.initialize(
     const InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
@@ -55,7 +89,7 @@ Future<void> initLocalNotifications({
 /// fire while backgrounded, never while the app is open, and would risk a
 /// duplicate if both paths tried to show something.
 Future<void> showPushNotification(RemoteMessage message) async {
-  final title = message.data['title'] as String? ?? 'FitCloud';
+  final title = message.data['title'] as String? ?? await _readAppName();
   final body = message.data['body'] as String?;
   await localNotificationsPlugin.show(
     message.hashCode,

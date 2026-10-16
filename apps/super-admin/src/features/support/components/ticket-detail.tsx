@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, Panel, Segmented } from '@/features/dashboard/components/ui';
 import { useNow } from '@/features/dashboard/components/use-now';
 import { Banner, BackLink, ConfirmRow, NotFoundCard } from '@/features/payments/components/pay-kit';
+import { usePlatformName } from '@/features/platform/hooks/use-platform-config';
 import { fmtDateTime, relTime, statusLabel } from '@/features/tenants/components/detail/tabs/_shared/kit';
 import { cn } from '@/lib/utils';
 import { toTicketError, useAddTicketNote, useCloseTicket, useSetTicketStatus, useTicket } from '../hooks/use-tickets';
@@ -51,6 +52,7 @@ function Bubble({ who, when, text, tone, index, label, mine }: { who: string; wh
 
 export function TicketDetailPage() {
   const params = useParams<{ ticketId: string }>();
+  const platformName = usePlatformName();
   const id = params.ticketId;
   const now = useNow();
   const { data: ticket, isLoading, isError, error, refetch } = useTicket(id);
@@ -113,7 +115,7 @@ export function TicketDetailPage() {
           <div className={cn('space-y-2 rounded-xl border p-3', mode === 'note' ? 'border-dashed border-amber-400/70 bg-amber-50/60 dark:border-amber-500/40 dark:bg-amber-500/5' : 'bg-muted/30')}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Segmented label="Message type" value={mode} onChange={setMode} options={[{ value: 'reply', label: 'Reply to tenant' }, { value: 'note', label: 'Internal note' }]} />
-              <p className="text-xs text-muted-foreground">{mode === 'reply' ? `Visible to ${ticket.createdByEmail}` : 'Only visible to FitCloud staff'}</p>
+              <p className="text-xs text-muted-foreground">{mode === 'reply' ? `Visible to ${ticket.createdByEmail}` : `Only visible to ${platformName} staff`}</p>
             </div>
             <label className="sr-only" htmlFor="ticket-compose">{mode === 'reply' ? 'Reply to the tenant' : 'Internal note'}</label>
             <textarea

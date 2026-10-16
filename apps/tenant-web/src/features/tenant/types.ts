@@ -48,6 +48,8 @@ export interface Tenant {
   /** Enabled module keys — the source of truth for the sidebar's feature-flag filtering. */
   featureFlags: string[];
   defaultBranch: TenantBranch | null;
+  /** The super-admin-configured platform/app name (`GET /public/platform-config`) — distinct from `name`, which is the GYM's name. Used for "Powered by <platformName>" style copy regardless of which tenant is loaded. Defaults to "FitCloud" until resolved or if the call fails. */
+  platformName: string;
 }
 
 /** The platform itself, used on non-tenant hosts (localhost, fitcloud.com) or when resolution fails. */
@@ -69,4 +71,5 @@ export const PLATFORM_TENANT: Tenant = {
   subscription: null,
   featureFlags: [],
   defaultBranch: null,
+  platformName: 'FitCloud',
 };

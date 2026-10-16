@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../bloc/platform/platform_config_cubit.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
@@ -133,7 +135,7 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
         const SizedBox(height: 16),
         if (ticket.notes.isEmpty)
           Text(
-            'No replies yet — the FitCloud team will respond here.',
+            'No replies yet — the ${context.watch<PlatformConfigCubit>().state.appName} team will respond here.',
             style: AppText.body(color: AppColors.inkFaint),
           )
         else
@@ -173,7 +175,7 @@ class _ReplyBubble extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${note.authorName ?? 'FitCloud Support'} · '
+            '${note.authorName ?? '${context.watch<PlatformConfigCubit>().state.appName} Support'} · '
             '${_relative(note.createdAt)}',
             style: AppText.body(
               size: 11,

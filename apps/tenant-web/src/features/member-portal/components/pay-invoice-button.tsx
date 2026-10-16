@@ -7,6 +7,7 @@ import { LoadingButton } from '@/components/ui/loading-button';
 import { loadRazorpayScript } from '@/lib/razorpay-checkout';
 import { useStartInvoicePaymentCheckout, useVerifyInvoicePaymentCheckout } from '../hooks/use-member-portal';
 import { toMemberAuthServiceError } from '../services/member-api-client';
+import { useTenant } from '@/features/tenant/tenant-provider';
 
 interface PayInvoiceButtonProps {
   invoiceId: string;
@@ -25,6 +26,7 @@ interface PayInvoiceButtonProps {
  * not just invoices.
  */
 export function PayInvoiceButton({ invoiceId, invoiceNumber, size = 'sm' }: PayInvoiceButtonProps) {
+  const tenant = useTenant();
   const [opening, setOpening] = React.useState(false);
   const startCheckout = useStartInvoicePaymentCheckout();
   const verifyCheckout = useVerifyInvoicePaymentCheckout();
@@ -47,7 +49,7 @@ export function PayInvoiceButton({ invoiceId, invoiceNumber, size = 'sm' }: PayI
           amount: result.amount,
           currency: result.currency,
           order_id: result.orderId,
-          name: 'FitCloud',
+          name: tenant.platformName,
           description: `Invoice ${invoiceNumber}`,
           theme: { color: '#16a34a' },
           handler: (response) => {

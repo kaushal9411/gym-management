@@ -17,6 +17,7 @@ import { KpiCard } from '@/features/dashboard/components/kpi-card';
 import { Chip, EmptyNote, Panel } from '@/features/dashboard/components/ui';
 import { fmtInt } from '@/features/dashboard/components/format';
 import { useNow } from '@/features/dashboard/components/use-now';
+import { usePlatformName } from '@/features/platform/hooks/use-platform-config';
 import { Banner, ConfirmRow } from '@/features/payments/components/pay-kit';
 import { ErrorNote, MixBar, relTime, statusLabel } from '@/features/tenants/components/detail/tabs/_shared/kit';
 import { cn } from '@/lib/utils';
@@ -50,6 +51,7 @@ function AudiencePicker({ value, onChange }: { value: AnnouncementAudience; onCh
 }
 
 function Preview({ title, body, audience, channel }: { title: string; body: string; audience: AnnouncementAudience; channel?: NotificationChannel }) {
+  const platformName = usePlatformName();
   return (
     <div aria-label="Preview" className="rounded-[12px] border bg-muted/30 p-3">
       <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Preview</p>
@@ -58,7 +60,7 @@ function Preview({ title, body, audience, channel }: { title: string; body: stri
         <div className="min-w-0">
           <p className="break-words text-sm font-semibold">{title || 'Your title appears here'}</p>
           <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] text-muted-foreground">{body || 'Your message body appears here.'}</p>
-          <p className="mt-1.5 text-[11px] text-muted-foreground">To {audLabel(audience)}{channel ? ` · ${statusLabel(channel)}` : ''} · from FitCloud</p>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">To {audLabel(audience)}{channel ? ` · ${statusLabel(channel)}` : ''} · from {platformName}</p>
         </div>
       </div>
     </div>

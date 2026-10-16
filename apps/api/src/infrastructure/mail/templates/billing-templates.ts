@@ -38,7 +38,7 @@ export function subscriptionActivatedEmail(
         tone: 'success',
         preheader: `Your subscription is now ${verb} — ${planName}.`,
       },
-      `${paragraph(`Hi ${escapeHtml(ownerName)}, the FitCloud subscription for ${strong(branding.tenantName)} has been ${escapeHtml(verb)}. Everything included in your plan is available right now.`)}
+      `${paragraph(`Hi ${escapeHtml(ownerName)}, the ${escapeHtml(branding.platformName ?? 'FitCloud')} subscription for ${strong(branding.tenantName)} has been ${escapeHtml(verb)}. Everything included in your plan is available right now.`)}
        ${keyFacts([
          { icon: '🏷️', label: 'Plan', value: planName },
          { icon: '✅', label: 'Status', value: 'Active', color: '#15803d' },
@@ -70,7 +70,7 @@ export function invoiceEmail(branding: EmailBranding, ownerName: string, invoice
         preheader: `Invoice ${invoiceNumber} — total ${total}.`,
         footerHint: 'preferences',
       },
-      `${paragraph(`Hi ${escapeHtml(ownerName)}, here’s the latest FitCloud invoice for ${strong(branding.tenantName)}.`)}
+      `${paragraph(`Hi ${escapeHtml(ownerName)}, here’s the latest ${escapeHtml(branding.platformName ?? 'FitCloud')} invoice for ${strong(branding.tenantName)}.`)}
        ${detailTable(
          detailRow('🏢', 'Billed to', escapeHtml(branding.tenantName)) +
            detailRow('📄', 'Invoice number', escapeHtml(invoiceNumber)) +
@@ -86,7 +86,7 @@ export function invoiceEmail(branding: EmailBranding, ownerName: string, invoice
 
 export function subscriptionExpiredEmail(branding: EmailBranding, ownerName: string, opts?: { billingUrl?: string }) {
   return {
-    subject: 'Your FitCloud subscription has expired',
+    subject: `Your ${branding.platformName ?? 'FitCloud'} subscription has expired`,
     html: renderEmailLayout(
       branding,
       {
@@ -97,7 +97,7 @@ export function subscriptionExpiredEmail(branding: EmailBranding, ownerName: str
         tone: 'danger',
         preheader: 'Your subscription has expired — renew to restore access.',
       },
-      `${paragraph(`Hi ${escapeHtml(ownerName)}, the FitCloud subscription for ${strong(branding.tenantName)} has expired after an extended grace period, so portal access is paused.`)}
+      `${paragraph(`Hi ${escapeHtml(ownerName)}, the ${escapeHtml(branding.platformName ?? 'FitCloud')} subscription for ${strong(branding.tenantName)} has expired after an extended grace period, so portal access is paused.`)}
        ${alertBox('info', 'Your data is safe', 'Members, invoices and settings are preserved. They’ll be right where you left them as soon as you renew.')}
        ${sectionTitle('To get back up and running')}
        ${stepList([{ title: 'Open the billing page' }, { title: 'Choose a plan and complete payment' }, { title: 'Sign in — access is restored straight away' }], branding.primaryColor)}

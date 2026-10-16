@@ -23,6 +23,7 @@ import { UnsavedChangesBar } from '@/features/gym-settings/components/unsaved-ch
 import { EmploymentInfoFields, type EmploymentInfoValue } from '@/features/staff/components/employment-info-fields';
 import { StaffBranchesEditor } from '@/features/staff/components/staff-branches-editor';
 import { STAFF_ROLE_OPTIONS, StaffRoleSelect } from '@/features/staff/components/staff-role-select';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import {
   toStaffError,
   useAssignStaffBranches,
@@ -89,6 +90,7 @@ function toFormState(staffMember: StaffDetail): FormState {
 type StatusActionKind = 'activate' | 'deactivate' | 'suspend' | 'restore' | 'delete';
 
 export default function StaffDetailPage() {
+  const tenant = useTenant();
   const params = useParams<{ staffId: string }>();
   const { hasPermission } = usePermissions();
   const staffId = params.staffId;
@@ -459,7 +461,7 @@ export default function StaffDetailPage() {
               </header>
               <div className="space-y-3 p-5">
                 <p className="text-sm text-muted-foreground">
-                  {roleLabel(data.role)} access to FitCloud can be paused or removed. Every step asks for confirmation and deleted accounts can be restored.
+                  {roleLabel(data.role)} access to {tenant.platformName} can be paused or removed. Every step asks for confirmation and deleted accounts can be restored.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {showLifecycle ? (

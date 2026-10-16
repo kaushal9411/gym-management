@@ -10,6 +10,7 @@ import { FormAlert } from '@/features/auth/components/form-alert';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { toOnboardingError, useStartOnboardingCheckout, useVerifyOnboardingCheckout } from '../../hooks/use-onboarding';
 import { useOnboardingWizard } from '../../store/onboarding-wizard-context';
+import { useTenant } from '@/features/tenant/tenant-provider';
 
 function formatMoney(amount: number, currency: string): string {
   try {
@@ -33,6 +34,7 @@ function formatMoney(amount: number, currency: string): string {
  * or starting the trial instead both still work.
  */
 export function PaymentStep() {
+  const tenant = useTenant();
   const { state, dispatch } = useOnboardingWizard();
   const startCheckout = useStartOnboardingCheckout();
   const verifyCheckout = useVerifyOnboardingCheckout();
@@ -70,7 +72,7 @@ export function PaymentStep() {
           amount: result.amount,
           currency: result.currency,
           order_id: result.orderId,
-          name: 'FitCloud',
+          name: tenant.platformName,
           description: `${plan.name} plan (${(state.billingCycle ?? 'MONTHLY').toLowerCase()})`,
           theme: { color: '#ff5a1f' },
           handler: (response) => {

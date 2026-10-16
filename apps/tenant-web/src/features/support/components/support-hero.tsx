@@ -7,6 +7,7 @@ import type * as React from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AnimatedNumber } from '@/features/reports/components/ui';
 import { EASE, useMotionSafe } from '@/features/reports/lib/motion';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { SUPPORT_HERO_GRADIENT } from '../lib/ticket-meta';
 
 export interface SupportHeroStat {
@@ -16,6 +17,7 @@ export interface SupportHeroStat {
 
 /** Support-gradient hero (same family as ReportsHero; the shared one can't take a custom accent). */
 export function SupportHero({ stats, statsLoading, actions }: { stats?: SupportHeroStat[]; statsLoading?: boolean; actions?: React.ReactNode }) {
+  const tenant = useTenant();
   const m = useMotionSafe();
   return (
     <motion.section
@@ -41,7 +43,7 @@ export function SupportHero({ stats, statsLoading, actions }: { stats?: SupportH
             Help centre
           </p>
           <h1 className="my-2 text-[32px] font-extrabold leading-[1.05] sm:text-[40px]">Support</h1>
-          <p className="max-w-[580px] text-[15px] leading-relaxed text-white/90">Find quick answers, raise a ticket and follow it until the FitCloud team has it sorted.</p>
+          <p className="max-w-[580px] text-[15px] leading-relaxed text-white/90">Find quick answers, raise a ticket and follow it until the {tenant.platformName} team has it sorted.</p>
           {stats ? (
             <motion.div className="mt-5 flex flex-wrap gap-7" variants={m.staggerContainer(0.08, 0.25)} initial={m.initial} animate="show">
               {stats.map((s) => (

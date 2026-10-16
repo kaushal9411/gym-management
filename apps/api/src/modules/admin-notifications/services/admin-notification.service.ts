@@ -3,9 +3,9 @@ import type { AnnouncementAudience } from '@prisma/client';
 import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { prisma } from '../../../infrastructure/database/prisma';
-import { PLATFORM_BRANDING } from '../../../infrastructure/mail/templates/base-layout';
 import { platformAnnouncementEmail } from '../../../infrastructure/mail/templates/notification-templates';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
+import { getPlatformBranding } from '../../admin-settings/services/platform-config.service';
 import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import { tenantNotificationService } from '../../tenant-notifications/services/tenant-notification.service';
 
@@ -29,7 +29,7 @@ export async function dispatchNotification(notification: { id: string; title: st
   const tenants = await tenantsForAudience(notification.audience);
 
   if (notification.channel === 'EMAIL') {
-    const { html } = platformAnnouncementEmail(PLATFORM_BRANDING, notification.title, notification.body);
+    const { html } = platformAnnouncementEmail(await getPlatformBranding(), notification.title, notification.body);
     for (const tenant of tenants) {
       const owner = tenant.users[0];
       if (owner) await sendGatedEmail(tenant.id, { to: owner.email, subject: notification.title, html });

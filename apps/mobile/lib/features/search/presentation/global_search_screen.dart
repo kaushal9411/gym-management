@@ -1,8 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../bloc/platform/platform_config_cubit.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
@@ -142,9 +144,10 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
 
   Widget _buildBody(GlobalSearchResult? result) {
     if (_controller.text.trim().length < 2) {
-      return const AppEmptyState(
+      final appName = context.watch<PlatformConfigCubit>().state.appName;
+      return AppEmptyState(
         icon: Icons.search_rounded,
-        title: 'Search FitCloud',
+        title: 'Search $appName',
         message: 'Type at least 2 characters to search members, staff and '
             'branches.',
       );

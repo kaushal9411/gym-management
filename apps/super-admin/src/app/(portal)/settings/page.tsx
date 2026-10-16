@@ -8,12 +8,16 @@
  */
 import * as React from 'react';
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Bot, ChevronRight, RotateCcw, Send } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useHasPermission } from '@/features/auth/hooks/use-auth';
+import { usePlatformName } from '@/features/platform/hooks/use-platform-config';
 import { KpiCard } from '@/features/dashboard/components/kpi-card';
 import { fmtInt } from '@/features/dashboard/components/format';
 import { Chip, Panel } from '@/features/dashboard/components/ui';
@@ -56,8 +60,30 @@ export default function SettingsPage() {
   const upsert = useUpsertSetting();
   const canManage = useHasPermission('settings:manage');
   const now = useNow();
+  const queryClient = useQueryClient();
+  const platformName = usePlatformName();
+  const [appNameDraft, setAppNameDraft] = React.useState<string | null>(null);
+  const [savingAppName, setSavingAppName] = React.useState(false);
+  const appNameValue = appNameDraft ?? platformName;
+  const appNameDirty = appNameDraft !== null && appNameDraft.trim() !== platformName;
   const [drafts, setDrafts] = React.useState<Record<string, string>>({});
   const [saving, setSaving] = React.useState(false);
+
+  const saveAppName = async () => {
+    const trimmed = appNameValue.trim();
+    if (!trimmed) { toast.error('App name is required'); return; }
+    setSavingAppName(true);
+    try {
+      await upsert.mutateAsync({ key: 'platform_identity', category: 'platform', value: { appName: trimmed } });
+      setAppNameDraft(null);
+      await queryClient.invalidateQueries({ queryKey: ['platform-config'] });
+      toast.success('Platform name saved');
+    } catch (err) {
+      toast.error(toSettingsError(err).message);
+    } finally {
+      setSavingAppName(false);
+    }
+  };
 
   const settings = settingsQ.data;
   const byKey = React.useMemo(() => new Map((settings ?? []).map((s) => [s.key, s])), [settings]);
@@ -94,6 +120,23 @@ export default function SettingsPage() {
         <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
         <p className="mt-0.5 text-[13px] text-teal-100">System configuration — stored as key-value JSON, editable per integration.</p>
       </Banner>
+
+      <Panel title="Platform Branding" hint="The product name shown across the super-admin portal, the tenant-web portal and the mobile app." index={0}>
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[240px] flex-1 space-y-1.5">
+            <Label htmlFor="platform-app-name">App name</Label>
+            <Input
+              id="platform-app-name"
+              value={appNameValue}
+              maxLength={60}
+              disabled={!canManage}
+              onChange={(e) => setAppNameDraft(e.target.value)}
+              placeholder="FitCloud"
+            />
+          </div>
+          <Button onClick={() => void saveAppName()} disabled={!canManage || savingAppName || !appNameDirty}>{savingAppName ? 'Saving…' : 'Save'}</Button>
+        </div>
+      </Panel>
 
       {settingsQ.isError ? <ErrorNote what="settings" message={settingsQ.error?.message} onRetry={() => void settingsQ.refetch()} /> : null}
 

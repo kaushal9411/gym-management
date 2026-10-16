@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google';
 
 import { WebVitalsReporter } from '@/components/web-vitals-reporter';
+import { resolvePlatformName } from '@/features/platform/resolve-platform-name';
 import { AppProviders } from '@/providers/app-providers';
 
 import './globals.css';
@@ -10,10 +11,13 @@ import './globals.css';
 const plexSans = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'], display: 'swap', variable: '--font-plex-sans', fallback: ['system-ui', 'Segoe UI', 'Arial', 'sans-serif'] });
 const plexMono = IBM_Plex_Mono({ subsets: ['latin'], weight: ['400', '500'], display: 'swap', variable: '--font-plex-mono', fallback: ['ui-monospace', 'Menlo', 'Consolas', 'monospace'] });
 
-export const metadata: Metadata = {
-  title: { default: 'FitCloud Admin', template: '%s · FitCloud Admin' },
-  description: 'FitCloud Super Admin portal — internal use only.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const appName = await resolvePlatformName();
+  return {
+    title: { default: `${appName} Admin`, template: `%s · ${appName} Admin` },
+    description: `${appName} Super Admin portal — internal use only.`,
+  };
+}
 
 /**
  * Root layout for the Super Admin portal (`admin.fitcloud.com`) — no

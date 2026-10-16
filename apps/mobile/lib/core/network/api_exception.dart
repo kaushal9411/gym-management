@@ -28,7 +28,7 @@ class ApiException implements Exception {
 
   /// True for connectivity failures (no response reached the server at all).
   factory ApiException.network() => const ApiException(
-        message: 'Can\'t reach FitCloud. Check your connection and try again.',
+        message: 'Can\'t reach the server. Check your connection and try again.',
       );
 
   factory ApiException.fromResponseData(dynamic data, int? statusCode) {

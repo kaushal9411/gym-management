@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { FormAlert } from '@/features/auth/components/form-alert';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { BillingHero } from '@/features/billing/components/billing-hero';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { PanelCard } from '@/features/finance/components/payments/payments-ui';
 import { toBillingError, useBillingAddress, useSaveBillingAddress } from '@/features/billing/hooks/use-billing';
 
@@ -30,6 +31,7 @@ const billingAddressSchema = z.object({
 type BillingAddressFormValues = z.infer<typeof billingAddressSchema>;
 
 export default function BillingAddressPage() {
+  const tenant = useTenant();
   const { data: address, isLoading } = useBillingAddress();
   const saveAddress = useSaveBillingAddress();
   const [serverError, setServerError] = React.useState<string | null>(null);
@@ -76,7 +78,7 @@ export default function BillingAddressPage() {
 
   return (
     <div className="space-y-6">
-      <BillingHero subtitle="The address and tax ID printed on your FitCloud invoices." />
+      <BillingHero subtitle={`The address and tax ID printed on your ${tenant.platformName} invoices.`} />
 
       {isLoading ? (
         <Skeleton className="h-96 rounded-xl" />

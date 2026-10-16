@@ -68,5 +68,5 @@ export async function buildPlatformContext(permissions: string[]): Promise<strin
   );
 
   const body = lines.filter((line): line is string => line != null).join('\n');
-  return `Current snapshot of the FitCloud platform (only sections the current admin has permission to view are included):\n${body || '(No context sections available for this admin\'s permissions.)'}`;
+  return `Current snapshot of the platform (only sections the current admin has permission to view are included):\n${body || '(No context sections available for this admin\'s permissions.)'}`;
 }

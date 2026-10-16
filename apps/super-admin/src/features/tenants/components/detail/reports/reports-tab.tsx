@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { fmtCompact, fmtInt, fmtMoney, fmtMoneyCompact } from '@/features/dashboard/components/format';
 import { KpiCard } from '@/features/dashboard/components/kpi-card';
 import { Bar, ChartTooltip, CountUp, EmptyNote, Panel, Segmented } from '@/features/dashboard/components/ui';
+import { usePlatformName } from '@/features/platform/hooks/use-platform-config';
 import { useTenantReports, type ReportRange, type TenantReports } from '@/features/tenants/api/detail';
 import { cn } from '@/lib/utils';
 
@@ -133,6 +134,7 @@ const PRINT_CSS = `@media print{
 }`;
 
 export function ReportsTab({ tenantId, tenantName }: { tenantId: string; tenantSlug?: string; tenantName: string; canManage?: boolean }) {
+  const platformName = usePlatformName();
   const reduce = !!useReducedMotion();
   const [range, setRange] = useState<ReportRange>('6m');
   const [compare, setCompare] = useState(true);
@@ -186,7 +188,7 @@ export function ReportsTab({ tenantId, tenantName }: { tenantId: string; tenantS
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {!k ? Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-[96px] animate-pulse rounded-[14px] bg-muted" />) : (
           <>
-            <KpiCard index={0} color="var(--chart-1)" label="Revenue paid to FitCloud" value={Number(k.revenuePaid.value)} previous={num(k.revenuePaid.previous)} format={fmtMoneyCompact} fallbackCaption={RANGE_LABEL[range]} />
+            <KpiCard index={0} color="var(--chart-1)" label={`Revenue paid to ${platformName}`} value={Number(k.revenuePaid.value)} previous={num(k.revenuePaid.previous)} format={fmtMoneyCompact} fallbackCaption={RANGE_LABEL[range]} />
             <KpiCard index={1} color="var(--chart-2)" label="Member growth (net)" value={Number(k.memberGrowth.value)} previous={num(k.memberGrowth.previous)} format={signed} deltaMode="abs" fallbackCaption="new − lost" />
             <KpiCard index={2} color="var(--chart-6)" label="Check-ins / day" value={Number(k.checkInsPerDay.value)} previous={num(k.checkInsPerDay.previous)} format={(v) => String(Math.round(v * 10) / 10)} fallbackCaption="daily average" />
             {k.retention90d ? <KpiCard index={3} color="var(--chart-3)" label="90-day retention" value={Number(k.retention90d.value)} previous={num(k.retention90d.previous)} format={(v) => `${Math.round(v)}%`} deltaMode="abs" absSuffix=" pts" fallbackCaption="of members joined 90d ago" /> : <StaticKpi label="90-day retention" value="—" sub="no members joined 90d ago" color="var(--chart-3)" />}
@@ -227,7 +229,7 @@ export function ReportsTab({ tenantId, tenantName }: { tenantId: string; tenantS
           <Heatmap cells={r?.checkInHeatmap ?? []} />
         </ChartCard>
 
-        <ChartCard className="lg:col-span-5" title="Revenue paid to FitCloud" hint="platform payments per month, not member payments" index={3} loading={loading} empty={!r || rev.every((m) => m.amount === 0)}>
+        <ChartCard className="lg:col-span-5" title={`Revenue paid to ${platformName}`} hint="platform payments per month, not member payments" index={3} loading={loading} empty={!r || rev.every((m) => m.amount === 0)}>
           <div className="h-[130px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={rev} margin={{ left: -8, top: 6 }}>

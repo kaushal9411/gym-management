@@ -6,8 +6,8 @@ const esc = (v: unknown): string => {
 };
 
 /** Builds a CSV of exactly what the dashboard shows (KPIs + daily series). Client-side only. */
-export function buildOverviewCsv(o: DashboardOverview, range: OverviewRange): string {
-  const rows: unknown[][] = [['FitCloud platform overview'], ['Range', range, o.range.from, o.range.to], ['Generated', o.generatedAt], [], ['KPI', 'Value', 'Previous period']];
+export function buildOverviewCsv(o: DashboardOverview, range: OverviewRange, platformName: string): string {
+  const rows: unknown[][] = [[`${platformName} platform overview`], ['Range', range, o.range.from, o.range.to], ['Generated', o.generatedAt], [], ['KPI', 'Value', 'Previous period']];
   const k = o.kpis;
   const add = (label: string, v: { value: number | string; previous?: number | string | null } | null | undefined) => { if (v) rows.push([label, v.value, v.previous ?? '']); };
   add('Tenants total', k.tenantsTotal); add('New tenants', k.newTenants); add('Active tenants', k.activeTenants); add('In trial', k.trialTenants);

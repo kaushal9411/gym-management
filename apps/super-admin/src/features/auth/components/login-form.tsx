@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { ADMIN_ROUTES } from '@/constants/routes';
+import { usePlatformName } from '@/features/platform/hooks/use-platform-config';
 import { toAdminError, useLogin } from '../hooks/use-auth';
 import { FormAlert } from './form-alert';
 import { LoadingButton } from './loading-button';
@@ -38,6 +39,7 @@ const DARK_FIELD_CLASS =
 
 export function LoginForm() {
   const router = useRouter();
+  const platformName = usePlatformName();
   const login = useLogin();
   const [serverError, setServerError] = React.useState<string | null>(null);
   const [emailFocused, setEmailFocused] = React.useState(false);
@@ -89,7 +91,7 @@ export function LoginForm() {
             <ShieldCheck className="size-8 text-orange-400" strokeWidth={1.75} aria-hidden />
           </div>
           <div>
-            <p className="text-lg font-bold uppercase tracking-wide text-white">FitCloud Admin</p>
+            <p className="text-lg font-bold uppercase tracking-wide text-white">{platformName} Admin</p>
             <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">Super Admin Portal</p>
           </div>
         </div>
@@ -201,7 +203,7 @@ export function LoginForm() {
       </motion.div>
 
       <motion.p variants={itemVariants} className="mt-8 text-center text-[11px] text-white/25">
-        FitCloud Admin · Internal use only
+        {platformName} Admin · Internal use only
       </motion.p>
     </motion.div>
   );

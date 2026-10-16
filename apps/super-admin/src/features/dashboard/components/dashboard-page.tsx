@@ -7,6 +7,7 @@ import { Download, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useHasPermission } from '@/features/auth/hooks/use-auth';
+import { usePlatformName } from '@/features/platform/hooks/use-platform-config';
 import { OVERVIEW_QUERY_KEY, useDashboardOverview, useDashboardStats } from '../hooks/use-dashboard';
 import type { DashboardOverview, OverviewRange } from '../types';
 import { AtRiskTenants, FailedPayments, TrialsEndingSoon } from './action-panels';
@@ -60,6 +61,7 @@ function Skeletons() {
 }
 
 export function DashboardPage() {
+  const platformName = usePlatformName();
   const qc = useQueryClient();
   const now = useNow(30_000);
   const canRead = useHasPermission('tenants:read');
@@ -112,7 +114,7 @@ export function DashboardPage() {
           <Button variant="outline" size="icon" aria-label="Refresh data" title="Refresh" onClick={() => void qc.invalidateQueries({ queryKey: [...OVERVIEW_QUERY_KEY] })}>
             <RefreshCw className={`size-4 ${ov.isFetching ? 'animate-spin' : ''}`} aria-hidden />
           </Button>
-          <Button variant="outline" disabled={!data} onClick={() => data && downloadCsv(`fitcloud-overview-${range}-${new Date().toISOString().slice(0, 10)}.csv`, buildOverviewCsv(data, range))}>
+          <Button variant="outline" disabled={!data} onClick={() => data && downloadCsv(`fitcloud-overview-${range}-${new Date().toISOString().slice(0, 10)}.csv`, buildOverviewCsv(data, range, platformName))}>
             <Download className="size-4" aria-hidden />Export report
           </Button>
         </div>

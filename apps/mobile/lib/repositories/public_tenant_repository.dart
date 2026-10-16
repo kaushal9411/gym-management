@@ -76,6 +76,25 @@ class PublicTenantRepository {
     }
   }
 
+  /// `GET /public/platform-config` — the super-admin-configured platform/app
+  /// name, no auth required. Unlike every other call in this class, this
+  /// never throws: it's a cosmetic value (app title, menu copy, notification
+  /// channel name), never worth blocking startup or surfacing an error for,
+  /// so any failure just falls back to the static default.
+  Future<String> getPlatformConfig() async {
+    try {
+      final response =
+          await _dio.get<Map<String, dynamic>>('/public/platform-config');
+      final appName = (response.data?['data'] as Map<String, dynamic>?)?[
+          'appName'] as String?;
+      return (appName != null && appName.trim().isNotEmpty)
+          ? appName
+          : 'FitCloud';
+    } catch (_) {
+      return 'FitCloud';
+    }
+  }
+
   ApiException _mapError(DioException e) {
     if (e.type == DioExceptionType.connectionError ||
         e.type == DioExceptionType.connectionTimeout) {

@@ -12,15 +12,17 @@
 
 export interface EmailBranding {
   tenantName: string;
-  /** Any CSS colour string the tenant stored (#hex, rgb(), oklch()). Unparseable values fall back to the FitCloud indigo. */
+  /** Any CSS colour string the tenant stored (#hex, rgb(), oklch()). Unparseable values fall back to the default indigo. */
   primaryColor?: string;
   logoUrl?: string;
   /** Optional support address shown in the footer (only pass real data). */
   supportEmail?: string;
   /** Optional support phone shown in the sign-off (only pass real data). */
   supportPhone?: string;
-  /** Platform-originated mail (FitCloud itself) rather than a gym's mail. */
+  /** Platform-originated mail (the SaaS itself) rather than a gym's mail. */
   isPlatform?: boolean;
+  /** The super-admin-configured platform/app name — set by `loadEmailBranding`/`getPlatformBranding` on every branding object, tenant or not. Falls back to "FitCloud" wherever absent (e.g. hand-built branding in a test). */
+  platformName?: string;
 }
 
 export type HeroTone = 'brand' | 'success' | 'warning' | 'danger' | 'info';
@@ -168,7 +170,8 @@ export function renderEmailLayout(branding: EmailBranding, hero: HeroOptions, bo
   const support = branding.supportEmail
     ? ` Questions? <a href="mailto:${escapeHtml(branding.supportEmail)}" style="color:#5f6676;">${escapeHtml(branding.supportEmail)}</a>`
     : '';
-  const sentBy = isPlatform ? `FitCloud &middot; gym management platform` : `${name} &middot; Sent via FitCloud`;
+  const platformName = branding.platformName ?? 'FitCloud';
+  const sentBy = isPlatform ? `${escapeHtml(platformName)} &middot; gym management platform` : `${name} &middot; Sent via ${escapeHtml(platformName)}`;
 
   return `<!doctype html>
 <html lang="en">
@@ -358,14 +361,15 @@ export function linkList(items: Array<{ label: string; url: string; description?
 /** Help line + sign-off: "Need help?" with the gym's real contact details when known, then "Regards, <Tenant> Team". */
 export function signature(branding: EmailBranding, line = 'Regards,'): string {
   const isPlatform = branding.isPlatform || branding.tenantName === 'FitCloud';
+  const platformName = branding.platformName ?? 'FitCloud';
   const contacts = [
     branding.supportEmail ? `<a href="mailto:${escapeHtml(branding.supportEmail)}" class="fc-accent" style="color:#4f46e5;">${escapeHtml(branding.supportEmail)}</a>` : '',
     branding.supportPhone ? escapeHtml(branding.supportPhone) : '',
   ].filter(Boolean);
   const help = contacts.length
-    ? `<p class="fc-text" style="margin:18px 0 0;font-size:14px;line-height:1.6;color:#2b2f3b;"><strong class="fc-strong" style="color:#14151f;">Need help?</strong> Contact ${isPlatform ? 'FitCloud support' : escapeHtml(branding.tenantName)} at ${contacts.join(' or ')}.</p>`
+    ? `<p class="fc-text" style="margin:18px 0 0;font-size:14px;line-height:1.6;color:#2b2f3b;"><strong class="fc-strong" style="color:#14151f;">Need help?</strong> Contact ${isPlatform ? `${escapeHtml(platformName)} support` : escapeHtml(branding.tenantName)} at ${contacts.join(' or ')}.</p>`
     : '';
-  return `${help}<p class="fc-text" style="margin:18px 0 4px;font-size:15px;line-height:1.6;color:#2b2f3b;">${escapeHtml(line)}<br/>${isPlatform ? 'The FitCloud Team' : `${escapeHtml(branding.tenantName)} Team`}</p>`;
+  return `${help}<p class="fc-text" style="margin:18px 0 4px;font-size:15px;line-height:1.6;color:#2b2f3b;">${escapeHtml(line)}<br/>${isPlatform ? `The ${escapeHtml(platformName)} Team` : `${escapeHtml(branding.tenantName)} Team`}</p>`;
 }
 
 /** Currency amount with the tenant's own symbol and en-IN digit grouping. */

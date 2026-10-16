@@ -1,5 +1,17 @@
+import { ValidationError } from '../../../core/errors/app-error';
+import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
+
+import { PLATFORM_IDENTITY_SETTING_KEY, PLATFORM_NAME_CACHE_KEY } from './platform-config.service';
+
+/** `platform_identity`'s value shape is the one key-value pair worth a dedicated check — everything else is intentionally free-form JSON. */
+function validatePlatformIdentity(value: unknown): void {
+  const appName = (value as { appName?: unknown } | null)?.appName;
+  if (typeof appName !== 'string' || !appName.trim() || appName.trim().length > 60) {
+    throw new ValidationError('appName must be a non-empty string of at most 60 characters', { key: PLATFORM_IDENTITY_SETTING_KEY });
+  }
+}
 
 /**
  * "Company Information, SMTP, SMS Gateway, Payment Gateway Keys, Storage
@@ -18,11 +30,14 @@ export class AdminSettingsService {
   }
 
   async upsert(key: string, category: string, value: unknown, adminUserId: string, adminRole: string) {
+    if (key === PLATFORM_IDENTITY_SETTING_KEY) validatePlatformIdentity(value);
+
     const setting = await prisma.systemSetting.upsert({
       where: { key },
       create: { key, category, value: value as object },
       update: { value: value as object, category },
     });
+    if (key === PLATFORM_IDENTITY_SETTING_KEY) await cache.del(PLATFORM_NAME_CACHE_KEY);
     await adminAuditLogRepository.record({ adminUserId, actorRole: adminRole, action: 'admin.system_setting_updated', entityType: 'SystemSetting', entityId: key });
     return setting;
   }

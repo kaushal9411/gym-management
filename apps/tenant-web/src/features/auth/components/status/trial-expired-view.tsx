@@ -5,6 +5,7 @@ import { Hourglass, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { ContactSalesDialog } from '@/features/support/components/contact-sales-dialog';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { useAppSelector } from '@/store/hooks';
 import { StatusScreen } from '../status-screen';
 import { StatusShell } from './status-shell';
@@ -17,6 +18,7 @@ import { StatusShell } from './status-shell';
  */
 export function TrialExpiredView() {
   const isAuthenticated = useAppSelector((state) => state.auth.user !== null);
+  const tenant = useTenant();
 
   return (
     <StatusShell>
@@ -27,7 +29,7 @@ export function TrialExpiredView() {
         tone="warning"
         eyebrow="Trial ended"
         title="Your free trial has ended"
-        description="We hope FitCloud made running your gym easier! Pick a plan to keep your members, schedules and data exactly where you left them — nothing has been deleted."
+        description={`We hope ${tenant.platformName} made running your gym easier! Pick a plan to keep your members, schedules and data exactly where you left them — nothing has been deleted.`}
         footnote="Your data is retained for 14 days after trial expiry."
       >
         <Button asChild size="lg" className="w-full sm:w-auto">

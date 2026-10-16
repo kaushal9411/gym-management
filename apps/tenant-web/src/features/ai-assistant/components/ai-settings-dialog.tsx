@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { useAiConfig } from '../hooks/use-ai-assistant';
 
 /**
@@ -17,6 +18,7 @@ import { useAiConfig } from '../hooks/use-ai-assistant';
  * left guessing why the assistant is unavailable mid-chat.
  */
 export function AiSettingsDialog() {
+  const tenant = useTenant();
   const { data: config, isLoading } = useAiConfig();
   const { hasPermission } = usePermissions();
 
@@ -31,7 +33,7 @@ export function AiSettingsDialog() {
         <DialogHeader>
           <DialogTitle>AI Assistant configuration</DialogTitle>
           <DialogDescription>
-            {config?.usingOwnKey ? "Using this gym's own AI provider key." : "Using FitCloud's shared platform AI configuration."}
+            {config?.usingOwnKey ? "Using this gym's own AI provider key." : `Using ${tenant.platformName}'s shared platform AI configuration.`}
           </DialogDescription>
         </DialogHeader>
         {isLoading || !config ? (

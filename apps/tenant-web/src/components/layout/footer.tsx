@@ -8,7 +8,7 @@ export function Footer() {
 
   return (
     <footer className="border-t px-4 py-3.5 text-center text-xs text-muted-foreground/80">
-      &copy; {year} {tenant.name}. Powered by FitCloud
+      &copy; {year} {tenant.name}. Powered by {tenant.platformName}
       {tenant.subscription ? ` — ${tenant.subscription.planName} plan` : ''}.
     </footer>
   );

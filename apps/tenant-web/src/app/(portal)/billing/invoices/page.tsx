@@ -11,12 +11,14 @@ import { BillingHero } from '@/features/billing/components/billing-hero';
 import { EmptyBlock, formatDate, formatMoney, StatusPill, SummaryCard } from '@/features/billing/components/billing-ui';
 import { toBillingError, useInvoices } from '@/features/billing/hooks/use-billing';
 import { billingService } from '@/features/billing/services/billing.service';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { Chip, PanelCard } from '@/features/finance/components/payments/payments-ui';
 
 const FILTERS = ['ALL', 'PAID', 'OPEN', 'DRAFT', 'VOID', 'UNCOLLECTIBLE'] as const;
 type Filter = (typeof FILTERS)[number];
 
 export default function InvoicesPage() {
+  const tenant = useTenant();
   const { data: invoices, isLoading, isError, error } = useInvoices();
   const [downloadingId, setDownloadingId] = React.useState<string | null>(null);
   const [filter, setFilter] = React.useState<Filter>('ALL');
@@ -52,7 +54,7 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-6">
       <BillingHero
-        subtitle="Download invoices for your FitCloud subscription."
+        subtitle={`Download invoices for your ${tenant.platformName} subscription.`}
         statsLoading={isLoading}
         stats={[
           { value: list.length, label: 'Invoices' },

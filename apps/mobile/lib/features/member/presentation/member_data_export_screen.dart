@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../bloc/platform/platform_config_cubit.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
@@ -65,6 +67,7 @@ class _MemberDataExportScreenState extends State<MemberDataExportScreen> {
   @override
   Widget build(BuildContext context) {
     final export = _export;
+    final appName = context.watch<PlatformConfigCubit>().state.appName;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -161,7 +164,7 @@ class _MemberDataExportScreenState extends State<MemberDataExportScreen> {
                                   ),
                                   const SizedBox(height: 12),
                                   Text(
-                                    'Everything FitCloud stores about you, including '
+                                    'Everything $appName stores about you, including '
                                     'your profile. Ask the front desk for a copy to '
                                     'take away.',
                                     style: AppText.body(

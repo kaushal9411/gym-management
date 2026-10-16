@@ -252,7 +252,7 @@ export function StaffActivationView({ token }: { token: string }) {
             </motion.div>
 
             <motion.p variants={itemVariants} className="mt-8 text-center text-[11px] text-white/25">
-              Powered by <span className="font-semibold text-white/40">FitCloud</span> · © {new Date().getFullYear()}
+              Powered by <span className="font-semibold text-white/40">{tenant.platformName}</span> · © {new Date().getFullYear()}
             </motion.p>
           </motion.div>
         </motion.div>

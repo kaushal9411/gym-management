@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
+import '../../../bloc/platform/platform_config_cubit.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
@@ -330,7 +332,7 @@ class _CheckoutSheetState extends State<CheckoutSheet> {
         'amount': result.amount,
         'currency': result.currency,
         'order_id': result.orderId,
-        'name': 'FitCloud',
+        'name': context.read<PlatformConfigCubit>().state.appName,
         'description':
             '${widget.targetPlan.name} plan (${_billingCycle.toLowerCase()})',
         'theme': {'color': '#16a34a'},

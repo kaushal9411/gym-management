@@ -15,10 +15,10 @@ export async function generateMetadata(): Promise<Metadata> {
   const tenant = await resolveTenant(headerList.get('x-tenant-slug'));
   return {
     title: {
-      default: tenant.id === 'platform' ? 'FitCloud' : `${tenant.name} · FitCloud`,
+      default: tenant.id === 'platform' ? tenant.platformName : `${tenant.name} · ${tenant.platformName}`,
       template: `%s · ${tenant.name}`,
     },
-    description: `${tenant.name} member and staff portal, powered by FitCloud.`,
+    description: `${tenant.name} member and staff portal, powered by ${tenant.platformName}.`,
     // Falls back to the static app/favicon.ico when the tenant hasn't uploaded one.
     icons: tenant.branding.faviconUrl ? { icon: tenant.branding.faviconUrl } : undefined,
   };

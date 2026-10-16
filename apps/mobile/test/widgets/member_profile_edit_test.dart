@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:gym_saas_mobile/bloc/platform/platform_config_cubit.dart';
 import 'package:gym_saas_mobile/bloc/session/session_cubit.dart';
 import 'package:gym_saas_mobile/bloc/session/session_state.dart';
 import 'package:gym_saas_mobile/core/network/api_exception.dart';
@@ -23,15 +24,22 @@ class _MockRepo extends Mock implements MemberPortalRepository {}
 
 class _MockSession extends MockCubit<SessionState> implements SessionCubit {}
 
+class _MockPlatformConfig extends MockCubit<PlatformConfigState>
+    implements PlatformConfigCubit {}
+
 void main() {
   late _MockRepo repo;
   late _MockSession session;
+  late _MockPlatformConfig platformConfig;
 
   setUpAll(() => GoogleFonts.config.allowRuntimeFetching = false);
 
   setUp(() {
     repo = _MockRepo();
     session = _MockSession();
+    platformConfig = _MockPlatformConfig();
+    when(() => platformConfig.state)
+        .thenReturn(const PlatformConfigState('FitCloud'));
     when(
       () => session.memberProfileChanged(
         name: any(named: 'name'),
@@ -52,8 +60,11 @@ void main() {
     t.view.devicePixelRatio = 3;
     addTearDown(t.view.reset);
     await t.pumpWidget(
-      BlocProvider<SessionCubit>.value(
-        value: session,
+      MultiBlocProvider(
+        providers: [
+          BlocProvider<SessionCubit>.value(value: session),
+          BlocProvider<PlatformConfigCubit>.value(value: platformConfig),
+        ],
         child: MaterialApp(home: child),
       ),
     );

@@ -19,10 +19,12 @@ import { FormAlert } from '../form-alert';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { PasswordInput } from '../password-input';
 import { PasswordStrengthMeter } from '../password-strength-meter';
+import { useTenant } from '@/features/tenant/tenant-provider';
 
 /** Gym-owner registration — entered from the marketing site's pricing CTA. */
 export function RegisterForm() {
   const router = useRouter();
+  const tenant = useTenant();
   const registerGym = useRegisterGym();
   const [serverError, setServerError] = React.useState<string | null>(null);
 
@@ -78,7 +80,7 @@ export function RegisterForm() {
   return (
     <div className="space-y-6">
       <AuthHeader
-        title="Create your gym on FitCloud"
+        title={`Create your gym on ${tenant.platformName}`}
         subtitle="14-day free trial · no credit card required"
       />
 
@@ -225,7 +227,7 @@ export function RegisterForm() {
       </Card>
 
       <p className="text-center text-sm text-muted-foreground">
-        Already using FitCloud?{' '}
+        Already using {tenant.platformName}?{' '}
         <Button asChild variant="link" className="h-auto p-0 text-sm">
           <Link href={AUTH_ROUTES.login}>Sign in</Link>
         </Button>

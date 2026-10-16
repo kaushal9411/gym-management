@@ -151,7 +151,7 @@ export const JOB_REGISTRY: JobDefinition[] = [
   job({
     name: 'platform-subscription-billing-sweep',
     category: 'PAYMENT',
-    description: "Migrated lifecycle sweep for FitCloud's own tenant billing (trial/renewal reminders, auto-renew, grace period, suspension, expiry).",
+    description: "Migrated lifecycle sweep for the platform's own tenant billing (trial/renewal reminders, auto-renew, grace period, suspension, expiry).",
     cronPattern: '0 5 * * *',
     priority: 1,
     timeoutMs: 10 * MIN,

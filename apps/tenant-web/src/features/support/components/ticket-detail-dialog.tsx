@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Spinner } from '@/components/ui/spinner';
 import { avatarColor, initials } from '@/features/finance/components/payments/payments-ui';
 import { useMotionSafe } from '@/features/reports/lib/motion';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { useTicketDetail } from '../hooks/use-tickets';
 import { PRIORITY_META, STATUS_META, SUPPORT_HERO_GRADIENT } from '../lib/ticket-meta';
 import { TicketPriorityBadge, TicketStatusBadge } from './ticket-badges';
@@ -17,6 +18,7 @@ interface TicketDetailDialogProps {
 }
 
 export function TicketDetailDialog({ ticketId, onOpenChange }: TicketDetailDialogProps) {
+  const tenant = useTenant();
   const { data: ticket, isLoading } = useTicketDetail(ticketId);
   const m = useMotionSafe();
 
@@ -38,7 +40,7 @@ export function TicketDetailDialog({ ticketId, onOpenChange }: TicketDetailDialo
                 {STATUS_META[ticket.status].label} · {PRIORITY_META[ticket.priority].label} priority
               </p>
               <DialogTitle className="mt-1 pr-10 text-[22px] font-extrabold leading-tight">{ticket.subject}</DialogTitle>
-              <DialogDescription className="sr-only">Ticket details and replies from the FitCloud team.</DialogDescription>
+              <DialogDescription className="sr-only">Ticket details and replies from the {tenant.platformName} team.</DialogDescription>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-white/90">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-2.5 py-1">
                   <User className="size-3" aria-hidden /> {ticket.createdByName ?? ticket.createdByEmail}
@@ -59,7 +61,7 @@ export function TicketDetailDialog({ ticketId, onOpenChange }: TicketDetailDialo
                   <motion.ol className="relative space-y-4" variants={m.staggerContainer(0.08)} initial={m.initial} animate="show">
                     <span aria-hidden className="absolute bottom-2 left-[17px] top-2 w-px bg-border" />
                     {ticket.notes.map((note) => {
-                      const author = note.authorAdmin?.name ?? 'FitCloud team';
+                      const author = note.authorAdmin?.name ?? `${tenant.platformName} team`;
                       return (
                         <motion.li key={note.id} variants={m.listItem} className="relative flex gap-3">
                           <span className="z-10 flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-extrabold text-white ring-4 ring-card" style={{ backgroundColor: avatarColor(author) }}>

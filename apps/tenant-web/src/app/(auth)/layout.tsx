@@ -95,8 +95,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </main>
 
         <footer className="pb-6 text-center text-xs text-muted-foreground">
-          Powered by <span className="font-semibold">FitCloud</span> · ©{' '}
-          {new Date().getFullYear()} FitCloud, Inc.
+          Powered by <span className="font-semibold">{tenant.platformName}</span> · ©{' '}
+          {new Date().getFullYear()} {tenant.platformName}, Inc.
         </footer>
       </div>
     </div>
