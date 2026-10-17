@@ -189,7 +189,7 @@ class _ResetDoneConfirmation extends StatelessWidget {
           Container(
             width: 64,
             height: 64,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppColors.successSoft,
               shape: BoxShape.circle,
             ),

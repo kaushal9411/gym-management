@@ -294,7 +294,7 @@ class _MemberFormScreenState extends State<MemberFormScreen> {
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(
+                                  Icon(
                                     Icons.calendar_today_rounded,
                                     size: 15,
                                     color: AppColors.inkFaint,

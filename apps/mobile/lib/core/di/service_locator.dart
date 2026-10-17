@@ -4,6 +4,8 @@ import 'package:get_it/get_it.dart';
 
 import '../../bloc/branches/branch_list_cubit.dart';
 import '../../bloc/dashboard/dashboard_cubit.dart';
+import '../../bloc/dashboard/owner_dashboard_cubit.dart';
+import '../../bloc/theme/theme_cubit.dart';
 import '../../bloc/finance/finance_summary_cubit.dart';
 import '../../bloc/finance/payments_analytics_cubit.dart';
 import '../../bloc/reports/reports_overview_cubit.dart';
@@ -62,6 +64,7 @@ void setupServiceLocator() {
   );
   getIt.registerLazySingleton<SecureStorage>(() => SecureStorage(getIt()));
   getIt.registerLazySingleton<AuthEventBus>(() => AuthEventBus());
+  getIt.registerLazySingleton<ThemeCubit>(() => ThemeCubit(getIt()));
 
   getIt.registerLazySingleton<DioClient>(() => DioClient(getIt(), getIt()));
   getIt.registerLazySingleton<Dio>(() => getIt<DioClient>().dio);
@@ -183,6 +186,18 @@ void setupServiceLocator() {
   );
 
   // Screen-scoped cubits — a fresh instance per screen, not app-wide state.
+  getIt.registerFactoryParam<OwnerDashboardCubit, DashboardAccess, void>(
+    (access, _) => OwnerDashboardCubit(
+      getIt(),
+      getIt(),
+      getIt(),
+      getIt(),
+      getIt(),
+      getIt(),
+      getIt(),
+      access,
+    ),
+  );
   getIt.registerFactory<DashboardCubit>(
     () => DashboardCubit(getIt(), getIt(), getIt(), getIt(), getIt()),
   );

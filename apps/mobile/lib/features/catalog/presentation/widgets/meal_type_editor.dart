@@ -141,7 +141,7 @@ class _MealTypeEditorState extends State<MealTypeEditor> {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.restaurant_menu_rounded,
                 size: 15,
                 color: AppColors.staffPillFg,
@@ -226,7 +226,7 @@ class _MealSection extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: onAdd,
-                child: const Icon(
+                child: Icon(
                   Icons.add_circle_outline_rounded,
                   size: 18,
                   color: AppColors.staffPillFg,
@@ -306,7 +306,7 @@ class _MealSection extends StatelessWidget {
                     ),
                     GestureDetector(
                       onTap: () => onRemove(i),
-                      child: const Icon(
+                      child: Icon(
                         Icons.close_rounded,
                         size: 15,
                         color: AppColors.inkFaint,
@@ -378,7 +378,7 @@ class _FoodPickerSheetState extends State<_FoodPickerSheet> {
               decoration: InputDecoration(
                 hintText: 'Search foods…',
                 hintStyle: AppText.body(size: 14, color: AppColors.inkFaint),
-                prefixIcon: const Icon(
+                prefixIcon: Icon(
                   Icons.search_rounded,
                   color: AppColors.inkFaint,
                 ),

@@ -189,7 +189,7 @@ class _DayRow extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     child: Text('–',
-                        style: AppText.body(color: AppColors.inkFaint)),
+                        style: AppText.body(color: AppColors.inkFaint),),
                   ),
                   _TimeChip(label: hours.close ?? '—', onTap: onTapClose),
                 ],

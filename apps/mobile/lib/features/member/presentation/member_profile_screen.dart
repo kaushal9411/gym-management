@@ -380,7 +380,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.lock_outline_rounded,
                       size: 14,
                       color: AppColors.inkFaint,

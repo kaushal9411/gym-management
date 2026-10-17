@@ -146,7 +146,7 @@ class LeadIconAction extends StatelessWidget {
       message: tooltip,
       child: Material(
         color: AppColors.surface3,
-        shape: const CircleBorder(side: BorderSide(color: AppColors.line)),
+        shape: CircleBorder(side: BorderSide(color: AppColors.line)),
         child: InkWell(
           customBorder: const CircleBorder(),
           onTap: onTap,
@@ -322,7 +322,7 @@ class LeadPickerField extends StatelessWidget {
                         onPressed: onClear,
                       )
                     else
-                      const Padding(
+                      Padding(
                         padding: EdgeInsets.only(right: 8),
                         child: Icon(
                           Icons.expand_more_rounded,

@@ -15,7 +15,7 @@ import 'widgets/donut_chart.dart';
 import 'widgets/report_filter_bar.dart';
 import 'widgets/report_summary_header.dart';
 
-const _statusColors = {
+Map<String, Color> get _statusColors => {
   'ACTIVE': AppColors.success,
   'INACTIVE': AppColors.danger,
   'FROZEN': AppColors.warning,

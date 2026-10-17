@@ -20,6 +20,8 @@ class TrendChart extends StatelessWidget {
     required this.color,
     this.type = TrendChartType.area,
     this.height = 150,
+    this.secondValues,
+    this.secondColor,
   });
 
   /// Same length as [dateLabels].
@@ -30,6 +32,11 @@ class TrendChart extends StatelessWidget {
   final Color color;
   final TrendChartType type;
   final double height;
+
+  /// Optional second area series on the same axis (Income vs Expenses).
+  /// Same length as [values]; area charts only.
+  final List<double>? secondValues;
+  final Color? secondColor;
 
   static List<double> _niceTicks(double maxValue, {int targetCount = 4}) {
     if (maxValue <= 0) return const [0, 1, 2, 3, 4];
@@ -72,7 +79,8 @@ class TrendChart extends StatelessWidget {
       );
     }
 
-    final maxValue = values.reduce((a, b) => a > b ? a : b);
+    final second = secondValues;
+    final maxValue = [...values, ...?second].reduce((a, b) => a > b ? a : b);
     final ticks = _niceTicks(maxValue);
     final axisMax = ticks.last <= 0 ? 1.0 : ticks.last;
     final labelStep = (values.length / 7).ceil().clamp(1, values.length);
@@ -113,6 +121,8 @@ class TrendChart extends StatelessWidget {
                           values: values,
                           axisMax: axisMax,
                           color: color,
+                          secondValues: second,
+                          secondColor: secondColor,
                         )
                       : _BarPainter(
                           values: values,
@@ -155,22 +165,34 @@ class _AreaPainter extends CustomPainter {
     required this.values,
     required this.axisMax,
     required this.color,
+    this.secondValues,
+    this.secondColor,
   });
 
   final List<double> values;
   final double axisMax;
   final Color color;
+  final List<double>? secondValues;
+  final Color? secondColor;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final dx = values.length > 1 ? size.width / (values.length - 1) : 0.0;
+    final second = secondValues;
+    if (second != null && secondColor != null) {
+      _series(canvas, size, second, secondColor!);
+    }
+    _series(canvas, size, values, color);
+  }
+
+  void _series(Canvas canvas, Size size, List<double> data, Color c) {
+    final dx = data.length > 1 ? size.width / (data.length - 1) : 0.0;
     Offset pointAt(int i) {
-      final normalized = (values[i] / axisMax).clamp(0.0, 1.0);
+      final normalized = (data[i] / axisMax).clamp(0.0, 1.0);
       return Offset(dx * i, size.height - normalized * size.height);
     }
 
     final linePath = Path()..moveTo(pointAt(0).dx, pointAt(0).dy);
-    for (var i = 1; i < values.length; i++) {
+    for (var i = 1; i < data.length; i++) {
       linePath.lineTo(pointAt(i).dx, pointAt(i).dy);
     }
 
@@ -185,17 +207,14 @@ class _AreaPainter extends CustomPainter {
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [
-            color.withValues(alpha: 0.28),
-            color.withValues(alpha: 0.02),
-          ],
+          colors: [c.withValues(alpha: 0.28), c.withValues(alpha: 0.02)],
         ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)),
     );
 
     canvas.drawPath(
       linePath,
       Paint()
-        ..color = color
+        ..color = c
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2
         ..strokeCap = StrokeCap.round
@@ -206,8 +225,10 @@ class _AreaPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _AreaPainter oldDelegate) =>
       oldDelegate.values != values ||
+      oldDelegate.secondValues != secondValues ||
       oldDelegate.axisMax != axisMax ||
-      oldDelegate.color != color;
+      oldDelegate.color != color ||
+      oldDelegate.secondColor != secondColor;
 }
 
 class _BarPainter extends CustomPainter {

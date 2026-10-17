@@ -266,7 +266,7 @@ class _PermissionMatrix extends StatelessWidget {
               for (final row in _matrixRows.entries)
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 7),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     border: Border(top: BorderSide(color: AppColors.line)),
                   ),
                   child: Row(
@@ -365,7 +365,7 @@ class _RoleCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 size: 18,
                 color: AppColors.inkFaint,
@@ -431,11 +431,11 @@ class _UsersTabState extends State<_UsersTab> {
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppRadii.field),
-                  borderSide: const BorderSide(color: AppColors.line),
+                  borderSide: BorderSide(color: AppColors.line),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(AppRadii.field),
-                  borderSide: const BorderSide(color: AppColors.line),
+                  borderSide: BorderSide(color: AppColors.line),
                 ),
               ),
             ),
@@ -749,7 +749,7 @@ class _InvitationCard extends StatelessWidget {
                   child: OutlinedButton(
                     onPressed: busy ? null : onResend,
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.line),
+                      side: BorderSide(color: AppColors.line),
                       padding: const EdgeInsets.symmetric(vertical: 8),
                     ),
                     child: Text(
@@ -763,7 +763,7 @@ class _InvitationCard extends StatelessWidget {
                   child: OutlinedButton(
                     onPressed: busy ? null : onRevoke,
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.line),
+                      side: BorderSide(color: AppColors.line),
                       padding: const EdgeInsets.symmetric(vertical: 8),
                     ),
                     child: Text(

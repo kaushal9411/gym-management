@@ -256,13 +256,13 @@ class _MemberDietScreenState extends State<MemberDietScreen> {
                           ),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(AppRadii.field),
-                            borderSide: const BorderSide(
+                            borderSide: BorderSide(
                               color: AppColors.line,
                             ),
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(AppRadii.field),
-                            borderSide: const BorderSide(
+                            borderSide: BorderSide(
                               color: AppColors.line,
                             ),
                           ),

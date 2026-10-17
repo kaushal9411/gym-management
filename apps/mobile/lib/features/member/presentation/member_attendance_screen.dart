@@ -196,7 +196,7 @@ class _VisitRow extends StatelessWidget {
                 style: AppText.body(size: 12, color: AppColors.inkFaint),
               ),
               const SizedBox(width: 6),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 size: 18,
                 color: AppColors.inkFaint,

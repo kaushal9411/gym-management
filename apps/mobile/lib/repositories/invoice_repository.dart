@@ -16,6 +16,8 @@ class InvoiceRepository {
     String? search,
     String? status,
     String? branchId,
+    String? sortBy,
+    String? sortDir,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -26,6 +28,8 @@ class InvoiceRepository {
           if (search != null && search.isNotEmpty) 'search': search,
           if (status != null) 'status': status,
           if (branchId != null) 'branchId': branchId,
+          if (sortBy != null) 'sortBy': sortBy,
+          if (sortDir != null) 'sortDir': sortDir,
         },
       );
       return PaginatedResult.fromJson(

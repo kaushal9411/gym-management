@@ -196,7 +196,7 @@ class _DayEditorScreenState extends State<DayEditorScreen> {
                                 IconButton(
                                   onPressed: () =>
                                       setState(() => _items.removeAt(i)),
-                                  icon: const Icon(
+                                  icon: Icon(
                                     Icons.close_rounded,
                                     size: 18,
                                     color: AppColors.inkFaint,
@@ -287,11 +287,11 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
                   ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppRadii.field),
-                    borderSide: const BorderSide(color: AppColors.line),
+                    borderSide: BorderSide(color: AppColors.line),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppRadii.field),
-                    borderSide: const BorderSide(color: AppColors.line),
+                    borderSide: BorderSide(color: AppColors.line),
                   ),
                 ),
               ),

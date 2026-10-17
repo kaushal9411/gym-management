@@ -235,7 +235,7 @@ class _CollectionsChart extends StatelessWidget {
                       style: AppText.body(size: 11, color: AppColors.inkSoft),
                     ),
                     const SizedBox(width: 14),
-                    const AnalyticsDot(color: AppColors.inkFaint),
+                    AnalyticsDot(color: AppColors.inkFaint),
                     Text(
                       '  Previous (${shortDate(data.previousRange.from)} – '
                       '${shortDate(data.previousRange.to)})',

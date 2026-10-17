@@ -198,7 +198,7 @@ class _SessionCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.surface2,
             borderRadius: BorderRadius.circular(AppRadii.card),
-            border: const Border(
+            border: Border(
               left: BorderSide(color: AppColors.staffA, width: 3),
               top: BorderSide(color: AppColors.line),
               right: BorderSide(color: AppColors.line),

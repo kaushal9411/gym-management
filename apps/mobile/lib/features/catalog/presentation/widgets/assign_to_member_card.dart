@@ -112,7 +112,7 @@ class _AssignToMemberCardState extends State<AssignToMemberCard> {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.person_add_alt_1_rounded,
                 size: 15,
                 color: AppColors.staffPillFg,
@@ -142,7 +142,7 @@ class _AssignToMemberCardState extends State<AssignToMemberCard> {
               decoration: InputDecoration(
                 hintText: 'Search members…',
                 hintStyle: AppText.body(size: 14, color: AppColors.inkFaint),
-                prefixIcon: const Icon(
+                prefixIcon: Icon(
                   Icons.search_rounded,
                   color: AppColors.inkFaint,
                 ),
@@ -191,7 +191,7 @@ class _AssignToMemberCardState extends State<AssignToMemberCard> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.calendar_today_rounded,
                       size: 15,
                       color: AppColors.inkFaint,
@@ -252,7 +252,7 @@ class _SelectedMemberRow extends StatelessWidget {
               Container(
                 width: 26,
                 height: 26,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.staffSoft,
                   shape: BoxShape.circle,
                 ),
@@ -276,7 +276,7 @@ class _SelectedMemberRow extends StatelessWidget {
               if (onClear != null)
                 GestureDetector(
                   onTap: onClear,
-                  child: const Icon(
+                  child: Icon(
                     Icons.close_rounded,
                     size: 16,
                     color: AppColors.inkFaint,

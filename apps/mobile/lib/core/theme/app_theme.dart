@@ -3,15 +3,21 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 import 'app_text_styles.dart';
 
-/// The app is dark-first by design (member + staff planes are both dark —
+/// The app is dark-first by design (the user can switch to light in
+/// Settings → Appearance) (member + staff planes are both dark —
 /// see the design doc's intro: "Dark-first, dual gradient identity"). One
 /// `ThemeData` covers the whole app; per-role accent color is applied at
 /// the widget level via `AppRoleAccent`, not via separate Flutter themes.
 class AppTheme {
   AppTheme._();
 
-  static ThemeData get dark {
-    final base = ThemeData.dark(useMaterial3: true);
+  static ThemeData get dark => _build(ThemeData.dark(useMaterial3: true));
+
+  static ThemeData get light => _build(ThemeData.light(useMaterial3: true));
+
+  /// Built from `AppColors`' current getters, so call it again (the app root
+  /// does, on every theme change) rather than caching the result.
+  static ThemeData _build(ThemeData base) {
     return base.copyWith(
       scaffoldBackgroundColor: AppColors.bg,
       canvasColor: AppColors.bg,

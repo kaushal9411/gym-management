@@ -74,7 +74,7 @@ class _NotificationBellIconState extends State<NotificationBellIcon> {
           clipBehavior: Clip.none,
           children: [
             Container(
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: AppColors.surface2,
                 shape: BoxShape.circle,
                 border: Border.fromBorderSide(

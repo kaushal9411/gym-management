@@ -324,7 +324,7 @@ class _MembershipPlanFormScreenState extends State<MembershipPlanFormScreen> {
         actions: [
           if (widget.isEdit && plan != null)
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert_rounded, color: AppColors.ink),
+              icon: Icon(Icons.more_vert_rounded, color: AppColors.ink),
               color: AppColors.surface2,
               enabled: !_busy,
               onSelected: (value) => switch (value) {

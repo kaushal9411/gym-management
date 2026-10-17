@@ -150,7 +150,7 @@ class _BranchCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(AppRadii.tile),
                   ),
                   alignment: Alignment.center,
-                  child: const Icon(
+                  child: Icon(
                     Icons.storefront_rounded,
                     size: 18,
                     color: AppColors.staffPillFg,

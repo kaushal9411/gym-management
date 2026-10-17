@@ -89,7 +89,7 @@ class _MemberInvoiceDetailScreenState extends State<MemberInvoiceDetailScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
           children: [
-            if (_loading) const LinearProgressIndicator(minHeight: 2, color: AppColors.memberB, backgroundColor: AppColors.surface3),
+            if (_loading) LinearProgressIndicator(minHeight: 2, color: AppColors.memberB, backgroundColor: AppColors.surface3),
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),

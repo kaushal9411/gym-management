@@ -157,7 +157,7 @@ class _RoleToggleRow extends StatelessWidget {
       decoration: BoxDecoration(
         border: isLast
             ? null
-            : const Border(bottom: BorderSide(color: AppColors.line)),
+            : Border(bottom: BorderSide(color: AppColors.line)),
       ),
       child: Row(
         children: [

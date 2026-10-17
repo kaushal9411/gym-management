@@ -143,7 +143,7 @@ class _FindGymScreenState extends State<FindGymScreen> {
                     hintText: 'Search gyms…',
                     hintStyle:
                         AppText.body(size: 15, color: AppColors.inkFaint),
-                    prefixIcon: const Icon(
+                    prefixIcon: Icon(
                       Icons.search_rounded,
                       size: 18,
                       color: AppColors.inkFaint,
@@ -275,7 +275,7 @@ class _GymTile extends StatelessWidget {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 else
-                  const Icon(
+                  Icon(
                     Icons.chevron_right_rounded,
                     size: 18,
                     color: AppColors.inkFaint,

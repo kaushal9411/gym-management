@@ -156,6 +156,12 @@ const _sections = <String, List<MenuEntry>>{
       permissions: ['settings:read'],
     ),
     MenuEntry(
+      icon: Icons.brightness_6_outlined,
+      title: 'Appearance',
+      subtitle: 'Light or dark theme',
+      route: AppRoutes.appearance,
+    ),
+    MenuEntry(
       icon: Icons.support_agent_outlined,
       title: 'Support',
       subtitle: 'Open tickets',

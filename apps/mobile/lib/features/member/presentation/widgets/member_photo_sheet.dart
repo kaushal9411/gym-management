@@ -60,12 +60,12 @@ Future<MemberPhotoAction?> showMemberPhotoSheet(
 }
 
 class _SheetRow extends StatelessWidget {
-  const _SheetRow({
+  _SheetRow({
     required this.icon,
     required this.label,
     required this.onTap,
-    this.color = AppColors.ink,
-  });
+    Color? color,
+  }) : color = color ?? AppColors.ink;
 
   final IconData icon;
   final String label;

@@ -169,7 +169,7 @@ class _PlanCard extends StatelessWidget {
               ),
               AppPill(label: plan.level, tone: AppPillTone.roleTint),
               const SizedBox(width: 8),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 size: 18,
                 color: AppColors.inkFaint,

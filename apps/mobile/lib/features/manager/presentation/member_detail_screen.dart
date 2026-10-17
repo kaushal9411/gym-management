@@ -661,7 +661,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           controller: daysController,
           autofocus: true,
           keyboardType: TextInputType.number,
-          style: const TextStyle(color: AppColors.ink),
+          style: TextStyle(color: AppColors.ink),
           decoration: const InputDecoration(labelText: 'Extend by (days)'),
         ),
         actions: [
@@ -818,7 +818,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
   Widget _buildOverflowMenu(GymMember member) {
     final deleted = member.deletedAt != null;
     return PopupMenuButton<String>(
-      icon: const Icon(Icons.more_vert_rounded, color: AppColors.ink),
+      icon: Icon(Icons.more_vert_rounded, color: AppColors.ink),
       color: AppColors.surface2,
       onSelected: (value) => switch (value) {
         'restore' => _restore(),
@@ -1279,7 +1279,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           _CardHeading(icon: icon, title: title),
           const SizedBox(height: 8),
           for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) const Divider(height: 1, color: AppColors.line),
+            if (i > 0) Divider(height: 1, color: AppColors.line),
             children[i],
           ],
         ],
@@ -1352,7 +1352,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
             )
           else
             for (var i = 0; i < _recentVisits.length; i++) ...[
-              if (i > 0) const Divider(height: 1, color: AppColors.line),
+              if (i > 0) Divider(height: 1, color: AppColors.line),
               _VisitRow(record: _recentVisits[i]),
             ],
         ],
@@ -1700,7 +1700,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.qr_code_2_rounded,
                             size: 32,
                             color: AppColors.inkFaint,
@@ -2229,7 +2229,7 @@ class _ActionTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 size: 18,
                 color: AppColors.inkFaint,
@@ -2490,11 +2490,11 @@ class _TrackingField extends StatelessWidget {
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadii.field),
-              borderSide: const BorderSide(color: AppColors.line),
+              borderSide: BorderSide(color: AppColors.line),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(AppRadii.field),
-              borderSide: const BorderSide(color: AppColors.line),
+              borderSide: BorderSide(color: AppColors.line),
             ),
           ),
         ),

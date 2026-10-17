@@ -332,7 +332,7 @@ class _MemberMeasurementsDetailScreenState
                                   ),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.edit_outlined, size: 18, color: AppColors.inkFaint),
+                                  icon: Icon(Icons.edit_outlined, size: 18, color: AppColors.inkFaint),
                                   visualDensity: VisualDensity.compact,
                                   onPressed: () => _startEdit(entry),
                                 ),

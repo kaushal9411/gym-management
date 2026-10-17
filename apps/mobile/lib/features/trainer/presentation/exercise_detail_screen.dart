@@ -182,7 +182,7 @@ class _ExerciseDetailScreenState extends State<ExerciseDetailScreen> {
                   border: Border.all(color: AppColors.line),
                 ),
                 alignment: Alignment.center,
-                child: const Icon(
+                child: Icon(
                   Icons.fitness_center_outlined,
                   size: 28,
                   color: AppColors.inkFaint,

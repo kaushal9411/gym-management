@@ -221,7 +221,7 @@ class _AttendanceDashboardScreenState extends State<AttendanceDashboardScreen> {
                 )
               else
                 for (var i = 0; i < today.length; i++) ...[
-                  if (i > 0) const Divider(height: 1, color: AppColors.line),
+                  if (i > 0) Divider(height: 1, color: AppColors.line),
                   _ActivityRow(record: today[i]),
                 ],
             ],
@@ -247,7 +247,7 @@ class _ActivityRow extends StatelessWidget {
           Container(
             width: 30,
             height: 30,
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               color: AppColors.staffSoft,
               shape: BoxShape.circle,
             ),

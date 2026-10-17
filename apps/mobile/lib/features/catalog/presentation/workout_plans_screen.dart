@@ -143,7 +143,7 @@ class _WorkoutPlansScreenState extends State<WorkoutPlansScreen> {
                     hintText: 'Search plans…',
                     hintStyle:
                         AppText.body(size: 14, color: AppColors.inkFaint),
-                    prefixIcon: const Icon(
+                    prefixIcon: Icon(
                       Icons.search_rounded,
                       color: AppColors.inkFaint,
                     ),
@@ -152,11 +152,11 @@ class _WorkoutPlansScreenState extends State<WorkoutPlansScreen> {
                     contentPadding: const EdgeInsets.symmetric(vertical: 12),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppRadii.field),
-                      borderSide: const BorderSide(color: AppColors.line),
+                      borderSide: BorderSide(color: AppColors.line),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(AppRadii.field),
-                      borderSide: const BorderSide(color: AppColors.line),
+                      borderSide: BorderSide(color: AppColors.line),
                     ),
                   ),
                 ),

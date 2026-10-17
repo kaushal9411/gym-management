@@ -132,7 +132,7 @@ class _NewMeasurementScreenState extends State<NewMeasurementScreen> {
                   decoration: InputDecoration(
                     hintText: 'Search members…',
                     hintStyle: AppText.body(size: 14, color: AppColors.inkFaint),
-                    prefixIcon: const Icon(
+                    prefixIcon: Icon(
                       Icons.search_rounded,
                       color: AppColors.inkFaint,
                     ),
@@ -212,7 +212,7 @@ class _SelectedMemberRow extends StatelessWidget {
               Container(
                 width: 28,
                 height: 28,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: AppColors.staffSoft,
                   shape: BoxShape.circle,
                 ),
@@ -236,7 +236,7 @@ class _SelectedMemberRow extends StatelessWidget {
               if (onClear != null)
                 GestureDetector(
                   onTap: onClear,
-                  child: const Icon(
+                  child: Icon(
                     Icons.close_rounded,
                     size: 18,
                     color: AppColors.inkFaint,

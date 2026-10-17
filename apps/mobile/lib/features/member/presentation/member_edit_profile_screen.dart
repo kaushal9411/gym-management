@@ -531,7 +531,7 @@ class _SelectField extends StatelessWidget {
           label: label,
           errorText: errorText,
           onTap: () => _open(context),
-          trailing: const Icon(
+          trailing: Icon(
             Icons.expand_more_rounded,
             size: 20,
             color: AppColors.inkFaint,
@@ -551,12 +551,12 @@ class _SelectField extends StatelessWidget {
 }
 
 class _OptionRow extends StatelessWidget {
-  const _OptionRow({
+  _OptionRow({
     required this.label,
     required this.selected,
     required this.onTap,
-    this.color = AppColors.ink,
-  });
+    Color? color,
+  }) : color = color ?? AppColors.ink;
 
   final String label;
   final bool selected;
@@ -664,7 +664,7 @@ class _DateField extends StatelessWidget {
           errorText: errorText,
           onTap: () => _pick(context),
           trailing: value.isEmpty
-              ? const Icon(
+              ? Icon(
                   Icons.calendar_today_outlined,
                   size: 18,
                   color: AppColors.inkFaint,
@@ -675,7 +675,7 @@ class _DateField extends StatelessWidget {
                   child: InkResponse(
                     onTap: () => controller.clear(),
                     radius: 24,
-                    child: const SizedBox(
+                    child: SizedBox(
                       width: 40,
                       height: 40,
                       child: Icon(

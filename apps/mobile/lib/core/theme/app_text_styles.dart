@@ -14,49 +14,49 @@ class AppText {
   /// `.display` — Bricolage Grotesque 700, tight tracking.
   static TextStyle display({
     required double size,
-    Color color = AppColors.ink,
+    Color? color,
     FontWeight weight = FontWeight.w700,
   }) =>
       GoogleFonts.bricolageGrotesque(
         fontSize: size,
         fontWeight: weight,
-        color: color,
+        color: color ?? AppColors.ink,
         letterSpacing: size * -0.01,
         height: 1.15,
       );
 
   /// `.eyebrow` — Hanken Grotesk 800, 11px, uppercase, wide tracking, faint.
-  static TextStyle eyebrow({Color color = AppColors.inkFaint}) =>
+  static TextStyle eyebrow({Color? color}) =>
       GoogleFonts.hankenGrotesk(
         fontSize: 11,
         fontWeight: FontWeight.w800,
         letterSpacing: 1.54, // .14em of 11px
-        color: color,
+        color: color ?? AppColors.inkFaint,
       );
 
   /// Body copy — Hanken Grotesk, regular weight range per design (400-800).
   static TextStyle body({
     double size = 14,
-    Color color = AppColors.ink,
+    Color? color,
     FontWeight weight = FontWeight.w500,
   }) =>
       GoogleFonts.hankenGrotesk(
         fontSize: size,
         fontWeight: weight,
-        color: color,
+        color: color ?? AppColors.ink,
         height: 1.4,
       );
 
   /// `.tabular` — same body font with tabular figures, for money/metrics.
   static TextStyle tabular({
     double size = 14,
-    Color color = AppColors.ink,
+    Color? color,
     FontWeight weight = FontWeight.w700,
   }) =>
       GoogleFonts.hankenGrotesk(
         fontSize: size,
         fontWeight: weight,
-        color: color,
+        color: color ?? AppColors.ink,
         fontFeatures: const [FontFeature.tabularFigures()],
       );
 }

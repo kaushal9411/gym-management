@@ -177,7 +177,7 @@ class _TodayAttendanceDetailState extends State<_TodayAttendanceDetail> {
         Expanded(
           child: ListView.separated(
             itemCount: _rows!.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.line),
+            separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.line),
             itemBuilder: (context, i) {
               final a = _rows![i];
               return ListTile(
@@ -259,7 +259,7 @@ class _ActiveMembersDetailState extends State<_ActiveMembersDetail> {
         Expanded(
           child: ListView.separated(
             itemCount: _rows!.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.line),
+            separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.line),
             itemBuilder: (context, i) {
               final m = _rows![i];
               return ListTile(
@@ -337,7 +337,7 @@ class _ExpiringMembershipsDetailState extends State<_ExpiringMembershipsDetail> 
         Expanded(
           child: ListView.separated(
             itemCount: _rows!.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.line),
+            separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.line),
             itemBuilder: (context, i) {
               final r = _rows![i];
               return ListTile(
@@ -406,7 +406,7 @@ class _NewMembersDetailState extends State<_NewMembersDetail> {
     }
     return ListView.separated(
       itemCount: _rows!.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.line),
+      separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.line),
       itemBuilder: (context, i) {
         final m = _rows![i];
         return ListTile(
@@ -484,7 +484,7 @@ class _MonthlyRevenueDetailState extends State<_MonthlyRevenueDetail> {
         Expanded(
           child: ListView.separated(
             itemCount: _rows!.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.line),
+            separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.line),
             itemBuilder: (context, i) {
               final entry = _rows![i];
               return ListTile(
@@ -573,7 +573,7 @@ class _OutstandingPaymentsDetailState extends State<_OutstandingPaymentsDetail> 
         Expanded(
           child: ListView.separated(
             itemCount: _rows!.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.line),
+            separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.line),
             itemBuilder: (context, i) {
               final inv = _rows![i];
               return ListTile(

@@ -175,7 +175,7 @@ class _MemberWorkoutScreenState extends State<MemberWorkoutScreen> {
               ),
               child: Column(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.self_improvement_rounded,
                     size: 26,
                     color: AppColors.inkFaint,

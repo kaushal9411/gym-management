@@ -102,7 +102,7 @@ class _ReportSummaryHeaderState extends State<ReportSummaryHeader> {
       builder: (context, state) {
         final Widget body = switch (state) {
           ReportSummaryForbidden() => const SizedBox.shrink(),
-          ReportSummaryLoading() => const Padding(
+          ReportSummaryLoading() => Padding(
               padding: EdgeInsets.fromLTRB(18, 0, 18, 8),
               child: ClipRRect(
                 borderRadius: BorderRadius.all(Radius.circular(AppRadii.pill)),
@@ -425,7 +425,7 @@ class _SeriesBlock extends StatelessWidget {
                       style: AppText.body(size: 11, color: AppColors.inkSoft),
                     ),
                     const SizedBox(width: 14),
-                    const AnalyticsDot(color: AppColors.inkFaint),
+                    AnalyticsDot(color: AppColors.inkFaint),
                     Text(
                       '  Previous',
                       style: AppText.body(size: 11, color: AppColors.inkSoft),

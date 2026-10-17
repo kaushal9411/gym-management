@@ -126,7 +126,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                 'Billed to ${invoice.member.name} · ${invoice.member.memberId}',
                 style: AppText.body(size: 11, color: AppColors.inkFaint),
               ),
-              const Divider(height: 24, color: AppColors.line),
+              Divider(height: 24, color: AppColors.line),
               for (final item in invoice.items)
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
@@ -166,7 +166,7 @@ class _InvoiceDetailScreenState extends State<InvoiceDetailScreen> {
                     ],
                   ),
                 ),
-              const Divider(height: 20, color: AppColors.line),
+              Divider(height: 20, color: AppColors.line),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [

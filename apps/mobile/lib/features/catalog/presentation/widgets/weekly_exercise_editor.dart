@@ -126,7 +126,7 @@ class _WeeklyExerciseEditorState extends State<WeeklyExerciseEditor> {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.calendar_view_week_rounded,
                 size: 15,
                 color: AppColors.staffPillFg,
@@ -204,7 +204,7 @@ class _DaySection extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: onAdd,
-                child: const Icon(
+                child: Icon(
                   Icons.add_circle_outline_rounded,
                   size: 18,
                   color: AppColors.staffPillFg,
@@ -237,7 +237,7 @@ class _DaySection extends StatelessWidget {
                     ),
                     GestureDetector(
                       onTap: () => onRemove(i),
-                      child: const Icon(
+                      child: Icon(
                         Icons.close_rounded,
                         size: 15,
                         color: AppColors.inkFaint,
@@ -306,7 +306,7 @@ class _ExercisePickerSheetState extends State<_ExercisePickerSheet> {
               decoration: InputDecoration(
                 hintText: 'Search exercises…',
                 hintStyle: AppText.body(size: 14, color: AppColors.inkFaint),
-                prefixIcon: const Icon(
+                prefixIcon: Icon(
                   Icons.search_rounded,
                   color: AppColors.inkFaint,
                 ),

@@ -93,6 +93,7 @@ class AppRoutes {
   static const invoiceSettings = '/settings/invoice';
   static const securityPolicySettings = '/settings/security';
   static const sessions = '/settings/sessions';
+  static const appearance = '/settings/appearance';
 
   static const finance = '/finance';
 

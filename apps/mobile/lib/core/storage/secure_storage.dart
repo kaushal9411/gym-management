@@ -62,12 +62,20 @@ class SecureStorage {
   static const _keyRefreshToken = 'refresh_token';
   static const _keyMemberProfile = 'member_profile';
   static const _keyRecentGyms = 'recent_gyms';
+  static const _keyThemeMode = 'theme_mode';
   static const _maxRecentGyms = 6;
 
   Future<void> saveTenantSlug(String slug) =>
       _storage.write(key: _keyTenantSlug, value: slug);
 
   Future<String?> readTenantSlug() => _storage.read(key: _keyTenantSlug);
+
+  /// `light`, `dark` or `system` — a device-level appearance preference that
+  /// deliberately survives sign-out (see `clearSession`).
+  Future<String?> readThemeMode() => _storage.read(key: _keyThemeMode);
+
+  Future<void> saveThemeMode(String mode) =>
+      _storage.write(key: _keyThemeMode, value: mode);
 
   Future<List<RecentGym>> readRecentGyms() async {
     final raw = await _storage.read(key: _keyRecentGyms);

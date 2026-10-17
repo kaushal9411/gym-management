@@ -114,7 +114,7 @@ class TrainerPickerField extends StatelessWidget {
                     ),
                   ),
                   if (isSelfTrainer)
-                    const Icon(
+                    Icon(
                       Icons.lock_outline_rounded,
                       size: 16,
                       color: AppColors.inkFaint,
@@ -122,14 +122,14 @@ class TrainerPickerField extends StatelessWidget {
                   else if (selectedTrainer != null)
                     GestureDetector(
                       onTap: () => onChanged(null),
-                      child: const Icon(
+                      child: Icon(
                         Icons.close_rounded,
                         size: 18,
                         color: AppColors.inkFaint,
                       ),
                     )
                   else
-                    const Icon(
+                    Icon(
                       Icons.chevron_right_rounded,
                       size: 18,
                       color: AppColors.inkFaint,
@@ -215,7 +215,7 @@ class _TrainerPickerSheetState extends State<_TrainerPickerSheet> {
               hintText: 'Search trainers…',
               hintStyle: AppText.body(size: 14, color: AppColors.inkFaint),
               prefixIcon:
-                  const Icon(Icons.search_rounded, color: AppColors.inkFaint),
+                  Icon(Icons.search_rounded, color: AppColors.inkFaint),
               filled: true,
               fillColor: AppColors.surface3,
               contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -266,7 +266,7 @@ class _TrainerPickerSheetState extends State<_TrainerPickerSheet> {
                                         Container(
                                           width: 30,
                                           height: 30,
-                                          decoration: const BoxDecoration(
+                                          decoration: BoxDecoration(
                                             color: AppColors.staffSoft,
                                             shape: BoxShape.circle,
                                           ),

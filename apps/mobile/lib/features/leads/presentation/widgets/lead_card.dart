@@ -27,7 +27,7 @@ class LeadCard extends StatelessWidget {
         color: AppColors.surface2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.card),
-          side: const BorderSide(color: AppColors.line),
+          side: BorderSide(color: AppColors.line),
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(AppRadii.card),

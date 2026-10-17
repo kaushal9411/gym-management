@@ -116,18 +116,18 @@ class _GlobalSearchScreenState extends State<GlobalSearchScreen> {
                   hintStyle: AppText.body(size: 14, color: AppColors.inkFaint),
                   filled: true,
                   fillColor: AppColors.surface2,
-                  prefixIcon: const Icon(
+                  prefixIcon: Icon(
                     Icons.search_rounded,
                     color: AppColors.inkFaint,
                   ),
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppRadii.field),
-                    borderSide: const BorderSide(color: AppColors.line),
+                    borderSide: BorderSide(color: AppColors.line),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(AppRadii.field),
-                    borderSide: const BorderSide(color: AppColors.line),
+                    borderSide: BorderSide(color: AppColors.line),
                   ),
                 ),
               ),
@@ -229,7 +229,7 @@ class _ResultTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
                   size: 18,
                   color: AppColors.inkFaint,

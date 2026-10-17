@@ -262,7 +262,7 @@ class _SecretChip extends StatelessWidget {
           children: [
             Text(secret, style: AppText.tabular(size: 13)),
             const SizedBox(width: 8),
-            const Icon(Icons.copy_rounded, size: 14, color: AppColors.inkFaint),
+            Icon(Icons.copy_rounded, size: 14, color: AppColors.inkFaint),
           ],
         ),
       ),

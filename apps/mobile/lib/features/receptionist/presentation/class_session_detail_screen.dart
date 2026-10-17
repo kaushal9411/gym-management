@@ -136,7 +136,7 @@ class _ClassSessionDetailScreenState extends State<ClassSessionDetailScreen> {
                         Container(
                           width: 24,
                           height: 24,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             color: AppColors.staffSoft,
                             shape: BoxShape.circle,
                           ),

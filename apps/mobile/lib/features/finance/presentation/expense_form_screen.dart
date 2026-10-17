@@ -136,7 +136,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
                 controller: _dateController,
                 readOnly: true,
                 onTap: _pickDate,
-                suffixIcon: const Icon(
+                suffixIcon: Icon(
                   Icons.calendar_today_rounded,
                   size: 16,
                   color: AppColors.inkFaint,

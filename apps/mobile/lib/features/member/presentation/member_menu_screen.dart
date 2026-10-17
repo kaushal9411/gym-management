@@ -69,6 +69,12 @@ const _entries = [
     route: AppRoutes.memberGymInfo,
   ),
   _MenuEntry(
+    icon: Icons.brightness_6_outlined,
+    title: 'Appearance',
+    subtitle: 'Light or dark theme',
+    route: AppRoutes.appearance,
+  ),
+  _MenuEntry(
     icon: Icons.download_outlined,
     title: 'Download my data',
     subtitle: 'GDPR export',
@@ -229,7 +235,7 @@ class _MenuTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(
+                Icon(
                   Icons.chevron_right_rounded,
                   size: 18,
                   color: AppColors.inkFaint,

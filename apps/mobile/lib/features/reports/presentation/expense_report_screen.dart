@@ -20,7 +20,7 @@ import 'widgets/load_more_button.dart';
 import 'widgets/report_filter_bar.dart';
 import 'widgets/report_summary_header.dart';
 
-const _categoryColors = [
+List<Color> get _categoryColors => [
   AppColors.staffB,
   AppColors.warning,
   AppColors.danger,

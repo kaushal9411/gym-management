@@ -118,6 +118,7 @@ import '../../features/settings/presentation/gym_social_screen.dart';
 import '../../features/settings/presentation/gym_settings_screen.dart';
 import '../../features/settings/presentation/invoice_settings_screen.dart';
 import '../../features/settings/presentation/security_policy_screen.dart';
+import '../../features/settings/presentation/appearance_screen.dart';
 import '../../features/settings/presentation/sessions_screen.dart';
 import '../../features/leads/presentation/lead_detail_screen.dart';
 import '../../features/leads/presentation/lead_follow_ups_screen.dart';
@@ -599,6 +600,10 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       GoRoute(
         path: AppRoutes.securityPolicySettings,
         builder: (context, state) => const SecurityPolicyScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.appearance,
+        builder: (context, state) => const AppearanceScreen(),
       ),
       GoRoute(
         path: AppRoutes.sessions,

@@ -368,7 +368,7 @@ class _SocialLinksTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppRadii.tile),
                 ),
                 alignment: Alignment.center,
-                child: const Icon(
+                child: Icon(
                   Icons.share_outlined,
                   size: 18,
                   color: AppColors.staffPillFg,
@@ -394,7 +394,7 @@ class _SocialLinksTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 size: 18,
                 color: AppColors.inkFaint,

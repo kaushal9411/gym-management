@@ -164,7 +164,7 @@ class _SearchMembersScreenState extends State<SearchMembersScreen> {
                   Container(
                     width: 34,
                     height: 34,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: AppColors.staffSoft,
                       shape: BoxShape.circle,
                     ),

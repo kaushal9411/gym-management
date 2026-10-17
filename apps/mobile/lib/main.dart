@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import 'bloc/session/session_cubit.dart';
+import 'bloc/theme/theme_cubit.dart';
 import 'core/di/service_locator.dart';
 import 'core/push/push_notification_service.dart';
 import 'core/routing/app_router.dart';
@@ -19,30 +20,73 @@ Future<void> main() async {
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   setupServiceLocator();
+  await getIt<ThemeCubit>().load();
   runApp(const FitCloudApp());
 }
 
-class FitCloudApp extends StatelessWidget {
+class FitCloudApp extends StatefulWidget {
   const FitCloudApp({super.key});
 
   @override
+  State<FitCloudApp> createState() => _FitCloudAppState();
+}
+
+class _FitCloudAppState extends State<FitCloudApp> with WidgetsBindingObserver {
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _router = buildAppRouter(getIt<SessionCubit>());
+    getIt<PushNotificationService>().attachRouter(_router);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    if (getIt<ThemeCubit>().onPlatformBrightnessChanged()) _repaintEverything();
+  }
+
+  /// `AppColors` neutrals are read at build time and many widgets are
+  /// `const`, so a new theme needs every element rebuilt once — a plain
+  /// `ThemeData` swap would only refresh widgets that read `Theme.of`.
+  /// Routes and widget state are untouched; only `build` re-runs.
+  void _repaintEverything() {
+    void rebuild(Element element) {
+      element.markNeedsBuild();
+      element.visitChildren(rebuild);
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      (context as Element).visitChildren(rebuild);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return BlocProvider<SessionCubit>.value(
-      value: getIt<SessionCubit>(),
-      child: Builder(
-        builder: (context) {
-          final GoRouter router = buildAppRouter(context.read<SessionCubit>());
-          final pushService = getIt<PushNotificationService>();
-          pushService.attachRouter(router);
-          return MaterialApp.router(
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<SessionCubit>.value(value: getIt<SessionCubit>()),
+        BlocProvider<ThemeCubit>.value(value: getIt<ThemeCubit>()),
+      ],
+      child: BlocListener<ThemeCubit, ThemeMode>(
+        listener: (_, __) => _repaintEverything(),
+        child: BlocBuilder<ThemeCubit, ThemeMode>(
+          builder: (context, mode) => MaterialApp.router(
             title: 'FitCloud',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.dark,
+            theme: AppTheme.light,
             darkTheme: AppTheme.dark,
-            themeMode: ThemeMode.dark,
-            routerConfig: router,
-          );
-        },
+            themeMode: mode,
+            routerConfig: _router,
+          ),
+        ),
       ),
     );
   }

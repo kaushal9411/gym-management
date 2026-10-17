@@ -166,7 +166,7 @@ class _ClassAddAttendeeScreenState extends State<ClassAddAttendeeScreen> {
                   Container(
                     width: 34,
                     height: 34,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: AppColors.staffSoft,
                       shape: BoxShape.circle,
                     ),

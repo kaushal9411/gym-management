@@ -13,7 +13,7 @@ import '../../core/theme/app_colors.dart';
 /// which stays with the caller since it's tied to that screen's own
 /// `setState`/`mounted` lifecycle.
 class StatusActionMenu extends StatelessWidget {
-  const StatusActionMenu({
+  StatusActionMenu({
     super.key,
     required this.subjectName,
     required this.isDeleted,
@@ -27,8 +27,8 @@ class StatusActionMenu extends StatelessWidget {
     required this.onRestore,
     this.deleteDescription = 'This soft-deletes the plan — it can no '
         'longer be assigned to members until restored.',
-    this.iconColor = AppColors.inkFaint,
-  });
+    Color? iconColor,
+  }) : iconColor = iconColor ?? AppColors.inkFaint;
 
   final String subjectName;
   final bool isDeleted;
