@@ -14,6 +14,7 @@ import { StaggerGroup } from '@/features/reports/components/ui';
 import { UnsavedChangesBar } from '@/features/gym-settings/components/unsaved-changes-bar';
 import { useResetTenantAiSettings, useTenantAiSettings, useUpdateTenantAiSettings } from '@/features/ai-assistant/hooks/use-ai-assistant';
 import type { AiProviderName } from '@/features/ai-assistant/types';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { cn } from '@/lib/utils';
 
 const PROVIDERS: { value: AiProviderName | ''; label: string }[] = [
@@ -35,6 +36,7 @@ interface AiSettingsForm {
 }
 
 export default function AiSettingsPage() {
+  const tenant = useTenant();
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('settings:manage');
 
@@ -164,7 +166,7 @@ export default function AiSettingsPage() {
                 subtitle={
                   <>
                     {settings.data?.usingPlatformDefault
-                      ? "You're currently using FitCloud's shared platform AI configuration."
+                      ? `You're currently using ${tenant.platformName}'s shared platform AI configuration.`
                       : "You're using your own AI provider configuration for this gym."}{' '}
                     Leave a field blank to fall back to the platform default for that field.
                   </>

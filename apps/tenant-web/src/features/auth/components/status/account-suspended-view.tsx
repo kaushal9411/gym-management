@@ -3,10 +3,13 @@
 import { Ban, PauseCircle, Mail } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { StatusScreen } from '../status-screen';
 import { StatusShell } from './status-shell';
 
 export function AccountSuspendedView() {
+  const tenant = useTenant();
+
   return (
     <StatusShell>
       <StatusScreen
@@ -19,7 +22,7 @@ export function AccountSuspendedView() {
         description="Your account has been suspended by your gym's administrator. Contact your gym owner to restore access."
         footnote={
           <>
-            Gym owner unavailable? Reach FitCloud support at{' '}
+            Gym owner unavailable? Reach {tenant.platformName} support at{' '}
             <a href="mailto:support@fitcloud.com" className="font-medium text-primary underline underline-offset-4 hover:no-underline">
               support@fitcloud.com
             </a>

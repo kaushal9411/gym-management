@@ -8,6 +8,7 @@ import '../../bloc/dashboard/owner_dashboard_cubit.dart';
 import '../../bloc/theme/theme_cubit.dart';
 import '../../bloc/finance/finance_summary_cubit.dart';
 import '../../bloc/finance/payments_analytics_cubit.dart';
+import '../../bloc/platform/platform_config_cubit.dart';
 import '../../bloc/reports/reports_overview_cubit.dart';
 import '../../bloc/session/session_cubit.dart';
 import '../../repositories/analytics_repository.dart';
@@ -221,5 +222,9 @@ void setupServiceLocator() {
       authEventBus: getIt(),
       pushNotificationService: getIt(),
     ),
+  );
+
+  getIt.registerLazySingleton<PlatformConfigCubit>(
+    () => PlatformConfigCubit(getIt()),
   );
 }

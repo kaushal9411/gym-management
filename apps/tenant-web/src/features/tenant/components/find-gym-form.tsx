@@ -18,6 +18,7 @@ import { slugSchema } from '@/features/auth/schemas';
 import { listActiveTenants } from '@/features/tenant/list-active';
 import { getRememberedGymSlug, setRememberedGymSlug } from '@/features/tenant/remember-gym';
 import { buildTenantLoginUrl } from '@/features/tenant/subdomain-urls';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { cn } from '@/lib/utils';
 
 const findGymSchema = z.object({ slug: slugSchema });
@@ -43,6 +44,7 @@ interface FindGymFormProps {
  * somewhere useful.
  */
 export function FindGymForm({ bare = false, dark = false }: FindGymFormProps) {
+  const tenant = useTenant();
   const form = useForm<FindGymFormValues>({
     resolver: zodResolver(findGymSchema),
     defaultValues: { slug: '' },
@@ -155,7 +157,7 @@ export function FindGymForm({ bare = false, dark = false }: FindGymFormProps) {
       <>
         {fields}
         <p className={cn('mt-6 text-center text-sm', dark ? 'text-white/40' : 'text-muted-foreground')}>
-          New to FitCloud?{' '}
+          New to {tenant.platformName}?{' '}
           {dark ? (
             <Link href={AUTH_ROUTES.register} className="font-medium text-cyan-300 underline-offset-4 hover:underline">
               Register your gym
@@ -182,7 +184,7 @@ export function FindGymForm({ bare = false, dark = false }: FindGymFormProps) {
       </Card>
 
       <p className="text-center text-sm text-muted-foreground">
-        New to FitCloud?{' '}
+        New to {tenant.platformName}?{' '}
         <Button asChild variant="link" className="h-auto p-0 text-sm">
           <Link href={AUTH_ROUTES.register}>Register your gym</Link>
         </Button>

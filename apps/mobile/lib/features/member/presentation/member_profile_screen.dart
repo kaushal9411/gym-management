@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../bloc/platform/platform_config_cubit.dart';
 import '../../../bloc/session/session_cubit.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
@@ -265,6 +266,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
   }
 
   Widget _buildBody(MemberSelfProfile profile) {
+    final appName = context.watch<PlatformConfigCubit>().state.appName;
     final locked = profile.locked;
     final photoUrl =
         _removedPending ? null : (_preview ?? profile.profilePhotoUrl);
@@ -412,7 +414,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'See everything FitCloud stores about you.',
+                  'See everything $appName stores about you.',
                   style: AppText.body(
                     size: 13,
                     weight: FontWeight.w600,

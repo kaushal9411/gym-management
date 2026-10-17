@@ -23,7 +23,7 @@ const hi = (name: string) => `Hi ${escapeHtml(name)},`;
 
 export function welcomeEmail(branding: EmailBranding, ownerName: string, verifyUrl: string) {
   return {
-    subject: `Welcome to ${branding.tenantName} on FitCloud`,
+    subject: `Welcome to ${branding.tenantName} on ${branding.platformName ?? 'FitCloud'}`,
     html: renderEmailLayout(
       branding,
       {
@@ -33,7 +33,7 @@ export function welcomeEmail(branding: EmailBranding, ownerName: string, verifyU
         categoryLabel: 'Welcome',
         preheader: `Verify your email to activate ${branding.tenantName} and start your free trial.`,
       },
-      `${paragraph(`${hi(ownerName)} your gym ${strong(branding.tenantName)} has been created on FitCloud. One quick step left: confirm your email address to activate the account and start your 14-day free trial (full access, no card charged until it ends).`)}
+      `${paragraph(`${hi(ownerName)} your gym ${strong(branding.tenantName)} has been created on ${escapeHtml(branding.platformName ?? 'FitCloud')}. One quick step left: confirm your email address to activate the account and start your 14-day free trial (full access, no card charged until it ends).`)}
        ${actionButton(verifyUrl, 'Verify email address', branding.primaryColor)}
        ${secondaryLink(verifyUrl, 'Or paste this link into your browser')}
        ${sectionTitle('What happens next')}
@@ -81,7 +81,7 @@ export function verifyEmailEmail(branding: EmailBranding, name: string, verifyUr
 
 export function passwordResetEmail(branding: EmailBranding, name: string, resetUrl: string, opts?: { byAdmin?: boolean }) {
   const lead = opts?.byAdmin
-    ? `a FitCloud administrator started a password reset for your ${strong(branding.tenantName)} account. Choose a new password using the button below.`
+    ? `a ${escapeHtml(branding.platformName ?? 'FitCloud')} administrator started a password reset for your ${strong(branding.tenantName)} account. Choose a new password using the button below.`
     : `we received a request to reset the password for your ${strong(branding.tenantName)} account. Click below to choose a new one.`;
   return {
     subject: 'Reset your password',
@@ -101,7 +101,7 @@ export function passwordResetEmail(branding: EmailBranding, name: string, resetU
        ${secondaryLink(resetUrl, 'Or paste this link into your browser')}
        ${alertBox('warning', 'Didn’t request this?', 'Ignore this email — your password stays exactly as it is. If you keep getting these, tell your gym owner.')}
        ${sectionTitle('Details')}
-       ${detailTable(detailRow('', 'Account', escapeHtml(name)) + detailRow('', 'Gym', escapeHtml(branding.tenantName)) + detailRow('', 'Requested by', opts?.byAdmin ? 'A FitCloud administrator' : 'You (via “Forgot password”)') + detailRow('', 'Link valid for', '30 minutes'))}
+       ${detailTable(detailRow('', 'Account', escapeHtml(name)) + detailRow('', 'Gym', escapeHtml(branding.tenantName)) + detailRow('', 'Requested by', opts?.byAdmin ? `A ${escapeHtml(branding.platformName ?? 'FitCloud')} administrator` : 'You (via “Forgot password”)') + detailRow('', 'Link valid for', '30 minutes'))}
        ${sectionTitle('What happens next')}
        ${stepList([{ title: 'Click “Reset password”', body: 'The link opens a page where you choose a new password.' }, { title: 'Choose a strong, unique password', body: 'Use a long passphrase you don’t use anywhere else.' }, { title: 'Sign in with the new password', body: 'Other devices are signed out once the password is changed.' }])}
        ${sectionTitle('Security tips')}
@@ -154,7 +154,7 @@ export function otpCodeEmail(branding: EmailBranding, name: string, code: string
        ${detailTable(detailRow('', 'Sent to', escapeHtml(name)) + detailRow('', 'For', escapeHtml(branding.tenantName)) + detailRow('', 'Valid for', `${escapeHtml(expiresInMinutes)} minutes`))}
        ${sectionTitle('What happens next')}
        ${stepList([{ title: 'Return to the page where you asked for the code' }, { title: 'Type the code exactly as shown', body: 'Request a new one if it has expired.' }])}
-       ${alertBox('warning', 'Keep this code private', 'No one from FitCloud or the gym will ask you for it. If you didn’t request it, you can ignore this email.')}
+       ${alertBox('warning', 'Keep this code private', `No one from ${escapeHtml(branding.platformName ?? 'FitCloud')} or the gym will ask you for it. If you didn’t request it, you can ignore this email.`)}
        ${signature(branding)}`,
     ),
   };
@@ -172,7 +172,7 @@ export function invitationEmail(branding: EmailBranding, inviterName: string, ro
         categoryLabel: 'Team Invite',
         preheader: `${inviterName} invited you to join ${branding.tenantName} as ${roleLabel}.`,
       },
-      `${paragraph(`${strong(inviterName)} invited you to join ${strong(branding.tenantName)} on FitCloud. Accept to set your password and sign in.`)}
+      `${paragraph(`${strong(inviterName)} invited you to join ${strong(branding.tenantName)} on ${escapeHtml(branding.platformName ?? 'FitCloud')}. Accept to set your password and sign in.`)}
        ${detailTable(
          detailRow('🏢', 'Gym', escapeHtml(branding.tenantName)) +
            detailRow('🪪', 'Your role', escapeHtml(roleLabel), { emphasize: true, color: toneAccent(branding) }) +
@@ -259,7 +259,7 @@ export function subscriptionAlertEmail(
       subtitle: 'A heads-up before your next billing date.',
       categoryLabel: 'Subscription',
       tone: 'brand',
-      body: `the FitCloud subscription for ${t} renews ${when}. No action is needed if your payment details are up to date.`,
+      body: `the ${escapeHtml(branding.platformName ?? 'FitCloud')} subscription for ${t} renews ${when}. No action is needed if your payment details are up to date.`,
       cta: 'Review billing',
       tip: 'Want to change plan before renewal? You can do that from the billing page.',
     },
@@ -281,9 +281,9 @@ export function subscriptionAlertEmail(
       subtitle: 'Access is paused until billing is resolved.',
       categoryLabel: 'Account Status',
       tone: 'danger',
-      body: `the FitCloud subscription for ${t} has been suspended. Resolve billing to restore access — your data is preserved.`,
+      body: `the ${escapeHtml(branding.platformName ?? 'FitCloud')} subscription for ${t} has been suspended. Resolve billing to restore access — your data is preserved.`,
       cta: 'Restore access',
-      tip: 'Need a hand? Reply to your account manager or contact FitCloud billing support.',
+      tip: `Need a hand? Reply to your account manager or contact ${escapeHtml(branding.platformName ?? 'FitCloud')} billing support.`,
     },
   };
   const c = copy[kind];

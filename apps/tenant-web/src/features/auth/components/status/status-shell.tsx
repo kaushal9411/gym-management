@@ -20,7 +20,7 @@ interface StatusShellProps {
  * Full-screen tenant-branded shell for standalone status pages (maintenance,
  * access denied, suspended, expired …): brand gradient with soft moving blobs
  * + dotted grid, tenant logo/name header with theme toggle, a centred glass
- * card, and the "Powered by FitCloud" footer.
+ * card, and the "Powered by &lt;platform&gt;" footer.
  */
 export function StatusShell({ children, maxWidth = 'max-w-xl', cardClassName }: StatusShellProps) {
   const tenant = useTenant();
@@ -64,7 +64,7 @@ export function StatusShell({ children, maxWidth = 'max-w-xl', cardClassName }: 
       </main>
 
       <footer className="pb-5 text-center text-xs text-primary-foreground/80">
-        Powered by <span className="font-semibold">FitCloud</span> · © {new Date().getFullYear()} FitCloud, Inc.
+        Powered by <span className="font-semibold">{tenant.platformName}</span> · © {new Date().getFullYear()} {tenant.platformName}, Inc.
       </footer>
     </div>
   );

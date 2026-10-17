@@ -12,6 +12,7 @@ import { invoiceEmail } from '../../../infrastructure/mail/templates/billing-tem
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
 import { adminPaymentRepository } from '../../admin-payments/repositories/admin-payment.repository';
 import { adminPlanRepository } from '../../admin-plans/repositories/admin-plan.repository';
+import { getPlatformName } from '../../admin-settings/services/platform-config.service';
 import { createPaymentLink, fetchPaymentLink, notifyPaymentLink } from '../../finance/services/razorpay-gateway.service';
 import { InvoiceService } from '../../invoice/services/invoice.service';
 import { addBillingPeriod } from '../../onboarding/utils/billing-period';
@@ -142,7 +143,7 @@ export class AdminTenantBillingService {
     const link = await createPaymentLink({
       amountInSmallestUnit: Math.round(Number(invoice.total) * 100),
       currency: invoice.currency,
-      description: `FitCloud invoice ${invoice.invoiceNumber}`,
+      description: `${await getPlatformName()} invoice ${invoice.invoiceNumber}`,
       referenceId: invoice.invoiceNumber,
       customerName: owner.name,
       customerEmail: owner.email,

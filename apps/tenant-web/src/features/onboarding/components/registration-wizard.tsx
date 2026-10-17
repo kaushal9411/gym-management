@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 
 import { AUTH_ROUTES } from '@/features/auth/constants';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { AccountDetailsStep } from './steps/account-details-step';
 import { OtpStep } from './steps/otp-step';
 import { PaymentStep } from './steps/payment-step';
@@ -17,7 +18,7 @@ import { WIZARD_STEPS } from '../types';
 import type { WizardStep } from '../types';
 
 const STEP_COPY: Record<WizardStep, { title: string; subtitle: string }> = {
-  account: { title: 'Create your gym on FitCloud', subtitle: '14-day free trial · no credit card required' },
+  account: { title: 'Create your gym', subtitle: '14-day free trial · no credit card required' },
   otp: { title: 'Verify your email', subtitle: 'One quick check before we set up your plan' },
   plan: { title: 'Choose your plan', subtitle: 'Switch or upgrade anytime from your dashboard' },
   subdomain: { title: 'Pick your portal address', subtitle: 'This is where your team will sign in' },
@@ -54,7 +55,8 @@ function BackButton() {
 
 function WizardBody() {
   const { state } = useOnboardingWizard();
-  const copy = STEP_COPY[state.step];
+  const tenant = useTenant();
+  const copy = state.step === 'account' ? { ...STEP_COPY.account, title: `Create your gym on ${tenant.platformName}` } : STEP_COPY[state.step];
 
   return (
     <div className="w-full space-y-6">
@@ -158,7 +160,7 @@ function WizardBody() {
 
       {state.step === 'account' ? (
         <p className="text-center text-sm text-white/40">
-          Already using FitCloud?{' '}
+          Already using {tenant.platformName}?{' '}
           <Link href={AUTH_ROUTES.login} className="font-medium text-cyan-300 underline-offset-4 hover:underline">
             Sign in
           </Link>

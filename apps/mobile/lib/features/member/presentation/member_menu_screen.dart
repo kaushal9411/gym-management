@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../bloc/platform/platform_config_cubit.dart';
 import '../../../bloc/session/session_cubit.dart';
 import '../../../bloc/session/session_state.dart';
 import '../../../core/routing/app_routes.dart';
@@ -139,6 +140,7 @@ class MemberMenuScreen extends StatelessWidget {
 /// Design frame "8g. Log out" — a confirm step, since signing back in
 /// needs the Member ID.
 Future<void> showMemberLogoutDialog(BuildContext context) async {
+  final appName = context.read<PlatformConfigCubit>().state.appName;
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (dialogContext) => AlertDialog(
@@ -146,7 +148,7 @@ Future<void> showMemberLogoutDialog(BuildContext context) async {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadii.card),
       ),
-      title: Text('Log out of FitCloud?', style: AppText.display(size: 18)),
+      title: Text('Log out of $appName?', style: AppText.display(size: 18)),
       content: Text(
         "You'll need your Member ID to sign back in.",
         style: AppText.body(size: 13, color: AppColors.inkFaint),

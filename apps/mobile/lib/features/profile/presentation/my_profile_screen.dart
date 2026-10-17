@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../bloc/platform/platform_config_cubit.dart';
 import '../../../bloc/session/session_cubit.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
@@ -214,6 +215,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
   }
 
   Future<void> _confirmLogout() async {
+    final appName = context.read<PlatformConfigCubit>().state.appName;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -221,7 +223,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.card),
         ),
-        title: Text('Log out of FitCloud?', style: AppText.display(size: 18)),
+        title: Text('Log out of $appName?', style: AppText.display(size: 18)),
         content: Text(
           "You'll need your email and password to sign back in.",
           style: AppText.body(size: 13, color: AppColors.inkFaint),

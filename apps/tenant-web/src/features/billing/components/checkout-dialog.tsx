@@ -17,6 +17,7 @@ import { FormAlert } from '@/features/auth/components/form-alert';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { cn } from '@/lib/utils';
 import { loadRazorpayScript } from '@/lib/razorpay-checkout';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { toBillingError, useCheckout, useValidateCoupon, useVerifyCheckout } from '../hooks/use-billing';
 import type { BillingCycle, SubscriptionPlan } from '../types';
 import { formatMoney as formatMoneyBase } from './billing-ui';
@@ -41,6 +42,7 @@ interface CheckoutDialogProps {
  * activates immediately with no modal at all.
  */
 export function CheckoutDialog({ open, onOpenChange, targetPlan, currentSortOrder, onSuccess }: CheckoutDialogProps) {
+  const tenant = useTenant();
   const [billingCycle, setBillingCycle] = React.useState<BillingCycle>('MONTHLY');
   const [couponCode, setCouponCode] = React.useState('');
   const [error, setError] = React.useState<string | null>(null);
@@ -95,7 +97,7 @@ export function CheckoutDialog({ open, onOpenChange, targetPlan, currentSortOrde
             amount: result.amount,
             currency: result.currency,
             order_id: result.orderId,
-            name: 'FitCloud',
+            name: tenant.platformName,
             description: `${targetPlan.name} plan (${billingCycle.toLowerCase()})`,
             theme: { color: '#16a34a' },
             handler: (response) => {

@@ -1,9 +1,9 @@
 import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
-import { PLATFORM_BRANDING } from '../../../infrastructure/mail/templates/base-layout';
 import { contactInquiryEmail } from '../../../infrastructure/mail/templates/notification-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
+import { getPlatformBranding } from '../../admin-settings/services/platform-config.service';
 import type { ContactRequestInput } from '../validators/contact.validators';
 
 /** Internal inboxes per topic — dev mail lands in Mailpit like everything else. */
@@ -21,7 +21,7 @@ export class ContactController {
   async submit(req: Request, res: Response): Promise<void> {
     const input = req.body as ContactRequestInput;
 
-    const mail = contactInquiryEmail(PLATFORM_BRANDING, input);
+    const mail = contactInquiryEmail(await getPlatformBranding(), input);
     await enqueueEmail({ to: TOPIC_INBOX[input.topic], subject: mail.subject, html: mail.html });
 
     sendSuccess(res, null, "Thanks — we've received your message and will get back to you within one business day.", 201);

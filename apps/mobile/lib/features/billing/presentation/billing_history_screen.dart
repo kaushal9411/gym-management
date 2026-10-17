@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../bloc/platform/platform_config_cubit.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
@@ -17,7 +19,7 @@ const _invoiceStatusTones = {
   'VOID': AppPillTone.neutral,
 };
 
-/// Design frame "16a. Billing history" — the FitCloud subscription
+/// Design frame "16a. Billing history" — the tenant's platform subscription
 /// invoices (`GET /invoice`), split out of the Billing screen as the
 /// design has it.
 class BillingHistoryScreen extends StatefulWidget {
@@ -51,6 +53,7 @@ class _BillingHistoryScreenState extends State<BillingHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final appName = context.watch<PlatformConfigCubit>().state.appName;
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
@@ -65,10 +68,10 @@ class _BillingHistoryScreenState extends State<BillingHistoryScreen> {
             : _invoices == null
                 ? const AppLoadingView()
                 : _invoices!.isEmpty
-                    ? const AppEmptyState(
+                    ? AppEmptyState(
                         icon: Icons.receipt_long_outlined,
                         title: 'No invoices yet',
-                        message: 'FitCloud subscription invoices appear here.',
+                        message: '$appName subscription invoices appear here.',
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),

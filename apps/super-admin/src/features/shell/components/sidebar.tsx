@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { avatarColor, fmtInt, initials } from '@/features/dashboard/components/format';
 import type { DashboardOverview } from '@/features/dashboard/types';
+import { usePlatformName } from '@/features/platform/hooks/use-platform-config';
 import { cn } from '@/lib/utils';
 import { NAV_GROUPS, type NavBadgeKey } from './nav-config';
 
@@ -19,6 +20,7 @@ function badgeFor(key: NavBadgeKey | undefined, ov: DashboardOverview | undefine
 /** 232px graphite sidebar: brand, grouped permission-filtered nav, admin card. Used inline (>= md) and inside the mobile drawer. */
 export function Sidebar({ overview, onNavigate }: { overview?: DashboardOverview; onNavigate?: () => void }) {
   const pathname = usePathname();
+  const platformName = usePlatformName();
   const { admin } = useAuth();
   const perms = admin?.permissions ?? [];
   const groups = NAV_GROUPS.map((g) => ({
@@ -29,8 +31,8 @@ export function Sidebar({ overview, onNavigate }: { overview?: DashboardOverview
   return (
     <div className="flex h-full min-h-0 flex-col gap-4 bg-sidebar px-3 py-4 text-sidebar-foreground">
       <Link href="/dashboard" onClick={onNavigate} className="flex items-center gap-2.5 rounded-lg px-2 py-1 text-base font-bold text-white outline-none focus-visible:ring-2 focus-visible:ring-brand-accent">
-        <span className="grid size-[30px] place-items-center rounded-lg bg-gradient-to-br from-[#14b8a6] to-[#0f766e] text-sm text-white" aria-hidden>F</span>
-        FitCloud <span className="text-xs font-medium text-sidebar-muted">Admin</span>
+        <span className="grid size-[30px] place-items-center rounded-lg bg-gradient-to-br from-[#14b8a6] to-[#0f766e] text-sm text-white" aria-hidden>{platformName.charAt(0).toUpperCase() || 'F'}</span>
+        {platformName} <span className="text-xs font-medium text-sidebar-muted">Admin</span>
       </Link>
       <nav aria-label="Main" className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-0.5">
         {groups.map((g) => (

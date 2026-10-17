@@ -190,7 +190,7 @@ export function PhoneOtpForm({ phone, role }: PhoneOtpFormProps) {
                 </div>
                 <div>
                   <p className="text-lg font-bold uppercase tracking-wide text-white">
-                    {isPlatform ? 'FitCloud' : tenant.name}
+                    {isPlatform ? tenant.platformName : tenant.name}
                   </p>
                   <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">Verify your phone</p>
                 </div>
@@ -282,7 +282,7 @@ export function PhoneOtpForm({ phone, role }: PhoneOtpFormProps) {
             </motion.p>
 
             <motion.p variants={itemVariants} className="mt-8 text-center text-[11px] text-white/25">
-              Powered by <span className="font-semibold text-white/40">FitCloud</span> · © {new Date().getFullYear()}
+              Powered by <span className="font-semibold text-white/40">{tenant.platformName}</span> · © {new Date().getFullYear()}
             </motion.p>
           </motion.div>
         </motion.div>

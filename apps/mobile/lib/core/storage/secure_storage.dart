@@ -63,7 +63,17 @@ class SecureStorage {
   static const _keyMemberProfile = 'member_profile';
   static const _keyRecentGyms = 'recent_gyms';
   static const _keyThemeMode = 'theme_mode';
+  static const _keyAppName = 'platform_app_name';
   static const _maxRecentGyms = 6;
+
+  /// The super-admin-configured platform name, resolved once at app start
+  /// (see `main.dart`) and cached here so it's readable from the FCM
+  /// background isolate too (`local_notifications.dart`'s channel/title),
+  /// which has no access to the main isolate's `PlatformConfigCubit`.
+  Future<void> saveAppName(String appName) =>
+      _storage.write(key: _keyAppName, value: appName);
+
+  Future<String?> readAppName() => _storage.read(key: _keyAppName);
 
   Future<void> saveTenantSlug(String slug) =>
       _storage.write(key: _keyTenantSlug, value: slug);

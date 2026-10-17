@@ -33,9 +33,9 @@ export function platformAnnouncementEmail(branding: EmailBranding, title: string
     subject: title,
     html: renderEmailLayout(
       branding,
-      { icon: '📣', title, categoryLabel: 'Platform announcement', subtitle: 'An update from the FitCloud team', preheader: body, footerHint: 'preferences' },
+      { icon: '📣', title, categoryLabel: 'Platform announcement', subtitle: `An update from the ${branding.platformName ?? 'FitCloud'} team`, preheader: body, footerHint: 'preferences' },
       `<div class="fc-soft" style="margin:4px 0 16px;padding:16px 18px;border-radius:14px;background:#f7f8fc;border:1px solid #e6e8f0;font-size:15.5px;line-height:1.7;color:#2b2f3b;">${textBlock(body)}</div>
-       ${footnote('You’re receiving this as the owner of a gym on FitCloud.')}`,
+       ${footnote(`You’re receiving this as the owner of a gym on ${branding.platformName ?? 'FitCloud'}.`)}`,
     ),
   };
 }

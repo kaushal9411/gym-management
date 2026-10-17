@@ -17,6 +17,7 @@ import { formatDate, parseMoney, plural, usePortalMoney } from '../../lib/format
 import { toMemberAuthServiceError } from '../../services/member-api-client';
 import { EmptyBlock, HeroChip, PortalHero, ProgressRing, SectionCard, SkeletonCard, SkeletonHero, StatusChip, heroActionClass } from '../kit';
 import { toneColor, toneTint } from '../kit/tones';
+import { useTenant } from '@/features/tenant/tenant-provider';
 
 type Phase = 'review' | 'starting' | 'opening' | 'confirming';
 const STEPS = ['Review', 'Pay', 'Done'] as const;
@@ -28,6 +29,7 @@ const STEPS = ['Review', 'Pay', 'Done'] as const;
  * page (same hooks/helpers); only the presentation + result states are new.
  */
 export function RenewPageContent() {
+  const tenant = useTenant();
   const m = useMotionSafe();
   const router = useRouter();
   const money = usePortalMoney();
@@ -74,7 +76,7 @@ export function RenewPageContent() {
           amount: result.amount,
           currency: result.currency,
           order_id: result.orderId,
-          name: 'FitCloud',
+          name: tenant.platformName,
           description: current ? `${current.planName} plan renewal` : 'Membership renewal',
           theme: { color: '#16a34a' },
           handler: (response) => {

@@ -10,6 +10,7 @@ import { toBillingError, useDownloadInvoicePdf } from '@/features/billing/hooks/
 import { fmtCompact, fmtInt, fmtMoney, fmtMoneyCompact, timeAgo } from '@/features/dashboard/components/format';
 import { Bar, ChartTooltip, Chip, CountUp, EmptyNote, Panel, type ChipTone } from '@/features/dashboard/components/ui';
 import { useNow } from '@/features/dashboard/components/use-now';
+import { usePlatformName } from '@/features/platform/hooks/use-platform-config';
 import { useTenantOverview, type TenantOverview } from '@/features/tenants/api/detail';
 import { useTenant } from '@/features/tenants/hooks/use-tenants';
 import type { TenantDetail } from '@/features/tenants/types';
@@ -134,6 +135,7 @@ function OverviewSkeleton() {
 }
 
 export function OverviewTab({ tenantId, canManage, onOpenTab }: { tenantId: string; canManage: boolean; onOpenTab: (tab: string) => void }) {
+  const platformName = usePlatformName();
   const reduce = !!useReducedMotion();
   const now = useNow();
   const q = useTenantOverview(tenantId);
@@ -156,7 +158,7 @@ export function OverviewTab({ tenantId, canManage, onOpenTab }: { tenantId: stri
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Kpi index={0} color="var(--chart-1)" label="MRR" sub={d.tenant.plan ? `${d.tenant.plan} plan` : 'no active plan'}>{k.mrr === null ? '—' : <CountUp value={Number(k.mrr)} format={fmtMoneyCompact} />}</Kpi>
-        <Kpi index={1} color="var(--chart-2)" label="Lifetime revenue" sub="paid to FitCloud"><CountUp value={Number(k.lifetimeRevenue)} format={fmtMoneyCompact} /></Kpi>
+        <Kpi index={1} color="var(--chart-2)" label="Lifetime revenue" sub={`paid to ${platformName}`}><CountUp value={Number(k.lifetimeRevenue)} format={fmtMoneyCompact} /></Kpi>
         <Kpi index={2} color="var(--chart-6)" label="Members" sub={`${fmtInt(e.activeMembers)} active in 30 days`}><CountUp value={k.memberCount} format={fmtInt} /></Kpi>
         <Kpi index={3} color="var(--chart-3)" label="Staff · Branches" sub={[d.usage.find((u) => u.key === 'staff'), d.usage.find((u) => u.key === 'branches')].map((u) => (u?.limit != null ? `limit ${u.limit}` : '∞')).join(' · ')}>{k.staffCount} · {k.branchCount}</Kpi>
         <Kpi index={4} color="var(--chart-4)" label="Last active" sub={`${e.staffLoginsPerWeek} staff logins this week`}>{k.lastActiveAt ? (now === null ? '—' : timeAgo(new Date(k.lastActiveAt).getTime(), now)) : 'Never'}</Kpi>

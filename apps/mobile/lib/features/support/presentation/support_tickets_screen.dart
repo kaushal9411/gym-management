@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../bloc/common/paginated_list_cubit.dart';
 import '../../../bloc/common/paginated_list_state.dart';
+import '../../../bloc/platform/platform_config_cubit.dart';
 import '../../../bloc/session/session_cubit.dart';
 import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
@@ -217,10 +218,11 @@ class _SupportTicketsScreenState extends State<SupportTicketsScreen> {
             child: SizedBox(
               height: 260,
               child: _status.isEmpty
-                  ? const AppEmptyState(
+                  ? AppEmptyState(
                       icon: Icons.support_agent_outlined,
                       title: 'No support tickets yet',
-                      message: 'Tap + to open a ticket with the FitCloud team.',
+                      message:
+                          'Tap + to open a ticket with the ${context.watch<PlatformConfigCubit>().state.appName} team.',
                     )
                   : const AppEmptyState(
                       icon: Icons.support_agent_outlined,

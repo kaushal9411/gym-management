@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { cn } from '@/lib/utils';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { toTicketError, useCreateTicket } from '../hooks/use-tickets';
 import { PRIORITY_META, PRIORITY_ORDER, SUPPORT_HERO_GRADIENT, tint } from '../lib/ticket-meta';
 import type { TicketPriority } from '../types';
@@ -33,6 +34,7 @@ function Counter({ value, min, max }: { value: number; min: number; max: number 
 
 /** Controlled by the support page (the hero / list header own the trigger buttons). Same validation as before: subject 3-200, description 10-5000. */
 export function NewTicketDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const tenant = useTenant();
   const [subject, setSubject] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [priority, setPriority] = React.useState<TicketPriority>('MEDIUM');
@@ -70,7 +72,7 @@ export function NewTicketDialog({ open, onOpenChange }: { open: boolean; onOpenC
         <div className="px-6 py-[22px] text-white" style={{ backgroundImage: SUPPORT_HERO_GRADIENT }}>
           <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/80">Support</p>
           <DialogTitle className="mt-1 pr-10 text-[22px] font-extrabold">Raise a support ticket</DialogTitle>
-          <DialogDescription className="mt-1 text-white/85">Tell us what&apos;s going on — the FitCloud team will follow up here.</DialogDescription>
+          <DialogDescription className="mt-1 text-white/85">Tell us what&apos;s going on — the {tenant.platformName} team will follow up here.</DialogDescription>
         </div>
         <form onSubmit={submit} className="space-y-5 px-6 py-6">
           {createTicket.isError ? (

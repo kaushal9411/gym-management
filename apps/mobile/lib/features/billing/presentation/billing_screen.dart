@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../bloc/platform/platform_config_cubit.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
@@ -89,6 +91,7 @@ class _BillingScreenState extends State<BillingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final appName = context.watch<PlatformConfigCubit>().state.appName;
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
@@ -98,7 +101,7 @@ class _BillingScreenState extends State<BillingScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('FitCloud subscription', style: AppText.eyebrow()),
+            Text('$appName subscription', style: AppText.eyebrow()),
             Text('Billing', style: AppText.display(size: 18)),
           ],
         ),

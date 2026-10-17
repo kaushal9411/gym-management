@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../bloc/platform/platform_config_cubit.dart';
 import '../../../bloc/session/session_cubit.dart';
 import '../../../bloc/session/session_state.dart';
 import '../../../core/routing/app_routes.dart';
@@ -30,7 +31,7 @@ import '../../../shared/widgets/user_avatar.dart';
 /// (see `FinanceTab`'s own doc comment) — only the separate FitCloud
 /// subscription `Billing` page (a different concept from that screen's own
 /// outstanding-payments card) was actually missing.
-const _sections = <String, List<MenuEntry>>{
+Map<String, List<MenuEntry>> _sections(String appName) => <String, List<MenuEntry>>{
   'Search': [
     MenuEntry(
       icon: Icons.search_rounded,
@@ -116,7 +117,7 @@ const _sections = <String, List<MenuEntry>>{
     MenuEntry(
       icon: Icons.credit_card_outlined,
       title: 'Billing',
-      subtitle: 'FitCloud subscription',
+      subtitle: '$appName subscription',
       route: AppRoutes.billing,
       permissions: ['billing:read'],
     ),
@@ -181,11 +182,12 @@ class ManagerMenuScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = context.watch<SessionCubit>().state;
     if (session is! SessionAuthenticatedStaff) return const SizedBox.shrink();
+    final appName = context.watch<PlatformConfigCubit>().state.appName;
     final tenantName = session.tenant.name;
     final name = session.user.name;
     final avatarUrl = session.user.avatarUrl;
     final sections =
-        visibleMenuSections(_sections, session.user, session.tenant);
+        visibleMenuSections(_sections(appName), session.user, session.tenant);
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 90),

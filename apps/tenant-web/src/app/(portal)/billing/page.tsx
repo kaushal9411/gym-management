@@ -12,9 +12,11 @@ import { formatDate, formatMoney, EmptyBlock } from '@/features/billing/componen
 import { PlanComparison } from '@/features/billing/components/plan-comparison';
 import { isCancellable, SubscriptionSummary } from '@/features/billing/components/subscription-summary';
 import { toBillingError, useCancelSubscription, useCurrentSubscription } from '@/features/billing/hooks/use-billing';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { HeroButton } from '@/features/finance/components/payments/payments-hero';
 
 export default function BillingOverviewPage() {
+  const tenant = useTenant();
   const { data: subscription, isLoading, isError, error } = useCurrentSubscription();
   const queryClient = useQueryClient();
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ['billing'] });
@@ -60,7 +62,7 @@ export default function BillingOverviewPage() {
   return (
     <div className="space-y-6">
       <BillingHero
-        subtitle="Manage your FitCloud plan, payment, and invoices."
+        subtitle={`Manage your ${tenant.platformName} plan, payment, and invoices.`}
         stats={stats}
         statsLoading={isLoading}
         actions={

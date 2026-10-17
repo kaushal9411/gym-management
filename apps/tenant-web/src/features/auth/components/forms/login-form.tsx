@@ -241,7 +241,7 @@ export function LoginForm() {
                 </div>
                 <div>
                   <p className="text-lg font-bold uppercase tracking-wide text-white">
-                    {isPlatform ? 'FitCloud' : tenant.name}
+                    {isPlatform ? tenant.platformName : tenant.name}
                   </p>
                   {!isPlatform ? <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">Gym Portal</p> : null}
                 </div>
@@ -470,7 +470,7 @@ export function LoginForm() {
 
             {isPlatform ? null : (
               <motion.p variants={itemVariants} className="mt-6 text-center text-sm text-white/40">
-                Want FitCloud for your gym?{' '}
+                Want {tenant.platformName} for your gym?{' '}
                 <Link href={AUTH_ROUTES.register} className="font-medium text-cyan-300 underline-offset-4 hover:underline">
                   Start a free trial
                 </Link>
@@ -478,7 +478,7 @@ export function LoginForm() {
             )}
 
             <motion.p variants={itemVariants} className="mt-8 text-center text-[11px] text-white/25">
-              Powered by <span className="font-semibold text-white/40">FitCloud</span> · © {new Date().getFullYear()}
+              Powered by <span className="font-semibold text-white/40">{tenant.platformName}</span> · © {new Date().getFullYear()}
             </motion.p>
           </motion.div>
         </motion.div>

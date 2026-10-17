@@ -55,8 +55,8 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'payments:refund', description: 'Issue a refund' },
   { key: 'reports:read', description: 'View operational reports' },
   { key: 'reports:view-financial', description: 'View revenue and financial reports' },
-  { key: 'billing:manage', description: "Manage the gym's FitCloud subscription, plan, and billing address" },
-  { key: 'billing:read', description: "View the gym's FitCloud invoices and subscription details" },
+  { key: 'billing:manage', description: "Manage the gym's platform subscription, plan, and billing address" },
+  { key: 'billing:read', description: "View the gym's platform invoices and subscription details" },
 
   // Communication & self-service
   { key: 'notifications:manage', description: 'Manage notification templates and campaigns' },
@@ -66,7 +66,7 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'profile:read', description: "Read one's own profile" },
   { key: 'profile:update', description: "Update one's own profile" },
   { key: 'support:view', description: "View the gym's support tickets" },
-  { key: 'support:create', description: 'Raise a new support ticket with the FitCloud team' },
+  { key: 'support:create', description: 'Raise a new support ticket with the platform team' },
   { key: 'ai:use', description: 'Chat with the AI Business Assistant (proposed actions still require the matching real permission to confirm)' },
 
   // Staff Management (Prompt 13) — Manager/Trainer/Receptionist only, distinct

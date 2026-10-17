@@ -20,6 +20,7 @@ import { adminReferenceDataRouter } from '../../modules/admin-reference-data/rou
 import { adminRevenueRouter } from '../../modules/admin-revenue/routes/admin-revenue.routes';
 import { adminRoleRouter } from '../../modules/admin-roles/routes/admin-role.routes';
 import { adminSettingsRouter } from '../../modules/admin-settings/routes/admin-settings.routes';
+import { getPlatformName } from '../../modules/admin-settings/services/platform-config.service';
 import { adminTicketRouter } from '../../modules/admin-support/routes/admin-ticket.routes';
 import { adminTemplateRouter } from '../../modules/admin-templates/routes/admin-template.routes';
 import { adminTenantBillingRouter } from '../../modules/admin-tenants/routes/admin-tenant-billing.routes';
@@ -227,6 +228,24 @@ v1Router.get('/public/tenants', async (_req, res, next) => {
   try {
     const tenants = await tenantService.listActive();
     sendSuccess(res, tenants);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * @openapi
+ * /public/platform-config:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: The super-admin-configured platform/app name (no auth required)
+ *     description: Used by every client (tenant-web, super-admin, mobile) to show the platform's own display name before login and anywhere there's no tenant to brand as. Falls back to "FitCloud" if never configured.
+ *     responses:
+ *       200: { description: Platform config }
+ */
+v1Router.get('/public/platform-config', async (_req, res, next) => {
+  try {
+    sendSuccess(res, { appName: await getPlatformName() });
   } catch (error) {
     next(error);
   }

@@ -8,6 +8,7 @@ import { BillingHero } from '@/features/billing/components/billing-hero';
 import { EmptyBlock, formatMoney, StatusPill, SummaryCard } from '@/features/billing/components/billing-ui';
 import { SpendChart } from '@/features/billing/components/spend-chart';
 import { toBillingError, usePaymentHistory } from '@/features/billing/hooks/use-billing';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { Chip, PanelCard } from '@/features/finance/components/payments/payments-ui';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -15,6 +16,7 @@ const FILTERS = ['ALL', 'SUCCEEDED', 'PENDING', 'FAILED', 'REFUNDED'] as const;
 type Filter = (typeof FILTERS)[number];
 
 export default function PaymentHistoryPage() {
+  const tenant = useTenant();
   const { data: payments, isLoading, isError, error } = usePaymentHistory();
   const [filter, setFilter] = React.useState<Filter>('ALL');
 
@@ -58,7 +60,7 @@ export default function PaymentHistoryPage() {
   return (
     <div className="space-y-6">
       <BillingHero
-        subtitle="Every payment attempt for your FitCloud subscription."
+        subtitle={`Every payment attempt for your ${tenant.platformName} subscription.`}
         statsLoading={isLoading}
         stats={[
           { value: formatMoney(derived.total, derived.currency), label: 'Total paid' },

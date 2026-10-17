@@ -30,7 +30,7 @@ export function onboardingWelcomeEmail(
 ) {
   const trialEnd = isTrial && trialEndsAt ? formatDate(trialEndsAt) : null;
   return {
-    subject: `${branding.tenantName} is ready on FitCloud!`,
+    subject: `${branding.tenantName} is ready on ${branding.platformName ?? 'FitCloud'}!`,
     html: renderEmailLayout(
       branding,
       {

@@ -38,6 +38,17 @@ android {
 
     defaultConfig {
         applicationId = "com.fitcloud.gym_saas_mobile"
+        // The home-screen app label — NOT live/dynamic (there's no OS API for
+        // an installed app to rename its own icon at runtime). This only
+        // takes effect for whoever's installing/updating AFTER a release is
+        // cut with it set, via Gradle's own env-var convention:
+        //   ORG_GRADLE_PROJECT_appLabel="New Name" flutter build apk --release
+        // Gradle auto-reads `ORG_GRADLE_PROJECT_<name>` as project property
+        // `<name>` — no Flutter-specific plumbing needed. Defaults to
+        // "FitCloud" for a plain `flutter build`/`flutter run` with nothing
+        // set. See docs/MOBILE-GUIDE.md.
+        manifestPlaceholders["appLabel"] =
+            (project.findProperty("appLabel") as String?) ?: "FitCloud"
         // `compileSdk`/`targetSdk`/`minSdk` all deliberately stay tied to
         // whatever Flutter SDK is installed rather than hardcoded numbers —
         // Flutter's own build tooling silently rewrites a pinned `minSdk`

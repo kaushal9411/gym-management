@@ -2,10 +2,9 @@ import { eventBus } from '../../../core/events/event-bus';
 import { otpCodeEmail } from '../../../infrastructure/mail/templates/auth-templates';
 import { onboardingWelcomeEmail } from '../../../infrastructure/mail/templates/onboarding-templates';
 import { enqueueEmail } from '../../../infrastructure/queue/email.queue';
+import { getPlatformBranding, getPlatformName } from '../../admin-settings/services/platform-config.service';
 import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
 import { tenantService } from '../../tenants/service/tenant.service';
-
-const PLATFORM_BRANDING = { tenantName: 'FitCloud' };
 
 /**
  * Onboarding's own event listeners — separate from
@@ -18,7 +17,7 @@ export function registerOnboardingEmailListeners(): void {
   eventBus.onEvent<{ email: string; code: string; expiresInMinutes: number }>(
     'onboarding.otp_issued',
     async (payload) => {
-      const template = otpCodeEmail(PLATFORM_BRANDING, 'there', payload.code, payload.expiresInMinutes);
+      const template = otpCodeEmail(await getPlatformBranding(), 'there', payload.code, payload.expiresInMinutes);
       await enqueueEmail({ to: payload.email, subject: template.subject, html: template.html });
     },
   );
@@ -33,7 +32,7 @@ export function registerOnboardingEmailListeners(): void {
     trialEndsAt: string | null;
     portalUrl: string;
   }>('onboarding.tenant_provisioned', async (payload) => {
-    const branding = { tenantName: payload.gymName };
+    const branding = { tenantName: payload.gymName, platformName: await getPlatformName() };
     const template = onboardingWelcomeEmail(
       branding,
       payload.name,

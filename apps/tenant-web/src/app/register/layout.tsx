@@ -1,4 +1,7 @@
+'use client';
+
 import { LoginHero } from '@/features/auth/components/login-hero';
+import { useTenant } from '@/features/tenant/tenant-provider';
 
 /**
  * Own top-level segment (not under `(auth)`) because the registration
@@ -6,9 +9,13 @@ import { LoginHero } from '@/features/auth/components/login-hero';
  * cards and multi-field rows don't fit the shared AuthLayout's `max-w-md`.
  * Reuses the same neon-dark backdrop as `/login` (`LoginHero` — generic,
  * not tenant-scoped, safe to share across both) for a consistent
- * authentication-flow identity end to end.
+ * authentication-flow identity end to end. `useTenant()` only for the
+ * platform name in the footer — the rest of this page is intentionally
+ * not tenant-scoped.
  */
 export default function RegisterLayout({ children }: { children: React.ReactNode }) {
+  const tenant = useTenant();
+
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
       <LoginHero />
@@ -18,8 +25,8 @@ export default function RegisterLayout({ children }: { children: React.ReactNode
       </main>
 
       <footer className="pb-6 text-center text-xs text-white/25">
-        Powered by <span className="font-semibold text-white/40">FitCloud</span> · ©{' '}
-        {new Date().getFullYear()} FitCloud, Inc.
+        Powered by <span className="font-semibold text-white/40">{tenant.platformName}</span> · ©{' '}
+        {new Date().getFullYear()} {tenant.platformName}, Inc.
       </footer>
     </div>
   );
