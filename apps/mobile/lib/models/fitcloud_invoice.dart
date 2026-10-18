@@ -1,5 +1,10 @@
-/// Mirrors `GET /invoice` — FitCloud's invoices to this tenant for its own
+import 'payments_analytics.dart' show jsonMoney;
+
+/// Mirrors `GET /invoice` — the platform's invoices to this tenant for its own
 /// subscription (distinct from invoices the tenant issues to its members).
+///
+/// `status` is the backend enum, UPPER_SNAKE: `DRAFT | OPEN | PAID | VOID |
+/// UNCOLLECTIBLE`.
 class FitCloudInvoice {
   const FitCloudInvoice({
     required this.id,
@@ -26,14 +31,13 @@ class FitCloudInvoice {
         id: json['id'] as String,
         invoiceNumber: json['invoiceNumber'] as String,
         status: json['status'] as String,
-        total: (json['total'] as num).toDouble(),
-        currency: json['currency'] as String,
-        dueDate: json['dueDate'] == null
-            ? null
-            : DateTime.parse(json['dueDate'] as String),
-        paidAt: json['paidAt'] == null
-            ? null
-            : DateTime.parse(json['paidAt'] as String),
+        total: jsonMoney(json['total']),
+        currency: json['currency'] as String? ?? 'INR',
+        dueDate: _date(json['dueDate']),
+        paidAt: _date(json['paidAt']),
         createdAt: DateTime.parse(json['createdAt'] as String),
       );
+
+  static DateTime? _date(Object? v) =>
+      v is String ? DateTime.tryParse(v) : null;
 }

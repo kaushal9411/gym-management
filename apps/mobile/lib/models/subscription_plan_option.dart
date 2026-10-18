@@ -1,3 +1,5 @@
+import 'payments_analytics.dart' show jsonMoney;
+
 /// One module toggle within a plan (`GET /onboarding/plans`'s `features[]`)
 /// — reused here for the "Change plan" comparison (`PlanComparison` on
 /// web), a different endpoint/shape from [SubscriptionPlanInfo] (the
@@ -85,9 +87,9 @@ class SubscriptionPlanOption {
         id: json['id'] as String,
         slug: json['slug'] as String,
         name: json['name'] as String,
-        description: json['description'] as String,
-        priceMonthly: (json['priceMonthly'] as num).toDouble(),
-        priceYearly: (json['priceYearly'] as num).toDouble(),
+        description: json['description'] as String? ?? '',
+        priceMonthly: jsonMoney(json['priceMonthly']),
+        priceYearly: jsonMoney(json['priceYearly']),
         currency: json['currency'] as String,
         trialDays: json['trialDays'] as int,
         sortOrder: json['sortOrder'] as int,

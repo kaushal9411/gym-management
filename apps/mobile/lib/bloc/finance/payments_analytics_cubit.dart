@@ -7,6 +7,10 @@ import '../../repositories/payment_repository.dart';
 
 /// Period chips above the Payments analytics header. Ranges are UTC days
 /// (the API buckets by UTC day) and always end today, except lastMonth.
+///
+/// Web's sixth chip, "Custom", is not an enum value (other cubits switch over
+/// this enum): the Payments screen keeps a custom `(from, to)` pair next to
+/// it and passes it straight to [PaymentsAnalyticsCubit.load].
 enum PaymentsPeriod { today, days7, thisMonth, lastMonth, days90 }
 
 extension PaymentsPeriodX on PaymentsPeriod {
@@ -51,66 +55,78 @@ extension PaymentsPeriodX on PaymentsPeriod {
 }
 
 sealed class PaymentsAnalyticsState extends Equatable {
-  const PaymentsAnalyticsState(this.period);
-
-  final PaymentsPeriod period;
+  const PaymentsAnalyticsState();
 
   @override
-  List<Object?> get props => [period];
+  List<Object?> get props => [];
 }
 
 class PaymentsAnalyticsLoading extends PaymentsAnalyticsState {
-  const PaymentsAnalyticsLoading(super.period);
+  const PaymentsAnalyticsLoading();
 }
 
 class PaymentsAnalyticsError extends PaymentsAnalyticsState {
-  const PaymentsAnalyticsError(super.period, this.message);
+  const PaymentsAnalyticsError(this.message);
 
   final String message;
 
   @override
-  List<Object?> get props => [period, message];
+  List<Object?> get props => [message];
 }
 
-/// The caller lacks `finance:view` (HTTP 403) — the header hides itself
+/// The caller lacks `finance:view` (HTTP 403) — the insights hide themselves
 /// instead of showing an error.
 class PaymentsAnalyticsForbidden extends PaymentsAnalyticsState {
-  const PaymentsAnalyticsForbidden(super.period);
+  const PaymentsAnalyticsForbidden();
 }
 
 class PaymentsAnalyticsLoaded extends PaymentsAnalyticsState {
-  const PaymentsAnalyticsLoaded(super.period, this.data);
+  const PaymentsAnalyticsLoaded(this.data);
 
   final PaymentsAnalytics data;
 
   @override
-  List<Object?> get props => [period, data.range.from, data.range.to];
+  List<Object?> get props => [data.range.from, data.range.to];
 }
 
 class PaymentsAnalyticsCubit extends Cubit<PaymentsAnalyticsState> {
-  PaymentsAnalyticsCubit(this._repo)
-      : super(const PaymentsAnalyticsLoading(PaymentsPeriod.thisMonth));
+  PaymentsAnalyticsCubit(this._repo) : super(const PaymentsAnalyticsLoading());
 
   final PaymentRepository _repo;
 
   /// Caller lacks `finance:view` — skip the request entirely.
-  void hide() => emit(PaymentsAnalyticsForbidden(state.period));
+  void hide() => emit(const PaymentsAnalyticsForbidden());
 
-  Future<void> load([PaymentsPeriod? period]) async {
-    final p = period ?? state.period;
-    emit(PaymentsAnalyticsLoading(p));
-    final r = p.range();
+  /// Loads the analytics for `[from, to]` (UTC `YYYY-MM-DD` days; the API
+  /// rejects ranges over 366 days) and an optional branch. [silent] keeps the
+  /// current figures on screen while refreshing.
+  Future<void> load({
+    required String from,
+    required String to,
+    String? branchId,
+    bool silent = false,
+  }) async {
+    if (!silent || state is! PaymentsAnalyticsLoaded) {
+      emit(const PaymentsAnalyticsLoading());
+    }
     try {
-      final data = await _repo.analytics(dateFrom: r.from, dateTo: r.to);
+      final data = await _repo.analytics(
+        dateFrom: from,
+        dateTo: to,
+        branchId: branchId,
+      );
       if (isClosed) return;
-      emit(PaymentsAnalyticsLoaded(p, data));
+      emit(PaymentsAnalyticsLoaded(data));
     } on ApiException catch (e) {
       if (isClosed) return;
       emit(
         e.statusCode == 403
-            ? PaymentsAnalyticsForbidden(p)
-            : PaymentsAnalyticsError(p, e.message),
+            ? const PaymentsAnalyticsForbidden()
+            : PaymentsAnalyticsError(e.detailedMessage),
       );
+    } catch (e) {
+      if (isClosed) return;
+      emit(PaymentsAnalyticsError('Could not load analytics ($e)'));
     }
   }
 }

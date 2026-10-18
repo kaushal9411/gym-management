@@ -53,6 +53,7 @@ function TrendCard({ stats, loading, error, compare, previousLabel }: Props) {
       ) : (
         <MultiSeriesChart
           data={readRows}
+          format="number"
           height={290}
           series={[
             { key: 'received', label: 'Received', type: 'area', color: accentColor(COMM_ACCENT) },

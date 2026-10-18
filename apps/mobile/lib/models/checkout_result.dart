@@ -25,7 +25,7 @@ class CheckoutResult {
         requiresPayment: json['requiresPayment'] as bool,
         paymentId: json['paymentId'] as String?,
         orderId: json['orderId'] as String?,
-        amount: json['amount'] as int?,
+        amount: (json['amount'] as num?)?.toInt(),
         currency: json['currency'] as String?,
         keyId: json['keyId'] as String?,
       );

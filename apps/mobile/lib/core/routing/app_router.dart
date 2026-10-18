@@ -18,6 +18,7 @@ import '../../features/auth/presentation/staff_mfa_setup_screen.dart';
 import '../../features/auth/presentation/staff_otp_screen.dart';
 import '../../features/billing/presentation/billing_address_screen.dart';
 import '../../features/billing/presentation/billing_history_screen.dart';
+import '../../features/billing/presentation/billing_invoices_screen.dart';
 import '../../features/billing/presentation/billing_screen.dart';
 import '../../features/branches/presentation/branch_detail_screen.dart';
 import '../../features/branches/presentation/branch_form_screen.dart';
@@ -38,11 +39,11 @@ import '../../features/workouts/presentation/workout_plan_form_screen.dart';
 import '../../features/workouts/presentation/workout_plan_profile_screen.dart';
 import '../../features/workouts/presentation/workout_plans_list_screen.dart';
 import '../../features/workouts/presentation/workout_schedule_screen.dart';
-import '../../features/finance/presentation/expense_form_screen.dart';
-import '../../features/finance/presentation/expense_list_screen.dart';
+import '../../features/expenses/presentation/expense_form_screen.dart';
+import '../../features/expenses/presentation/expense_list_screen.dart';
 import '../../features/finance/presentation/finance_screen.dart';
-import '../../features/finance/presentation/income_form_screen.dart';
-import '../../features/finance/presentation/income_list_screen.dart';
+import '../../features/income/presentation/income_form_screen.dart';
+import '../../features/income/presentation/income_list_screen.dart';
 import '../../features/finance/presentation/invoice_detail_screen.dart';
 import '../../features/finance/presentation/invoices_screen.dart';
 import '../../features/finance/presentation/payment_detail_screen.dart';
@@ -616,6 +617,10 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       GoRoute(
         path: AppRoutes.billingHistory,
         builder: (context, state) => const BillingHistoryScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.billingInvoices,
+        builder: (context, state) => const BillingInvoicesScreen(),
       ),
       GoRoute(
         path: AppRoutes.billingAddress,

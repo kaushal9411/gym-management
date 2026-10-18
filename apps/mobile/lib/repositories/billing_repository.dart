@@ -2,8 +2,10 @@ import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
 import '../models/billing_address.dart';
+import '../models/billing_payment.dart';
 import '../models/checkout_result.dart';
 import '../models/fitcloud_invoice.dart';
+import '../models/payments_analytics.dart' show jsonMoney;
 import '../models/subscription_plan_info.dart';
 import '../models/subscription_plan_option.dart';
 
@@ -119,7 +121,39 @@ class BillingRepository {
         data: {'code': code, 'amount': amount},
       );
       final data = response.data!['data'] as Map<String, dynamic>;
-      return (data['finalAmount'] as num).toDouble();
+      return jsonMoney(data['finalAmount']);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Ends the subscription — `immediate: false` keeps it running until the
+  /// period end (`cancelAtPeriodEnd`), `true` cancels right away. Mirrors
+  /// web's `useCancelSubscription` (`POST /subscription/cancel`, reason
+  /// `Cancelled from billing portal`); the API needs `billing:manage`.
+  Future<void> cancel({required bool immediate}) async {
+    try {
+      await _dio.post<Map<String, dynamic>>(
+        '/subscription/cancel',
+        data: {
+          'immediate': immediate,
+          'reason': 'Cancelled from billing portal',
+        },
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /payment/history` — every charge attempt for the tenant's own
+  /// subscription, newest first (web's "History" page). Not paginated.
+  Future<List<BillingPayment>> paymentHistory() async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>('/payment/history');
+      final list = response.data!['data'] as List;
+      return list
+          .map((e) => BillingPayment.fromJson(e as Map<String, dynamic>))
+          .toList();
     } on DioException catch (e) {
       throw _mapError(e);
     }

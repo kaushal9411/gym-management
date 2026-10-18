@@ -53,6 +53,10 @@ class FinanceRepository {
     double? discount,
     double? tax,
     String? status,
+    String? invoiceId,
+    String? paymentDate,
+    String? transactionReference,
+    String? notes,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -62,9 +66,15 @@ class FinanceRepository {
           'amount': amount,
           'method': method,
           if (membershipId != null) 'membershipId': membershipId,
+          if (invoiceId != null) 'invoiceId': invoiceId,
           if (discount != null && discount > 0) 'discount': discount,
           if (tax != null && tax > 0) 'tax': tax,
           if (status != null) 'status': status,
+          if (paymentDate != null && paymentDate.isNotEmpty)
+            'paymentDate': paymentDate,
+          if (transactionReference != null && transactionReference.isNotEmpty)
+            'transactionReference': transactionReference,
+          if (notes != null && notes.isNotEmpty) 'notes': notes,
         },
       );
       return MemberPayment.fromJson(
@@ -82,6 +92,10 @@ class FinanceRepository {
     required double amount,
     bool? notifyEmail,
     bool? notifySms,
+    String? invoiceId,
+    double? discount,
+    double? tax,
+    String? notes,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -89,6 +103,10 @@ class FinanceRepository {
         data: {
           'memberId': memberId,
           'amount': amount,
+          if (invoiceId != null) 'invoiceId': invoiceId,
+          if (discount != null && discount > 0) 'discount': discount,
+          if (tax != null && tax > 0) 'tax': tax,
+          if (notes != null && notes.isNotEmpty) 'notes': notes,
           if (notifyEmail != null) 'notifyEmail': notifyEmail,
           if (notifySms != null) 'notifySms': notifySms,
         },

@@ -10,23 +10,57 @@ class IncomeRepository {
 
   final Dio _dio;
 
+  /// Query for `GET /income` (`listIncomeQuerySchema`): every filter is
+  /// optional; `category` is the UPPER_SNAKE api value, `sortBy` is
+  /// `incomeDate` | `amount`, `sortDir` `asc` | `desc`.
+  static Map<String, dynamic> _query({
+    required int page,
+    required int limit,
+    String? search,
+    String? category,
+    String? branchId,
+    String? dateFrom,
+    String? dateTo,
+    String? sortBy,
+    String? sortDir,
+  }) =>
+      {
+        'page': page,
+        'limit': limit,
+        if (search != null && search.isNotEmpty) 'search': search,
+        if (category != null && category.isNotEmpty) 'category': category,
+        if (branchId != null) 'branchId': branchId,
+        if (dateFrom != null) 'dateFrom': dateFrom,
+        if (dateTo != null) 'dateTo': dateTo,
+        if (sortBy != null) 'sortBy': sortBy,
+        if (sortDir != null) 'sortDir': sortDir,
+      };
+
   Future<PaginatedResult<IncomeEntry>> list({
     int page = 1,
     int limit = 20,
     String? branchId,
     String? dateFrom,
     String? dateTo,
+    String? search,
+    String? category,
+    String? sortBy,
+    String? sortDir,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/income',
-        queryParameters: {
-          'page': page,
-          'limit': limit,
-          if (branchId != null) 'branchId': branchId,
-          if (dateFrom != null) 'dateFrom': dateFrom,
-          if (dateTo != null) 'dateTo': dateTo,
-        },
+        queryParameters: _query(
+          page: page,
+          limit: limit,
+          search: search,
+          category: category,
+          branchId: branchId,
+          dateFrom: dateFrom,
+          dateTo: dateTo,
+          sortBy: sortBy,
+          sortDir: sortDir,
+        ),
       );
       return PaginatedResult.fromJson(
         response.data!['data'] as Map<String, dynamic>,
@@ -37,14 +71,34 @@ class IncomeRepository {
     }
   }
 
-  /// [list] plus the filtered-set `summary` (separate so the generic
-  /// `PaginatedListCubit` closure can keep using the page envelope).
+  /// [list] plus the filtered-set `summary` (separate so a page-only caller
+  /// can keep using the page envelope).
   Future<({PaginatedResult<IncomeEntry> page, LedgerListSummary? summary})>
-      listWithSummary({int page = 1, int limit = 20}) async {
+      listWithSummary({
+    int page = 1,
+    int limit = 20,
+    String? search,
+    String? category,
+    String? branchId,
+    String? dateFrom,
+    String? dateTo,
+    String? sortBy,
+    String? sortDir,
+  }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/income',
-        queryParameters: {'page': page, 'limit': limit},
+        queryParameters: _query(
+          page: page,
+          limit: limit,
+          search: search,
+          category: category,
+          branchId: branchId,
+          dateFrom: dateFrom,
+          dateTo: dateTo,
+          sortBy: sortBy,
+          sortDir: sortDir,
+        ),
       );
       final data = response.data!['data'] as Map<String, dynamic>;
       final summary = data['summary'];
@@ -82,6 +136,9 @@ class IncomeRepository {
     }
   }
 
+  /// `POST /income` (perm `finance:income-manage`). [incomeDate] goes out as
+  /// a plain `YYYY-MM-DD` (the column is a date, not a timestamp) — exactly
+  /// what web sends — so no timezone can shift the day.
   Future<IncomeEntry> create({
     required IncomeCategory category,
     required double amount,
@@ -94,7 +151,7 @@ class IncomeRepository {
         data: {
           'category': category.apiValue,
           'amount': amount,
-          'incomeDate': incomeDate.toIso8601String(),
+          'incomeDate': _ymd(incomeDate),
           if (description != null && description.isNotEmpty)
             'description': description,
         },
@@ -106,6 +163,20 @@ class IncomeRepository {
       throw _mapError(e);
     }
   }
+
+  /// `DELETE /income/:id` (perm `finance:income-manage`) — a soft delete; the
+  /// API refuses entries auto-created from a payment.
+  Future<void> delete(String id) async {
+    try {
+      await _dio.delete<Object?>('/income/$id');
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  static String _ymd(DateTime d) => '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 
   ApiException _mapError(DioException e) {
     if (e.type == DioExceptionType.connectionError ||

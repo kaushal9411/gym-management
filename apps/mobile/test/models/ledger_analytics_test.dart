@@ -68,11 +68,6 @@ void main() {
     expect(a.categories.last.deltaPercent, isNull);
     expect(a.branches.single.name, 'Main');
     expect(a.topEntries.single.description, isNull);
-    expect(
-        LedgerKind.expense.categoryLabel('OFFICE_SUPPLIES'),
-      'Office Supplies',
-    );
-    expect(LedgerKind.income.categoryLabel('PERSONAL_TRAINING'), 'PT add-on');
   });
 
   test('empty / malformed payload degrades instead of throwing', () {

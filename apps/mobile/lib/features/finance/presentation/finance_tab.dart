@@ -9,12 +9,12 @@ import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/menu_button.dart';
 import '../../reports/presentation/widgets/donut_chart.dart';
 import '../../reports/presentation/widgets/report_filter_bar.dart';
+import '../../team/presentation/widgets/team_ui.dart';
 import 'widgets/revenue_expense_chart.dart';
 
 const _methodColors = {
@@ -185,13 +185,13 @@ class _FinanceTabView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        GlassCard(
-          padding: const EdgeInsets.all(16),
+        TeamInsightCard(
+          icon: Icons.show_chart_rounded,
+          title: 'Payment collection',
+          color: TeamColors.indigo,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Payment collection', style: AppText.eyebrow()),
-              const SizedBox(height: 10),
               state.paymentTrend.isEmpty
                   ? const SizedBox(height: 80)
                   : RevenueExpenseChart(points: state.paymentTrend),
@@ -206,12 +206,13 @@ class _FinanceTabView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        AppCard(
+        TeamInsightCard(
+          icon: Icons.donut_large_rounded,
+          title: 'Payment methods',
+          color: TeamColors.teal,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Payment methods', style: AppText.eyebrow()),
-              const SizedBox(height: 12),
               state.methodBreakdown.isEmpty
                   ? Text(
                       'No payments recorded in this range.',
@@ -232,9 +233,10 @@ class _FinanceTabView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        AppButton(
+        TeamGradientButton(
           label: 'Record payment',
-          onPressed: () => context.push(AppRoutes.recordPayment),
+          icon: Icons.add_card_rounded,
+          onTap: () => context.push(AppRoutes.recordPayment),
         ),
       ],
     );

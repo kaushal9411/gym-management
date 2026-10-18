@@ -1,22 +1,11 @@
-import 'expense_entry.dart';
-import 'income_entry.dart';
 import 'payments_analytics.dart';
 
-/// Income vs Expenses — one analytics model serves both
-/// (`GET /income/analytics`, `GET /expenses/analytics`, perm `finance:view`).
-/// Money arrives as decimal STRINGS. Parsing is defensive (missing → 0/empty),
-/// reusing the helpers of `payments_analytics.dart`.
-enum LedgerKind { income, expense }
+// Income vs Expenses — one analytics model serves both
+// (`GET /income/analytics`, `GET /expenses/analytics`, perm `finance:view`).
+// Money arrives as decimal STRINGS. Parsing is defensive (missing → 0/empty),
+// reusing the helpers of `payments_analytics.dart`.
 
-extension LedgerKindX on LedgerKind {
-  String get title => this == LedgerKind.income ? 'Income' : 'Expenses';
-
-  /// Singular noun for counts ("3 entries" works for both).
-  String categoryLabel(String api) => this == LedgerKind.income
-      ? IncomeCategoryX.fromApi(api).label
-      : ExpenseCategoryX.fromApi(api).label;
-}
-
+/// The `largest` KPI of a ledger analytics payload.
 class LedgerLargest {
   const LedgerLargest({
     required this.value,

@@ -49,8 +49,8 @@ class PeriodStatsLoaded<T> extends PeriodStatsState<T> {
 
 /// One cubit for any "stats for a period" endpoint (the Notifications and
 /// Announcements insights headers); the screen injects the repository call.
-/// Same Loading/Loaded/Error/Forbidden contract as `LedgerAnalyticsCubit`
-/// and reuses [PaymentsPeriod] (Today/7 days/This month/Last month/90 days).
+/// Loading/Loaded/Error/Forbidden states, and reuses [PaymentsPeriod]
+/// (Today/7 days/This month/Last month/90 days).
 class PeriodStatsCubit<T> extends Cubit<PeriodStatsState<T>> {
   PeriodStatsCubit(this._fetch)
       : super(PeriodStatsLoading<T>(PaymentsPeriod.thisMonth));

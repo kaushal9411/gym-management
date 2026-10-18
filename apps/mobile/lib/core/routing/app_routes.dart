@@ -91,6 +91,7 @@ class AppRoutes {
   static const globalSearch = '/search';
   static const billing = '/billing';
   static const billingHistory = '/billing/history';
+  static const billingInvoices = '/billing/invoices';
   static const billingAddress = '/billing/address';
   static const gymSettings = '/settings';
   static const gymProfileSettings = '/settings/profile';
