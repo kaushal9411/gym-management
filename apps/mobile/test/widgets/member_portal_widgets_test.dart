@@ -7,17 +7,13 @@ import 'package:gym_saas_mobile/bloc/common/paginated_list_cubit.dart';
 import 'package:gym_saas_mobile/features/member/presentation/member_gym_info_screen.dart';
 import 'package:gym_saas_mobile/features/member/presentation/member_invoice_detail_screen.dart';
 import 'package:gym_saas_mobile/features/member/presentation/member_payments_screen.dart';
-import 'package:gym_saas_mobile/features/member/presentation/widgets/member_insights.dart';
 import 'package:gym_saas_mobile/models/gym_info.dart';
 import 'package:gym_saas_mobile/models/member_invoice.dart';
 import 'package:gym_saas_mobile/models/member_invoice_detail.dart';
-import 'package:gym_saas_mobile/models/member_overview.dart';
 import 'package:gym_saas_mobile/models/paginated_result.dart';
 import 'package:gym_saas_mobile/models/portal_payment.dart';
 import 'package:gym_saas_mobile/repositories/member_portal_repository.dart';
 import 'package:mocktail/mocktail.dart';
-
-import '../models/member_overview_test.dart' show fullFixture, realFixture;
 
 class _MockRepo extends Mock implements MemberPortalRepository {}
 
@@ -30,64 +26,6 @@ void main() {
     addTearDown(t.view.reset);
     await t.pumpWidget(MaterialApp(home: Scaffold(body: child)));
   }
-
-  testWidgets('insights: full overview at 360px, no overflow', (t) async {
-    await pump(
-      t,
-      SingleChildScrollView(
-        child: MemberInsightsBody(
-          overview: MemberOverview.fromJson(fullFixture()),
-        ),
-      ),
-    );
-    await t.pump(const Duration(seconds: 2));
-    expect(find.text('Insights'), findsOneWidget);
-    expect(find.text('Membership'), findsOneWidget);
-    expect(find.text('Visits this month'), findsOneWidget);
-    expect(find.text('Streak 3d'), findsOneWidget);
-    expect(find.text('Best 9d'), findsOneWidget);
-    expect(find.text('Busiest: Sat'), findsOneWidget);
-    expect(find.text('Workout progress'), findsOneWidget);
-    expect(find.text('Diet'), findsOneWidget);
-    expect(find.text('Next booked classes'), findsOneWidget);
-    expect(find.text('Yoga'), findsOneWidget);
-    expect(t.takeException(), isNull);
-  });
-
-  testWidgets('insights: real-shaped overview hides workout/diet/classes',
-      (t) async {
-    await pump(
-      t,
-      SingleChildScrollView(
-        child: MemberInsightsBody(
-          overview: MemberOverview.fromJson(realFixture()),
-        ),
-      ),
-    );
-    await t.pump(const Duration(seconds: 2));
-    expect(find.text('Workout progress'), findsNothing);
-    expect(find.text('Diet'), findsNothing);
-    expect(find.text('Next booked classes'), findsNothing);
-    expect(find.text('All paid'), findsOneWidget);
-    expect(t.takeException(), isNull);
-  });
-
-  testWidgets('insights: expired membership shows warning state', (t) async {
-    final j = fullFixture();
-    (j['membership'] as Map<String, dynamic>)
-      ..['expired'] = true
-      ..['daysLeft'] = -4;
-    await pump(
-      t,
-      SingleChildScrollView(
-        child: MemberInsightsBody(overview: MemberOverview.fromJson(j)),
-      ),
-    );
-    await t.pump(const Duration(seconds: 2));
-    expect(find.text('Expired 1 Dec'), findsOneWidget);
-    expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
-    expect(t.takeException(), isNull);
-  });
 
   testWidgets('payments list: rows, refunded note, 360px', (t) async {
     final cubit = PaginatedListCubit<PortalPayment>(

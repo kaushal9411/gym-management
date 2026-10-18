@@ -1,41 +1,58 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../bloc/common/period_stats_cubit.dart';
 import '../../../bloc/session/session_cubit.dart';
 import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
+import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../models/body_measurement.dart';
+import '../../../models/gym_info.dart';
 import '../../../models/member_invoice.dart';
 import '../../../models/member_overview.dart';
 import '../../../models/member_portal_profile.dart';
 import '../../../models/member_visit.dart';
 import '../../../models/member_workout_assignment.dart';
-import '../../../models/member_workout_progress.dart';
 import '../../../repositories/member_portal_repository.dart';
-import '../../../shared/widgets/app_button.dart';
+import '../../../shared/widgets/adaptive_columns.dart';
 import '../../../shared/widgets/app_state_views.dart';
-import '../../../shared/widgets/menu_button.dart';
-import '../../../shared/widgets/notification_bell_icon.dart';
-import '../../../shared/widgets/user_avatar.dart';
+import '../../../shared/widgets/motion.dart';
+import '../../team/presentation/widgets/team_ui.dart'
+    show TeamCenter, TeamColors;
 import 'member_dashboard_detail_sheet.dart';
+import 'member_pay_invoice_sheet.dart';
 import 'member_renew_sheet.dart';
-import 'widgets/member_insights.dart';
+import 'widgets/member_dash_ui.dart';
 
-/// Design frame "4. Dashboard". The design's "Renew membership" CTA (frame
-/// "4a. Renew — Confirm & pay") is now built — `MemberRenewSheet`, opened
-/// from `_MembershipCard` below once the membership has expired. Every tile
-/// (Membership, This month, Streak, Workout, Outstanding) is tappable,
-/// opening `MemberDashboardDetailSheet` with the real records behind it —
-/// mirrors the Owner dashboard's `DashboardStatKind`/`showDashboardDetailSheet`
-/// pattern, reusing data this screen already loaded rather than re-fetching.
+/// Member Dashboard — web's `/portal/dashboard`, redesigned for phone and
+/// tablet, in the member palette (lime → teal).
+///
+/// Same order as web: the hero (greeting, plan + validity, id / status /
+/// branch chips, days-left ring, Total visits / Streak / This month, and the
+/// Renew / Book class / My QR actions), six stat tiles, then the cards —
+/// Attendance (12-week heatmap, weekday bars, best streak / avg visit / last
+/// visit), Upcoming classes, Workout, Body snapshot, Recent invoices (with a
+/// Pay strip for the first unpaid one), Your gym, My data.
+///
+/// Data: `GET /portal/overview` drives the hero, tiles and the attendance /
+/// classes / workout / billing numbers (a failure shows the retry view, like
+/// the page has nothing to show without it); `/portal/me` (QR, plan for the
+/// sheets), visits, workout and invoices feed the tile detail sheets and the
+/// invoices card; measurements and gym info load on their own and only their
+/// card degrades. Tiles Membership, Visits, Workout and Outstanding open the
+/// same detail sheets as before; the diet tile jumps to the Diet tab.
+///
+/// Dropped vs web: the "My data" card links to the existing export screen
+/// instead of downloading inline; the hero does not extend behind the status
+/// bar (the shell's SafeArea owns it); chart hover tooltips (long-press).
 class MemberDashboardScreen extends StatefulWidget {
   const MemberDashboardScreen({required this.onQuickAction, super.key});
 
-  /// Jumps the shell to the Workout (1) / Diet (2) tab.
+  /// Jumps the shell to the Workout (1) / Diet (2) / Classes (3) tab.
   final ValueChanged<int> onQuickAction;
 
   @override
@@ -43,22 +60,16 @@ class MemberDashboardScreen extends StatefulWidget {
 }
 
 class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
+  MemberOverview? _overview;
   MemberPortalProfile? _profile;
   List<MemberVisit> _visits = const [];
   MemberWorkoutAssignment? _workout;
   List<MemberInvoice> _invoices = const [];
+  List<BodyMeasurement>? _measurements;
+  bool _measurementsLoading = true;
+  GymInfo? _gym;
   bool _loading = true;
   String? _error;
-
-  /// Drives the Insights section (`GET /portal/overview`). Reuses the
-  /// generic [PeriodStatsCubit] — the fetcher ignores the date range since
-  /// the member overview has no period chips. A failure only hides the
-  /// section; it never affects the rest of the dashboard.
-  late final PeriodStatsCubit<MemberOverview> _insights =
-      PeriodStatsCubit<MemberOverview>(
-    ({required String dateFrom, required String dateTo}) =>
-        getIt<MemberPortalRepository>().overview(),
-  );
 
   @override
   void initState() {
@@ -66,84 +77,60 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
     _load();
   }
 
-  @override
-  void dispose() {
-    _insights.close();
-    super.dispose();
+  Future<T?> _tolerant<T>(Future<T> f) async {
+    try {
+      return await f;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _load() async {
     setState(() {
-      _loading = true;
+      _loading = _overview == null;
       _error = null;
     });
-    // Fire-and-forget: independent of the core dashboard fetches below.
-    _insights.load(null, true);
+    final repo = getIt<MemberPortalRepository>();
+    // Optional pieces start now and fill their cards when they land.
+    _tolerant(repo.measurements()).then((m) {
+      if (mounted) {
+        setState(() {
+          _measurements = m;
+          _measurementsLoading = false;
+        });
+      }
+    });
+    _tolerant(repo.gymInfo()).then((g) {
+      if (mounted && g != null) setState(() => _gym = g);
+    });
     try {
-      final repo = getIt<MemberPortalRepository>();
-      // Fired in parallel (not individually awaited yet) — a plain
-      // Future.wait/record .wait both work here, but this avoids depending
-      // on the `async` package's record-wait extension actually covering
-      // 4-tuples on whatever version is pinned.
-      final profileFuture = repo.me();
-      final visitsFuture = repo.attendance(limit: 60);
-      final workoutFuture = repo.workout();
-      final invoicesFuture = repo.invoices(limit: 20);
-      final profile = await profileFuture;
-      final visits = await visitsFuture;
-      final workout = await workoutFuture;
-      final invoices = await invoicesFuture;
+      final overviewF = repo.overview();
+      final profileF = repo.me();
+      final visitsF = _tolerant(repo.attendance(limit: 60));
+      final workoutF = _tolerant(repo.workout());
+      final invoicesF = _tolerant(repo.invoices(limit: 20));
+      final overview = await overviewF;
+      final profile = await profileF;
+      final visits = await visitsF;
+      final workout = await workoutF;
+      final invoices = await invoicesF;
       if (!mounted) return;
       setState(() {
+        _overview = overview;
         _profile = profile;
-        _visits = visits.items;
+        _visits = visits?.items ?? const [];
         _workout = workout;
-        _invoices = invoices.items;
+        _invoices = invoices?.items ?? const [];
       });
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = 'Could not load your dashboard ($e)');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  int get _visitsThisMonth {
-    final now = DateTime.now();
-    return _visits
-        .where(
-          (v) =>
-              v.attendanceDate.year == now.year &&
-              v.attendanceDate.month == now.month,
-        )
-        .length;
-  }
-
-  /// Consecutive days with a visit, counting back from today (or from
-  /// yesterday, so a streak isn't shown as broken before today's workout).
-  int get _streak {
-    final days = _visits
-        .map(
-          (v) => DateTime(
-            v.attendanceDate.year,
-            v.attendanceDate.month,
-            v.attendanceDate.day,
-          ),
-        )
-        .toSet();
-    if (days.isEmpty) return 0;
-    final now = DateTime.now();
-    var cursor = DateTime(now.year, now.month, now.day);
-    if (!days.contains(cursor)) {
-      cursor = cursor.subtract(const Duration(days: 1));
-      if (!days.contains(cursor)) return 0;
-    }
-    var streak = 0;
-    while (days.contains(cursor)) {
-      streak++;
-      cursor = cursor.subtract(const Duration(days: 1));
-    }
-    return streak;
   }
 
   String get _greeting {
@@ -152,22 +139,6 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
   }
-
-  /// Percent of the assigned plan's exercises marked COMPLETED — null when
-  /// no plan is assigned, or the plan has no exercises to measure against.
-  int? get _workoutPercent {
-    final w = _workout;
-    if (w == null || w.exercises.isEmpty) return null;
-    final completed = w.exercises
-        .where(
-            (e) => w.statusOf(e.exerciseId) == ExerciseProgressStatus.completed,)
-        .length;
-    return (completed / w.exercises.length * 100).round();
-  }
-
-  double get _outstandingTotal => _invoices
-      .where((i) => i.status != 'PAID')
-      .fold(0.0, (sum, i) => sum + i.totalAmount);
 
   void _openDetail(MemberDashboardStatKind kind) {
     final profile = _profile;
@@ -184,18 +155,87 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
     );
   }
 
+  Future<void> _renew() async {
+    final plan = _overview?.membership?.planName ?? 'Membership';
+    final renewed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => MemberRenewSheet(planName: plan),
+    );
+    if (renewed == true) _load();
+  }
+
+  Future<void> _pay(MemberInvoice inv) async {
+    final paid = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => MemberPayInvoiceSheet(
+        invoiceId: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        amount: inv.totalAmount,
+      ),
+    );
+    if (paid == true) _load();
+  }
+
+  void _showQr() {
+    final url = _profile?.qrCodeImageUrl;
+    if (url == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+        ),
+        title: Text('Check-in QR code', style: AppText.display(size: 18)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Show this at the front desk to check in.',
+              style: AppText.body(size: 12.5, color: AppColors.inkFaint),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: memberQrImage(url),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const AppLoadingView(role: AppRole.member);
-    if (_error != null) {
+    final o = _overview;
+    if (o == null) {
       return AppErrorView(
-        message: _error!,
+        message: _error ?? 'Could not load your dashboard.',
         onRetry: _load,
         role: AppRole.member,
       );
     }
-    final profile = _profile;
-    if (profile == null) return const SizedBox.shrink();
 
     // Name/photo follow the session so a self-service edit shows up here
     // immediately (this tab is cached by the shell's IndexedStack).
@@ -204,339 +244,206 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
         session is SessionAuthenticatedMember ? session.member : null;
     final displayName = (sessionMember?.name.isNotEmpty ?? false)
         ? sessionMember!.name
-        : profile.name;
+        : o.member.name;
 
     return RefreshIndicator(
       color: AppColors.memberB,
       backgroundColor: AppColors.surface2,
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 90),
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 90),
         children: [
-          Row(
-            children: [
-              const MenuButton(),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(_greeting, style: AppText.eyebrow()),
-                    Text(displayName, style: AppText.display(size: 22)),
-                  ],
-                ),
-              ),
-              const NotificationBellIcon(isStaff: false),
-              const SizedBox(width: 10),
-              UserAvatar(
-                avatarUrl: sessionMember?.profilePhotoUrl,
-                name: displayName,
-                role: AppRole.member,
-              ),
-            ],
+          MemberHero(
+            overview: o,
+            greeting: _greeting,
+            displayName: displayName,
+            avatarUrl: sessionMember?.profilePhotoUrl ?? o.member.photoUrl,
+            hasQr: (_profile?.qrCodeImageUrl ?? '').isNotEmpty,
+            onRenew: _renew,
+            onBook: () => widget.onQuickAction(3),
+            onQr: _showQr,
           ),
-          const SizedBox(height: 16),
-          _MembershipCard(
-            profile: profile,
-            onRenewed: _load,
-            onTap: () => _openDetail(MemberDashboardStatKind.membership),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  label: 'This month',
-                  value: '$_visitsThisMonth',
-                  caption: 'visits',
-                  onTap: () => _openDetail(MemberDashboardStatKind.attendance),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatCard(
-                  label: 'Streak',
-                  value: '$_streak',
-                  caption: 'days',
-                  accent: true,
-                  onTap: () => _openDetail(MemberDashboardStatKind.attendance),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  label: 'Workout',
-                  value: _workoutPercent != null ? '$_workoutPercent%' : '—',
-                  caption: 'progress',
-                  onTap: () => _openDetail(MemberDashboardStatKind.workout),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatCard(
-                  label: 'Outstanding',
-                  value: _outstandingTotal > 0
-                      ? '₹${_outstandingTotal.toStringAsFixed(0)}'
-                      : 'All paid',
-                  caption: _outstandingTotal > 0 ? 'due' : 'settled',
-                  accent: _outstandingTotal > 0,
-                  onTap: () => _openDetail(MemberDashboardStatKind.outstanding),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface2,
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              border: Border.all(color: AppColors.line),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Quick actions', style: AppText.eyebrow()),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _QuickAction(
-                        icon: Icons.fitness_center_rounded,
-                        label: 'Workout',
-                        onTap: () => widget.onQuickAction(1),
+          TeamCenter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _tiles(o),
+                  const SizedBox(height: 14),
+                  AdaptiveColumns(
+                    fullWidth: [
+                      StaggeredReveal(
+                        index: 1,
+                        child: MemberAttendanceCard(
+                          attendance: o.attendance,
+                          onHistory: () =>
+                              context.push(AppRoutes.memberAttendance),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _QuickAction(
-                        icon: Icons.restaurant_rounded,
-                        label: 'Diet log',
-                        onTap: () => widget.onQuickAction(2),
+                    ],
+                    children: [
+                      MemberClassesCard(
+                        classes: o.upcomingClasses,
+                        onBook: () => widget.onQuickAction(3),
                       ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
-          BlocProvider<PeriodStatsCubit<MemberOverview>>.value(
-            value: _insights,
-            child: const MemberInsightsSection(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MembershipCard extends StatelessWidget {
-  const _MembershipCard({
-    required this.profile,
-    required this.onRenewed,
-    required this.onTap,
-  });
-
-  final MemberPortalProfile profile;
-
-  /// Called after a successful renewal (the sheet popped `true`) so the
-  /// dashboard re-fetches and this card reflects the fresh expiry date.
-  final VoidCallback onRenewed;
-
-  /// Opens the Membership detail sheet — a separate tap target from the
-  /// "Renew now" button below (Flutter's gesture arena resolves a tap on
-  /// the nested button to the button alone, never both).
-  final VoidCallback onTap;
-
-  Future<void> _openRenewSheet(BuildContext context, String planName) async {
-    final renewed = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => MemberRenewSheet(planName: planName),
-    );
-    if (renewed == true) onRenewed();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final membership = profile.currentMembership;
-    final days = profile.daysLeft;
-    final expired = membership != null && days != null && days < 0;
-
-    final headline = membership == null
-        ? 'No active plan'
-        : days == null
-            ? membership.planName
-            : days < 0
-                ? 'Expired'
-                : days == 0
-                    ? 'Expires today'
-                    : '$days day${days == 1 ? '' : 's'} left';
-
-    final card = Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0x24C6F135), Color(0x1A14E0B4)],
-        ),
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: AppColors.glassBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            membership?.planName ?? 'Membership',
-            style: AppText.body(
-              size: 11,
-              weight: FontWeight.w800,
-              color: AppColors.memberPillFg,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(headline, style: AppText.display(size: 24)),
-          const SizedBox(height: 6),
-          Text(
-            membership == null
-                ? 'Ask the front desk to set up your membership.'
-                : expired
-                    ? 'Renew to keep using the gym.'
-                    : 'Renewals open up once this expires.',
-            style: AppText.body(size: 12, color: AppColors.inkFaint),
-          ),
-          if (expired) ...[
-            const SizedBox(height: 12),
-            AppButton(
-              label: 'Renew now',
-              role: AppRole.member,
-              size: AppButtonSize.small,
-              fullWidth: false,
-              onPressed: () => _openRenewSheet(context, membership.planName),
-            ),
-          ],
-        ],
-      ),
-    );
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadii.card),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        onTap: onTap,
-        child: card,
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.caption,
-    this.accent = false,
-    this.onTap,
-  });
-
-  final String label;
-  final String value;
-  final String caption;
-  final bool accent;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final content = Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: AppText.eyebrow()),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: AppText.display(
-              size: 26,
-              color: accent ? AppColors.memberPillFg : AppColors.ink,
-            ),
-          ),
-          Text(
-            caption,
-            style: AppText.body(
-              size: 11,
-              color: AppColors.inkFaint,
-              weight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-    if (onTap == null) return content;
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(AppRadii.card),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        onTap: onTap,
-        child: content,
-      ),
-    );
-  }
-}
-
-class _QuickAction extends StatelessWidget {
-  const _QuickAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.line),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, size: 20, color: AppColors.memberB),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: AppText.body(size: 12, weight: FontWeight.w700),
+                      MemberWorkoutCard(
+                        workout: o.workout,
+                        onOpen: () => widget.onQuickAction(1),
+                      ),
+                      MemberBodyCard(
+                        measurements: _measurements,
+                        loading: _measurementsLoading,
+                        onAll: () => context.push(AppRoutes.memberMeasurements),
+                      ),
+                      MemberBillingCard(
+                        invoices: _invoices,
+                        billing: o.billing,
+                        onAll: () => context.push(AppRoutes.memberInvoices),
+                        onPay: _pay,
+                      ),
+                      MemberGymCard(
+                        overview: o,
+                        gym: _gym,
+                        onMore: () => context.push(AppRoutes.memberGymInfo),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  MemberDataCard(
+                    onExport: () => context.push(AppRoutes.memberDataExport),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
+  }
+
+  Widget _tiles(MemberOverview o) {
+    final m = o.membership;
+    final a = o.attendance;
+    final w = o.workout;
+    final d = o.diet;
+    final msColor = m == null
+        ? TeamColors.slate
+        : m.expired
+            ? TeamColors.rose
+            : (m.daysLeft <= 7 ? TeamColors.amber : TeamColors.violet);
+    final due = o.billing.outstanding;
+    String count(double v) => v.round().toString();
+    return MemberTileGrid(
+      tiles: [
+        MemberStatTile(
+          label: 'Membership',
+          icon: Icons.event_available_rounded,
+          color: msColor,
+          value: m == null
+              ? const Text('None')
+              : m.expired
+                  ? const Text('Expired')
+                  : AnimatedNumber(
+                      value: m.daysLeft.toDouble(),
+                      format: (v) => '${v.round()}d left',
+                    ),
+          hint: m == null
+              ? 'Talk to the front desk'
+              : '${m.expired ? 'Ended' : 'Ends'} ${_short(m.endDate)}',
+          progress: m == null || m.totalDays <= 0 ? null : m.remainingFraction,
+          onTap: () => _openDetail(MemberDashboardStatKind.membership),
+        ),
+        MemberStatTile(
+          label: 'Visits this month',
+          icon: Icons.login_rounded,
+          color: TeamColors.sky,
+          value: AnimatedNumber(
+            value: a.thisMonthVisits.toDouble(),
+            format: count,
+          ),
+          hint: 'vs ${a.previousMonthVisits} last month',
+          delta: a.deltaPercent,
+          onTap: () => _openDetail(MemberDashboardStatKind.attendance),
+        ),
+        MemberStatTile(
+          label: 'Current streak',
+          icon: Icons.local_fire_department_rounded,
+          color: const Color(0xFFF97316),
+          value: AnimatedNumber(
+            value: a.currentStreakDays.toDouble(),
+            format: (v) => '${v.round()}d',
+          ),
+          hint:
+              'Best ${a.bestStreakDays} ${a.bestStreakDays == 1 ? 'day' : 'days'}',
+        ),
+        MemberStatTile(
+          label: 'Workout progress',
+          icon: Icons.fitness_center_rounded,
+          color: const Color(0xFFF97316),
+          value: w == null
+              ? const Text('—')
+              : AnimatedNumber(
+                  value: w.progressPercent.toDouble(),
+                  format: (v) => '${v.round()}%',
+                ),
+          hint: w == null
+              ? 'No plan assigned'
+              : '${w.completedExercises}/${w.totalExercises} exercises',
+          progress: w == null ? null : w.progressPercent / 100,
+          onTap: () => _openDetail(MemberDashboardStatKind.workout),
+        ),
+        if (d != null)
+          MemberStatTile(
+            label: 'Diet today',
+            icon: Icons.restaurant_rounded,
+            color: d.loggedToday ? TeamColors.green : TeamColors.amber,
+            value: Text(d.loggedToday ? 'Logged' : 'Not yet'),
+            hint: d.waterTodayMl != null
+                ? '${d.waterTodayMl} ml water'
+                : d.dailyCalories != null
+                    ? '${d.dailyCalories} kcal plan'
+                    : d.planName,
+            onTap: () => widget.onQuickAction(2),
+          )
+        else
+          MemberStatTile(
+            label: 'Total visits',
+            icon: Icons.login_rounded,
+            color: TeamColors.green,
+            value: AnimatedNumber(
+              value: a.totalVisits.toDouble(),
+              format: count,
+            ),
+            hint: 'All time',
+            onTap: () => _openDetail(MemberDashboardStatKind.attendance),
+          ),
+        MemberStatTile(
+          label: 'Outstanding',
+          icon: Icons.account_balance_wallet_outlined,
+          color: due > 0 ? TeamColors.amber : TeamColors.green,
+          value: due > 0
+              ? AnimatedNumber(value: due, format: memberMoney)
+              : const Text('All paid'),
+          hint: due > 0
+              ? '${o.billing.outstandingInvoiceCount} '
+                  '${o.billing.outstandingInvoiceCount == 1 ? 'invoice' : 'invoices'}'
+                  '${o.billing.nextDueDate != null ? ' · due ${_short(o.billing.nextDueDate!)}' : ''}'
+              : 'Nothing due',
+          onTap: () => _openDetail(MemberDashboardStatKind.outstanding),
+        ),
+      ],
+    );
+  }
+
+  String _short(String iso) {
+    final d = DateTime.tryParse(iso);
+    if (d == null) return iso;
+    const m = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', //
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${d.day} ${m[d.month - 1]}';
   }
 }

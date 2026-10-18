@@ -16,6 +16,7 @@ class MemberPortalProfile {
     required this.branch,
     required this.currentMembership,
     required this.joiningDate,
+    this.qrCodeImageUrl,
   });
 
   final String id;
@@ -27,6 +28,9 @@ class MemberPortalProfile {
   final MemberBranchSummary branch;
   final CurrentMembershipSummary? currentMembership;
   final DateTime joiningDate;
+
+  /// Check-in QR (a `data:` URL or object-storage URL); null when none yet.
+  final String? qrCodeImageUrl;
 
   String get initials {
     final words =
@@ -67,5 +71,6 @@ class MemberPortalProfile {
                 json['currentMembership'] as Map<String, dynamic>,
               ),
         joiningDate: DateTime.parse(json['joiningDate'] as String),
+        qrCodeImageUrl: json['qrCodeImageUrl'] as String?,
       );
 }
