@@ -923,8 +923,11 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       ),
       GoRoute(
         path: AppRoutes.memberInvoiceDetail,
-        builder: (context, state) =>
-            MemberInvoiceDetailScreen(invoice: state.extra as MemberInvoice),
+        builder: (context, state) => switch (state.extra) {
+          final MemberInvoice inv => MemberInvoiceDetailScreen(invoice: inv),
+          final String id => MemberInvoiceDetailScreen(invoiceId: id),
+          _ => const MemberInvoicesScreen(),
+        },
       ),
       GoRoute(
         path: AppRoutes.memberProfile,

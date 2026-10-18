@@ -158,6 +158,10 @@ void main() {
           ),
         ),
         GoRoute(
+          path: '/member/profile',
+          builder: (_, __) => const Text('PROFILE PAGE'),
+        ),
+        GoRoute(
           path: '/member/attendance',
           builder: (_, __) => const Text('ATT'),
         ),
@@ -209,6 +213,14 @@ void main() {
       expect(find.text(label), findsWidgets, reason: label);
     }
     expect(t.takeException(), isNull);
+  });
+
+  testWidgets('tapping the hero avatar opens My Profile', (t) async {
+    await pump(t);
+    await t.tap(find.byKey(const ValueKey('hero-avatar')));
+    await t.pump();
+    await t.pump(const Duration(seconds: 1));
+    expect(find.text('PROFILE PAGE'), findsOneWidget);
   });
 
   testWidgets('hero actions: Book class jumps to the Classes tab', (t) async {

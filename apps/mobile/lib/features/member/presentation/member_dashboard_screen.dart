@@ -263,6 +263,7 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
             onRenew: _renew,
             onBook: () => widget.onQuickAction(3),
             onQr: _showQr,
+            onProfile: () => context.push(AppRoutes.memberProfile),
           ),
           TeamCenter(
             child: Padding(

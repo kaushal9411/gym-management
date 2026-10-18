@@ -63,8 +63,12 @@ class MemberHero extends StatelessWidget {
     required this.onRenew,
     required this.onBook,
     required this.onQr,
+    required this.onProfile,
     super.key,
   });
+
+  /// The avatar opens My Profile (view and edit).
+  final VoidCallback onProfile;
 
   final MemberOverview overview;
   final String greeting;
@@ -122,10 +126,24 @@ class MemberHero extends StatelessWidget {
                     const Spacer(),
                     const NotificationBellIcon(isStaff: false),
                     const SizedBox(width: 10),
-                    UserAvatar(
-                      avatarUrl: avatarUrl,
-                      name: displayName,
-                      role: AppRole.member,
+                    GestureDetector(
+                      key: const ValueKey('hero-avatar'),
+                      onTap: onProfile,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            width: 2,
+                          ),
+                        ),
+                        child: UserAvatar(
+                          avatarUrl: avatarUrl,
+                          name: displayName,
+                          role: AppRole.member,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -201,7 +219,7 @@ class MemberHero extends StatelessWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: _HeroButton(
+                      child: MemberHeroButton(
                         icon: Icons.credit_card_rounded,
                         label: 'Renew',
                         solid: urgent,
@@ -210,7 +228,7 @@ class MemberHero extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: _HeroButton(
+                      child: MemberHeroButton(
                         icon: Icons.event_available_rounded,
                         label: 'Book class',
                         onTap: onBook,
@@ -219,7 +237,7 @@ class MemberHero extends StatelessWidget {
                     if (hasQr) ...[
                       const SizedBox(width: 8),
                       Expanded(
-                        child: _HeroButton(
+                        child: MemberHeroButton(
                           icon: Icons.qr_code_2_rounded,
                           label: 'My QR',
                           onTap: onQr,
@@ -293,8 +311,9 @@ class _HeroStat extends StatelessWidget {
       );
 }
 
-class _HeroButton extends StatelessWidget {
-  const _HeroButton({
+class MemberHeroButton extends StatelessWidget {
+  const MemberHeroButton({
+    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
@@ -418,6 +437,139 @@ class _OnDarkRing extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _OnDarkRing old) => old.fraction != fraction;
+}
+
+/// Compact hero for the member sub-pages: back button, eyebrow, title,
+/// subtitle, chips and up to three count-up stats — the page-level sibling of
+/// [MemberHero] (same gradient and chips).
+class MemberPageHero extends StatelessWidget {
+  const MemberPageHero({
+    required this.eyebrow,
+    required this.title,
+    this.subtitle,
+    this.chips = const [],
+    this.stats = const [],
+    this.trailing,
+    this.actions = const [],
+    super.key,
+  });
+
+  /// Buttons under the stats ([MemberHeroButton]s), shared equally.
+  final List<Widget> actions;
+  final String eyebrow;
+  final String title;
+  final String? subtitle;
+  final List<String> chips;
+
+  /// (label, value, format) — numbers count up.
+  final List<(String, int, String Function(int))> stats;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final top = MediaQuery.of(context).padding.top;
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: _memberHeroGradient,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
+      ),
+      padding: EdgeInsets.fromLTRB(18, top + 8, 18, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.of(context).maybePop(),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              if (trailing != null) trailing!,
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            eyebrow.toUpperCase(),
+            style: AppText.eyebrow(color: Colors.white.withValues(alpha: 0.8)),
+          ),
+          Text(
+            title,
+            style: AppText.display(size: 25, color: Colors.white),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              subtitle!,
+              style: AppText.body(
+                size: 12.5,
+                weight: FontWeight.w600,
+                color: Colors.white.withValues(alpha: 0.9),
+              ),
+            ),
+          ],
+          if (chips.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [for (final c in chips) _HeroChip(c)],
+            ),
+          ],
+          if (stats.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                for (final st in stats)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        AnimatedNumber(
+                          value: st.$2.toDouble(),
+                          format: (v) => st.$3(v.round()),
+                          style: AppText.display(size: 24, color: Colors.white),
+                        ),
+                        Text(
+                          st.$1,
+                          style: AppText.body(
+                            size: 11.5,
+                            weight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          if (actions.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                for (var i = 0; i < actions.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 8),
+                  Expanded(child: actions[i]),
+                ],
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 // ───────────────────────────────────────────────────────────────── tiles

@@ -809,3 +809,36 @@ Mobile-only; **every report screen's routes, class names and `extra` types are u
 - **Traps**: with `ResponseType.bytes` an **error body is bytes too** — `exportReport` decodes it (`jsonDecode(utf8.decode)`) into `ApiException` (`detailedMessage` for field errors); HTML / empty bodies get a generic message (403 -> "You do not have permission to export reports."); a receive timeout says "The export took too long. Try a shorter period or a single branch"; a 200 with a JSON content type is treated as an error. The server filename is sanitised (basename only, `[A-Za-z0-9._-]`, must end with the format's extension, else `<type>-<today>.<ext>`). Excel/CSV/PDF all use the screen's filters; Print is always the PDF. Dates are the report list's plain local `YYYY-MM-DD`. Tests must register a fake `ExportSink` (and the repository mock) in `get_it`; the sheet reads them only when an export is tapped, so existing screen tests are unaffected. Never `pumpAndSettle` (skeletons loop).
 - **Not covered (deliberate)**: Payments / Income / Expenses / Attendance / Leads list exports (non-report screens, separate decision — their docs still list CSV / Excel as dropped), the Hub (web has no export there).
 - **Tests**: `test/repositories/reports_export_test.dart` (fake Dio adapter: query building for every filter, bytes / filename / mime, filename sanitising, JSON-as-bytes error decoding, timeouts, `summary()` regression), `test/widgets/report_export_test.dart` (gating with / without `reports:export` on all 7 people reports, 4 finance reports and all 7 analytics views; sheet rows; each format -> repository args + sink; Print job name; dismissed share; busy / disabled rows; server, field and unexpected errors reset the state; phone 360x740 and tablet 1500x1300).
+
+## Member Attendance redesign (Prompt 160)
+
+Web `/portal/attendance` on mobile; `features/member/presentation/member_attendance_screen.dart` (+ `member_visit_detail_screen.dart`), member palette.
+
+- **Reusable**: `MemberPageHero` (back button, eyebrow, title, subtitle, chips, up to 3 count-up stats) is the hero for every member sub-page — reuse it for Classes, Workout, Diet, Invoices etc. alongside `MemberSection` / `MemberStatTile` / `MemberTileGrid` / `MemberListRow` / `MemberEmpty` from `member_dash_ui.dart`.
+- **Data**: `attendance(limit)` critical; "Load more" re-requests with `limit + 30` (API cap 100, then "Showing your latest 100 visits"); `overview()` only for hero / tiles / heatmap and fails silently. Month chips are client-side over the loaded visits (latest 6 months). `formatClock` / `formatVisitDay` still live in the screen file (the visit detail imports them).
+- **Dropped vs web**: heatmap hover (long-press), separate weekday card (inside the heatmap card).
+- **Tests**: `test/widgets/member_attendance_test.dart` (grouped history, month filter, load more, overview failure, empty, error, detail navigation, 360x740 and 1500x1300).
+
+## Member Notifications, Invoices & Payments redesign (Prompt 161)
+
+All under `features/member/presentation/`, member palette, built from `member_dash_ui.dart` (`MemberPageHero` — now with `actions` of `MemberHeroButton`s — `MemberSection`, `MemberListRow`, `MemberEmpty`).
+
+- **Files**: `member_notifications_screen.dart` (+ `notificationCategory()` icon / colour / label map), `member_invoices_screen.dart`, `member_invoice_detail_screen.dart`, `member_payments_screen.dart`, `member_invoice_logic.dart` (`isOpenInvoice`, `invoiceStatusLabel/Color`, `invoiceDueChip`, `paymentStatusLabel/Color`, `paymentMethodLabel/Icon`, `formatInvoiceDate`).
+- **Paging**: invoices / payments / attendance grow `limit` (+20) and refetch page 1 (web's approach; API cap 100); notifications append pages. Overview (`billing`) is optional and fails silently.
+- **Invoice detail routing**: `AppRoutes.memberInvoiceDetail` `extra` is a `MemberInvoice` (from the list) **or** an invoice id `String` (from a payment row). Without the list item it waits for `GET /portal/invoices/:id`.
+- **PDF**: `MemberPortalRepository.downloadInvoice(id, number)` → `ReportExportFile` → `getIt<ExportSink>().share(file)` (temp file + system share sheet; "Save to Files" etc. live there). Same sink the reports use — register a fake in tests.
+- **Status filter on invoices is client-side** over the loaded invoices (the API has no status param), like web; counts are of the loaded set.
+- **Dropped vs web**: the animated paid-percentage ring on invoice detail (shown as "N% paid" text), chart-style motion.
+- **Tests**: `test/widgets/member_billing_test.dart` (helpers, filters, Pay / PDF, detail by id, payments → invoice, notification filters sending server params, mark read / all, tablet).
+
+## Member Profile entry point (Prompt 162)
+
+The member drawer (`member_menu_screen.dart`) has no "Profile" row any more. Open My Profile by tapping the **hero avatar** on the dashboard (`MemberHero.onProfile`, key `hero-avatar`) or the **header** of the drawer (`AppDrawer.onHeaderTap` — optional, only the member drawer sets it; it closes the drawer then pushes `AppRoutes.memberProfile`). `MemberProfileScreen` / `MemberEditProfileScreen` are unchanged: view the details, edit them, change the photo, change the password, download data, log out. Tests: `test/widgets/member_menu_test.dart`.
+
+## Member My Profile redesign (Prompt 163)
+
+`member_profile_screen.dart` (view) + `member_profile_logic.dart` (`memberProfileChecks` = web's ten checks, `memberProfilePercent`, `memberProfileHint`); editing stays on `member_edit_profile_screen.dart`. Built from `member_dash_ui.dart` (`MemberSection`, `MemberListRow`, `MemberStatTile`/`MemberTileGrid`, `MemberHeroButton`, `memberQrImage`) and `member_insights.dart`'s `RingPainter`. Motion: `Looping` (gradient drift, avatar ring), `TweenAnimationBuilder` (avatar spring, chip pop-in), `AnimatedFraction`/`AnimatedNumber` (completeness ring), `StaggeredReveal` (sections), `AnimatedSize` (security card). Photo flow (`MemberPhotoPicker`, optimistic preview, session sync) is unchanged. **Trap**: the hero loops forever, so widget tests must `pump(Duration)` — never `pumpAndSettle`.
+
+## Member My Profile v2 — blocks (Prompt 164)
+
+`member_profile_screen.dart` now lays out `ProfileBlock`s (`widgets/member_profile_blocks.dart`): gradient header + Edit pill; the body is the read-only `rows` or, in edit mode, the block's form built by the screen through `ProfileBlockForm` (`text` / `select` / `date`). Each block owns its keys, sends only changed ones through `updateProfile`, and calls `onSaved(updated)` (the screen sets the profile and syncs the session). `ProfileBlockState.startEditing()` is public — the screen keeps a `GlobalKey` per block so a completeness chip can open it. Shared pieces: `BounceIn` (elastic entrance, stagger via the controller timeline — never `Future.delayed`, tests would see a pending timer), `PressBounce`, `ProfileColorTile`. Tests must `ensureVisible` + `pump(1s)` before tapping inside an expanding block (the size animation moves it).

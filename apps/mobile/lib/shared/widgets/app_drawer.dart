@@ -39,8 +39,12 @@ class AppDrawer extends StatelessWidget {
     required this.subtitle,
     required this.sections,
     required this.onSignOut,
+    this.onHeaderTap,
     super.key,
   });
+
+  /// Makes the avatar / name header tappable (Member: opens My Profile).
+  final VoidCallback? onHeaderTap;
 
   final AppRole role;
   final String? avatarUrl;
@@ -68,6 +72,7 @@ class AppDrawer extends StatelessWidget {
             avatarUrl: avatarUrl,
             name: name,
             subtitle: subtitle,
+            onTap: onHeaderTap,
           ),
           Expanded(
             child: ListView(
@@ -110,12 +115,22 @@ class _Header extends StatelessWidget {
     required this.avatarUrl,
     required this.name,
     required this.subtitle,
+    this.onTap,
   });
 
   final AppRole role;
   final String? avatarUrl;
   final String name;
   final String subtitle;
+  final VoidCallback? onTap;
+
+  Widget _tap(Widget child) => onTap == null
+      ? child
+      : GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: child,
+        );
 
   @override
   Widget build(BuildContext context) {
@@ -129,48 +144,52 @@ class _Header extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: role.onGradient.withValues(alpha: 0.5),
-                    width: 2,
+              _tap(
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: role.onGradient.withValues(alpha: 0.5),
+                      width: 2,
+                    ),
                   ),
-                ),
-                child: UserAvatar(
-                  avatarUrl: avatarUrl,
-                  name: name,
-                  role: role,
-                  size: 44,
+                  child: UserAvatar(
+                    avatarUrl: avatarUrl,
+                    name: name,
+                    role: role,
+                    size: 44,
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 2),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.body(
-                          size: 14.5,
-                          weight: FontWeight.w700,
-                          color: role.onGradient,
+                child: _tap(
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.body(
+                            size: 14.5,
+                            weight: FontWeight.w700,
+                            color: role.onGradient,
+                          ),
                         ),
-                      ),
-                      Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppText.body(
-                          size: 11.5,
-                          color: role.onGradient.withValues(alpha: 0.75),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.body(
+                            size: 11.5,
+                            color: role.onGradient.withValues(alpha: 0.75),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),

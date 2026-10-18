@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
@@ -19,6 +22,7 @@ import '../models/member_workout_assignment.dart';
 import '../models/member_workout_progress.dart';
 import '../models/paginated_result.dart';
 import '../models/portal_payment.dart';
+import '../models/report_export.dart';
 
 /// The member plane's single API surface (`/portal/*`) — every route is
 /// gated by `memberAuthenticateMiddleware` and always scoped to the
@@ -164,6 +168,52 @@ class MemberPortalRepository {
   }
 
   /// `GET /portal/invoices/:id` — items, linked payments, paid and balance.
+  /// `GET /portal/invoices/:id/download` — the invoice PDF as bytes, ready for
+  /// the share sheet (`ExportSink.share`). The filename is `<number>.pdf` with
+  /// anything unsafe replaced.
+  Future<ReportExportFile> downloadInvoice(
+    String id,
+    String invoiceNumber,
+  ) async {
+    try {
+      final response = await _dio.get<List<int>>(
+        '/portal/invoices/$id/download',
+        options: Options(
+          responseType: ResponseType.bytes,
+          receiveTimeout: const Duration(minutes: 1),
+        ),
+      );
+      final raw = response.data ?? const <int>[];
+      if (raw.isEmpty) {
+        throw const ApiException(message: 'The invoice file was empty.');
+      }
+      final safe = invoiceNumber.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+      return ReportExportFile(
+        bytes: raw is Uint8List ? raw : Uint8List.fromList(raw),
+        filename: '${safe.isEmpty ? 'invoice' : safe}.pdf',
+        format: ReportExportFormat.pdf,
+      );
+    } on DioException catch (e) {
+      // `ResponseType.bytes` turns the JSON error envelope into bytes too —
+      // decode it so the server's own message reaches the screen.
+      final data = e.response?.data;
+      if (data is List<int>) {
+        try {
+          final decoded = jsonDecode(utf8.decode(data, allowMalformed: true));
+          if (decoded is Map<String, dynamic>) {
+            throw ApiException.fromResponseData(
+              decoded,
+              e.response?.statusCode,
+            );
+          }
+        } on FormatException {
+          // Not JSON — fall through to the generic mapping.
+        }
+      }
+      throw _mapError(e);
+    }
+  }
+
   Future<MemberInvoiceDetail> invoiceDetail(String id) async {
     try {
       final response =

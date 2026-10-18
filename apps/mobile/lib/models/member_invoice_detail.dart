@@ -45,6 +45,8 @@ class MemberInvoiceDetail {
     required this.paid,
     required this.balance,
     required this.branchName,
+    this.invoiceDate,
+    this.dueDate,
   });
 
   final String id;
@@ -59,6 +61,8 @@ class MemberInvoiceDetail {
   final double paid;
   final double balance;
   final String? branchName;
+  final DateTime? invoiceDate;
+  final DateTime? dueDate;
 
   factory MemberInvoiceDetail.fromJson(Map<String, dynamic> j) =>
       MemberInvoiceDetail(
@@ -92,5 +96,7 @@ class MemberInvoiceDetail {
         paid: jsonMoney(j['paid']),
         balance: jsonMoney(j['balance']),
         branchName: jsonMap(j['branch'])['name'] as String?,
+        invoiceDate: DateTime.tryParse(j['invoiceDate'] as String? ?? ''),
+        dueDate: DateTime.tryParse(j['dueDate'] as String? ?? ''),
       );
 }

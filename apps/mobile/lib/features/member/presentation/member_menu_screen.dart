@@ -11,6 +11,7 @@ import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/menu_entry.dart';
+import '../../../shared/widgets/slide_drawer_scaffold.dart';
 
 const _entries = [
   MenuEntry(
@@ -44,12 +45,6 @@ const _entries = [
     route: AppRoutes.memberMeasurements,
   ),
   MenuEntry(
-    icon: Icons.person_outline_rounded,
-    title: 'Profile',
-    subtitle: 'Your details',
-    route: AppRoutes.memberProfile,
-  ),
-  MenuEntry(
     icon: Icons.storefront_outlined,
     title: 'Gym info',
     subtitle: 'Hours, address and contact',
@@ -69,7 +64,8 @@ const _entries = [
   ),
 ];
 
-/// Design frame "8. Menu", plus a "Body Measurements" tile added alongside
+/// Design frame "8. Menu" (Profile is no longer a row: the avatar / name
+/// header here and the avatar on the dashboard open My Profile), plus a "Body Measurements" tile added alongside
 /// the mobile permission-parity work (not in the original design frame —
 /// it's the natural member-facing counterpart of the trainer/owner-side
 /// "Record measurement" flow on `member_detail_screen.dart`, real backend
@@ -93,6 +89,10 @@ class MemberMenuScreen extends StatelessWidget {
       name: name,
       subtitle: 'Member',
       sections: const {'': _entries},
+      onHeaderTap: () {
+        SlideDrawerController.of(context)?.close();
+        context.push(AppRoutes.memberProfile);
+      },
       onSignOut: () => showMemberLogoutDialog(context),
     );
   }

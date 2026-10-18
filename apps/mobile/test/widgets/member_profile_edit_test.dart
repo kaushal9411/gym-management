@@ -12,6 +12,7 @@ import 'package:gym_saas_mobile/bloc/session/session_state.dart';
 import 'package:gym_saas_mobile/core/network/api_exception.dart';
 import 'package:gym_saas_mobile/core/network/profile_failure.dart';
 import 'package:gym_saas_mobile/features/member/presentation/member_edit_profile_screen.dart';
+import 'package:gym_saas_mobile/features/member/presentation/member_profile_logic.dart';
 import 'package:gym_saas_mobile/features/member/presentation/member_profile_screen.dart';
 import 'package:gym_saas_mobile/features/member/presentation/widgets/member_photo_sheet.dart';
 import 'package:gym_saas_mobile/models/member_self_profile.dart';
@@ -227,10 +228,12 @@ void main() {
             Uint8List.fromList([0xFF, 0xD8, 0xFF, 0xE0, 0, 1, 2]),
       ),
     );
-    expect(find.text('Test Member'), findsOneWidget);
+    expect(find.text('Test Member'), findsWidgets);
     expect(find.text('Edit profile'), findsOneWidget);
     await t.tap(find.byIcon(Icons.photo_camera_rounded));
-    await t.pumpAndSettle();
+    // The hero loops (gradient + ring), so pumpAndSettle would never settle.
+    await t.pump();
+    await t.pump(const Duration(seconds: 1));
     await t.tap(find.text('Choose from gallery'));
     await t.pump();
     await t.pump(const Duration(seconds: 1));
@@ -254,5 +257,221 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Managed by your gym'), findsOneWidget);
+  });
+
+  group('profile redesign', () {
+    Future<void> show(WidgetTester t, Finder f) async {
+      for (var i = 0; i < 40 && f.evaluate().isEmpty; i++) {
+        await t.drag(find.byType(Scrollable).first, const Offset(0, -300));
+        await t.pump();
+      }
+      await t.ensureVisible(f.first);
+      await t.pump();
+    }
+
+    Future<void> tapKey(WidgetTester t, String key) async {
+      final f = find.byKey(ValueKey(key));
+      await t.ensureVisible(f);
+      await t.pump(const Duration(seconds: 1));
+      await t.tap(f);
+    }
+
+    test('completeness uses web\'s ten real checks', () {
+      final sparse = MemberSelfProfile.fromJson(realFixture());
+      final checks = memberProfileChecks(sparse);
+      expect(checks, hasLength(10));
+      // photo, phone, email, gender are filled in the real-shaped fixture.
+      expect(checks.where((c) => c.done).map((c) => c.label), [
+        'photo',
+        'phone',
+        'email',
+        'gender',
+      ]);
+      expect(memberProfilePercent(checks), 40);
+      expect(
+        memberProfileHint(checks),
+        'Add your date of birth and address +4 more',
+      );
+      final full = memberProfileChecks(MemberSelfProfile.fromJson(dtoFixture()));
+      expect(memberProfilePercent(full), greaterThan(40));
+    });
+
+    testWidgets('hero, completeness chips, tiles and sections at 360',
+        (t) async {
+      when(() => repo.selfProfile()).thenAnswer(
+        (_) async => MemberSelfProfile.fromJson(realFixture()),
+      );
+      await pump(t, const MemberProfileScreen());
+      await t.pump(const Duration(seconds: 1));
+      expect(t.takeException(), isNull);
+      for (final l in [
+        'MY PROFILE',
+        'Test Member',
+        'MEM-0001 · Demo Gym - Main Branch',
+        'Check-in QR',
+        'Profile completeness',
+        '40%',
+        'Add your date of birth and address +4 more',
+        'address',
+        'Plan',
+        'Member since',
+        'Trainer',
+        'Personal',
+        'Contact',
+        'Address',
+        'Emergency contact',
+        'Fitness profile',
+        'Managed by your gym',
+        'Security & data',
+        'Download my data',
+        'Log out',
+      ]) {
+        await show(t, find.text(l));
+        expect(find.text(l), findsWidgets, reason: l);
+      }
+      expect(t.takeException(), isNull);
+    });
+
+    testWidgets('a missing-field chip opens that block\'s form', (t) async {
+      when(() => repo.selfProfile()).thenAnswer(
+        (_) async => MemberSelfProfile.fromJson(realFixture()),
+      );
+      await pump(t, const MemberProfileScreen());
+      await t.pump(const Duration(seconds: 1));
+      await show(t, find.text('address'));
+      await t.tap(find.text('address'));
+      await t.pump(const Duration(seconds: 1));
+      expect(find.byKey(const ValueKey('block-save-addressLine')), findsOneWidget);
+      expect(find.text('Address line'), findsOneWidget);
+    });
+
+    testWidgets('edit a block in place: only its changed keys are sent',
+        (t) async {
+      when(() => repo.selfProfile()).thenAnswer(
+        (_) async => MemberSelfProfile.fromJson(realFixture()),
+      );
+      final updated = Map<String, dynamic>.of(realFixture())
+        ..['phone'] = '9111111111';
+      when(() => repo.updateProfile(any())).thenAnswer(
+        (_) async => MemberSelfProfile.fromJson(updated),
+      );
+      await pump(t, const MemberProfileScreen());
+      await t.pump(const Duration(seconds: 1));
+      await show(t, find.byKey(const ValueKey('block-edit-phone')));
+      await tapKey(t, 'block-edit-phone');
+      await t.pump(const Duration(seconds: 1));
+      // Save is disabled until something changes.
+      await tapKey(t, 'block-save-phone');
+      await t.pump();
+      verifyNever(() => repo.updateProfile(any()));
+      await t.enterText(find.byType(TextField).first, '9111111111');
+      await t.pump();
+      await tapKey(t, 'block-save-phone');
+      await t.pump();
+      await t.pump(const Duration(seconds: 1));
+      verify(() => repo.updateProfile({'phone': '9111111111'})).called(1);
+      verify(
+        () => session.memberProfileChanged(
+          name: any(named: 'name'),
+          email: any(named: 'email'),
+          profilePhotoUrl: any(named: 'profilePhotoUrl'),
+          clearPhoto: any(named: 'clearPhoto'),
+        ),
+      ).called(greaterThanOrEqualTo(1));
+      expect(find.text('9111111111'), findsWidgets);
+    });
+
+    testWidgets('changing the e-mail asks for the current password',
+        (t) async {
+      when(() => repo.selfProfile()).thenAnswer(
+        (_) async => MemberSelfProfile.fromJson(realFixture()),
+      );
+      await pump(t, const MemberProfileScreen());
+      await t.pump(const Duration(seconds: 1));
+      await show(t, find.byKey(const ValueKey('block-edit-phone')));
+      await tapKey(t, 'block-edit-phone');
+      await t.pump(const Duration(seconds: 1));
+      expect(find.text('Current password'), findsNothing);
+      await t.enterText(find.byType(TextField).at(1), 'new.mail@example.com');
+      await t.pump(const Duration(seconds: 1));
+      expect(find.text('Current password'), findsOneWidget);
+      await tapKey(t, 'block-save-phone');
+      await t.pump();
+      expect(find.textContaining('current password'), findsWidgets);
+      verifyNever(() => repo.updateProfile(any()));
+    });
+
+    testWidgets('a server field error stays on the block', (t) async {
+      when(() => repo.selfProfile()).thenAnswer(
+        (_) async => MemberSelfProfile.fromJson(realFixture()),
+      );
+      when(() => repo.updateProfile(any())).thenAnswer(
+        (_) async => throw const ApiException(
+          message: 'Validation failed',
+          fieldErrors: [FieldError(field: 'phone', message: 'Already used')],
+        ),
+      );
+      await pump(t, const MemberProfileScreen());
+      await t.pump(const Duration(seconds: 1));
+      await show(t, find.byKey(const ValueKey('block-edit-phone')));
+      await tapKey(t, 'block-edit-phone');
+      await t.pump(const Duration(seconds: 1));
+      await t.enterText(find.byType(TextField).first, '9222222222');
+      await t.pump();
+      await tapKey(t, 'block-save-phone');
+      await t.pump();
+      await t.pump(const Duration(seconds: 1));
+      expect(find.text('Already used'), findsOneWidget);
+      expect(find.byKey(const ValueKey('block-save-phone')), findsOneWidget);
+    });
+
+    testWidgets('Cancel closes the form without saving', (t) async {
+      when(() => repo.selfProfile()).thenAnswer(
+        (_) async => MemberSelfProfile.fromJson(realFixture()),
+      );
+      await pump(t, const MemberProfileScreen());
+      await t.pump(const Duration(seconds: 1));
+      await show(t, find.byKey(const ValueKey('block-edit-phone')));
+      await tapKey(t, 'block-edit-phone');
+      await t.pump(const Duration(seconds: 1));
+      await tapKey(t, 'block-edit-phone');
+      await t.pump(const Duration(seconds: 1));
+      expect(find.byKey(const ValueKey('block-save-phone')), findsNothing);
+      verifyNever(() => repo.updateProfile(any()));
+    });
+
+    testWidgets('the security card collapses', (t) async {
+      when(() => repo.selfProfile()).thenAnswer(
+        (_) async => MemberSelfProfile.fromJson(realFixture()),
+      );
+      await pump(t, const MemberProfileScreen());
+      await show(t, find.text('Hide options'));
+      expect(find.text('Change password'), findsOneWidget);
+      await t.tap(find.text('Hide options'));
+      await t.pump(const Duration(milliseconds: 400));
+      expect(find.text('Change password'), findsNothing);
+      expect(find.text('Show options'), findsOneWidget);
+    });
+
+    testWidgets('tablet 1500x1300 renders without overflow', (t) async {
+      when(() => repo.selfProfile()).thenAnswer(
+        (_) async => MemberSelfProfile.fromJson(realFixture()),
+      );
+      t.view.physicalSize = const Size(1500 * 2, 1300 * 2);
+      t.view.devicePixelRatio = 2;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(
+        MultiBlocProvider(
+          providers: [
+            BlocProvider<SessionCubit>.value(value: session),
+            BlocProvider<PlatformConfigCubit>.value(value: platformConfig),
+          ],
+          child: const MaterialApp(home: MemberProfileScreen()),
+        ),
+      );
+      await t.pump(const Duration(seconds: 1));
+      await show(t, find.text('Log out'));
+      expect(t.takeException(), isNull);
+    });
   });
 }

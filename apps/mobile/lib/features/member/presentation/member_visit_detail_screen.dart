@@ -4,118 +4,113 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/member_visit.dart';
+import '../../team/presentation/widgets/team_ui.dart'
+    show TeamCenter, TeamColors;
 import 'member_attendance_screen.dart';
+import 'widgets/member_dash_ui.dart';
 
-/// Design frame "8b. Visit detail".
+/// One visit — mobile-only detail of a row on My Attendance (web lists the
+/// same fields inline): a hero with the day and duration, then check-in,
+/// check-out, branch and method. Read-only, from the list item already loaded.
 class MemberVisitDetailScreen extends StatelessWidget {
   const MemberVisitDetailScreen({required this.visit, super.key});
 
   final MemberVisit visit;
 
+  String _pretty(String s) {
+    final t = s.toLowerCase().replaceAll('_', ' ');
+    return t.isEmpty ? '—' : t[0].toUpperCase() + t.substring(1);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final duration = visit.duration;
-
+    final d = visit.duration;
+    final inside = d == null;
+    final duration = inside
+        ? 'Still inside'
+        : d.inMinutes >= 60
+            ? '${d.inHours}h ${d.inMinutes % 60}m'
+            : '${d.inMinutes}m';
+    Widget row(IconData icon, String label, String value) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: AppColors.memberB),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: AppText.body(
+                    size: 13,
+                    color: AppColors.inkFaint,
+                    weight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Flexible(
+                child: Text(
+                  value,
+                  textAlign: TextAlign.end,
+                  style: AppText.body(size: 13, weight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+        );
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Text(
-          'Visit — ${formatVisitDay(visit.attendanceDate)}',
-          style: AppText.display(size: 18),
-        ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0x24C6F135), Color(0x1A14E0B4)],
-                ),
-                borderRadius: BorderRadius.circular(AppRadii.card),
-                border: Border.all(color: AppColors.glassBorder),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Duration',
-                    style: AppText.body(
-                      size: 11,
-                      weight: FontWeight.w800,
-                      color: AppColors.memberPillFg,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    duration == null
-                        ? 'Still inside'
-                        : '${duration.inHours}h ${duration.inMinutes % 60}m',
-                    style: AppText.display(size: 24),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.surface2,
-                borderRadius: BorderRadius.circular(AppRadii.card),
-                border: Border.all(color: AppColors.line),
-              ),
-              child: Column(
-                children: [
-                  _Row(
-                      label: 'Check-in', value: formatClock(visit.checkInTime),),
-                  _Row(
-                    label: 'Check-out',
-                    value: visit.checkOutTime == null
-                        ? '—'
-                        : formatClock(visit.checkOutTime!),
-                  ),
-                  _Row(label: 'Branch', value: visit.branchName),
-                  _Row(label: 'Method', value: visit.method),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Row extends StatelessWidget {
-  const _Row({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: 28),
         children: [
-          Text(
-            label,
-            style: AppText.body(
-              size: 13,
-              color: AppColors.inkFaint,
-              weight: FontWeight.w600,
+          MemberPageHero(
+            eyebrow: 'Visit',
+            title: formatVisitDay(visit.attendanceDate),
+            subtitle: visit.branchName,
+            chips: [
+              if (inside) 'Checked in' else 'Completed',
+              _pretty(visit.method),
+            ],
+            stats: [
+              if (!inside) ('Duration', d.inMinutes, (n) => duration),
+            ],
+          ),
+          TeamCenter(
+            maxWidth: 760,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
+              child: MemberSection(
+                title: 'Visit details',
+                icon: Icons.login_rounded,
+                color: TeamColors.green,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppRadii.card),
+                  ),
+                  child: Column(
+                    children: [
+                      row(
+                        Icons.login_rounded,
+                        'Check-in',
+                        formatClock(visit.checkInTime),
+                      ),
+                      row(
+                        Icons.logout_rounded,
+                        'Check-out',
+                        visit.checkOutTime == null
+                            ? 'In progress'
+                            : formatClock(visit.checkOutTime!),
+                      ),
+                      row(Icons.timer_outlined, 'Duration', duration),
+                      row(Icons.storefront_outlined, 'Branch',
+                          visit.branchName,),
+                      row(Icons.touch_app_outlined, 'Method',
+                          _pretty(visit.method),),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
-          Text(value, style: AppText.body(size: 13, weight: FontWeight.w700)),
         ],
       ),
     );
