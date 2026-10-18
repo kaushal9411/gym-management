@@ -1,29 +1,36 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../bloc/session/session_cubit.dart';
-import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../models/gym_branding.dart';
 import '../../../repositories/gym_settings_repository.dart';
-import '../../../shared/widgets/app_button.dart';
-import '../../../shared/widgets/app_state_views.dart';
-import '../../../shared/widgets/category_chip_selector.dart';
+import '../../../shared/widgets/app_labeled_field.dart';
+import '../../../shared/widgets/list_hero.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import 'settings_ui.dart';
+import 'widgets/settings_fields.dart';
+import 'widgets/settings_previews.dart';
 
-/// The design's swatch rows, as hex values (`cssColorSchema` accepts them).
-const _primarySwatches = ['#DB1F1F', '#8B5CF6', '#14E0B4', '#FFB648'];
-const _secondarySwatches = ['#1B1526', '#241C33', '#2E2440'];
-const _themes = ['LIGHT', 'DARK', 'SYSTEM'];
-
-/// Design frame "11b. Branding" — primary/secondary swatches + theme,
-/// writing to `PATCH /settings/branding`. The frame's "Upload logo" button
-/// is not built: there's no image-picker package in the app, and the
-/// endpoint takes a base64 data URL that only a real picker could produce.
-/// The logo tile shows the gym's initials, as the design does.
+/// Branding — web's `/gym-settings/branding`: Theme colors (primary and
+/// secondary colour, the theme — Match device / Light / Dark — and the login
+/// welcome message), the five Images (logo, favicon, login background,
+/// dashboard banner, email logo) and a live preview of the login screen and
+/// dashboard.
+///
+/// Colours, theme and message save with the save bar (`PATCH
+/// /settings/branding`; a blank secondary colour or message is left out, as on
+/// web). **Each image uploads and saves immediately**, like web (`POST
+/// /settings/branding/{logo,favicon,upload}`): pick from the camera or
+/// gallery, the picture is shrunk to the size web uses (logo and email logo
+/// 512, favicon 64, backgrounds 1280) and sent as a base64 data URL — the
+/// API's 1 MB body cap applies, oversized pictures are refused with a message.
+///
+/// Needs `settings:read` / `settings:manage`. Colours accept any CSS colour as
+/// text (saved as typed) plus preset swatches; only `#rrggbb` can be drawn in
+/// the preview.
+///
+/// **Dropped vs web**: the browser's native colour picker (preset swatches +
+/// the hex field replace it) and upload progress percentage (a spinner).
 class BrandingSettingsScreen extends StatefulWidget {
   const BrandingSettingsScreen({super.key});
 
@@ -32,191 +39,284 @@ class BrandingSettingsScreen extends StatefulWidget {
 }
 
 class _BrandingSettingsScreenState extends State<BrandingSettingsScreen> {
-  GymBranding? _branding;
-  String? _primary;
-  String? _secondary;
+  late final SettingsAccess _access;
+  final _primary = TextEditingController();
+  final _secondary = TextEditingController();
+  final _welcome = TextEditingController();
   String _theme = 'SYSTEM';
+  GymBranding? _branding;
+  String _gymName = '';
+  String _baseline = '';
+  bool _loading = true;
   bool _saving = false;
   String? _error;
+
+  List<TextEditingController> get _all => [_primary, _secondary, _welcome];
 
   @override
   void initState() {
     super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() => _error = null);
-    try {
-      final branding = await getIt<GymSettingsRepository>().getBranding();
-      if (!mounted) return;
-      setState(() {
-        _branding = branding;
-        _primary = branding.primaryColor;
-        _secondary = branding.secondaryColor;
-        _theme = branding.theme;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
+    _access = SettingsAccess.of(context);
+    for (final c in _all) {
+      c.addListener(_changed);
+    }
+    if (_access.canRead) {
+      _load();
+    } else {
+      _loading = false;
     }
   }
 
-  Future<void> _save() async {
+  @override
+  void dispose() {
+    for (final c in _all) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  String _snapshot() => [
+        _primary.text.trim(),
+        _secondary.text.trim(),
+        _welcome.text.trim(),
+        _theme,
+      ].join('\u0001');
+
+  void _apply(GymBranding b) {
+    _branding = b;
+    _primary.text = b.primaryColor ?? '';
+    _secondary.text = b.secondaryColor ?? '';
+    _welcome.text = b.welcomeMessage ?? '';
+    _theme = b.theme;
+    _baseline = _snapshot();
+  }
+
+  Future<void> _load() async {
     setState(() {
-      _saving = true;
+      _loading = true;
       _error = null;
     });
     try {
-      final updated = await getIt<GymSettingsRepository>().updateBranding(
-        primaryColor: _primary,
-        secondaryColor: _secondary,
-        theme: _theme,
-      );
+      final repo = getIt<GymSettingsRepository>();
+      final b = await repo.getBranding();
+      // The gym name only labels the preview; a failure there is harmless.
+      try {
+        _gymName = (await repo.getProfile()).gymName;
+      } catch (_) {}
       if (!mounted) return;
-      setState(() => _branding = updated);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Branding saved')));
+      setState(() {
+        _apply(b);
+        _loading = false;
+      });
     } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.detailedMessage;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Could not load branding ($e)';
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  bool get _dirty => !_loading && _error == null && _snapshot() != _baseline;
+
+  Future<void> _save() async {
+    if (_saving) return;
+    setState(() => _saving = true);
+    try {
+      final b = await getIt<GymSettingsRepository>().updateBranding(
+        primaryColor: _primary.text.trim(),
+        secondaryColor: _secondary.text.trim(),
+        theme: _theme,
+        welcomeMessage: _welcome.text.trim(),
+      );
+      invalidateSetupProgress();
       if (!mounted) return;
-      setState(() => _error = e.message);
+      setState(() => _apply(b));
+      teamSnack(context, 'Theme colors saved');
+    } on ApiException catch (e) {
+      if (mounted) teamSnack(context, e.detailedMessage, error: true);
+    } catch (e) {
+      if (mounted) {
+        teamSnack(context, 'Could not save branding ($e)', error: true);
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final session = context.watch<SessionCubit>().state;
-    final tenantName =
-        session is SessionAuthenticatedStaff ? session.tenant.name : '';
-    final initials = tenantName
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((w) => w.isNotEmpty)
-        .take(2)
-        .map((w) => w[0].toUpperCase())
-        .join();
-
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Text('Branding', style: AppText.display(size: 18)),
-      ),
-      body: SafeArea(
-        top: false,
-        child: _error != null && _branding == null
-            ? AppErrorView(message: _error!, onRetry: _load)
-            : _branding == null
-                ? const AppLoadingView()
-                : ListView(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                    children: [
-                      if (_error != null) ...[
-                        FormAlert(message: _error!),
-                        const SizedBox(height: 12),
-                      ],
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface2,
-                          borderRadius: BorderRadius.circular(AppRadii.card),
-                          border: Border.all(color: AppColors.glassBorder),
-                        ),
-                        alignment: Alignment.center,
-                        child: Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            gradient: AppColors.staffGrad,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            initials.isEmpty ? '?' : initials,
-                            style: AppText.body(
-                              size: 20,
-                              weight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Text('Primary color', style: AppText.eyebrow()),
-                      const SizedBox(height: 8),
-                      _SwatchRow(
-                        swatches: _primarySwatches,
-                        selected: _primary,
-                        onSelected: (c) => setState(() => _primary = c),
-                      ),
-                      const SizedBox(height: 18),
-                      Text('Secondary color', style: AppText.eyebrow()),
-                      const SizedBox(height: 8),
-                      _SwatchRow(
-                        swatches: _secondarySwatches,
-                        selected: _secondary,
-                        onSelected: (c) => setState(() => _secondary = c),
-                      ),
-                      const SizedBox(height: 18),
-                      Text('Theme', style: AppText.eyebrow()),
-                      const SizedBox(height: 8),
-                      CategoryChipSelector<String>(
-                        options: _themes,
-                        labelOf: (t) => t[0] + t.substring(1).toLowerCase(),
-                        value: _theme,
-                        onChanged: (t) => setState(() => _theme = t),
-                      ),
-                      const SizedBox(height: 24),
-                      AppButton(
-                        label: 'Save changes',
-                        loading: _saving,
-                        onPressed: _save,
-                      ),
-                    ],
-                  ),
-      ),
-    );
+  /// Uploads save immediately and update only the image fields, so unsaved
+  /// colour edits are never overwritten by the response.
+  Future<void> _upload(Future<GymBranding> Function() call) async {
+    try {
+      final b = await call();
+      invalidateSetupProgress();
+      if (!mounted) return;
+      setState(() => _branding = b);
+      teamSnack(context, 'Image uploaded');
+    } on ApiException catch (e) {
+      throw Exception(e.detailedMessage);
+    }
   }
-}
-
-class _SwatchRow extends StatelessWidget {
-  const _SwatchRow({
-    required this.swatches,
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final List<String> swatches;
-  final String? selected;
-  final ValueChanged<String> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: swatches.map((hex) {
-        final isSelected = selected?.toUpperCase() == hex;
-        return Padding(
-          padding: const EdgeInsets.only(right: 10),
-          child: GestureDetector(
-            onTap: () => onSelected(hex),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: Color(int.parse('FF${hex.substring(1)}', radix: 16)),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isSelected ? AppColors.ink : Colors.transparent,
-                  width: 2,
-                ),
+    final manage = _access.canManage;
+    final b = _branding;
+    final repo = getIt<GymSettingsRepository>();
+    return SettingsScaffold(
+      access: _access,
+      page: SettingsPage.branding,
+      title: 'Branding',
+      subtitle: "Your gym's colors, logo, and images across the app, login, "
+          'and emails.',
+      loading: _loading,
+      error: _error,
+      onRetry: _load,
+      onRefresh: _load,
+      chips: [
+        if (b != null)
+          ListHeroChip(
+            icon: Icons.image_outlined,
+            label: '${b.imageCount}/5 images uploaded',
+          ),
+      ],
+      saveBar: (manage && _dirty)
+          ? SettingsSaveBar(
+              saving: _saving,
+              onSave: _save,
+              onDiscard: () {
+                if (b != null) setState(() => _apply(b));
+              },
+            )
+          : null,
+      main: [
+        if (!manage) const ReadOnlyNotice(),
+        TeamFormSection(
+          icon: Icons.palette_rounded,
+          color: TeamColors.fuchsia,
+          title: 'Theme colors',
+          subtitle: 'Applied to the sidebar, buttons and login screen',
+          children: [
+            ColorField(
+              label: 'Primary color',
+              controller: _primary,
+              disabled: !manage,
+              onChanged: (_) => setState(() {}),
+            ),
+            ColorField(
+              label: 'Secondary color',
+              controller: _secondary,
+              disabled: !manage,
+              onChanged: (_) => setState(() {}),
+            ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final t in const [
+                  ('SYSTEM', 'Match device'),
+                  ('LIGHT', 'Light'),
+                  ('DARK', 'Dark'),
+                ])
+                  TeamFilterChip(
+                    label: t.$2,
+                    selected: _theme == t.$1,
+                    color: TeamColors.fuchsia,
+                    onTap: () {
+                      if (manage) setState(() => _theme = t.$1);
+                    },
+                  ),
+              ],
+            ),
+            AppLabeledField(
+              label: 'Login welcome message',
+              icon: Icons.waving_hand_outlined,
+              iconColor: TeamColors.amber,
+              controller: _welcome,
+              readOnly: !manage,
+              textCapitalization: TextCapitalization.sentences,
+            ),
+          ],
+        ),
+        TeamFormSection(
+          icon: Icons.image_outlined,
+          color: TeamColors.indigo,
+          title: 'Images',
+          subtitle: 'Uploads are resized on your phone and saved immediately',
+          children: [
+            BrandImageField(
+              label: 'Gym logo',
+              description: 'Shown in the sidebar and login screen.',
+              url: b?.logoUrl,
+              maxDimension: 512,
+              disabled: !manage,
+              onUpload: (d) => _upload(() => repo.uploadLogo(d)),
+            ),
+            BrandImageField(
+              label: 'Favicon',
+              description: 'Shown in the browser tab.',
+              url: b?.faviconUrl,
+              maxDimension: 64,
+              disabled: !manage,
+              onUpload: (d) => _upload(() => repo.uploadFavicon(d)),
+            ),
+            BrandImageField(
+              label: 'Login background image',
+              url: b?.loginBackgroundUrl,
+              maxDimension: 1280,
+              wide: true,
+              disabled: !manage,
+              onUpload: (d) => _upload(
+                () => repo.uploadBrandingAsset('loginBackgroundUrl', d),
               ),
             ),
-          ),
-        );
-      }).toList(),
+            BrandImageField(
+              label: 'Dashboard banner',
+              url: b?.dashboardBannerUrl,
+              maxDimension: 1280,
+              wide: true,
+              disabled: !manage,
+              onUpload: (d) => _upload(
+                () => repo.uploadBrandingAsset('dashboardBannerUrl', d),
+              ),
+            ),
+            BrandImageField(
+              label: 'Email logo',
+              description:
+                  'Used in transactional emails sent to your staff and members.',
+              url: b?.emailLogoUrl,
+              maxDimension: 512,
+              disabled: !manage,
+              onUpload: (d) =>
+                  _upload(() => repo.uploadBrandingAsset('emailLogoUrl', d)),
+            ),
+          ],
+        ),
+      ],
+      aside: [
+        BrandingPreview(
+          primary: _primary.text,
+          secondary: _secondary.text,
+          theme: _theme,
+          welcome: _welcome.text,
+          gymName: _gymName,
+          logoUrl: b?.logoUrl,
+          loginBackgroundUrl: b?.loginBackgroundUrl,
+          dashboardBannerUrl: b?.dashboardBannerUrl,
+        ),
+      ],
     );
   }
 }

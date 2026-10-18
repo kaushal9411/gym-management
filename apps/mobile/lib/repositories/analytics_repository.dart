@@ -81,6 +81,44 @@ class AnalyticsRepository {
     }
   }
 
+  /// `GET /analytics/membership-growth` — new memberships assigned per day
+  /// (web's "Membership Growth" view).
+  Future<List<TrendPoint>> membershipGrowth({
+    required DateTime from,
+    required DateTime to,
+    String? branchId,
+  }) =>
+      _trend('/analytics/membership-growth', from, to, branchId);
+
+  /// `GET /analytics/retention` — the active-member count, snapshotted each
+  /// day (a level, not a rate — web's "Member Retention" view).
+  Future<List<TrendPoint>> retention({
+    required DateTime from,
+    required DateTime to,
+    String? branchId,
+  }) =>
+      _trend('/analytics/retention', from, to, branchId);
+
+  Future<List<TrendPoint>> _trend(
+    String path,
+    DateTime from,
+    DateTime to,
+    String? branchId,
+  ) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        path,
+        queryParameters: _params(from, to, branchId),
+      );
+      final list = response.data!['data'] as List;
+      return list
+          .map((e) => TrendPoint.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   Future<List<TrendPoint>> newMemberGrowth({
     required DateTime from,
     required DateTime to,

@@ -18,6 +18,8 @@ class GymBusinessSettings {
     required this.dateFormat,
     required this.timeFormat,
     required this.measurementUnit,
+    this.weekStartDay = 0,
+    this.locale = 'en',
   });
 
   final String currency;
@@ -26,6 +28,10 @@ class GymBusinessSettings {
   final String dateFormat;
   final String timeFormat;
   final MeasurementUnit measurementUnit;
+
+  /// 0 = Sunday … 6 = Saturday (web's "Week starts on").
+  final int weekStartDay;
+  final String locale;
 
   factory GymBusinessSettings.fromJson(Map<String, dynamic> json) =>
       GymBusinessSettings(
@@ -36,5 +42,7 @@ class GymBusinessSettings {
         timeFormat: json['timeFormat'] as String,
         measurementUnit:
             MeasurementUnitX.fromApi(json['measurementUnit'] as String),
+        weekStartDay: (json['weekStartDay'] as num?)?.toInt() ?? 0,
+        locale: json['locale'] as String? ?? 'en',
       );
 }

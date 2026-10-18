@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../bloc/session/session_cubit.dart';
+import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
@@ -14,70 +15,30 @@ import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/staff_profile.dart';
 import '../../../repositories/profile_repository.dart';
+import '../../../shared/widgets/adaptive_columns.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/staff_logout_dialog.dart';
-import '../../../shared/widgets/user_avatar.dart';
+import '../../owner/presentation/widgets/dash_ui.dart' show DashRing;
+import '../../team/presentation/widgets/team_ui.dart';
+import 'profile_logic.dart';
+import 'profile_ui.dart';
 
-class _MenuEntry {
-  const _MenuEntry({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.route,
-    this.danger = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String? route;
-  final bool danger;
-}
-
-const _entries = [
-  _MenuEntry(
-    icon: Icons.person_outline_rounded,
-    title: 'Profile data',
-    subtitle: 'Name, phone',
-    route: AppRoutes.profileData,
-  ),
-  _MenuEntry(
-    icon: Icons.emergency_outlined,
-    title: 'Emergency contact',
-    subtitle: 'Who to call, and how',
-    route: AppRoutes.profileEmergencyContact,
-  ),
-  _MenuEntry(
-    icon: Icons.notifications_outlined,
-    title: 'Notification preferences',
-    subtitle: 'What you get notified about',
-    route: AppRoutes.profileNotifications,
-  ),
-  _MenuEntry(
-    icon: Icons.lock_outline_rounded,
-    title: 'Change password',
-    subtitle: 'Signs out other devices',
-    route: AppRoutes.profileChangePassword,
-  ),
-  _MenuEntry(
-    icon: Icons.shield_outlined,
-    title: 'Check permissions',
-    subtitle: 'Your role and what it can do',
-    route: AppRoutes.profilePermissions,
-  ),
-  _MenuEntry(
-    icon: Icons.logout_rounded,
-    title: 'Log out',
-    subtitle: 'End this session',
-    danger: true,
-  ),
-];
-
-/// The header avatar circle (Owner/Manager/Trainer/Receptionist — every
-/// staff menu/dashboard screen) opens here. A hub, mirroring
-/// `GymSettingsScreen`'s pattern: this screen shows the photo + identity
-/// header and holds no editable fields itself — each menu row owns one
-/// slice of `ProfileDto` and does its own `GET/PATCH /profile` round trip.
+/// My Profile — web's `/profile` page plus its Account Settings entry points,
+/// as one hub for phone and tablet.
+///
+/// Header: photo (tap to take / choose / remove — `PATCH /profile`), name,
+/// e-mail, role and branch pills, "Email verified". Then web's four stats
+/// (Profile complete, Member since, Last sign-in, Two-factor), the
+/// completeness card (a ring + the eight real checks), and the sections:
+/// Personal details, Emergency contact, Notification preferences, Change
+/// password, Two-factor authentication, Sessions & devices, Check permissions
+/// (mobile extra, from the session), Help Center and "Your gym". Each section
+/// is its own page that does its own `GET`/`PATCH /profile`; the hub reloads
+/// on return. Log out sits at the bottom.
+///
+/// Dropped vs web: the gym's plan / timezone / currency in "Your gym" (they
+/// need `settings:read`; only the name and status are known to every role).
+/// Everyone can open their own profile — no permission is involved.
 class MyProfileScreen extends StatefulWidget {
   const MyProfileScreen({super.key});
 
@@ -87,7 +48,6 @@ class MyProfileScreen extends StatefulWidget {
 
 class _MyProfileScreenState extends State<MyProfileScreen> {
   StaffProfile? _profile;
-  bool _loading = true;
   String? _error;
   bool _uploadingPhoto = false;
 
@@ -98,30 +58,21 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
   }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    setState(() => _error = null);
     try {
       final profile = await getIt<ProfileRepository>().getProfile();
       if (!mounted) return;
-      setState(() {
-        _profile = profile;
-        _loading = false;
-      });
+      setState(() => _profile = profile);
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _loading = false;
-      });
+      if (mounted) setState(() => _error = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Could not load your profile ($e)');
     }
   }
 
-  /// Pushes [route] and refreshes on return, since the sub-screen may have
-  /// changed a field this hub displays (name, phone) or that another row
-  /// depends on.
-  Future<void> _openSection(String route) async {
+  /// Pushes [route] and refreshes on return, since the sub-page may have
+  /// changed something this hub shows (name, phone, 2FA, completeness).
+  Future<void> _open(String route) async {
     await context.push(route);
     if (mounted) _load();
   }
@@ -136,320 +87,236 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     if (!mounted) return;
+    await _savePhoto('data:image/jpeg;base64,${base64Encode(bytes)}');
+  }
+
+  Future<void> _savePhoto(String? dataUrl) async {
     setState(() => _uploadingPhoto = true);
     try {
-      final updated = await getIt<ProfileRepository>()
-          .updateAvatar('data:image/jpeg;base64,${base64Encode(bytes)}');
+      final updated = await getIt<ProfileRepository>().updateAvatar(dataUrl);
       if (!mounted) return;
       setState(() => _profile = updated);
       await context.read<SessionCubit>().refreshStaffUser();
     } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
+      if (mounted) teamSnack(context, e.detailedMessage, error: true);
+    } catch (e) {
+      if (mounted) {
+        teamSnack(context, 'Could not save the photo ($e)', error: true);
+      }
     } finally {
       if (mounted) setState(() => _uploadingPhoto = false);
     }
   }
 
-  Future<void> _removePhoto() async {
-    setState(() => _uploadingPhoto = true);
-    try {
-      final updated = await getIt<ProfileRepository>().updateAvatar(null);
-      if (!mounted) return;
-      setState(() => _profile = updated);
-      await context.read<SessionCubit>().refreshStaffUser();
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _uploadingPhoto = false);
-    }
-  }
-
-  void _showPhotoOptions() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColors.surface2,
-      shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(AppRadii.card)),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            _PhotoOptionTile(
-              icon: Icons.photo_camera_outlined,
-              label: 'Take a photo',
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _pickPhoto(ImageSource.camera);
-              },
-            ),
-            _PhotoOptionTile(
-              icon: Icons.photo_library_outlined,
-              label: 'Choose from gallery',
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _pickPhoto(ImageSource.gallery);
-              },
-            ),
-            if (_profile?.avatarUrl != null && _profile!.avatarUrl!.isNotEmpty)
-              _PhotoOptionTile(
-                icon: Icons.delete_outline_rounded,
-                label: 'Remove photo',
-                color: AppColors.danger,
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _removePhoto();
-                },
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+  Future<void> _photoOptions() async {
+    final hasPhoto = _profile?.avatarUrl?.isNotEmpty ?? false;
+    final choice = await pickOneSheet(
+      context,
+      title: 'Profile photo',
+      options: [
+        ('camera', 'Take a photo'),
+        ('gallery', 'Choose from gallery'),
+        if (hasPhoto) ('remove', 'Remove photo'),
+      ],
+      current: null,
     );
+    switch (choice) {
+      case 'camera':
+        await _pickPhoto(ImageSource.camera);
+      case 'gallery':
+        await _pickPhoto(ImageSource.gallery);
+      case 'remove':
+        await _savePhoto(null);
+    }
   }
-
-  Future<void> _confirmLogout() => showStaffLogoutDialog(context);
 
   @override
   Widget build(BuildContext context) {
+    final p = _profile;
     return Scaffold(
       backgroundColor: AppColors.bg,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: AppColors.bg,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
         elevation: 0,
-        title: Text('My Profile', style: AppText.display(size: 18)),
+        scrolledUnderElevation: 0,
+        title: const Text('My Profile'),
       ),
-      body: SafeArea(
-        top: false,
-        child: _loading
-            ? const AppLoadingView()
-            : _profile == null
-                ? AppErrorView(message: _error!, onRetry: _load)
-                : ListView(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                    children: [
-                      Center(
-                        child: _AvatarPicker(
-                          avatarUrl: _profile!.avatarUrl,
-                          initials: _profile!.name,
-                          loading: _uploadingPhoto,
-                          onTap: _showPhotoOptions,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Center(
-                        child: Text(
-                          _profile!.name,
-                          style: AppText.display(size: 18),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Center(
-                        child: Text(
-                          _profile!.email,
-                          style: AppText.body(
-                            size: 12.5,
-                            color: AppColors.inkFaint,
-                            weight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      if (_profile!.phone != null &&
-                          _profile!.phone!.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Center(
-                          child: Text(
-                            _profile!.phone!,
-                            style: AppText.body(
-                              size: 12.5,
-                              color: AppColors.inkFaint,
-                              weight: FontWeight.w600,
+      body: p == null
+          ? Padding(
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + kToolbarHeight,
+              ),
+              child: _error != null
+                  ? AppErrorView(message: _error!, onRetry: _load)
+                  : const AppLoadingView(),
+            )
+          : RefreshIndicator(
+              color: AppColors.staffB,
+              backgroundColor: AppColors.surface2,
+              onRefresh: _load,
+              child: _content(p),
+            ),
+    );
+  }
+
+  Widget _content(StaffProfile p) {
+    final top = MediaQuery.of(context).padding.top + kToolbarHeight;
+    final items = profileCompleteness(p);
+    final percent = completenessPercent(items);
+    final branches = p.branchAccess.allBranches
+        ? const ['All branches']
+        : [for (final b in p.branchAccess.branches) b.branchName];
+    final session = context.watch<SessionCubit>().state;
+    final tenant = session is SessionAuthenticatedStaff ? session.tenant : null;
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: 28),
+      children: [
+        TeamHero(
+          topInset: top,
+          name: p.name,
+          subtitle: p.email,
+          avatarUrl: p.avatarUrl,
+          uploading: _uploadingPhoto,
+          onAvatarTap: _photoOptions,
+          pills: [
+            for (final r in p.roles) TeamHeroPill(r),
+            for (final b in branches)
+              TeamHeroPill(b, icon: Icons.place_outlined),
+            if (p.emailVerifiedAt != null)
+              const TeamHeroPill(
+                'Email verified',
+                icon: Icons.check_circle_outline_rounded,
+              ),
+          ],
+        ),
+        TeamCenter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TeamSummaryGrid(
+                  tiles: [
+                    TeamSummaryTile(
+                      index: 0,
+                      icon: Icons.verified_user_outlined,
+                      color: kProfileColor,
+                      label: 'Profile complete',
+                      number: percent,
+                      suffix: '%',
+                    ),
+                    TeamSummaryTile(
+                      index: 1,
+                      icon: Icons.event_available_outlined,
+                      color: TeamColors.teal,
+                      label: 'Member since',
+                      text: profileDate(p.createdAt, never: '—'),
+                    ),
+                    TeamSummaryTile(
+                      index: 2,
+                      icon: Icons.login_rounded,
+                      color: TeamColors.amber,
+                      label: 'Last sign-in',
+                      text: profileDate(p.lastLoginAt),
+                    ),
+                    TeamSummaryTile(
+                      index: 3,
+                      icon: Icons.shield_outlined,
+                      color: p.mfaEnabled ? TeamColors.green : TeamColors.rose,
+                      label: 'Two-factor',
+                      text: p.mfaEnabled ? 'On' : 'Off',
+                      onTap: () => _open(AppRoutes.profileSecurity),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                AdaptiveColumns(
+                  children: [
+                    _completeness(items, percent),
+                    _sections(),
+                  ],
+                ),
+                if (tenant != null) ...[
+                  const SizedBox(height: 14),
+                  TeamSectionCard(
+                    icon: Icons.storefront_rounded,
+                    color: TeamColors.sky,
+                    title: 'Your gym',
+                    subtitle: 'Workspace this account belongs to.',
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              tenant.name,
+                              style: AppText.display(size: 17),
                             ),
                           ),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                      for (final entry in _entries)
-                        _MenuTile(
-                          entry: entry,
-                          onTap: entry.danger
-                              ? _confirmLogout
-                              : () => _openSection(entry.route!),
-                        ),
-                    ],
+                          TeamTag(
+                            label: tenant.status.replaceAll('_', ' '),
+                            color: tenant.status == 'ACTIVE'
+                                ? TeamColors.green
+                                : TeamColors.amber,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-      ),
-    );
-  }
-}
-
-class _AvatarPicker extends StatelessWidget {
-  const _AvatarPicker({
-    required this.avatarUrl,
-    required this.initials,
-    required this.loading,
-    required this.onTap,
-  });
-
-  final String? avatarUrl;
-  final String initials;
-  final bool loading;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: loading ? null : onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          UserAvatar(avatarUrl: avatarUrl, name: initials, size: 88),
-          if (loading)
-            Container(
-              width: 88,
-              height: 88,
-              decoration: const BoxDecoration(
-                color: Colors.black45,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          Positioned(
-            right: -2,
-            bottom: -2,
-            child: Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                gradient: AppColors.staffGrad,
-                shape: BoxShape.circle,
-                border: Border.all(color: AppColors.bg, width: 3),
-              ),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.camera_alt_rounded,
-                size: 14,
-                color: Colors.white,
-              ),
+                ],
+                const SizedBox(height: 14),
+                _logout(),
+              ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PhotoOptionTile extends StatelessWidget {
-  const _PhotoOptionTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon, color: color ?? AppColors.ink),
-      title: Text(
-        label,
-        style: AppText.body(
-          size: 14,
-          weight: FontWeight.w600,
-          color: color ?? AppColors.ink,
         ),
-      ),
-      onTap: onTap,
+      ],
     );
   }
-}
 
-/// Same tile chrome as `GymSettingsScreen`'s `_SettingsTile` — "Log out"
-/// swaps the icon tile and label to the danger tone instead of a chevron
-/// row, since it's an action, not a drill-down.
-class _MenuTile extends StatelessWidget {
-  const _MenuTile({required this.entry, required this.onTap});
-
-  final _MenuEntry entry;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadii.card),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.surface2,
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              border: Border.all(
-                color: entry.danger
-                    ? AppColors.danger.withValues(alpha: 0.3)
-                    : AppColors.line,
-              ),
-            ),
-            child: Row(
+  Widget _completeness(List<CompletenessItem> items, int percent) {
+    final done = items.where((i) => i.done).length;
+    return TeamSectionCard(
+      icon: Icons.verified_user_outlined,
+      color: kProfileColor,
+      title: 'Completeness',
+      subtitle: 'Based on your saved details',
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          children: [
+            Row(
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: entry.danger
-                        ? AppColors.dangerSoft
-                        : AppColors.staffSoft,
-                    borderRadius: BorderRadius.circular(AppRadii.tile),
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    entry.icon,
-                    size: 18,
-                    color:
-                        entry.danger ? AppColors.danger : AppColors.staffPillFg,
+                DashRing(
+                  size: 84,
+                  thickness: 10,
+                  segments: [percent / 100],
+                  colors: [percent == 100 ? TeamColors.green : kProfileColor],
+                  trackColor: AppColors.surface3,
+                  semanticLabel: 'Profile $percent percent complete',
+                  child: Text(
+                    '$percent%',
+                    style: AppText.display(size: 17),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        entry.title,
-                        style: AppText.body(
-                          size: 13,
-                          weight: FontWeight.w700,
-                          color:
-                              entry.danger ? AppColors.danger : AppColors.ink,
-                        ),
+                        percent == 100
+                            ? 'Profile complete'
+                            : 'Profile completeness',
+                        style: AppText.body(size: 14, weight: FontWeight.w800),
                       ),
                       Text(
-                        entry.subtitle,
+                        '$done of ${items.length} details filled in',
                         style: AppText.body(
-                          size: 11,
+                          size: 12,
                           color: AppColors.inkFaint,
                           weight: FontWeight.w600,
                         ),
@@ -457,17 +324,174 @@ class _MenuTile extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (!entry.danger)
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    size: 18,
-                    color: AppColors.inkFaint,
-                  ),
               ],
             ),
-          ),
+            const SizedBox(height: 10),
+            for (final i in items)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    Icon(
+                      i.done
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      size: 17,
+                      color: i.done ? TeamColors.green : AppColors.inkFaint,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        i.label,
+                        style: AppText.body(
+                          size: 12.5,
+                          weight: FontWeight.w600,
+                          color: i.done ? AppColors.ink : AppColors.inkFaint,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
         ),
       ),
     );
   }
+
+  Widget _sections() {
+    Widget tile(
+      IconData icon,
+      String label,
+      String hint,
+      String route,
+      Color color,
+    ) =>
+        TeamActionTile(
+          icon: icon,
+          label: label,
+          hint: hint,
+          color: color,
+          onTap: () => _open(route),
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TeamSectionCard(
+          icon: Icons.person_outline_rounded,
+          color: kProfileColor,
+          title: 'Personal',
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+            child: Column(
+              children: [
+                tile(
+                  Icons.badge_outlined,
+                  'Personal details',
+                  'Name and phone',
+                  AppRoutes.profileData,
+                  kProfileColor,
+                ),
+                tile(
+                  Icons.emergency_outlined,
+                  'Emergency contact',
+                  'Who to call, and how',
+                  AppRoutes.profileEmergencyContact,
+                  TeamColors.amber,
+                ),
+                tile(
+                  Icons.notifications_outlined,
+                  'Notification preferences',
+                  'What you get notified about',
+                  AppRoutes.profileNotifications,
+                  TeamColors.sky,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        TeamSectionCard(
+          icon: Icons.lock_outline_rounded,
+          color: TeamColors.indigo,
+          title: 'Security & help',
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+            child: Column(
+              children: [
+                tile(
+                  Icons.key_rounded,
+                  'Change password',
+                  'Signs out other devices',
+                  AppRoutes.profileChangePassword,
+                  TeamColors.indigo,
+                ),
+                tile(
+                  Icons.shield_outlined,
+                  'Two-factor authentication',
+                  'Authenticator app and backup codes',
+                  AppRoutes.profileSecurity,
+                  TeamColors.green,
+                ),
+                tile(
+                  Icons.devices_rounded,
+                  'Sessions & devices',
+                  "Where you're signed in",
+                  AppRoutes.sessions,
+                  TeamColors.teal,
+                ),
+                tile(
+                  Icons.admin_panel_settings_outlined,
+                  'Check permissions',
+                  'Your role and what it can do',
+                  AppRoutes.profilePermissions,
+                  TeamColors.violet,
+                ),
+                tile(
+                  Icons.help_outline_rounded,
+                  'Help Center',
+                  'Guides & tickets',
+                  AppRoutes.support,
+                  TeamColors.fuchsia,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _logout() => Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          onTap: () => showStaffLogoutDialog(context),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.dangerSoft,
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border:
+                  Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.logout_rounded, color: AppColors.danger),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Log out',
+                    style: AppText.body(
+                      size: 13.5,
+                      weight: FontWeight.w800,
+                      color: AppColors.danger,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
 }

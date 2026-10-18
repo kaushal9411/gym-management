@@ -2967,9 +2967,13 @@ class TeamOutlineButton extends StatelessWidget {
               Icon(icon, size: 17, color: AppColors.ink),
               const SizedBox(width: 6),
             ],
-            Text(
-              label,
-              style: AppText.body(size: 14, weight: FontWeight.w700),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.body(size: 14, weight: FontWeight.w700),
+              ),
             ),
           ],
         ),

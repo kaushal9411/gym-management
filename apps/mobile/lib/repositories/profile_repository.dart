@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
+import '../models/mfa_setup.dart';
 import '../models/staff_profile.dart';
 
 /// Staff plane's own-account profile — `GET/PATCH /profile`. Distinct from
@@ -56,6 +57,52 @@ class ProfileRepository {
     Map<String, bool> preferences,
   ) =>
       _patch({'notificationPreferences': preferences});
+
+  /// `POST /profile/two-factor/setup` — a fresh secret + QR for an
+  /// authenticator app (same shape the login-time setup returns).
+  Future<MfaSetupChallenge> beginTwoFactorSetup() async {
+    try {
+      final response =
+          await _dio.post<Map<String, dynamic>>('/profile/two-factor/setup');
+      return MfaSetupChallenge.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `POST /profile/two-factor/setup/confirm` — turns 2FA on; returns the
+  /// one-time backup codes.
+  Future<List<String>> confirmTwoFactorSetup(String code) =>
+      _codes('/profile/two-factor/setup/confirm', {'code': code});
+
+  /// `POST /profile/two-factor/backup-codes/regenerate` — needs a current
+  /// authenticator code; invalidates the old set.
+  Future<List<String>> regenerateBackupCodes(String code) =>
+      _codes('/profile/two-factor/backup-codes/regenerate', {'code': code});
+
+  /// `POST /profile/two-factor/disable` — confirms with the password.
+  Future<void> disableTwoFactor(String password) async {
+    try {
+      await _dio.post<void>(
+        '/profile/two-factor/disable',
+        data: {'password': password},
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  Future<List<String>> _codes(String path, Map<String, dynamic> body) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(path, data: body);
+      final data = response.data!['data'] as Map<String, dynamic>;
+      return (data['backupCodes'] as List).cast<String>();
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
 
   Future<StaffProfile> _patch(Map<String, dynamic> data) async {
     try {

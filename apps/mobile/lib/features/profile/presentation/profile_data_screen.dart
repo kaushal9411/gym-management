@@ -5,16 +5,17 @@ import 'package:go_router/go_router.dart';
 import '../../../bloc/session/session_cubit.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
+import '../../../models/staff_profile.dart';
 import '../../../repositories/profile_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
-import '../../../shared/widgets/app_state_views.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import 'profile_ui.dart';
 
-/// "My Profile" → "Profile data". Owns only `name`/`phone` — saving here
-/// never touches avatar, emergency contact, or notification prefs (see
-/// `ProfileRepository`'s doc comment on why that separation matters).
+/// My Profile → Personal details — web's "Personal details" panel (full name
+/// and phone; the photo is changed from the hub header). Owns only `name` /
+/// `phone`: the PATCH never carries the avatar, emergency contact or
+/// preferences (an absent key leaves them alone, `null` would clear them —
+/// see `ProfileRepository`). Name needs 2+ characters, like web's Save button.
 class ProfileDataScreen extends StatefulWidget {
   const ProfileDataScreen({super.key});
 
@@ -23,9 +24,10 @@ class ProfileDataScreen extends StatefulWidget {
 }
 
 class _ProfileDataScreenState extends State<ProfileDataScreen> {
-  final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
-  bool _loading = true;
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
+  StaffProfile? _profile;
+  String? _loadError;
   bool _saving = false;
   String? _error;
 
@@ -37,33 +39,32 @@ class _ProfileDataScreenState extends State<ProfileDataScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
+    _name.dispose();
+    _phone.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
+    setState(() => _loadError = null);
     try {
-      final profile = await getIt<ProfileRepository>().getProfile();
+      final p = await getIt<ProfileRepository>().getProfile();
       if (!mounted) return;
       setState(() {
-        _nameController.text = profile.name;
-        _phoneController.text = profile.phone ?? '';
-        _loading = false;
+        _profile = p;
+        _name.text = p.name;
+        _phone.text = p.phone ?? '';
       });
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _loading = false;
-      });
+      if (mounted) setState(() => _loadError = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _loadError = 'Could not load ($e)');
     }
   }
 
   Future<void> _save() async {
-    final name = _nameController.text.trim();
+    final name = _name.text.trim();
     if (name.length < 2) {
-      setState(() => _error = 'Full name is required');
+      setState(() => _error = 'Full name is required.');
       return;
     }
     setState(() {
@@ -71,18 +72,20 @@ class _ProfileDataScreenState extends State<ProfileDataScreen> {
       _error = null;
     });
     try {
+      final phone = _phone.text.trim();
       await getIt<ProfileRepository>().updateBasicInfo(
         name: name,
-        phone:
-            _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+        phone: phone.isEmpty ? null : phone,
       );
       if (!mounted) return;
       await context.read<SessionCubit>().refreshStaffUser();
       if (!mounted) return;
+      teamSnack(context, 'Profile saved');
       context.pop();
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.detailedMessage);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Could not save ($e)');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -90,47 +93,49 @@ class _ProfileDataScreenState extends State<ProfileDataScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Text('Profile data', style: AppText.display(size: 18)),
-      ),
-      body: SafeArea(
-        top: false,
-        child: _loading
-            ? const AppLoadingView()
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                children: [
-                  if (_error != null) ...[
-                    FormAlert(message: _error!),
-                    const SizedBox(height: 12),
-                  ],
-                  AppLabeledField(
-                    label: 'Full name',
-                    hintText: 'e.g. Priya Sharma',
-                    controller: _nameController,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 14),
-                  AppLabeledField(
-                    label: 'Phone',
-                    hintText: 'e.g. 9876543210',
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    textInputAction: TextInputAction.done,
-                  ),
-                  const SizedBox(height: 20),
-                  AppButton(
-                    label: 'Save changes',
-                    loading: _saving,
-                    onPressed: _save,
-                  ),
-                ],
-              ),
-      ),
+    final p = _profile;
+    return ProfileFormPage(
+      title: 'Personal details',
+      chip: 'Account · Personal details',
+      icon: Icons.badge_outlined,
+      color: kProfileColor,
+      name: p?.name ?? 'My profile',
+      subtitle: p?.email ?? '',
+      avatarUrl: p?.avatarUrl,
+      loading: p == null && _loadError == null,
+      loadError: p == null ? _loadError : null,
+      onRetry: _load,
+      error: _error,
+      saving: _saving,
+      onSave: _save,
+      sections: [
+        TeamFormSection(
+          icon: Icons.person_outline_rounded,
+          color: kProfileColor,
+          title: 'Your name and phone',
+          subtitle: 'Change your photo from the profile header.',
+          children: [
+            AppLabeledField(
+              label: 'Full name',
+              hintText: 'e.g. Priya Sharma',
+              icon: Icons.person_outline_rounded,
+              iconColor: kProfileColor,
+              controller: _name,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+            ),
+            AppLabeledField(
+              label: 'Phone',
+              hintText: 'e.g. 9876543210',
+              icon: Icons.phone_outlined,
+              iconColor: TeamColors.teal,
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.done,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

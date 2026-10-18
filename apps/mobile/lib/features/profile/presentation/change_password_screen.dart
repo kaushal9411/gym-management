@@ -3,15 +3,16 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../repositories/auth_repository.dart';
-import '../../../shared/widgets/app_button.dart';
+import '../../../repositories/profile_repository.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
-import '../../../shared/widgets/app_state_views.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import 'profile_ui.dart';
 
-/// "My Profile" → "Change password". `PATCH /auth/change-password` revokes
-/// every other active session on success — this device stays signed in.
+/// My Profile → Change password — web's Password tab. `PATCH
+/// /auth/change-password` revokes every other session on success (this device
+/// stays signed in). Same rules as web's form: all three fields, the new one
+/// must pass the server's policy (live checklist) and match the confirmation.
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
 
@@ -20,30 +21,55 @@ class ChangePasswordScreen extends StatefulWidget {
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  final _currentController = TextEditingController();
-  final _newController = TextEditingController();
-  final _confirmController = TextEditingController();
+  final _current = TextEditingController();
+  final _new = TextEditingController();
+  final _confirm = TextEditingController();
+  String _name = 'My profile';
+  String _email = '';
   bool _saving = false;
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    _loadHeader();
+  }
+
+  @override
   void dispose() {
-    _currentController.dispose();
-    _newController.dispose();
-    _confirmController.dispose();
+    _current.dispose();
+    _new.dispose();
+    _confirm.dispose();
     super.dispose();
   }
 
+  Future<void> _loadHeader() async {
+    try {
+      final p = await getIt<ProfileRepository>().getProfile();
+      if (mounted) {
+        setState(() {
+          _name = p.name;
+          _email = p.email;
+        });
+      }
+    } catch (_) {
+      // Cosmetic only — the form works without it.
+    }
+  }
+
   Future<void> _submit() async {
-    final current = _currentController.text;
-    final next = _newController.text;
-    final confirm = _confirmController.text;
+    final current = _current.text;
+    final next = _new.text;
     if (current.isEmpty || next.isEmpty) {
-      setState(() => _error = 'Both password fields are required');
+      setState(() => _error = 'Both password fields are required.');
       return;
     }
-    if (next != confirm) {
-      setState(() => _error = 'New passwords don\'t match');
+    if (!PasswordRules.isValid(next)) {
+      setState(() => _error = 'The new password does not meet every rule.');
+      return;
+    }
+    if (next != _confirm.text) {
+      setState(() => _error = "New passwords don't match.");
       return;
     }
     setState(() {
@@ -56,15 +82,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         newPassword: next,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password changed. Other devices were signed out.'),
-        ),
-      );
+      teamSnack(context, 'Password changed. Other devices were signed out.');
       context.pop();
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.detailedMessage);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Could not change it ($e)');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -72,54 +95,75 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Text('Change password', style: AppText.display(size: 18)),
-      ),
-      body: SafeArea(
-        top: false,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+    return ProfileFormPage(
+      title: 'Change password',
+      chip: 'Security · Password',
+      icon: Icons.key_rounded,
+      color: TeamColors.indigo,
+      name: _name,
+      subtitle: _email,
+      error: _error,
+      saving: _saving,
+      onSave: _submit,
+      saveLabel: 'Change password',
+      saveIcon: Icons.lock_reset_rounded,
+      sections: [
+        TeamFormSection(
+          icon: Icons.key_rounded,
+          color: TeamColors.indigo,
+          title: 'Change password',
+          subtitle: 'Changing it signs you out of every other session.',
           children: [
-            if (_error != null) ...[
-              FormAlert(message: _error!),
-              const SizedBox(height: 12),
-            ],
             AppLabeledField(
               label: 'Current password',
               hintText: 'Enter your current password',
-              controller: _currentController,
+              icon: Icons.lock_outline_rounded,
+              iconColor: TeamColors.indigo,
+              controller: _current,
               obscureText: true,
               textInputAction: TextInputAction.next,
             ),
-            const SizedBox(height: 14),
             AppLabeledField(
               label: 'New password',
-              hintText: 'At least 8 characters',
-              controller: _newController,
+              hintText: 'Choose a strong password',
+              icon: Icons.password_rounded,
+              iconColor: TeamColors.violet,
+              controller: _new,
               obscureText: true,
               textInputAction: TextInputAction.next,
+              onChanged: (_) => setState(() {}),
             ),
-            const SizedBox(height: 14),
+            PasswordRules(password: _new.text),
             AppLabeledField(
               label: 'Confirm new password',
-              hintText: 'Re-enter new password',
-              controller: _confirmController,
+              hintText: 'Re-enter the new password',
+              icon: Icons.verified_outlined,
+              iconColor: TeamColors.green,
+              controller: _confirm,
               obscureText: true,
               textInputAction: TextInputAction.done,
             ),
-            const SizedBox(height: 20),
-            AppButton(
-              label: 'Change password',
-              loading: _saving,
-              onPressed: _submit,
-            ),
           ],
         ),
-      ),
+        TeamSectionCard(
+          icon: Icons.tips_and_updates_outlined,
+          color: TeamColors.green,
+          title: 'Good habits',
+          child: const Padding(
+            padding: EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ProfileNote('Use a password you do not use anywhere else.'),
+                ProfileNote('A long phrase beats a short complex one.'),
+                ProfileNote(
+                  'Pair it with two-factor authentication (Two-factor page).',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

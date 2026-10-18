@@ -86,15 +86,56 @@ class AnnouncementRepository {
     }
   }
 
+  /// `POST /tenant-announcements` (perm `announcements:create`) — always
+  /// saved as a DRAFT. [branchId] targets one branch; [expiresAt] is a plain
+  /// `YYYY-MM-DD` day (the API stores it as a date).
   Future<Announcement> create({
     required String title,
     required String body,
     required AnnouncementAudience audience,
+    String? branchId,
+    String? expiresAt,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/tenant-announcements',
-        data: {'title': title, 'body': body, 'audience': audience.apiValue},
+        data: {
+          'title': title,
+          'body': body,
+          'audience': audience.apiValue,
+          if (branchId != null) 'branchId': branchId,
+          if (expiresAt != null) 'expiresAt': expiresAt,
+        },
+      );
+      return Announcement.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `PATCH /tenant-announcements/:id` (perm `announcements:update`) — only
+  /// DRAFT / SCHEDULED announcements are editable (web's Edit). Sends the
+  /// same fields as create; web does the same.
+  Future<Announcement> update(
+    String id, {
+    required String title,
+    required String body,
+    required AnnouncementAudience audience,
+    String? branchId,
+    String? expiresAt,
+  }) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/tenant-announcements/$id',
+        data: {
+          'title': title,
+          'body': body,
+          'audience': audience.apiValue,
+          if (branchId != null) 'branchId': branchId,
+          if (expiresAt != null) 'expiresAt': expiresAt,
+        },
       );
       return Announcement.fromJson(
         response.data!['data'] as Map<String, dynamic>,
@@ -118,7 +159,7 @@ class AnnouncementRepository {
     try {
       await _dio.post<void>(
         '/tenant-announcements/$id/schedule',
-        data: {'publishAt': publishAt.toIso8601String()},
+        data: {'publishAt': publishAt.toUtc().toIso8601String()},
       );
     } on DioException catch (e) {
       throw _mapError(e);

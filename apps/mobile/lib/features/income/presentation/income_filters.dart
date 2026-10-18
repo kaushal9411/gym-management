@@ -31,11 +31,11 @@ class IncomePeriodBar extends StatelessWidget {
     required this.customLabel,
     required this.onPeriod,
     required this.onCustom,
-    required this.branchId,
-    required this.branches,
-    required this.onBranch,
     required this.compare,
     required this.onCompare,
+    this.branchId,
+    this.branches = const [],
+    this.onBranch,
   });
 
   final IncomePeriod period;
@@ -46,7 +46,10 @@ class IncomePeriodBar extends StatelessWidget {
   final VoidCallback onCustom;
   final String? branchId;
   final List<BranchOption> branches;
-  final VoidCallback onBranch;
+
+  /// Null hides the branch control (the notification and announcement feeds
+  /// are tenant-wide — web's `NotificationPeriodBar` has no branch select).
+  final VoidCallback? onBranch;
   final bool compare;
   final ValueChanged<bool> onCompare;
 
@@ -89,13 +92,15 @@ class IncomePeriodBar extends StatelessWidget {
             ),
           ]),
           const SizedBox(height: 10),
-          TeamToolbarButton(
-            icon: Icons.storefront_rounded,
-            label: branchLabel,
-            active: branchId != null,
-            onTap: onBranch,
-          ),
-          const SizedBox(height: 4),
+          if (onBranch != null) ...[
+            TeamToolbarButton(
+              icon: Icons.storefront_rounded,
+              label: branchLabel,
+              active: branchId != null,
+              onTap: onBranch!,
+            ),
+            const SizedBox(height: 4),
+          ],
           Row(
             children: [
               Expanded(

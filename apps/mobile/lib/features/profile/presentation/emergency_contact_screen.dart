@@ -3,28 +3,28 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
+import '../../../models/staff_profile.dart';
 import '../../../repositories/profile_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
-import '../../../shared/widgets/app_state_views.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import 'profile_ui.dart';
 
-/// "My Profile" → "Emergency contact". Owns only the three
-/// `emergencyContact*` fields.
+/// My Profile → Emergency contact — web's "Emergency contact" panel (name,
+/// phone, relation). Owns only the three `emergencyContact*` fields; empty
+/// ones are cleared (`null`), exactly like web.
 class EmergencyContactScreen extends StatefulWidget {
   const EmergencyContactScreen({super.key});
 
   @override
-  State<EmergencyContactScreen> createState() =>
-      _EmergencyContactScreenState();
+  State<EmergencyContactScreen> createState() => _EmergencyContactScreenState();
 }
 
 class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
-  final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _relationController = TextEditingController();
-  bool _loading = true;
+  final _name = TextEditingController();
+  final _phone = TextEditingController();
+  final _relation = TextEditingController();
+  StaffProfile? _profile;
+  String? _loadError;
   bool _saving = false;
   String? _error;
 
@@ -36,29 +36,33 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _relationController.dispose();
+    _name.dispose();
+    _phone.dispose();
+    _relation.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
+    setState(() => _loadError = null);
     try {
-      final profile = await getIt<ProfileRepository>().getProfile();
+      final p = await getIt<ProfileRepository>().getProfile();
       if (!mounted) return;
       setState(() {
-        _nameController.text = profile.emergencyContact.name ?? '';
-        _phoneController.text = profile.emergencyContact.phone ?? '';
-        _relationController.text = profile.emergencyContact.relation ?? '';
-        _loading = false;
+        _profile = p;
+        _name.text = p.emergencyContact.name ?? '';
+        _phone.text = p.emergencyContact.phone ?? '';
+        _relation.text = p.emergencyContact.relation ?? '';
       });
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _loading = false;
-      });
+      if (mounted) setState(() => _loadError = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _loadError = 'Could not load ($e)');
     }
+  }
+
+  String? _v(TextEditingController c) {
+    final t = c.text.trim();
+    return t.isEmpty ? null : t;
   }
 
   Future<void> _save() async {
@@ -68,21 +72,17 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
     });
     try {
       await getIt<ProfileRepository>().updateEmergencyContact(
-        name: _nameController.text.trim().isEmpty
-            ? null
-            : _nameController.text.trim(),
-        phone: _phoneController.text.trim().isEmpty
-            ? null
-            : _phoneController.text.trim(),
-        relation: _relationController.text.trim().isEmpty
-            ? null
-            : _relationController.text.trim(),
+        name: _v(_name),
+        phone: _v(_phone),
+        relation: _v(_relation),
       );
       if (!mounted) return;
+      teamSnack(context, 'Emergency contact saved');
       context.pop();
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.detailedMessage);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'Could not save ($e)');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -90,54 +90,57 @@ class _EmergencyContactScreenState extends State<EmergencyContactScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Text('Emergency contact', style: AppText.display(size: 18)),
-      ),
-      body: SafeArea(
-        top: false,
-        child: _loading
-            ? const AppLoadingView()
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                children: [
-                  if (_error != null) ...[
-                    FormAlert(message: _error!),
-                    const SizedBox(height: 12),
-                  ],
-                  AppLabeledField(
-                    label: 'Name',
-                    hintText: 'e.g. Priya Sharma',
-                    controller: _nameController,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 14),
-                  AppLabeledField(
-                    label: 'Phone',
-                    hintText: 'e.g. 9876543210',
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    textInputAction: TextInputAction.next,
-                  ),
-                  const SizedBox(height: 14),
-                  AppLabeledField(
-                    label: 'Relation',
-                    hintText: 'e.g. Spouse, Parent, Sibling',
-                    controller: _relationController,
-                    textInputAction: TextInputAction.done,
-                  ),
-                  const SizedBox(height: 20),
-                  AppButton(
-                    label: 'Save changes',
-                    loading: _saving,
-                    onPressed: _save,
-                  ),
-                ],
-              ),
-      ),
+    final p = _profile;
+    return ProfileFormPage(
+      title: 'Emergency contact',
+      chip: 'Account · Emergency contact',
+      icon: Icons.emergency_outlined,
+      color: TeamColors.amber,
+      name: p?.name ?? 'My profile',
+      subtitle: p?.email ?? '',
+      avatarUrl: p?.avatarUrl,
+      loading: p == null && _loadError == null,
+      loadError: p == null ? _loadError : null,
+      onRetry: _load,
+      error: _error,
+      saving: _saving,
+      onSave: _save,
+      sections: [
+        TeamFormSection(
+          icon: Icons.favorite_outline_rounded,
+          color: TeamColors.amber,
+          title: 'Who we should call if needed',
+          children: [
+            AppLabeledField(
+              label: 'Name',
+              hintText: 'e.g. Priya Sharma',
+              icon: Icons.person_outline_rounded,
+              iconColor: TeamColors.amber,
+              controller: _name,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+            ),
+            AppLabeledField(
+              label: 'Phone',
+              hintText: 'e.g. 9876543210',
+              icon: Icons.phone_outlined,
+              iconColor: TeamColors.teal,
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.next,
+            ),
+            AppLabeledField(
+              label: 'Relation',
+              hintText: 'e.g. Spouse, Parent, Sibling',
+              icon: Icons.family_restroom_rounded,
+              iconColor: TeamColors.rose,
+              controller: _relation,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.done,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

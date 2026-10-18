@@ -82,6 +82,7 @@ import '../../features/manager/presentation/staff_edit_employment_screen.dart';
 import '../../features/manager/presentation/staff_edit_personal_screen.dart';
 import '../../features/manager/presentation/staff_form_screen.dart';
 import '../../features/manager/presentation/team_screen.dart';
+import '../../features/notifications/presentation/notification_log_screen.dart';
 import '../../features/notifications/presentation/notification_template_form_screen.dart';
 import '../../features/notifications/presentation/notification_templates_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
@@ -91,6 +92,7 @@ import '../../features/profile/presentation/my_permissions_screen.dart';
 import '../../features/profile/presentation/my_profile_screen.dart';
 import '../../features/profile/presentation/notification_preferences_screen.dart';
 import '../../features/profile/presentation/profile_data_screen.dart';
+import '../../features/profile/presentation/two_factor_screen.dart';
 import '../../features/receptionist/presentation/checked_in_screen.dart';
 import '../../features/classes/presentation/class_add_attendee_screen.dart';
 import '../../features/classes/presentation/class_form_screen.dart';
@@ -125,11 +127,12 @@ import '../../features/roles/presentation/user_form_screen.dart';
 import '../../features/search/presentation/global_search_screen.dart';
 import '../../features/settings/presentation/branding_settings_screen.dart';
 import '../../features/settings/presentation/gym_profile_settings_screen.dart';
-import '../../features/settings/presentation/gym_social_screen.dart';
 import '../../features/settings/presentation/gym_settings_screen.dart';
 import '../../features/settings/presentation/invoice_settings_screen.dart';
 import '../../features/settings/presentation/security_policy_screen.dart';
+import '../../features/settings/presentation/ai_settings_screen.dart';
 import '../../features/settings/presentation/appearance_screen.dart';
+import '../../features/settings/presentation/business_settings_screen.dart';
 import '../../features/settings/presentation/sessions_screen.dart';
 import '../../features/leads/presentation/lead_detail_screen.dart';
 import '../../features/leads/presentation/lead_follow_ups_screen.dart';
@@ -163,7 +166,6 @@ import '../../models/exercise.dart';
 import '../../models/food.dart';
 import '../../models/group_class.dart';
 import '../../models/gym_member.dart';
-import '../../models/gym_profile.dart';
 import '../../models/iam_user.dart';
 import '../../models/member_invoice.dart';
 import '../../models/member_self_profile.dart';
@@ -296,6 +298,10 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       GoRoute(
         path: AppRoutes.profileChangePassword,
         builder: (context, state) => const ChangePasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.profileSecurity,
+        builder: (context, state) => const TwoFactorScreen(),
       ),
       GoRoute(
         path: AppRoutes.profilePermissions,
@@ -483,6 +489,10 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         builder: (context, state) => const NotificationsScreen(),
       ),
       GoRoute(
+        path: AppRoutes.messageLog,
+        builder: (context, state) => const NotificationLogScreen(),
+      ),
+      GoRoute(
         path: AppRoutes.notificationTemplates,
         builder: (context, state) => const NotificationTemplatesScreen(),
       ),
@@ -498,7 +508,8 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       ),
       GoRoute(
         path: AppRoutes.announcementForm,
-        builder: (context, state) => const AnnouncementFormScreen(),
+        builder: (context, state) =>
+            AnnouncementFormScreen(editing: state.extra as Announcement?),
       ),
       GoRoute(
         path: AppRoutes.scheduleAnnouncement,
@@ -635,9 +646,12 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         builder: (context, state) => const GymProfileSettingsScreen(),
       ),
       GoRoute(
-        path: AppRoutes.gymSocialSettings,
-        builder: (context, state) =>
-            GymSocialScreen(socialLinks: state.extra as SocialLinks?),
+        path: AppRoutes.businessSettings,
+        builder: (context, state) => const BusinessSettingsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.aiSettings,
+        builder: (context, state) => const AiSettingsScreen(),
       ),
       GoRoute(
         path: AppRoutes.brandingSettings,

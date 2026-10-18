@@ -1,31 +1,31 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
-import '../../../core/routing/app_routes.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
-import '../../../core/theme/app_text_styles.dart';
-import '../../../models/gym_business_settings.dart';
+import '../../../models/business_hours.dart';
 import '../../../models/gym_profile.dart';
 import '../../../repositories/gym_settings_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
-import '../../../shared/widgets/app_state_views.dart';
-import '../../../shared/widgets/category_chip_selector.dart';
+import '../../../shared/widgets/list_hero.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import 'settings_ui.dart';
+import 'widgets/business_hours_editor.dart';
+import 'widgets/settings_previews.dart';
 
-const _dateFormats = ['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'];
-const _timeFormats = ['12h', '24h'];
-
-/// Design frame "11a. Gym profile" — Legal name / contact fields, plus the
-/// business-settings block (currency, timezone, formats) which has no
-/// frame of its own but belongs with the profile. The design's "Operating
-/// hours" single field is not built: the API models hours per weekday and
-/// flattening that into one string would silently overwrite real per-day
-/// values (branches get a real per-day editor, frame "8c" — the gym-level
-/// hours don't have a mobile screen yet). "Social media" opens frame
-/// "11a-i" (`GymSocialScreen`).
+/// Gym Profile — web's `/gym-settings/profile`: the setup-progress card, Basic
+/// information (name, legal name, registration, GST / VAT, business type,
+/// description), Contact information (email, website, phones, address,
+/// coordinates), Business hours (per weekday) and Social media links, with the
+/// weekly-hours chart and the business-card preview beside / below them.
+///
+/// Saving mirrors web: one bar for the whole page that fires the four writes
+/// (`PATCH /settings/profile`, `/contact`, `/business-hours`, `/social-links`)
+/// together, then reloads the profile. Needs `settings:read` to open and
+/// `settings:manage` to edit (read-only otherwise, no save bar).
+/// "Gym name is required." is the one client check, like web's required field.
+///
+/// **Dropped vs web**: nothing. The business-settings block that used to live
+/// on this screen moved to its own Business page, as on web.
 class GymProfileSettingsScreen extends StatefulWidget {
   const GymProfileSettingsScreen({super.key});
 
@@ -35,374 +35,490 @@ class GymProfileSettingsScreen extends StatefulWidget {
 }
 
 class _GymProfileSettingsScreenState extends State<GymProfileSettingsScreen> {
-  GymProfile? _profile;
-  GymBusinessSettings? _business;
+  late final SettingsAccess _access;
+
+  static const _textKeys = [
+    'gymName',
+    'legalBusinessName',
+    'registrationNumber',
+    'gstVatNumber',
+    'businessType',
+    'description',
+    'email',
+    'website',
+    'phone',
+    'alternatePhone',
+    'addressLine',
+    'city',
+    'state',
+    'country',
+    'postalCode',
+    'latitude',
+    'longitude',
+    'facebook',
+    'instagram',
+    'twitter',
+    'youtube',
+    'linkedin',
+  ];
+  final Map<String, TextEditingController> _c = {
+    for (final k in _textKeys) k: TextEditingController(),
+  };
+  BusinessHours _hours = const BusinessHours();
+  String _baseline = '';
+  bool _loading = true;
+  bool _saving = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _access = SettingsAccess.of(context);
+    for (final c in _c.values) {
+      c.addListener(_changed);
+    }
+    if (_access.canRead) {
+      _load();
+    } else {
+      _loading = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in _c.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  String _snapshot() =>
+      '${_textKeys.map((k) => _c[k]!.text.trim()).join('\u0001')}'
+      '\u0002${_hours.toJson()}';
+
+  void _apply(GymProfile p) {
+    String s(String? v) => v ?? '';
+    final social = p.socialLinks;
+    final v = <String, String>{
+      'gymName': p.gymName,
+      'legalBusinessName': s(p.legalBusinessName),
+      'registrationNumber': s(p.registrationNumber),
+      'gstVatNumber': s(p.gstVatNumber),
+      'businessType': s(p.businessType),
+      'description': s(p.description),
+      'email': s(p.email),
+      'website': s(p.website),
+      'phone': s(p.phone),
+      'alternatePhone': s(p.alternatePhone),
+      'addressLine': s(p.addressLine),
+      'city': s(p.city),
+      'state': s(p.state),
+      'country': s(p.country),
+      'postalCode': s(p.postalCode),
+      'latitude': p.latitude?.toString() ?? '',
+      'longitude': p.longitude?.toString() ?? '',
+      'facebook': s(social?.facebook),
+      'instagram': s(social?.instagram),
+      'twitter': s(social?.twitter),
+      'youtube': s(social?.youtube),
+      'linkedin': s(social?.linkedin),
+    };
+    for (final e in v.entries) {
+      _c[e.key]!.text = e.value;
+    }
+    _hours = p.businessHours;
+    _baseline = _snapshot();
   }
 
   Future<void> _load() async {
-    setState(() => _error = null);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final repo = getIt<GymSettingsRepository>();
-      final (profile, business) =
-          await (repo.getProfile(), repo.getBusinessSettings()).wait;
+      final p = await getIt<GymSettingsRepository>().getProfile();
       if (!mounted) return;
       setState(() {
-        _profile = profile;
-        _business = business;
+        _apply(p);
+        _loading = false;
       });
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
+      if (mounted) {
+        setState(() {
+          _error = e.detailedMessage;
+          _loading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Could not load the gym profile ($e)';
+          _loading = false;
+        });
+      }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Text('Gym Profile', style: AppText.display(size: 18)),
-      ),
-      body: SafeArea(
-        top: false,
-        child: _error != null
-            ? AppErrorView(message: _error!, onRetry: _load)
-            : _profile == null || _business == null
-                ? const AppLoadingView()
-                : ListView(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                    children: [
-                      _ProfileSection(profile: _profile!),
-                      const SizedBox(height: 16),
-                      _SocialLinksTile(profile: _profile!, onReturn: _load),
-                      const SizedBox(height: 24),
-                      _BusinessSection(business: _business!),
-                    ],
-                  ),
-      ),
-    );
-  }
-}
-
-class _ProfileSection extends StatefulWidget {
-  const _ProfileSection({required this.profile});
-
-  final GymProfile profile;
-
-  @override
-  State<_ProfileSection> createState() => _ProfileSectionState();
-}
-
-class _ProfileSectionState extends State<_ProfileSection> {
-  late final _nameController =
-      TextEditingController(text: widget.profile.gymName);
-  late final _legalNameController =
-      TextEditingController(text: widget.profile.legalBusinessName ?? '');
-  late final _emailController =
-      TextEditingController(text: widget.profile.email ?? '');
-  late final _phoneController =
-      TextEditingController(text: widget.profile.phone ?? '');
-  late final _addressController =
-      TextEditingController(text: widget.profile.addressLine ?? '');
-  late final _cityController =
-      TextEditingController(text: widget.profile.city ?? '');
-  bool _saving = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _legalNameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _addressController.dispose();
-    _cityController.dispose();
-    super.dispose();
-  }
+  bool get _dirty => !_loading && _error == null && _snapshot() != _baseline;
 
   Future<void> _save() async {
-    setState(() {
-      _saving = true;
-      _error = null;
-    });
+    if (_saving) return;
+    String t(String k) => _c[k]!.text.trim();
+    if (t('gymName').isEmpty) {
+      teamSnack(context, 'Gym name is required.', error: true);
+      return;
+    }
+    double? coord(String k, String label) {
+      if (t(k).isEmpty) return null;
+      final d = double.tryParse(t(k));
+      if (d == null) throw ApiException(message: '$label must be a number.');
+      return d;
+    }
+
+    setState(() => _saving = true);
     try {
-      await getIt<GymSettingsRepository>().saveProfile(
-        gymName: _nameController.text.trim(),
-        legalBusinessName: _legalNameController.text.trim(),
-        email: _emailController.text.trim(),
-        phone: _phoneController.text.trim(),
-        addressLine: _addressController.text.trim(),
-        city: _cityController.text.trim(),
-      );
+      final lat = coord('latitude', 'Latitude');
+      final lng = coord('longitude', 'Longitude');
+      final repo = getIt<GymSettingsRepository>();
+      await Future.wait([
+        repo.updateProfile(
+          gymName: t('gymName'),
+          legalBusinessName: t('legalBusinessName'),
+          registrationNumber: t('registrationNumber'),
+          gstVatNumber: t('gstVatNumber'),
+          businessType: t('businessType'),
+          description: t('description'),
+        ),
+        repo.updateContact(
+          email: t('email'),
+          phone: t('phone'),
+          alternatePhone: t('alternatePhone'),
+          website: t('website'),
+          addressLine: t('addressLine'),
+          city: t('city'),
+          state: t('state'),
+          country: t('country'),
+          postalCode: t('postalCode'),
+          latitude: lat,
+          longitude: lng,
+        ),
+        repo.updateBusinessHours(_hours),
+        repo.updateSocialLinks(
+          facebook: t('facebook'),
+          instagram: t('instagram'),
+          twitter: t('twitter'),
+          youtube: t('youtube'),
+          linkedin: t('linkedin'),
+        ),
+      ]);
+      invalidateSetupProgress();
+      final fresh = await repo.getProfile();
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Profile saved')));
+      setState(() => _apply(fresh));
+      teamSnack(context, 'Gym profile saved');
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
+      if (mounted) teamSnack(context, e.detailedMessage, error: true);
+    } catch (e) {
+      if (mounted) {
+        teamSnack(context, 'Could not save the profile ($e)', error: true);
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
+  Future<void> _discard() async {
+    setState(() => _loading = true);
+    await _load();
+  }
+
+  AppLabeledField _field(
+    String key,
+    String label, {
+    IconData? icon,
+    Color? color,
+    TextInputType? keyboard,
+    String? hint,
+    int maxLines = 1,
+    TextCapitalization cap = TextCapitalization.none,
+  }) =>
+      AppLabeledField(
+        label: label,
+        icon: icon,
+        iconColor: color,
+        hintText: hint,
+        controller: _c[key]!,
+        keyboardType: keyboard,
+        readOnly: !_access.canManage,
+        minLines: maxLines > 1 ? 3 : null,
+        maxLines: maxLines,
+        textCapitalization: cap,
+      );
+
+  int get _socialCount => [
+        'facebook',
+        'instagram',
+        'twitter',
+        'youtube',
+        'linkedin',
+      ].where((k) => _c[k]!.text.trim().isNotEmpty).length;
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (_error != null) ...[
-          FormAlert(message: _error!),
-          const SizedBox(height: 12),
-        ],
-        AppLabeledField(
-          label: 'Legal name',
-          hintText: 'e.g. Kaushal Fitness Pvt Ltd',
-          controller: _legalNameController,
-        ),
-        const SizedBox(height: 14),
-        AppLabeledField(
-          label: 'Gym name',
-          hintText: 'e.g. Kaushal Fitness Studio',
-          controller: _nameController,
-        ),
-        const SizedBox(height: 14),
-        AppLabeledField(
-          label: 'Contact email',
-          hintText: 'contact@gym.com',
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
-        ),
-        const SizedBox(height: 14),
-        AppLabeledField(
-          label: 'Contact phone',
-          hintText: 'e.g. 9876543210',
-          controller: _phoneController,
-          keyboardType: TextInputType.phone,
-        ),
-        const SizedBox(height: 14),
-        AppLabeledField(
-          label: 'Address',
-          hintText: 'Street, building, area',
-          controller: _addressController,
-        ),
-        const SizedBox(height: 14),
-        AppLabeledField(
-          label: 'City',
-          hintText: 'e.g. Mumbai',
-          controller: _cityController,
-        ),
-        const SizedBox(height: 18),
-        AppButton(label: 'Save changes', loading: _saving, onPressed: _save),
+    final address = [
+      _c['addressLine']!.text.trim(),
+      [_c['city']!.text.trim(), _c['state']!.text.trim()]
+          .where((s) => s.isNotEmpty)
+          .join(', '),
+      [_c['country']!.text.trim(), _c['postalCode']!.text.trim()]
+          .where((s) => s.isNotEmpty)
+          .join(' '),
+    ].where((s) => s.isNotEmpty).join(' - ');
+    return SettingsScaffold(
+      access: _access,
+      page: SettingsPage.profile,
+      title: 'Gym Profile',
+      subtitle: "Your gym's identity, legal details, contact info, hours and "
+          'social links.',
+      loading: _loading,
+      error: _error,
+      onRetry: _load,
+      onRefresh: _load,
+      chips: [
+        if (!_loading)
+          ListHeroChip(
+            icon: Icons.schedule_rounded,
+            label: '${weeklyHoursOf(_hours)} hours open / week',
+          ),
       ],
-    );
-  }
-}
-
-class _BusinessSection extends StatefulWidget {
-  const _BusinessSection({required this.business});
-
-  final GymBusinessSettings business;
-
-  @override
-  State<_BusinessSection> createState() => _BusinessSectionState();
-}
-
-class _BusinessSectionState extends State<_BusinessSection> {
-  late final _currencyController =
-      TextEditingController(text: widget.business.currency);
-  late final _symbolController =
-      TextEditingController(text: widget.business.currencySymbol);
-  late final _timezoneController =
-      TextEditingController(text: widget.business.timezone);
-  late String _dateFormat = widget.business.dateFormat;
-  late String _timeFormat = widget.business.timeFormat;
-  late MeasurementUnit _unit = widget.business.measurementUnit;
-  bool _saving = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _currencyController.dispose();
-    _symbolController.dispose();
-    _timezoneController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    setState(() {
-      _saving = true;
-      _error = null;
-    });
-    try {
-      await getIt<GymSettingsRepository>().updateBusinessSettings(
-        currency: _currencyController.text.trim(),
-        currencySymbol: _symbolController.text.trim(),
-        timezone: _timezoneController.text.trim(),
-        dateFormat: _dateFormat,
-        timeFormat: _timeFormat,
-        measurementUnit: _unit,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Business settings saved')),
-      );
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Business', style: AppText.eyebrow()),
-        const SizedBox(height: 10),
-        if (_error != null) ...[
-          FormAlert(message: _error!),
-          const SizedBox(height: 12),
-        ],
-        Row(
+      saveBar: (_access.canManage && _dirty)
+          ? SettingsSaveBar(
+              saving: _saving,
+              onSave: _save,
+              onDiscard: _discard,
+            )
+          : null,
+      main: [
+        if (!_access.canManage) const ReadOnlyNotice(),
+        const SetupProgressCard(),
+        TeamFormSection(
+          icon: Icons.storefront_rounded,
+          color: TeamColors.indigo,
+          title: 'Basic information',
+          subtitle: 'Identity and legal details',
           children: [
-            Expanded(
-              child: AppLabeledField(
-                label: 'Currency code',
-                hintText: 'e.g. INR',
-                controller: _currencyController,
+            _field(
+              'gymName',
+              'Gym name',
+              icon: Icons.fitness_center_rounded,
+              color: TeamColors.indigo,
+              cap: TextCapitalization.words,
+            ),
+            _field(
+              'legalBusinessName',
+              'Legal business name',
+              icon: Icons.gavel_rounded,
+              color: TeamColors.violet,
+              cap: TextCapitalization.words,
+            ),
+            _field(
+              'registrationNumber',
+              'Registration number',
+              icon: Icons.tag_rounded,
+              color: TeamColors.teal,
+            ),
+            _field(
+              'gstVatNumber',
+              'GST / VAT number',
+              icon: Icons.receipt_long_rounded,
+              color: TeamColors.green,
+            ),
+            _field(
+              'businessType',
+              'Business type',
+              icon: Icons.category_rounded,
+              color: TeamColors.amber,
+              hint: 'e.g. Fitness Center',
+              cap: TextCapitalization.words,
+            ),
+            _field(
+              'description',
+              'Description',
+              icon: Icons.notes_rounded,
+              color: TeamColors.slate,
+              maxLines: 5,
+              cap: TextCapitalization.sentences,
+            ),
+          ],
+        ),
+        TeamFormSection(
+          icon: Icons.contact_phone_rounded,
+          color: TeamColors.teal,
+          title: 'Contact information',
+          subtitle: 'How members and partners reach you',
+          children: [
+            _field(
+              'email',
+              'Email',
+              icon: Icons.mail_outline_rounded,
+              color: TeamColors.indigo,
+              keyboard: TextInputType.emailAddress,
+            ),
+            _field(
+              'website',
+              'Website',
+              icon: Icons.public_rounded,
+              color: TeamColors.sky,
+              keyboard: TextInputType.url,
+            ),
+            _field(
+              'phone',
+              'Phone',
+              icon: Icons.phone_outlined,
+              color: TeamColors.green,
+              keyboard: TextInputType.phone,
+            ),
+            _field(
+              'alternatePhone',
+              'Alternate phone',
+              icon: Icons.phone_forwarded_outlined,
+              color: TeamColors.teal,
+              keyboard: TextInputType.phone,
+            ),
+            _field(
+              'addressLine',
+              'Address',
+              icon: Icons.place_outlined,
+              color: TeamColors.rose,
+              cap: TextCapitalization.words,
+            ),
+            _field(
+              'city',
+              'City',
+              icon: Icons.location_city_rounded,
+              color: TeamColors.amber,
+              cap: TextCapitalization.words,
+            ),
+            _field(
+              'state',
+              'State',
+              icon: Icons.map_outlined,
+              color: TeamColors.violet,
+              cap: TextCapitalization.words,
+            ),
+            _field(
+              'country',
+              'Country',
+              icon: Icons.flag_outlined,
+              color: TeamColors.fuchsia,
+              cap: TextCapitalization.words,
+            ),
+            _field(
+              'postalCode',
+              'Postal code',
+              icon: Icons.markunread_mailbox_outlined,
+              color: TeamColors.slate,
+            ),
+            _field(
+              'latitude',
+              'Latitude',
+              icon: Icons.my_location_rounded,
+              color: TeamColors.indigo,
+              keyboard: const TextInputType.numberWithOptions(
+                decimal: true,
+                signed: true,
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: AppLabeledField(
-                label: 'Symbol',
-                hintText: 'e.g. ₹',
-                controller: _symbolController,
+            _field(
+              'longitude',
+              'Longitude',
+              icon: Icons.explore_outlined,
+              color: TeamColors.indigo,
+              keyboard: const TextInputType.numberWithOptions(
+                decimal: true,
+                signed: true,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 14),
-        AppLabeledField(
-          label: 'Timezone',
-          hintText: 'e.g. Asia/Kolkata',
-          controller: _timezoneController,
+        TeamFormSection(
+          icon: Icons.schedule_rounded,
+          color: TeamColors.amber,
+          title: 'Business hours',
+          subtitle: 'Opening and closing time for each day',
+          children: [
+            BusinessHoursEditor(
+              value: _hours,
+              disabled: !_access.canManage,
+              onChanged: (h) => setState(() => _hours = h),
+            ),
+          ],
         ),
-        const SizedBox(height: 14),
-        Text('Date format', style: AppText.eyebrow()),
-        const SizedBox(height: 8),
-        CategoryChipSelector<String>(
-          options: _dateFormats,
-          labelOf: (f) => f,
-          value: _dateFormat,
-          onChanged: (f) => setState(() => _dateFormat = f),
-        ),
-        const SizedBox(height: 14),
-        Text('Time format', style: AppText.eyebrow()),
-        const SizedBox(height: 8),
-        CategoryChipSelector<String>(
-          options: _timeFormats,
-          labelOf: (f) => f,
-          value: _timeFormat,
-          onChanged: (f) => setState(() => _timeFormat = f),
-        ),
-        const SizedBox(height: 14),
-        Text('Measurement unit', style: AppText.eyebrow()),
-        const SizedBox(height: 8),
-        CategoryChipSelector<MeasurementUnit>(
-          options: MeasurementUnit.values,
-          labelOf: (u) => u.label,
-          value: _unit,
-          onChanged: (u) => setState(() => _unit = u),
-        ),
-        const SizedBox(height: 18),
-        AppButton(
-          label: 'Save business settings',
-          loading: _saving,
-          onPressed: _save,
+        TeamFormSection(
+          icon: Icons.share_rounded,
+          color: TeamColors.fuchsia,
+          title: 'Social media links',
+          children: [
+            _field(
+              'facebook',
+              'Facebook',
+              icon: Icons.facebook_rounded,
+              color: const Color(0xFF1877F2),
+              keyboard: TextInputType.url,
+              hint: 'https://facebook.com/yourgym',
+            ),
+            _field(
+              'instagram',
+              'Instagram',
+              icon: Icons.camera_alt_outlined,
+              color: const Color(0xFFE1306C),
+              keyboard: TextInputType.url,
+              hint: 'https://instagram.com/yourgym',
+            ),
+            _field(
+              'twitter',
+              'Twitter / X',
+              icon: Icons.alternate_email_rounded,
+              color: TeamColors.sky,
+              keyboard: TextInputType.url,
+              hint: 'https://twitter.com/yourgym',
+            ),
+            _field(
+              'youtube',
+              'YouTube',
+              icon: Icons.smart_display_outlined,
+              color: const Color(0xFFFF0000),
+              keyboard: TextInputType.url,
+              hint: 'https://youtube.com/@yourgym',
+            ),
+            _field(
+              'linkedin',
+              'LinkedIn',
+              icon: Icons.work_outline_rounded,
+              color: const Color(0xFF0A66C2),
+              keyboard: TextInputType.url,
+              hint: 'https://linkedin.com/company/yourgym',
+            ),
+          ],
         ),
       ],
-    );
-  }
-}
-
-class _SocialLinksTile extends StatelessWidget {
-  const _SocialLinksTile({required this.profile, required this.onReturn});
-
-  final GymProfile profile;
-  final VoidCallback onReturn;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        onTap: () => context
-            .push(AppRoutes.gymSocialSettings, extra: profile.socialLinks)
-            .then((_) => onReturn()),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(AppRadii.card),
-            border: Border.all(color: AppColors.line),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.staffSoft,
-                  borderRadius: BorderRadius.circular(AppRadii.tile),
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.share_outlined,
-                  size: 18,
-                  color: AppColors.staffPillFg,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Social media',
-                      style: AppText.body(size: 13, weight: FontWeight.w700),
-                    ),
-                    Text(
-                      'Facebook, Instagram, Twitter, YouTube, LinkedIn',
-                      style: AppText.body(
-                        size: 11,
-                        color: AppColors.inkFaint,
-                        weight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: AppColors.inkFaint,
-              ),
-            ],
-          ),
+      aside: [
+        HoursChartCard(hours: _hours),
+        BusinessCardPreview(
+          gymName: _c['gymName']!.text,
+          businessType: _c['businessType']!.text,
+          description: _c['description']!.text,
+          email: _c['email']!.text,
+          phone: _c['phone']!.text,
+          website: _c['website']!.text,
+          address: address,
+          socialCount: _socialCount,
         ),
-      ),
+      ],
     );
   }
 }

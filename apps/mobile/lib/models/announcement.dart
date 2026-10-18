@@ -32,6 +32,10 @@ class Announcement {
     required this.publishedAt,
     required this.expiresAt,
     required this.createdAt,
+    this.branchId,
+    this.branchName,
+    this.publishAt,
+    this.createdByName,
   });
 
   final String id;
@@ -42,6 +46,16 @@ class Announcement {
   final DateTime? publishedAt;
   final DateTime? expiresAt;
   final DateTime createdAt;
+
+  /// Branch the announcement is targeted at; null = all branches.
+  final String? branchId;
+  final String? branchName;
+
+  /// When a SCHEDULED announcement goes out.
+  final DateTime? publishAt;
+  final String? createdByName;
+
+  bool get isPending => status == 'DRAFT' || status == 'SCHEDULED';
 
   factory Announcement.fromJson(Map<String, dynamic> json) => Announcement(
         id: json['id'] as String,
@@ -56,5 +70,13 @@ class Announcement {
             ? null
             : DateTime.parse(json['expiresAt'] as String),
         createdAt: DateTime.parse(json['createdAt'] as String),
+        branchId: (json['branch'] as Map<String, dynamic>?)?['id'] as String?,
+        branchName:
+            (json['branch'] as Map<String, dynamic>?)?['name'] as String?,
+        publishAt: json['publishAt'] == null
+            ? null
+            : DateTime.parse(json['publishAt'] as String),
+        createdByName:
+            (json['createdBy'] as Map<String, dynamic>?)?['name'] as String?,
       );
 }

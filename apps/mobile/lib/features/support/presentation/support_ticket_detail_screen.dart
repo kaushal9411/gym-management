@@ -9,17 +9,21 @@ import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/support_ticket.dart';
 import '../../../repositories/support_ticket_repository.dart';
-import '../../../shared/widgets/app_card.dart';
-import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../manager/presentation/widgets/member_detail_anim.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import 'support_ui.dart';
 
-const _statusTones = {
-  'OPEN': AppPillTone.warning,
-  'IN_PROGRESS': AppPillTone.roleTint,
-  'RESOLVED': AppPillTone.success,
-  'CLOSED': AppPillTone.neutral,
-};
-
+/// One ticket — web's ticket dialog as a page: a teal hero (status · priority,
+/// subject, who raised it and when), the status / priority tags, the
+/// description, and "Replies from our team" as a timeline (or "Waiting for our
+/// team" when there are none). Backs `GET /support/tickets/:id`
+/// (`support:view`).
+///
+/// Dropped vs web: nothing — web's dialog is read-only too. The design's
+/// "Write a reply" composer is not built because `/support/tickets` exposes
+/// only list / get / create; replies are added by the platform team from the
+/// admin console.
 class SupportTicketDetailScreen extends StatefulWidget {
   const SupportTicketDetailScreen({super.key, required this.ticketId});
 
@@ -50,157 +54,311 @@ class _SupportTicketDetailScreenState extends State<SupportTicketDetailScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not load the ticket ($e)');
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: _ticket == null
-            ? Text('Ticket', style: AppText.display(size: 18))
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _ticket!.subject,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.display(size: 18),
-                  ),
-                  Text(
-                    'Ticket #${_ticket!.id.substring(0, 8)} · '
-                    '${_ticket!.priority.label} priority',
-                    style: AppText.eyebrow(),
-                  ),
-                ],
-              ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: _error != null
-            ? AppErrorView(message: _error!, onRetry: _load)
-            : _ticket == null
-                ? const AppLoadingView()
-                : _buildContent(_ticket!),
-      ),
-    );
+  String _stamp(DateTime d) => '${fmtDate(d)} · ${_time(d)}';
+
+  String _time(DateTime d) {
+    final l = d.toLocal();
+    final h = l.hour % 12 == 0 ? 12 : l.hour % 12;
+    return '$h:${l.minute.toString().padLeft(2, '0')} '
+        '${l.hour < 12 ? 'AM' : 'PM'}';
   }
 
-  Widget _buildContent(SupportTicket ticket) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-      children: [
-        AppCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      ticket.subject,
-                      style: AppText.body(size: 15, weight: FontWeight.w700),
+  Widget _hero(double top, SupportTicket? t) {
+    return MeshHeroBackground(
+      radius: const BorderRadius.vertical(bottom: Radius.circular(30)),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          18 + teamSideInset(context),
+          top + 4,
+          18 + teamSideInset(context),
+          22,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () => Navigator.of(context).maybePop(),
+                  icon: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    t == null
+                        ? 'TICKET'
+                        : '${ticketStatusLabel(t.status)} · '
+                                '${t.priority.label} priority'
+                            .toUpperCase(),
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.eyebrow(
+                      color: Colors.white.withValues(alpha: 0.85),
                     ),
                   ),
-                  AppPill(
-                    label: ticket.status.replaceAll('_', ' '),
-                    tone: _statusTones[ticket.status] ?? AppPillTone.neutral,
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              t?.subject ?? 'Ticket details',
+              style: AppText.display(size: 22, color: Colors.white),
+            ),
+            if (t != null) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.person_outline_rounded,
+                          size: 13,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            t.createdByName ?? t.createdByEmail ?? 'You',
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.body(
+                              size: 12,
+                              weight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    'Raised ${_stamp(t.createdAt)}',
+                    style: AppText.body(
+                      size: 12,
+                      weight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                ticket.description,
-                style: AppText.body(size: 13, color: AppColors.inkSoft),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                '${ticket.priority.label} priority · Opened ${_formatDate(ticket.createdAt)}'
-                '${ticket.closedAt != null ? ' · Closed ${_formatDate(ticket.closedAt!)}' : ''}',
-                style: AppText.body(
-                  size: 11,
-                  color: AppColors.inkFaint,
-                  weight: FontWeight.w600,
-                ),
-              ),
             ],
-          ),
+          ],
         ),
-        const SizedBox(height: 16),
-        if (ticket.notes.isEmpty)
-          Text(
-            'No replies yet — the ${context.watch<PlatformConfigCubit>().state.appName} team will respond here.',
-            style: AppText.body(color: AppColors.inkFaint),
-          )
-        else
-          ...ticket.notes.map((note) => _ReplyBubble(note: note)),
-      ],
+      ),
     );
   }
 
-  String _formatDate(DateTime d) => '${d.day}/${d.month}/${d.year}';
-}
-
-/// A support-side reply, styled as the design's tinted "FitCloud Support"
-/// bubble. The design's "Write a reply… / Send reply" composer is not
-/// built: `/support/tickets` exposes only list/get/create — replies are
-/// added by FitCloud admins through the admin console, so a tenant has
-/// nothing to POST a reply to.
-class _ReplyBubble extends StatelessWidget {
-  const _ReplyBubble({required this.note});
-
-  final TicketNote note;
-
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0x298B5CF6), Color(0x14FF6B5B)],
-        ),
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: AppColors.glassBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final top = MediaQuery.of(context).padding.top;
+    final t = _ticket;
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      body: Column(
         children: [
-          Text(
-            '${note.authorName ?? '${context.watch<PlatformConfigCubit>().state.appName} Support'} · '
-            '${_relative(note.createdAt)}',
-            style: AppText.body(
-              size: 11,
-              weight: FontWeight.w800,
-              color: AppColors.staffPillFg,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            note.note,
-            style: AppText.body(size: 13, color: AppColors.ink),
+          _hero(top, t),
+          Expanded(
+            child: _error != null
+                ? AppErrorView(message: _error!, onRetry: _load)
+                : t == null
+                    ? const AppLoadingView()
+                    : RefreshIndicator(
+                        color: AppColors.staffB,
+                        backgroundColor: AppColors.surface2,
+                        onRefresh: _load,
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 28),
+                          children: [
+                            TeamCenter(
+                              maxWidth: 760,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                                child: _content(t),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
           ),
         ],
       ),
     );
   }
 
-  static String _relative(DateTime time) {
-    final diff = DateTime.now().difference(time);
-    if (diff.inMinutes < 1) return 'just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
-    if (diff.inHours < 24) {
-      return '${diff.inHours} hr${diff.inHours == 1 ? '' : 's'} ago';
-    }
-    if (diff.inDays == 1) return 'yesterday';
-    return '${diff.inDays} days ago';
+  Widget _content(SupportTicket t) {
+    final platform = context.watch<PlatformConfigCubit>().state.appName;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            TeamTag(
+              label: ticketStatusLabel(t.status),
+              color: ticketStatusColor(t.status),
+              icon: ticketStatusIcon(t.status),
+            ),
+            TeamTag(
+              label: t.priority.label,
+              color: ticketPriorityColor(t.priority),
+              icon: ticketPriorityIcon(t.priority),
+            ),
+            if (t.closedAt != null)
+              TeamTag(
+                label: 'Closed ${fmtDate(t.closedAt)}',
+                color: TeamColors.slate,
+                icon: Icons.lock_outline_rounded,
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface2,
+            borderRadius: BorderRadius.circular(AppRadii.card),
+            border: Border.all(color: AppColors.line),
+          ),
+          child: Text(
+            t.description,
+            style: AppText.body(size: 13.5, color: AppColors.ink),
+          ),
+        ),
+        const SizedBox(height: 22),
+        Text('REPLIES FROM OUR TEAM', style: AppText.eyebrow()),
+        const SizedBox(height: 12),
+        if (t.notes.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 26),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadii.card),
+              border: Border.all(color: AppColors.line),
+            ),
+            child: Column(
+              children: [
+                Icon(Icons.hourglass_empty_rounded, color: AppColors.inkFaint),
+                const SizedBox(height: 6),
+                Text(
+                  'Waiting for our team',
+                  style: AppText.body(size: 14, weight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "No replies yet — we'll respond here as soon as we can.",
+                  textAlign: TextAlign.center,
+                  style: AppText.body(size: 12.5, color: AppColors.inkFaint),
+                ),
+              ],
+            ),
+          )
+        else
+          for (final n in t.notes)
+            _Reply(
+              note: n,
+              author: n.authorName ?? '$platform team',
+              stamp: _stamp(n.createdAt),
+            ),
+      ],
+    );
+  }
+}
+
+/// One reply on the timeline: initials avatar and a bordered bubble.
+class _Reply extends StatelessWidget {
+  const _Reply({
+    required this.note,
+    required this.author,
+    required this.stamp,
+  });
+
+  final TicketNote note;
+  final String author;
+  final String stamp;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = TeamColors.rotation[
+        author.codeUnits.fold<int>(0, (a, c) => a + c) %
+            TeamColors.rotation.length];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            child: Text(
+              supportInitials(author),
+              style: AppText.body(
+                size: 12,
+                weight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surface2,
+                borderRadius: BorderRadius.circular(AppRadii.card),
+                border: Border.all(color: AppColors.line),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    author,
+                    style: AppText.body(size: 12.5, weight: FontWeight.w800),
+                  ),
+                  Text(
+                    stamp,
+                    style: AppText.body(
+                      size: 11,
+                      color: AppColors.inkFaint,
+                      weight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    note.note,
+                    style: AppText.body(size: 13, color: AppColors.ink),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

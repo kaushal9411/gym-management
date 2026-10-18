@@ -5,6 +5,8 @@ import '../core/storage/secure_storage.dart';
 import '../models/mfa_setup.dart';
 import '../models/staff_login_result.dart';
 import '../models/user_profile.dart';
+import '../models/login_history_entry.dart';
+import '../models/paginated_result.dart';
 import '../models/user_session.dart';
 
 /// Staff auth plane — `/auth/*` (Owner/Manager/Trainer/Receptionist).
@@ -188,10 +190,8 @@ class AuthRepository {
     }
   }
 
-  /// `GET /auth/sessions` — active devices only. The backend has no
-  /// separate login-history endpoint (past, revoked sessions aren't
-  /// queryable), so frame "11f. Sessions"'s history list has no mobile
-  /// counterpart — only its active-devices half is real here.
+  /// `GET /auth/sessions` — active devices only; past sign-ins come from
+  /// [loginHistory].
   Future<List<UserSession>> listSessions() async {
     try {
       final response = await _dio.get<Map<String, dynamic>>('/auth/sessions');
@@ -199,6 +199,36 @@ class AuthRepository {
       return list
           .map((e) => UserSession.fromJson(e as Map<String, dynamic>))
           .toList();
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /sessions/login-history` — the account's own recent sign-in
+  /// attempts (successes and failures), newest first.
+  Future<PaginatedResult<LoginHistoryEntry>> loginHistory({
+    int page = 1,
+    int limit = 10,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/sessions/login-history',
+        queryParameters: {'page': page, 'limit': limit},
+      );
+      return PaginatedResult.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+        LoginHistoryEntry.fromJson,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `POST /auth/logout-all` — revokes every session including this one;
+  /// the caller then clears the local session.
+  Future<void> logoutAllDevices() async {
+    try {
+      await _dio.post<void>('/auth/logout-all');
     } on DioException catch (e) {
       throw _mapError(e);
     }

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
+import '../models/message_log_item.dart';
 import '../models/notification_stats.dart';
 import '../models/notification_template.dart';
 import '../models/paginated_result.dart';
@@ -89,6 +90,43 @@ class TenantNotificationRepository {
   Future<void> markAllRead() async {
     try {
       await _dio.post<void>('/notifications/read-all');
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `DELETE /notifications/:id` — perm `notifications:manage` (web's
+  /// per-row delete on the inbox).
+  Future<void> delete(String id) async {
+    try {
+      await _dio.delete<void>('/notifications/$id');
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /notifications/message-log` (perm `notifications:view`) — every
+  /// Email / SMS / WhatsApp send attempt, newest first. [channel] / [status]
+  /// are the API's upper-case values; null = all.
+  Future<PaginatedResult<MessageLogItem>> messageLog({
+    int page = 1,
+    int limit = 20,
+    String? channel,
+    String? status,
+  }) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/notifications/message-log',
+        queryParameters: {
+          'page': page,
+          'limit': limit,
+          if (channel != null) 'channel': channel,
+          if (status != null) 'status': status,
+        },
+      );
+      return MessageLogItem.page(
+        response.data!['data'] as Map<String, dynamic>,
+      );
     } on DioException catch (e) {
       throw _mapError(e);
     }

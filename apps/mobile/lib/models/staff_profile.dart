@@ -65,6 +65,8 @@ class StaffProfile {
     required this.mfaEnabled,
     required this.branchAccess,
     required this.lastLoginAt,
+    this.emailVerifiedAt,
+    this.createdAt,
   });
 
   final String id;
@@ -78,6 +80,8 @@ class StaffProfile {
   final bool mfaEnabled;
   final BranchAccess branchAccess;
   final String? lastLoginAt;
+  final String? emailVerifiedAt;
+  final String? createdAt;
 
   factory StaffProfile.fromJson(Map<String, dynamic> json) => StaffProfile(
         id: json['id'] as String,
@@ -97,5 +101,7 @@ class StaffProfile {
           json['branchAccess'] as Map<String, dynamic>? ?? const {},
         ),
         lastLoginAt: json['lastLoginAt'] as String?,
+        emailVerifiedAt: json['emailVerifiedAt'] as String?,
+        createdAt: json['createdAt'] as String?,
       );
 }

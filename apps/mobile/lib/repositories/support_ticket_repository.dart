@@ -91,6 +91,24 @@ class SupportTicketRepository {
     }
   }
 
+  /// `GET /public/cms/pages?type=FAQ` — published FAQ pages (no auth needed;
+  /// web's help centre reads the same endpoint).
+  Future<List<FaqItem>> faqs() async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/public/cms/pages',
+        queryParameters: {'type': 'FAQ'},
+      );
+      final list = response.data!['data'] as List;
+      return [
+        for (final e in list)
+          if (FaqItem.tryParse(e as Map<String, dynamic>) case final f?) f,
+      ];
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   ApiException _mapError(DioException e) {
     if (e.type == DioExceptionType.connectionError ||
         e.type == DioExceptionType.connectionTimeout) {

@@ -6,6 +6,10 @@ class GymBranding {
     required this.secondaryColor,
     required this.theme,
     required this.welcomeMessage,
+    this.faviconUrl,
+    this.loginBackgroundUrl,
+    this.dashboardBannerUrl,
+    this.emailLogoUrl,
   });
 
   final String? logoUrl;
@@ -13,6 +17,19 @@ class GymBranding {
   final String? secondaryColor;
   final String theme;
   final String? welcomeMessage;
+  final String? faviconUrl;
+  final String? loginBackgroundUrl;
+  final String? dashboardBannerUrl;
+  final String? emailLogoUrl;
+
+  /// How many of web's five brand images are uploaded (setup progress).
+  int get imageCount => [
+        logoUrl,
+        faviconUrl,
+        loginBackgroundUrl,
+        dashboardBannerUrl,
+        emailLogoUrl,
+      ].where((u) => u != null && u.isNotEmpty).length;
 
   factory GymBranding.fromJson(Map<String, dynamic> json) => GymBranding(
         logoUrl: json['logoUrl'] as String?,
@@ -20,6 +37,10 @@ class GymBranding {
         secondaryColor: json['secondaryColor'] as String?,
         theme: json['theme'] as String? ?? 'SYSTEM',
         welcomeMessage: json['welcomeMessage'] as String?,
+        faviconUrl: json['faviconUrl'] as String?,
+        loginBackgroundUrl: json['loginBackgroundUrl'] as String?,
+        dashboardBannerUrl: json['dashboardBannerUrl'] as String?,
+        emailLogoUrl: json['emailLogoUrl'] as String?,
       );
 }
 

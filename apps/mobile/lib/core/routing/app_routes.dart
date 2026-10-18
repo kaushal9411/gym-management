@@ -17,6 +17,7 @@ class AppRoutes {
   static const profileEmergencyContact = '/profile/me/emergency-contact';
   static const profileNotifications = '/profile/me/notifications';
   static const profileChangePassword = '/profile/me/change-password';
+  static const profileSecurity = '/profile/me/security';
   static const profilePermissions = '/profile/me/permissions';
 
   static const branches = '/branches';
@@ -67,6 +68,7 @@ class AppRoutes {
 
   static const notifications = '/notifications';
   static const notificationTemplates = '/notifications/templates';
+  static const messageLog = '/notifications/log';
   static const editNotificationTemplate = '/notifications/templates/edit';
   static const announcements = '/announcements';
   static const announcementForm = '/announcements/form';
@@ -95,8 +97,9 @@ class AppRoutes {
   static const billingAddress = '/billing/address';
   static const gymSettings = '/settings';
   static const gymProfileSettings = '/settings/profile';
-  static const gymSocialSettings = '/settings/profile/social';
+  static const businessSettings = '/settings/business';
   static const brandingSettings = '/settings/branding';
+  static const aiSettings = '/settings/ai';
   static const invoiceSettings = '/settings/invoice';
   static const securityPolicySettings = '/settings/security';
   static const sessions = '/settings/sessions';
