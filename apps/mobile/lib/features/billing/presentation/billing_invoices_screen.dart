@@ -47,7 +47,7 @@ class InvoiceTotals {
   final Map<String, int> counts;
 
   factory InvoiceTotals.from(List<FitCloudInvoice> list) {
-    final currency = list.isEmpty ? 'USD' : list.first.currency;
+    final currency = list.isEmpty ? 'INR' : list.first.currency;
     final billable = list
         .where(
           (i) =>

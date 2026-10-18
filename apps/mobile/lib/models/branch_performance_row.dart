@@ -1,4 +1,7 @@
+import 'payments_analytics.dart' show jsonInt, jsonMoney;
+
 /// Mirrors `BranchPerformanceRow` (`GET /reports/branch-performance`).
+/// `monthlyRevenue` is a DECIMAL string (month to date).
 class BranchPerformanceRow {
   const BranchPerformanceRow({
     required this.branchId,
@@ -20,12 +23,12 @@ class BranchPerformanceRow {
 
   factory BranchPerformanceRow.fromJson(Map<String, dynamic> json) =>
       BranchPerformanceRow(
-        branchId: json['branchId'] as String,
-        branch: json['branch'] as String,
-        totalMembers: json['totalMembers'] as int? ?? 0,
-        activeMembers: json['activeMembers'] as int? ?? 0,
-        monthlyRevenue: double.parse(json['monthlyRevenue'] as String),
-        monthlyAttendance: json['monthlyAttendance'] as int? ?? 0,
-        staffCount: json['staffCount'] as int? ?? 0,
+        branchId: json['branchId']?.toString() ?? '',
+        branch: json['branch']?.toString() ?? '',
+        totalMembers: jsonInt(json['totalMembers']),
+        activeMembers: jsonInt(json['activeMembers']),
+        monthlyRevenue: jsonMoney(json['monthlyRevenue']),
+        monthlyAttendance: jsonInt(json['monthlyAttendance']),
+        staffCount: jsonInt(json['staffCount']),
       );
 }

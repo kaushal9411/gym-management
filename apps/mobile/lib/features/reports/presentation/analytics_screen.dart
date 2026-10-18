@@ -5,20 +5,17 @@ import 'package:go_router/go_router.dart';
 import '../../../bloc/session/session_cubit.dart';
 import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
-import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/branch_comparison_row.dart';
-import '../../../models/branch_option.dart';
+import '../../../models/report_summary.dart' show ReportSummaryFilters;
 import '../../../repositories/analytics_repository.dart';
-import '../../../repositories/branch_repository.dart';
 import '../../../shared/widgets/list_hero.dart';
-import '../../income/presentation/income_filters.dart';
-import '../../income/presentation/income_ui.dart';
 import '../../team/presentation/widgets/team_ui.dart';
-import 'analytics/analytics_chart.dart';
+import 'analytics/analytics_branch_parts.dart';
 import 'analytics/analytics_logic.dart';
-import 'analytics/analytics_view_parts.dart';
+import 'analytics/analytics_view_chart.dart';
+import 'kit/kit.dart';
 
 /// One loaded series view: merged rows (current + previous) or its status.
 class _Series {
@@ -56,39 +53,45 @@ class _Branches {
 /// button — or a single view in focus with its four stat tiles and a large
 /// chart. Branch Comparison has its own ranking view with a metric switcher.
 ///
+/// Built on the report kit (`kit/`): [RptPeriodController] + [RptPeriodBar],
+/// [RptChartCard], [RptKpiGrid], [RptTrendChart] / [RptMultiSeriesChart] (via
+/// [AnalyticsViewChart]), [RptHBarChart] and [RptGroupedBarChart].
+///
 /// Data: the same `/analytics/*` endpoints web calls (revenue-trends,
 /// attendance-trends, membership-growth, new-member-growth, retention,
 /// payment-collection, branch-comparison), for the selected range and — when
 /// comparing — the previous range of equal length. Views load lazily: the
-/// overview loads all of them, a focused view only its own.
+/// overview loads all of them, a focused view only its own. Ranges over 366
+/// days (the API's cap) are flagged by the period bar and not requested.
 ///
 /// Gating: unchanged menu/route gating (`analytics:view`); like web's page the
 /// screen itself also shows "You don't have access to analytics." without that
-/// key (the API would answer 403 anyway).
+/// key (the API would answer 403 anyway) and makes no request.
 ///
-/// **Dropped vs web**: the CSV / Excel / PDF export buttons on a focused view —
-/// the app has no file-saving / sharing package (same documented omission as
-/// the other report screens); chart hover tooltips (tap / drag inspection
-/// replaces them); the header-branch seeding (mobile has no global branch
-/// selector, so the branch starts as "All branches").
+/// [initialView] opens a view directly (the Reports Center's analytics
+/// catalogue cards pass it as the route `extra`); null = Overview.
 ///
-/// The previous Analytics screen (6-month new members, revenue-by-method
-/// donut, revenue by branch) showed things web's Analytics page does not, so
-/// it was replaced rather than extended.
+/// **Export** (`reports:export`, like web): a focused view's hero gets the
+/// "Export" pill (PDF / Excel / CSV / Print of `analytics-<view>` for the
+/// selected range + branch); the Overview has none.
+///
+/// **Dropped vs web**: chart hover tooltips (tap / drag inspection replaces
+/// them); the header-branch seeding (mobile has no global branch selector, so
+/// the branch starts as "All branches").
 class AnalyticsScreen extends StatefulWidget {
-  const AnalyticsScreen({super.key});
+  const AnalyticsScreen({super.key, this.initialView});
+
+  final AnalyticsView? initialView;
 
   @override
   State<AnalyticsScreen> createState() => _AnalyticsScreenState();
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
-  AnalyticsView? _view; // null = Overview
-  IncomePeriod _period = IncomePeriod.thisMonth;
-  DateTimeRange? _custom;
-  bool _compare = true;
-  String? _branchId;
-  List<BranchOption> _branches = [];
+  late AnalyticsView? _view = widget.initialView; // null = Overview
+  final _controls = RptPeriodController();
+  String _lastScope = '';
+  bool _lastCompare = true;
 
   /// Bumped on every scope change so late responses for an old scope are
   /// ignored.
@@ -96,8 +99,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   final Map<AnalyticsView, _Series> _series = {};
   _Branches? _branchData;
 
-  ({String from, String to}) get _range => incomeRange(_period, _custom);
-  bool get _rangeReady => _range.from.compareTo(_range.to) <= 0;
+  ({String from, String to}) get _range => _controls.range;
+  bool get _compare => _controls.compare;
 
   List<AnalyticsView> get _active =>
       _view == null ? AnalyticsView.values : [_view!];
@@ -113,30 +116,47 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   @override
   void initState() {
     super.initState();
+    _lastScope = _controls.scope;
+    _lastCompare = _controls.compare;
+    _controls.addListener(_onControls);
     if (!_allowed) return;
-    _loadBranchOptions();
+    _controls.loadBranches();
     _ensureLoaded();
   }
 
-  Future<void> _loadBranchOptions() async {
-    try {
-      final options = await getIt<BranchRepository>().assignable();
-      if (mounted) setState(() => _branches = options);
-    } on ApiException {
-      // Non-fatal: the branch picker just offers "All branches".
-    } catch (_) {}
+  @override
+  void dispose() {
+    _controls
+      ..removeListener(_onControls)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _onControls() {
+    final scopeChanged = _controls.scope != _lastScope;
+    final compareChanged = _controls.compare != _lastCompare;
+    _lastScope = _controls.scope;
+    _lastCompare = _controls.compare;
+    if (!_allowed) return;
+    // Turning Compare on needs the previous-period data; turning it off just
+    // hides it.
+    if (scopeChanged || (compareChanged && _controls.compare)) {
+      _reload();
+    } else if (mounted) {
+      setState(() {});
+    }
   }
 
   void _reload() {
     _scope++;
     _series.clear();
     _branchData = null;
-    setState(() {});
+    if (mounted) setState(() {});
     _ensureLoaded();
   }
 
   void _ensureLoaded() {
-    if (!_rangeReady) return;
+    if (!_controls.rangeReady) return;
     for (final v in _active) {
       if (v == AnalyticsView.branches) {
         if (_branchData == null) _loadBranches();
@@ -156,7 +176,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final repo = getIt<AnalyticsRepository>();
     final f = _d(from);
     final t = _d(to);
-    final b = _branchId;
+    final b = _controls.branchId;
     switch (v) {
       case AnalyticsView.revenue:
         return AnalyticsPoint.fromMoney(
@@ -221,11 +241,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final r = _range;
     final prev = previousRange(r.from, r.to);
     final repo = getIt<AnalyticsRepository>();
+    final branch = _controls.branchId;
     try {
       final current = await repo.branchComparison(
         from: _d(r.from),
         to: _d(r.to),
-        branchId: _branchId,
+        branchId: branch,
       );
       List<BranchComparisonRow>? previous;
       if (_compare) {
@@ -233,7 +254,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           previous = await repo.branchComparison(
             from: _d(prev.from),
             to: _d(prev.to),
-            branchId: _branchId,
+            branchId: branch,
           );
         } catch (_) {
           previous = null;
@@ -273,58 +294,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         );
       }
     });
-  }
-
-  void _setPeriod(IncomePeriod p) {
-    _period = p;
-    _reload();
-  }
-
-  Future<void> _pickCustom() async {
-    final now = DateTime.now();
-    final r = _range;
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(now.year + 1),
-      initialDateRange: _period == IncomePeriod.custom
-          ? _custom
-          : DateTimeRange(start: _d(r.from), end: _d(r.to)),
-    );
-    if (picked == null) return;
-    _custom = picked;
-    _period = IncomePeriod.custom;
-    _reload();
-  }
-
-  Future<void> _pickBranch() async {
-    final v = await pickOneSheet(
-      context,
-      title: 'Branch',
-      options: [for (final b in _branches) (b.id, b.name)],
-      current: _branchId,
-      clearLabel: 'All branches',
-    );
-    if (v == null) return;
-    _branchId = v.isEmpty ? null : v;
-    _reload();
-  }
-
-  void _setCompare(bool v) {
-    _compare = v;
-    // Turning it on needs the previous-period data; turning it off just
-    // hides it.
-    if (v) {
-      _reload();
-    } else {
-      setState(() {});
-    }
-  }
-
-  String get _customLabel {
-    final c = _custom;
-    if (c == null) return 'Custom…';
-    return '${dayMonth(c.start)} – ${dayMonth(c.end)}';
   }
 
   // ── build ─────────────────────────────────────────────────────────────────
@@ -372,21 +341,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           children: [
                             _tabs(),
                             const SizedBox(height: 12),
-                            IncomePeriodBar(
-                              period: _period,
-                              customLabel: _customLabel,
-                              onPeriod: _setPeriod,
-                              onCustom: _pickCustom,
-                              branchId: _branchId,
-                              branches: _branches,
-                              onBranch: _pickBranch,
-                              compare: _compare,
-                              onCompare: _setCompare,
+                            RptPeriodBar(
+                              controller: _controls,
+                              accent: RptColors.indigo,
                             ),
-                            if (_compare && _rangeReady) ...[
-                              const SizedBox(height: 8),
-                              _compareNote(),
-                            ],
                             const SizedBox(height: 14),
                             _content(),
                           ],
@@ -413,6 +371,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         icon: Icons.arrow_back_rounded,
         onTap: () => context.pop(),
       ),
+      // Like web, export only appears on a focused view (the Overview shows
+      // all seven at once and has nothing single to export).
+      trailing: [
+        if (v != null && _allowed)
+          RptExportButton(
+            spec: RptExportSpec(
+              reportType: v.exportType,
+              title: v.title,
+              filters: () => ReportSummaryFilters(
+                from: DateTime.parse(_range.from),
+                to: DateTime.parse(_range.to),
+                branchId: _controls.branchId,
+              ),
+              enabled: _controls.rangeReady,
+            ),
+          ),
+      ],
       chips: chips,
     );
   }
@@ -502,106 +477,53 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  Widget _compareNote() {
-    final p = previousRange(_range.from, _range.to);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Text(
-        'Previous period: ${analyticsShortDate(p.from)} – '
-        '${analyticsShortDate(p.to)}. Dashed lines show the previous period '
-        'of equal length.',
-        style: AppText.body(
-          size: 11.5,
-          color: AppColors.inkFaint,
-          weight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-
   Widget _content() {
-    if (!_rangeReady) {
-      return const AnalyticsCard(
+    if (!_controls.rangeReady) {
+      return const RptChartCard(
         title: 'Pick a valid range',
-        color: TeamColors.slate,
+        color: RptColors.slate,
         icon: Icons.date_range_rounded,
         empty: true,
-        emptyText: 'Pick a valid date range (start on or before end).',
+        emptyText: 'Pick a valid date range (start on or before end, at most '
+            '$kRptMaxRangeDays days).',
         child: SizedBox.shrink(),
       );
     }
     final v = _view;
-    if (v == null) {
-      return _overviewGrid();
-    }
+    if (v == null) return _overviewGrid();
     return _focus(v);
   }
 
   /// One column on phones; two on tablets (the branch card spans both).
-  /// Plain columns, not `TeamAdaptive` — that one measures its children with
-  /// `IntrinsicHeight`, which the charts' `LayoutBuilder` can't support.
   Widget _overviewGrid() {
-    final series = [
-      for (final v in AnalyticsView.values)
-        if (v != AnalyticsView.branches) _overviewCard(v),
-    ];
-    final branch = _overviewCard(AnalyticsView.branches);
-    return LayoutBuilder(
-      builder: (context, box) {
-        if (box.maxWidth < 700) {
-          return Column(
-            children: [
-              for (final w in [...series, branch]) ...[
-                w,
-                const SizedBox(height: 12),
-              ],
-            ],
-          );
-        }
-        Widget col(int parity) => Expanded(
-              child: Column(
-                children: [
-                  for (var i = parity; i < series.length; i += 2) ...[
-                    series[i],
-                    const SizedBox(height: 12),
-                  ],
-                ],
-              ),
-            );
-        return Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [col(0), const SizedBox(width: 12), col(1)],
-            ),
-            branch,
-          ],
-        );
-      },
+    return RptPanelGrid(
+      panels: [
+        for (final v in AnalyticsView.values)
+          if (v != AnalyticsView.branches) RptPanel(_overviewCard(v)),
+        RptPanel(full: true, _overviewCard(AnalyticsView.branches)),
+      ],
     );
   }
 
-  int get _days {
-    final r = _range;
-    return _d(r.to).difference(_d(r.from)).inDays + 1;
-  }
+  int get _days => _controls.days;
 
   // ── overview ──────────────────────────────────────────────────────────────
 
   Widget _overviewCard(AnalyticsView v) {
     if (v == AnalyticsView.branches) {
       final b = _branchData;
-      return AnalyticsCard(
+      return RptChartCard(
         title: v.title,
         subtitle: v.subtitle,
         color: v.color,
         icon: v.icon,
         loading: b == null || b.loading,
         error: b?.error ?? false,
+        errorText: 'Could not load this view.',
         empty: b != null && !b.loading && !b.error && b.current.isEmpty,
         emptyText: 'No branch data for this period.',
         onRetry: _loadBranches,
-        trailing: AnalyticsDeepDive(label: v.title, onTap: () => _setView(v)),
+        actions: AnalyticsDeepDive(label: v.title, onTap: () => _setView(v)),
         child: AnalyticsBranchBars(
           rows: b?.current ?? const [],
           previous: b?.previous,
@@ -619,45 +541,32 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final prevBasis = stats == null
         ? null
         : (v.isSnapshot ? stats.prevLatest : stats.prevTotal);
-    return AnalyticsCard(
+    return RptChartCard(
       title: v.title,
       subtitle: v.subtitle,
       color: v.color,
       icon: v.icon,
       loading: loading,
       error: s?.error ?? false,
+      errorText: 'Could not load this view.',
       empty: !loading && !s.error && s.rows.isEmpty,
       onRetry: () => _loadSeries(v),
-      trailing: Row(
+      actions: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (_compare && stats != null) ...[
-            AnalyticsDeltaChip(value: basis, previous: prevBasis),
+            RptDeltaBadge(value: basis, previous: prevBasis),
             const SizedBox(width: 6),
           ],
           AnalyticsDeepDive(label: v.title, onTap: () => _setView(v)),
         ],
       ),
-      child: _chart(v, s?.rows ?? const [], 190),
-    );
-  }
-
-  Widget _chart(AnalyticsView v, List<AnalyticsRow> rows, double height) {
-    final dual = v.dual;
-    return AnalyticsTrendChart(
-      rows: rows,
-      format: v.format,
-      color: v.color,
-      labelA: dual?.$1 ?? v.seriesLabel,
-      colorB: dual == null
-          ? null
-          : (v == AnalyticsView.collection
-              ? TeamColors.amber
-              : TeamColors.rose),
-      labelB: dual?.$2,
-      compare: _compare,
-      lineOnly: v.lineOnly,
-      height: height,
+      child: AnalyticsViewChart(
+        view: v,
+        rows: s?.rows ?? const [],
+        compare: _compare,
+        height: 190,
+      ),
     );
   }
 
@@ -667,16 +576,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final r = _range;
     if (v == AnalyticsView.branches) {
       final b = _branchData;
-      return AnalyticsCard(
+      return RptChartCard(
         title: v.title,
         subtitle: '${r.from} – ${r.to}',
         color: v.color,
         icon: v.icon,
         loading: b == null || b.loading,
         error: b?.error ?? false,
+        errorText: 'Could not load this view.',
         empty: b != null && !b.loading && !b.error && b.current.isEmpty,
         emptyText: 'No branch data for this period.',
         onRetry: _loadBranches,
+        minHeight: 260,
         child: AnalyticsBranchFocus(
           rows: b?.current ?? const [],
           previous: b?.previous,
@@ -694,19 +605,31 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (stats != null) ...[
-          _statTiles(v, stats),
+          LayoutBuilder(
+            builder: (context, box) => RptKpiGrid(
+              columns: box.maxWidth >= 700 ? 4 : 2,
+              kpis: _statTiles(v, stats),
+            ),
+          ),
           const SizedBox(height: 12),
         ],
-        AnalyticsCard(
+        RptChartCard(
           title: v.title,
           subtitle: '${r.from} – ${r.to}',
           color: v.color,
           icon: v.icon,
           loading: loading,
           error: failed,
+          errorText: 'Could not load this view.',
           empty: !loading && !failed && s.rows.isEmpty,
           onRetry: () => _loadSeries(v),
-          child: _chart(v, s?.rows ?? const [], 260),
+          minHeight: 280,
+          child: AnalyticsViewChart(
+            view: v,
+            rows: s?.rows ?? const [],
+            compare: _compare,
+            height: 260,
+          ),
         ),
       ],
     );
@@ -714,11 +637,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   /// Web's `ViewStatsRow`: four tiles — total/latest, average, peak day and
   /// the change vs previous (or the span when not comparing).
-  Widget _statTiles(AnalyticsView v, AnalyticsStats st) {
-    final f = v.format;
-    final money = f == AnalyticsFormat.money;
+  List<RptKpi> _statTiles(AnalyticsView v, AnalyticsStats st) {
+    final f = v.format.rpt;
+    final money = v.format == AnalyticsFormat.money;
     final c = v.color;
-    final tiles = <Widget>[];
     final dual = v.dual;
     if (dual != null) {
       final isRate = v == AnalyticsView.collection;
@@ -727,8 +649,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final prevRate = st.prevTotal != null && (st.prevTotalB ?? 0) != 0
           ? st.prevTotal! / st.prevTotalB! * 100
           : null;
-      tiles.addAll([
-        AnalyticsStatTile(
+      return [
+        RptKpi(
           label: 'Total ${dual.$1.toLowerCase()}',
           value: st.total,
           format: f,
@@ -737,7 +659,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           color: c,
           compact: true,
         ),
-        AnalyticsStatTile(
+        RptKpi(
           label: 'Total ${dual.$2.toLowerCase()}',
           value: tb,
           format: f,
@@ -748,17 +670,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           compact: true,
         ),
         if (isRate)
-          AnalyticsStatTile(
+          RptKpi(
             label: 'Collection rate',
             value: rate,
-            format: AnalyticsFormat.percent,
+            format: RptFormat.percent,
             previous: prevRate,
             icon: Icons.speed_rounded,
             color: c,
             hint: 'collected / invoiced',
           )
         else
-          AnalyticsStatTile(
+          RptKpi(
             label: 'Net',
             value: st.total - tb,
             format: f,
@@ -769,7 +691,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             color: c,
             compact: true,
           ),
-        AnalyticsStatTile(
+        RptKpi(
           label: 'Peak ${dual.$1.toLowerCase()} day',
           value: st.peak,
           format: f,
@@ -778,70 +700,54 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           compact: true,
           hint: st.peakDate.isEmpty ? null : analyticsShortDate(st.peakDate),
         ),
-      ]);
-    } else {
-      final snap = v.isSnapshot;
-      tiles.addAll([
-        AnalyticsStatTile(
-          label: snap ? 'Latest' : 'Total',
-          value: snap ? st.latest : st.total,
-          format: f,
-          previous: snap ? st.prevLatest : st.prevTotal,
-          icon: Icons.functions_rounded,
-          color: c,
-          compact: money,
-        ),
-        AnalyticsStatTile(
-          label: 'Daily average',
-          value: st.average,
-          format: f,
-          previous: st.prevAverage,
-          icon: Icons.show_chart_rounded,
-          color: c,
-          compact: money,
-        ),
-        AnalyticsStatTile(
-          label: 'Peak day',
-          value: st.peak,
-          format: f,
-          icon: Icons.trending_up_rounded,
-          color: c,
-          compact: money,
-          hint: st.peakDate.isEmpty ? null : analyticsShortDate(st.peakDate),
-        ),
-        if (_compare && st.change != null)
-          AnalyticsStatTile(
-            label: 'Change vs previous',
-            value: st.change!,
-            format: AnalyticsFormat.percent,
-            icon: Icons.speed_rounded,
-            color: c,
-            hint: snap ? 'latest vs latest' : 'total vs total',
-          )
-        else
-          AnalyticsStatTile(
-            label: 'Days in range',
-            value: _days.toDouble(),
-            format: AnalyticsFormat.number,
-            icon: Icons.calendar_today_rounded,
-            color: c,
-            hint: _compare ? 'no previous data' : null,
-          ),
-      ]);
+      ];
     }
-    return LayoutBuilder(
-      builder: (context, box) {
-        final cols = box.maxWidth >= 700 ? 4 : 2;
-        const gap = 10.0;
-        final w = (box.maxWidth - gap * (cols - 1)) / cols;
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
-          children: [
-            for (final t in tiles) SizedBox(width: w, height: 118, child: t),
-          ],
-        );
-      },
-    );
+    final snap = v.isSnapshot;
+    return [
+      RptKpi(
+        label: snap ? 'Latest' : 'Total',
+        value: snap ? st.latest : st.total,
+        format: f,
+        previous: snap ? st.prevLatest : st.prevTotal,
+        icon: Icons.functions_rounded,
+        color: c,
+        compact: money,
+      ),
+      RptKpi(
+        label: 'Daily average',
+        value: st.average,
+        format: f,
+        previous: st.prevAverage,
+        icon: Icons.show_chart_rounded,
+        color: c,
+        compact: money,
+      ),
+      RptKpi(
+        label: 'Peak day',
+        value: st.peak,
+        format: f,
+        icon: Icons.trending_up_rounded,
+        color: c,
+        compact: money,
+        hint: st.peakDate.isEmpty ? null : analyticsShortDate(st.peakDate),
+      ),
+      if (_compare && st.change != null)
+        RptKpi(
+          label: 'Change vs previous',
+          value: st.change!,
+          format: RptFormat.percent,
+          icon: Icons.speed_rounded,
+          color: c,
+          hint: snap ? 'latest vs latest' : 'total vs total',
+        )
+      else
+        RptKpi(
+          label: 'Days in range',
+          value: _days.toDouble(),
+          icon: Icons.calendar_today_rounded,
+          color: c,
+          hint: _compare ? 'no previous data' : null,
+        ),
+    ];
   }
 }

@@ -23,7 +23,7 @@ export default function PaymentHistoryPage() {
   const derived = React.useMemo(() => {
     const list = payments ?? [];
     const paid = list.filter((p) => p.status === 'SUCCEEDED');
-    const currency = list[0]?.currency ?? 'USD';
+    const currency = list[0]?.currency ?? 'INR';
     const sameCurrency = paid.filter((p) => p.currency === currency);
     const total = sameCurrency.reduce((s, p) => s + p.amount, 0);
     const failed = list.filter((p) => p.status === 'FAILED').length;

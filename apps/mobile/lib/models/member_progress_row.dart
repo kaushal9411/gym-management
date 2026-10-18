@@ -1,5 +1,9 @@
+import 'payments_analytics.dart' show jsonInt;
+
 /// Mirrors `MemberProgressRow` (`GET /reports/member-progress`) — one row
 /// per member's *active* workout/diet assignment (either may be absent).
+/// Percentages are 0..100 or null when the member has no active plan of
+/// that kind.
 class MemberProgressRow {
   const MemberProgressRow({
     required this.memberCode,
@@ -19,11 +23,15 @@ class MemberProgressRow {
 
   factory MemberProgressRow.fromJson(Map<String, dynamic> json) =>
       MemberProgressRow(
-        memberCode: json['memberCode'] as String,
-        name: json['name'] as String,
+        memberCode: json['memberCode']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
         workoutPlan: json['workoutPlan'] as String?,
-        workoutProgressPercent: json['workoutProgressPercent'] as int?,
+        workoutProgressPercent: json['workoutProgressPercent'] == null
+            ? null
+            : jsonInt(json['workoutProgressPercent']),
         dietPlan: json['dietPlan'] as String?,
-        dietProgressPercent: json['dietProgressPercent'] as int?,
+        dietProgressPercent: json['dietProgressPercent'] == null
+            ? null
+            : jsonInt(json['dietProgressPercent']),
       );
 }

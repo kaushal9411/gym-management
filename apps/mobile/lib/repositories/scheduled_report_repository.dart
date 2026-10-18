@@ -45,6 +45,22 @@ class ScheduledReportRepository {
     }
   }
 
+  /// Pause / resume a schedule — `PATCH /reports/scheduled/:id {isActive}`
+  /// (web's Pause / Resume button; perm `reports:export`).
+  Future<ScheduledReport> setActive(String id, {required bool isActive}) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/reports/scheduled/$id',
+        data: {'isActive': isActive},
+      );
+      return ScheduledReport.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   Future<void> runNow(String id) async {
     try {
       await _dio.post<void>('/reports/scheduled/$id/run-now');

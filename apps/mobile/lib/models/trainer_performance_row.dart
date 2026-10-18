@@ -1,3 +1,5 @@
+import 'payments_analytics.dart' show jsonInt;
+
 /// Mirrors `TrainerPerformanceRow` (`GET /reports/trainer-performance`).
 class TrainerPerformanceRow {
   const TrainerPerformanceRow({
@@ -16,10 +18,10 @@ class TrainerPerformanceRow {
 
   factory TrainerPerformanceRow.fromJson(Map<String, dynamic> json) =>
       TrainerPerformanceRow(
-        trainerId: json['trainerId'] as String,
-        name: json['name'] as String,
-        assignedMembers: json['assignedMembers'] as int,
-        activeWorkoutPlans: json['activeWorkoutPlans'] as int,
-        activeDietPlans: json['activeDietPlans'] as int,
+        trainerId: json['trainerId']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        assignedMembers: jsonInt(json['assignedMembers']),
+        activeWorkoutPlans: jsonInt(json['activeWorkoutPlans']),
+        activeDietPlans: jsonInt(json['activeDietPlans']),
       );
 }

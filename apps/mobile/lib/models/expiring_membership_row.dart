@@ -1,5 +1,8 @@
+import 'payments_analytics.dart' show jsonInt;
+
 /// Mirrors `ExpiringMembershipRow` (`GET /reports/expiring-memberships`) —
 /// active memberships ending within the next 30 days (server default).
+/// `endDate` is a plain `YYYY-MM-DD` (never timezone-shifted).
 class ExpiringMembershipRow {
   const ExpiringMembershipRow({
     required this.memberCode,
@@ -19,11 +22,11 @@ class ExpiringMembershipRow {
 
   factory ExpiringMembershipRow.fromJson(Map<String, dynamic> json) =>
       ExpiringMembershipRow(
-        memberCode: json['memberCode'] as String,
-        name: json['name'] as String,
-        branch: json['branch'] as String,
-        plan: json['plan'] as String,
-        endDate: json['endDate'] as String,
-        daysRemaining: json['daysRemaining'] as int,
+        memberCode: json['memberCode']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        branch: json['branch']?.toString() ?? '',
+        plan: json['plan']?.toString() ?? '',
+        endDate: json['endDate']?.toString() ?? '',
+        daysRemaining: jsonInt(json['daysRemaining']),
       );
 }

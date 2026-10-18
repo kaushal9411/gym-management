@@ -6,143 +6,46 @@ import 'package:go_router/go_router.dart';
 
 import '../../../bloc/reports/reports_overview_cubit.dart';
 import '../../../bloc/session/session_cubit.dart';
-import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
-import '../../../core/theme/app_text_styles.dart';
-import '../../../shared/widgets/menu_button.dart';
-import 'widgets/reports_insights_header.dart';
+import '../../../models/reports_overview.dart';
+import '../../../shared/widgets/list_hero.dart';
+import '../../../shared/widgets/slide_drawer_scaffold.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import 'hub/hub_catalog.dart';
+import 'hub/hub_insights.dart';
+import 'hub/hub_scheduled.dart';
+import 'kit/kit.dart';
 
-class _ReportEntry {
-  const _ReportEntry({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.route,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String route;
-}
-
-class _ReportSection {
-  const _ReportSection({required this.label, required this.reports});
-
-  final String label;
-  final List<_ReportEntry> reports;
-}
-
-const _sections = [
-  _ReportSection(
-    label: 'Members',
-    reports: [
-      _ReportEntry(
-        icon: Icons.groups_rounded,
-        title: 'Membership Report',
-        subtitle: 'Members with plan, status, and dates.',
-        route: AppRoutes.membershipReport,
-      ),
-      _ReportEntry(
-        icon: Icons.hourglass_bottom_rounded,
-        title: 'Expiring Memberships',
-        subtitle: 'Memberships ending within 30 days.',
-        route: AppRoutes.expiringMembershipsReport,
-      ),
-      _ReportEntry(
-        icon: Icons.pie_chart_outline_rounded,
-        title: 'Active vs Inactive',
-        subtitle: 'Member count by status.',
-        route: AppRoutes.churnReport,
-      ),
-      _ReportEntry(
-        icon: Icons.trending_up_rounded,
-        title: 'Member Progress',
-        subtitle: 'Workout and diet adherence.',
-        route: AppRoutes.memberProgressReport,
-      ),
-    ],
-  ),
-  _ReportSection(
-    label: 'Attendance',
-    reports: [
-      _ReportEntry(
-        icon: Icons.check_circle_outline_rounded,
-        title: 'Attendance Report',
-        subtitle: 'Check-ins and check-outs over time.',
-        route: AppRoutes.attendanceReport,
-      ),
-    ],
-  ),
-  _ReportSection(
-    label: 'Finance',
-    reports: [
-      _ReportEntry(
-        icon: Icons.bar_chart_rounded,
-        title: 'Revenue Report',
-        subtitle: 'Successful payments over time.',
-        route: AppRoutes.revenueReport,
-      ),
-      _ReportEntry(
-        icon: Icons.receipt_long_outlined,
-        title: 'Expense Report',
-        subtitle: 'Recorded expenses over time.',
-        route: AppRoutes.expenseReport,
-      ),
-      _ReportEntry(
-        icon: Icons.payments_rounded,
-        title: 'Payment Report',
-        subtitle: 'Every payment, with status.',
-        route: AppRoutes.paymentReport,
-      ),
-    ],
-  ),
-  _ReportSection(
-    label: 'Staff',
-    reports: [
-      _ReportEntry(
-        icon: Icons.badge_outlined,
-        title: 'Staff Report',
-        subtitle: 'Managers, trainers, and receptionists.',
-        route: AppRoutes.staffReport,
-      ),
-      _ReportEntry(
-        icon: Icons.emoji_events_outlined,
-        title: 'Trainer Performance',
-        subtitle: 'Assigned members and active plans.',
-        route: AppRoutes.staffPerformanceReport,
-      ),
-    ],
-  ),
-  _ReportSection(
-    label: 'Branches',
-    reports: [
-      _ReportEntry(
-        icon: Icons.storefront_rounded,
-        title: 'Branch Performance',
-        subtitle: 'Members, revenue, and attendance per branch.',
-        route: AppRoutes.branchPerformanceReport,
-      ),
-    ],
-  ),
-];
-
-/// Design frame "9. Reports center" — redesigned to match web's own
-/// Reports Center exactly: named reports grouped by "members, attendance,
-/// finance, staff, and branches," a link into the Analytics Dashboard, and
-/// Scheduled Reports as its own entry point. Every card here is real,
-/// working, and view-only — no report renders a transaction/payment-record
-/// table for its own sake, matching the rest of this app's "charts and
-/// summaries, not ledgers" convention.
+/// Reports Center — web's `/reports` hub, redesigned (Owner "Reports" tab).
 ///
-/// Above the report links sits the animated [ReportsInsightsHeader]
-/// (`GET /reports/overview`), hidden without `reports:view`. This screen is
-/// an `IndexedStack` tab (Owner shell), so `initState` runs once at shell
-/// construction and never again on tab switch — hence pull-to-refresh
-/// reloads the insights, and the period chips reload them too.
+/// Page order = web: gradient [ListHero] (Revenue / Net profit / New members
+/// / Check-ins headlines; Analytics and Schedule buttons) -> Period bar
+/// (Today / 7 days / This month / Last month / 90 days / Custom, branch,
+/// Compare) -> 9 KPI tiles with sparklines and deltas -> eleven insight
+/// panels (trend with Daily / Weekly / Cumulative, revenue vs expenses vs
+/// net, member-status donut, weekday attendance, peak-hours heatmap, plan
+/// distribution, payment-method donut, branch comparison, top trainers,
+/// expiring buckets, health-ratio gauges) -> the Report catalogue (search,
+/// category chips, every report and analytics view) -> Scheduled Reports.
+/// Everything comes from `GET /reports/overview` (and `GET /reports/scheduled`
+/// for the last panel); nothing is invented.
+///
+/// **Gating** (see [HubAccess]): insights and the period bar need
+/// `reports:view` (a 403 — no permission or a plan-gated module — hides them
+/// and the catalogue stays); report tiles `reports:view`; analytics tiles and
+/// the hero's Analytics button `analytics:view`; the Scheduled panel
+/// `reports:view`, its "Schedule a report" `reports:export`.
+///
+/// This screen is an `IndexedStack` tab, so `initState` runs once at shell
+/// construction and never again on a tab switch: pull-to-refresh and the
+/// period bar reload it.
+///
+/// Dropped vs web: chart hover tooltips (tap / drag inspection instead), the
+/// header-branch seeding (starts at "All branches"), "Schedule report"
+/// scrolling to the panel (opens the Scheduled Reports screen instead).
 class ReportsCenterScreen extends StatefulWidget {
   const ReportsCenterScreen({super.key});
 
@@ -152,19 +55,20 @@ class ReportsCenterScreen extends StatefulWidget {
 
 class _ReportsCenterScreenState extends State<ReportsCenterScreen> {
   late final ReportsOverviewCubit _overview;
+  late final RptPeriodController _controls;
+  String _lastScope = '';
 
-  bool get _canView {
-    final session = context.read<SessionCubit>().state;
-    return session is SessionAuthenticatedStaff &&
-        session.user.hasPermission('reports:view');
-  }
+  HubAccess get _access => HubAccess.of(context);
 
   @override
   void initState() {
     super.initState();
     _overview = getIt<ReportsOverviewCubit>();
-    if (_canView) {
-      unawaited(_overview.load());
+    _controls = RptPeriodController()..addListener(_onControls);
+    _lastScope = _controls.scope;
+    if (_access.canViewReports) {
+      unawaited(_controls.loadBranches());
+      _load();
     } else {
       _overview.hide();
     }
@@ -172,224 +76,205 @@ class _ReportsCenterScreenState extends State<ReportsCenterScreen> {
 
   @override
   void dispose() {
+    _controls
+      ..removeListener(_onControls)
+      ..dispose();
     _overview.close();
     super.dispose();
   }
 
+  void _onControls() {
+    if (_controls.scope != _lastScope) {
+      _lastScope = _controls.scope;
+      _load();
+    }
+    if (mounted) setState(() {});
+  }
+
+  void _load() {
+    if (!_access.canViewReports || !_controls.rangeReady) return;
+    final r = _controls.range;
+    unawaited(
+      _overview.load(from: r.from, to: r.to, branchId: _controls.branchId),
+    );
+  }
+
   Future<void> _refresh() async {
-    if (_canView) await _overview.load();
+    _load();
+    await _overview.stream
+        .firstWhere((s) => s is! ReportsOverviewLoading)
+        .timeout(const Duration(seconds: 20), onTimeout: () => _overview.state);
   }
 
   @override
   Widget build(BuildContext context) {
-    final total = _sections.fold<int>(0, (n, s) => n + s.reports.length);
+    // Watched so a permission change rebuilds.
+    context.watch<SessionCubit>();
+    final access = _access;
     return BlocProvider<ReportsOverviewCubit>.value(
       value: _overview,
-      child: RefreshIndicator(
-        color: AppColors.staffB,
-        onRefresh: _refresh,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 90),
-          children: [
-            Row(
-              children: [
-                const MenuButton(),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$total named reports · ${_sections.length} categories',
-                        style: AppText.eyebrow(),
+      child: BlocBuilder<ReportsOverviewCubit, ReportsOverviewState>(
+        builder: (context, state) {
+          final data = state is ReportsOverviewLoaded ? state.data : null;
+          return RefreshIndicator(
+            color: AppColors.staffB,
+            backgroundColor: AppColors.surface2,
+            onRefresh: _refresh,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(child: _hero(context, access, data)),
+                SliverToBoxAdapter(
+                  child: TeamCenter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        18,
+                        14,
+                        18,
+                        AppSpacing.screenBottomWithNav,
                       ),
-                      Text('Reports Center', style: AppText.display(size: 22)),
-                    ],
+                      child: _body(context, access, state, data),
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              'Covering members, attendance, finance, staff, and branches.',
-              style: AppText.body(size: 12, color: AppColors.inkFaint),
-            ),
-            const SizedBox(height: 16),
-            const ReportsInsightsHeader(),
-            _AnalyticsBanner(onTap: () => context.push(AppRoutes.analytics)),
-            for (final section in _sections) ...[
-              const SizedBox(height: 22),
-              Text(section.label, style: AppText.eyebrow()),
-              const SizedBox(height: 10),
-              for (final report in section.reports) ...[
-                _ReportTile(
-                  entry: report,
-                  onTap: () => context.push(report.route),
-                ),
-                const SizedBox(height: 8),
-              ],
-            ],
-            const SizedBox(height: 22),
-            Text('Automation', style: AppText.eyebrow()),
-            const SizedBox(height: 10),
-            _ReportTile(
-              entry: const _ReportEntry(
-                icon: Icons.event_note_outlined,
-                title: 'Scheduled Reports',
-                subtitle: 'Schedule a report to run and email automatically.',
-                route: AppRoutes.scheduledReports,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _hero(BuildContext context, HubAccess access, ReportsOverview? d) {
+    final k = d?.kpis;
+    final r = _controls.range;
+    return ListHero(
+      title: 'Reports Center',
+      subtitle: access.canViewReports
+          ? 'Performance, attendance and member trends · '
+              '${rptShortDate(r.from)} – ${rptShortDate(r.to)}'
+          : 'Reports and analytics',
+      side: 18 + teamSideInset(context),
+      leading: ListHeroButton(
+        icon: Icons.menu_rounded,
+        onTap: () => SlideDrawerController.of(context)?.open(),
+      ),
+      trailing: [
+        if (access.canViewAnalytics)
+          ListHeroButton(
+            icon: Icons.insights_rounded,
+            onTap: () => context.push(AppRoutes.analytics),
+          ),
+        if (access.canExport)
+          ListHeroButton(
+            icon: Icons.event_note_rounded,
+            onTap: () => context.push(AppRoutes.scheduledReports),
+          ),
+      ],
+      chips: k == null
+          ? const []
+          : [
+              ListHeroChip(
+                icon: Icons.payments_rounded,
+                label:
+                    'Revenue ${rptFormatValue(RptFormat.money, k.revenue.value, compact: true)}',
               ),
-              onTap: () => context.push(AppRoutes.scheduledReports),
+              ListHeroChip(
+                icon: Icons.trending_up_rounded,
+                label:
+                    'Net ${rptFormatValue(RptFormat.money, k.netProfit.value, compact: true)}',
+              ),
+              ListHeroChip(
+                icon: Icons.person_add_alt_1_rounded,
+                label: '${rptGrouped(k.newMembers.value)} new members',
+              ),
+              ListHeroChip(
+                icon: Icons.how_to_reg_rounded,
+                label: '${rptGrouped(k.checkIns.value)} check-ins',
+              ),
+            ],
+    );
+  }
+
+  Widget _body(
+    BuildContext context,
+    HubAccess access,
+    ReportsOverviewState state,
+    ReportsOverview? data,
+  ) {
+    final showInsights =
+        access.canViewReports && state is! ReportsOverviewForbidden;
+    final nothing = filterHubEntries(access).isEmpty && !access.canViewReports;
+    if (nothing) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 48),
+        child: RptChartEmpty(
+          height: 160,
+          message: "You don't have access to reports.",
+          icon: Icons.lock_outline_rounded,
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (showInsights) ...[
+          RptReveal(child: RptPeriodBar(controller: _controls)),
+          const SizedBox(height: 14),
+          if (!_controls.rangeReady)
+            const RptChartCard(
+              empty: true,
+              emptyText: 'Pick a valid date range (start on or before end, '
+                  'at most 366 days).',
+              minHeight: 120,
+              child: SizedBox.shrink(),
+            )
+          else ...[
+            RptKpiGrid(
+              loading: data == null && state is ReportsOverviewLoading,
+              kpis: data != null
+                  ? hubKpis(data, compare: _controls.compare)
+                  : [
+                      for (final l in const [
+                        'Revenue',
+                        'Expenses',
+                        'Net profit',
+                        'New members',
+                      ])
+                        RptKpi(label: l, value: 0),
+                    ],
             ),
+            const SizedBox(height: 14),
+            if (state is ReportsOverviewError)
+              RptChartCard(
+                title: 'Insights',
+                icon: Icons.insights_rounded,
+                color: RptColors.violet,
+                error: true,
+                errorText: state.message,
+                onRetry: _load,
+                minHeight: 80,
+                child: const SizedBox.shrink(),
+              )
+            else if (data != null)
+              HubInsights(
+                data: data,
+                compare: _controls.compare,
+                previousLabel: _controls.previousLabel,
+                canOpenExpiring: access.canViewReports,
+              )
+            else
+              const RptChartCard(
+                  loading: true, minHeight: 260, child: SizedBox(),),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// "Go to Analytics Dashboard" — matches web's link at the top of its
-/// Reports Center, into the same chart-heavy `AnalyticsScreen` already
-/// reachable from Owner's Menu.
-class _AnalyticsBanner extends StatelessWidget {
-  const _AnalyticsBanner({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0x298B5CF6), Color(0x14FF6B5B)],
-            ),
-            borderRadius: BorderRadius.circular(AppRadii.card),
-            border: Border.all(color: AppColors.glassBorder),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: const BoxDecoration(
-                  gradient: AppColors.staffGrad,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.insights_rounded,
-                  size: 20,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Go to Analytics Dashboard',
-                      style: AppText.body(size: 14, weight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Growth trends and revenue mix, all in one view.',
-                      style: AppText.body(
-                        size: 11,
-                        color: AppColors.inkFaint,
-                        weight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: AppColors.inkFaint,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// One report row — icon badge, title, one-line description (web's own
-/// copy, verbatim), trailing chevron. Same settings-list chrome used
-/// throughout the app's other hub-style screens.
-class _ReportTile extends StatelessWidget {
-  const _ReportTile({required this.entry, required this.onTap});
-
-  final _ReportEntry entry;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(AppRadii.card),
-            border: Border.all(color: AppColors.line),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: AppColors.staffSoft,
-                  borderRadius: BorderRadius.circular(AppRadii.tile),
-                ),
-                alignment: Alignment.center,
-                child: Icon(entry.icon, size: 18, color: AppColors.staffPillFg),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      entry.title,
-                      style: AppText.body(size: 13, weight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      entry.subtitle,
-                      style: AppText.body(
-                        size: 11,
-                        color: AppColors.inkFaint,
-                        weight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: AppColors.inkFaint,
-              ),
-            ],
-          ),
-        ),
-      ),
+          const SizedBox(height: 24),
+        ],
+        HubCatalogue(access: access),
+        if (access.canViewReports) ...[
+          const SizedBox(height: 8),
+          RptReveal(child: HubScheduledPanel(access: access)),
+        ],
+      ],
     );
   }
 }

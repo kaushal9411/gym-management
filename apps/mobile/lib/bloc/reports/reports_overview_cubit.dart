@@ -4,72 +4,80 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/network/api_exception.dart';
 import '../../models/reports_overview.dart';
 import '../../repositories/reports_repository.dart';
-import '../finance/payments_analytics_cubit.dart'
-    show PaymentsPeriod, PaymentsPeriodX;
 
 sealed class ReportsOverviewState extends Equatable {
-  const ReportsOverviewState(this.period);
-
-  final PaymentsPeriod period;
+  const ReportsOverviewState();
 
   @override
-  List<Object?> get props => [period];
+  List<Object?> get props => [];
 }
 
 class ReportsOverviewLoading extends ReportsOverviewState {
-  const ReportsOverviewLoading(super.period);
+  const ReportsOverviewLoading();
 }
 
 class ReportsOverviewError extends ReportsOverviewState {
-  const ReportsOverviewError(super.period, this.message);
+  const ReportsOverviewError(this.message);
 
   final String message;
 
   @override
-  List<Object?> get props => [period, message];
+  List<Object?> get props => [message];
 }
 
-/// No `reports:view` (checked up front) or HTTP 403 — the Insights header
-/// hides itself entirely.
+/// No `reports:view` (checked up front) or HTTP 403 (plan-gated module) —
+/// the hub's insights (period bar, KPIs, charts) hide themselves entirely.
 class ReportsOverviewForbidden extends ReportsOverviewState {
-  const ReportsOverviewForbidden(super.period);
+  const ReportsOverviewForbidden();
 }
 
 class ReportsOverviewLoaded extends ReportsOverviewState {
-  const ReportsOverviewLoaded(super.period, this.data);
+  const ReportsOverviewLoaded(this.data);
 
   final ReportsOverview data;
 
   @override
-  List<Object?> get props => [period, data.range.from, data.range.to];
+  List<Object?> get props => [identityHashCode(data)];
 }
 
-/// Drives the Reports Center "Insights" header. Same shape as
-/// `PaymentsAnalyticsCubit`; reuses [PaymentsPeriod] for the chips.
+/// Drives the Reports Center insights (`GET /reports/overview`). The screen
+/// owns the period / branch controls and passes them to [load]; responses
+/// for a superseded request are dropped.
 class ReportsOverviewCubit extends Cubit<ReportsOverviewState> {
-  ReportsOverviewCubit(this._repo)
-      : super(const ReportsOverviewLoading(PaymentsPeriod.thisMonth));
+  ReportsOverviewCubit(this._repo) : super(const ReportsOverviewLoading());
 
   final ReportsRepository _repo;
+  int _seq = 0;
 
   /// Caller lacks `reports:view` — skip the request entirely.
-  void hide() => emit(ReportsOverviewForbidden(state.period));
+  void hide() => emit(const ReportsOverviewForbidden());
 
-  Future<void> load([PaymentsPeriod? period]) async {
-    final p = period ?? state.period;
-    emit(ReportsOverviewLoading(p));
-    final r = p.range();
+  /// [from]/[to] are `YYYY-MM-DD` (local days), max 366 days apart.
+  Future<void> load({
+    required String from,
+    required String to,
+    String? branchId,
+  }) async {
+    final seq = ++_seq;
+    emit(const ReportsOverviewLoading());
     try {
-      final data = await _repo.overview(dateFrom: r.from, dateTo: r.to);
-      if (isClosed) return;
-      emit(ReportsOverviewLoaded(p, data));
+      final data = await _repo.overview(
+        dateFrom: from,
+        dateTo: to,
+        branchId: branchId,
+      );
+      if (isClosed || seq != _seq) return;
+      emit(ReportsOverviewLoaded(data));
     } on ApiException catch (e) {
-      if (isClosed) return;
+      if (isClosed || seq != _seq) return;
       emit(
         e.statusCode == 403
-            ? ReportsOverviewForbidden(p)
-            : ReportsOverviewError(p, e.message),
+            ? const ReportsOverviewForbidden()
+            : ReportsOverviewError(e.message),
       );
+    } catch (e) {
+      if (isClosed || seq != _seq) return;
+      emit(ReportsOverviewError(e.toString()));
     }
   }
 }

@@ -1,25 +1,42 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/di/service_locator.dart';
-import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
-import '../../../models/report_summary.dart';
-import '../../../models/branch_option.dart';
 import '../../../models/branch_performance_row.dart';
-import '../../../repositories/branch_repository.dart';
+import '../../../models/report_summary.dart';
 import '../../../repositories/reports_repository.dart';
-import '../../../shared/widgets/app_card.dart';
-import '../../../shared/widgets/app_state_views.dart';
-import 'widgets/report_filter_bar.dart';
-import 'widgets/report_summary_header.dart';
+import '../../../shared/widgets/list_hero.dart';
+import '../../../shared/widgets/motion.dart';
+import 'finance/fin_report_parts.dart';
+import 'finance/fin_report_state.dart';
+import 'kit/kit.dart';
 
-/// Reports Center's "Branch Performance" — "Members, revenue, and
-/// attendance per branch," matching web's report of the same name
-/// (`GET /reports/branch-performance`). Point-in-time (this month's
-/// revenue/attendance) — no date-range filter on web either.
+/// Report type id (`GET /reports/branch-performance`,
+/// `/reports/branch-performance/summary`, the export endpoint
+/// `GET /reports/branch-performance/export`).
+const kBranchPerformanceReportType = 'branch-performance';
+
+/// Reports Center's "Branch Performance" — members, revenue and attendance
+/// per branch, on the report kit like web's `ReportViewer`. A point-in-time
+/// report (this month's revenue / attendance; web has no date range for it
+/// either), so the filter bar is the branch-only [RptPeriodBar].
+///
+///  * hero chips = the first three summary KPIs (Branches / Total revenue /
+///    Total members), falling back to the branch count / revenue total;
+///  * `GET /reports/branch-performance/summary` via [RptSummaryPanel]: the
+///    three KPIs and the "Revenue per branch" ranked bars;
+///  * the result rows (web's table: branch, total / active members, monthly
+///    revenue, monthly attendance, staff), richest branch first, as cards: a
+///    rank badge, an animated active-members ring, revenue-share bar and
+///    stat tiles, with a detail sheet. The endpoint is not paginated.
+///
+/// Export: the hero "Export" pill + the results-header icon (CSV / Excel / PDF
+/// / Print, `reports:export`) via `exportSpec`, scoped to the branch filter.
+/// Permissions unchanged (hub tile `reports:view`; summary hides itself
+/// without it / on 403).
 class BranchPerformanceScreen extends StatefulWidget {
   const BranchPerformanceScreen({super.key});
 
@@ -28,229 +45,318 @@ class BranchPerformanceScreen extends StatefulWidget {
       _BranchPerformanceScreenState();
 }
 
-class _BranchPerformanceScreenState extends State<BranchPerformanceScreen> {
-  List<BranchPerformanceRow>? _rows;
-  List<BranchOption> _branchOptions = [];
-  String? _error;
-  String? _branchId;
+class _BranchPerformanceScreenState extends State<BranchPerformanceScreen>
+    with FinReportState<BranchPerformanceScreen, BranchPerformanceRow> {
+  ReportSummary? _summary;
 
   @override
   void initState() {
     super.initState();
-    _loadBranchOptions();
-    _load();
+    initFin();
   }
 
-  Future<void> _loadBranchOptions() async {
-    try {
-      final options = await getIt<BranchRepository>().assignable();
-      if (!mounted) return;
-      setState(() => _branchOptions = options);
-    } on ApiException {
-      // Non-fatal — filter bar just shows "All branches" only.
-    }
+  @override
+  void dispose() {
+    disposeFin();
+    super.dispose();
   }
 
-  Future<void> _load() async {
-    setState(() => _error = null);
-    try {
-      final rows = await getIt<ReportsRepository>()
-          .branchPerformance(branchId: _branchId);
-      if (!mounted) return;
-      setState(() => _rows = rows);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
-    }
+  @override
+  Future<FinPage<BranchPerformanceRow>> fetchPage(int page) async {
+    final list = await getIt<ReportsRepository>()
+        .branchPerformance(branchId: controls.branchId);
+    final sorted = [...list]
+      ..sort((a, b) => b.monthlyRevenue.compareTo(a.monthlyRevenue));
+    return FinPage(
+      items: sorted,
+      page: 1,
+      total: sorted.length,
+      totalPages: 1,
+    );
   }
 
-  void _onBranchChanged(String? branchId) {
-    setState(() => _branchId = branchId);
-    _load();
+  double get _totalRevenue =>
+      rows.items.fold(0, (s, r) => s + r.monthlyRevenue);
+
+  List<Widget> get _fallbackChips => [
+        if (!rows.loading && rows.error == null) ...[
+          ListHeroChip(
+            icon: Icons.storefront_rounded,
+            label: '${rows.total} branches',
+          ),
+          ListHeroChip(
+            icon: Icons.payments_rounded,
+            label: '${Formatters.currencyCompact(_totalRevenue)} · Revenue',
+          ),
+        ],
+      ];
+
+  void _open(BranchPerformanceRow r, int rank) {
+    showFinDetailSheet(
+      context,
+      icon: Icons.storefront_rounded,
+      title: r.branch,
+      subtitle: 'Rank #$rank by revenue · this month',
+      color: RptColors.sky,
+      amount: Formatters.currency(r.monthlyRevenue),
+      rows: [
+        ('Branch', r.branch),
+        ('Total members', rptGrouped(r.totalMembers.toDouble())),
+        ('Active members', rptGrouped(r.activeMembers.toDouble())),
+        ('Monthly revenue', Formatters.currency(r.monthlyRevenue)),
+        ('Monthly attendance', rptGrouped(r.monthlyAttendance.toDouble())),
+        ('Staff', rptGrouped(r.staffCount.toDouble())),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('This month, per branch', style: AppText.eyebrow()),
-            Text('Branch Performance', style: AppText.display(size: 18)),
-          ],
-        ),
+    final total = _totalRevenue;
+    return RptViewerScaffold<BranchPerformanceRow>(
+      title: 'Branch Performance',
+      subtitle: 'Members, revenue and attendance per branch',
+      heroChips: finHeroChips(_summary, _fallbackChips),
+      filters: RptPeriodBar(
+        controller: controls,
+        showPeriod: false,
+        showCompare: false,
+        accent: RptColors.sky,
       ),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
-              child: ReportFilterBar(
-                branches: _branchOptions,
-                selectedBranchId: _branchId,
-                onBranchChanged: _onBranchChanged,
-              ),
-            ),
-            ReportSummaryHeader(
-              type: 'branch-performance',
-              filters: ReportSummaryFilters(
-                branchId: _branchId,
-              ),
-            ),
-            Expanded(
-              child: _error != null
-                  ? AppErrorView(message: _error!, onRetry: _load)
-                  : _rows == null
-                      ? const AppLoadingView()
-                      : _rows!.isEmpty
-                          ? const AppEmptyState(
-                              icon: Icons.storefront_outlined,
-                              title: 'No branches found',
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                              itemCount: _rows!.length,
-                              itemBuilder: (context, i) =>
-                                  _BranchCard(row: _rows![i]),
-                            ),
-            ),
-          ],
-        ),
+      summary: RptSummaryPanel(
+        key: ValueKey('branch-summary-$refreshTick'),
+        type: kBranchPerformanceReportType,
+        filters: ReportSummaryFilters(branchId: controls.branchId),
+        accent: RptAccent.operations,
+        compare: false,
+        onLoaded: (s) {
+          if (mounted) setState(() => _summary = s);
+        },
+      ),
+      resultsTitle: 'Branches',
+      exportSpec: RptExportSpec(
+        reportType: kBranchPerformanceReportType,
+        title: 'Branch Performance',
+        filters: () => ReportSummaryFilters(branchId: controls.branchId),
+      ),
+      items: rows.items,
+      total: rows.total,
+      loading: rows.loading,
+      error: rows.error,
+      onRetry: () => rows.reload(),
+      onRefresh: refreshAll,
+      emptyTitle: 'No branches found',
+      emptyIcon: Icons.storefront_outlined,
+      itemBuilder: (context, r, i) => _BranchCard(
+        row: r,
+        rank: i + 1,
+        revenueShare: total <= 0 ? 0 : r.monthlyRevenue / total,
+        onTap: () => _open(r, i + 1),
       ),
     );
   }
 }
 
 class _BranchCard extends StatelessWidget {
-  const _BranchCard({required this.row});
-
-  final BranchPerformanceRow row;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: AppCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.staffSoft,
-                    borderRadius: BorderRadius.circular(AppRadii.tile),
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    Icons.storefront_rounded,
-                    size: 18,
-                    color: AppColors.staffPillFg,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    row.branch,
-                    style: AppText.body(size: 14, weight: FontWeight.w700),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: _Stat(
-                    icon: Icons.groups_rounded,
-                    label: 'Members',
-                    value: '${row.activeMembers}/${row.totalMembers}',
-                    color: AppColors.staffPillFg,
-                  ),
-                ),
-                Expanded(
-                  child: _Stat(
-                    icon: Icons.payments_rounded,
-                    label: 'Revenue',
-                    value: Formatters.currencyCompact(row.monthlyRevenue),
-                    color: AppColors.success,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _Stat(
-                    icon: Icons.check_circle_outline_rounded,
-                    label: 'Visits',
-                    value: '${row.monthlyAttendance}',
-                    color: AppColors.memberB,
-                  ),
-                ),
-                Expanded(
-                  child: _Stat(
-                    icon: Icons.badge_outlined,
-                    label: 'Staff',
-                    value: '${row.staffCount}',
-                    color: AppColors.warning,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
+  const _BranchCard({
+    required this.row,
+    required this.rank,
+    required this.revenueShare,
+    required this.onTap,
   });
 
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
+  final BranchPerformanceRow row;
+  final int rank;
+
+  /// 0..1 share of the listed branches' revenue.
+  final double revenueShare;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 15, color: color),
-        const SizedBox(width: 6),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              value,
-              style: AppText.tabular(
-                size: 14,
-                weight: FontWeight.w800,
-                color: color,
-              ),
+    final active = row.totalMembers <= 0
+        ? 0.0
+        : (row.activeMembers / row.totalMembers).clamp(0.0, 1.0);
+    Widget tile(IconData icon, String value, String label, Color color) =>
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
             ),
-            Text(
-              label,
-              style: AppText.body(size: 10, color: AppColors.inkFaint),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(icon, size: 14, color: color),
+                const SizedBox(height: 4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    style: AppText.tabular(
+                      size: 14,
+                      weight: FontWeight.w800,
+                      color: color,
+                    ),
+                  ),
+                ),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.body(
+                    size: 10.5,
+                    color: AppColors.inkFaint,
+                    weight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
+        );
+    return RptReveal(
+      index: (rank - 1).clamp(0, 6),
+      child: Material(
+        color: AppColors.surface2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          side: BorderSide(color: AppColors.line),
         ),
-      ],
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: rank == 1
+                              ? const [RptColors.amber, RptColors.rose]
+                              : const [RptColors.sky, RptColors.indigo],
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '$rank',
+                        style: AppText.display(size: 13, color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        row.branch,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            AppText.body(size: 14.5, weight: FontWeight.w800),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      Formatters.currencyCompact(row.monthlyRevenue),
+                      style: AppText.tabular(
+                        size: 15,
+                        weight: FontWeight.w800,
+                        color: RptColors.green,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    RptRadialGauge(
+                      value: active * 100,
+                      size: 70,
+                      thickness: 8,
+                      color: RptColors.teal,
+                      label: 'Active',
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${rptGrouped(row.activeMembers.toDouble())} of '
+                            '${rptGrouped(row.totalMembers.toDouble())} members active',
+                            style: AppText.body(
+                              size: 12,
+                              weight: FontWeight.w700,
+                              color: AppColors.inkSoft,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Share of revenue · '
+                            '${rptFormatValue(RptFormat.percent, revenueShare * 100)}',
+                            style: AppText.body(
+                              size: 11,
+                              weight: FontWeight.w700,
+                              color: AppColors.inkFaint,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          AnimatedFraction(
+                            fraction: revenueShare.clamp(0.0, 1.0),
+                            builder: (context, v) => ClipRRect(
+                              borderRadius: BorderRadius.circular(99),
+                              child: LinearProgressIndicator(
+                                value: v,
+                                minHeight: 7,
+                                backgroundColor: RptColors.track,
+                                valueColor: const AlwaysStoppedAnimation(
+                                  RptColors.green,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    tile(
+                      Icons.groups_rounded,
+                      rptGrouped(row.totalMembers.toDouble()),
+                      'Members',
+                      RptColors.indigo,
+                    ),
+                    const SizedBox(width: 8),
+                    tile(
+                      Icons.login_rounded,
+                      rptGrouped(row.monthlyAttendance.toDouble()),
+                      'Visits',
+                      RptColors.violet,
+                    ),
+                    const SizedBox(width: 8),
+                    tile(
+                      Icons.badge_outlined,
+                      rptGrouped(row.staffCount.toDouble()),
+                      'Staff',
+                      RptColors.amber,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

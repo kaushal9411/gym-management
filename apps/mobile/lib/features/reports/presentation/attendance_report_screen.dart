@@ -1,173 +1,237 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/di/service_locator.dart';
-import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../models/report_summary.dart';
-import '../../../models/branch_option.dart';
-import '../../../models/trend_point.dart';
-import '../../../repositories/analytics_repository.dart';
-import '../../../repositories/branch_repository.dart';
-import '../../../shared/widgets/app_card.dart';
-import '../../../shared/widgets/app_state_views.dart';
-import 'widgets/report_filter_bar.dart';
-import 'widgets/report_summary_header.dart';
-import 'widgets/simple_bar_chart.dart';
+import '../../../models/attendance_report_row.dart';
+import '../../../repositories/reports_repository.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import 'kit/kit.dart';
+import 'people/people_report_page.dart';
+import 'people/people_ui.dart';
 
-/// Design frame "9c. Attendance report" — daily check-ins, filterable by
-/// date range + branch. The design's "Peak hours" card is dropped: no
-/// hour-of-day aggregation endpoint exists to back it honestly.
-class AttendanceReportScreen extends StatefulWidget {
+/// `/reports/attendance` — the report-type id (summary + list + export).
+const kAttendanceReportType = 'attendance';
+
+/// Reports Center's "Attendance Report" — "Check-ins and check-outs over
+/// time", matching web's report: the period bar (Today ... Custom, Compare,
+/// branch), the summary (**Total check-ins / Unique members / Avg per day**
+/// with deltas, **Daily check-ins** this-vs-previous trend with a Cumulative
+/// switch, **Check-ins by method** donut) and the **check-in rows**
+/// (member, in -> out, time inside, method) from `GET /reports/attendance`.
+///
+/// Changes vs the old screen: the bar chart came from
+/// `/analytics/attendance-trends` (`analytics:view`); the same daily counts
+/// are in the summary series (`reports:view`, what web uses), so that call is
+/// gone — and roles with `reports:view` but not `analytics:view`
+/// (Receptionist, Trainer) now get the chart instead of a 403. The check-in
+/// rows are new (web has them). Branch scoping is unchanged: the picked
+/// branch is sent as `branchId`. Export + Print: `PeopleReportPage`.
+class AttendanceReportScreen extends StatelessWidget {
   const AttendanceReportScreen({super.key});
 
   @override
-  State<AttendanceReportScreen> createState() => _AttendanceReportScreenState();
+  Widget build(BuildContext context) {
+    return PeopleReportPage<AttendanceReportRow>(
+      type: kAttendanceReportType,
+      title: 'Attendance Report',
+      subtitle: 'Check-ins and check-outs over time',
+      accent: RptAccent.attendance,
+      showPeriod: true,
+      noun: 'check-ins',
+      resultsTitle: 'Check-ins',
+      emptyTitle: 'No check-ins in this period',
+      emptyMessage: 'Try a wider period or another branch.',
+      emptyIcon: Icons.how_to_reg_rounded,
+      fetch: (q, page, limit) => getIt<ReportsRepository>().attendance(
+        from: q.from,
+        to: q.to,
+        branchId: q.branchId,
+        page: page,
+        limit: limit,
+      ),
+      itemBuilder: (context, row, i) => _AttendanceCard(row: row, index: i),
+    );
+  }
 }
 
-class _AttendanceReportScreenState extends State<AttendanceReportScreen> {
-  List<TrendPoint>? _trend;
-  List<BranchOption> _branchOptions = [];
-  String? _error;
+class _AttendanceCard extends StatelessWidget {
+  const _AttendanceCard({required this.row, required this.index});
 
-  DateTimeRange _range = DateTimeRange(
-    start: DateTime.now().subtract(const Duration(days: 6)),
-    end: DateTime.now(),
-  );
-  String? _branchId;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadBranchOptions();
-    _load();
-  }
-
-  Future<void> _loadBranchOptions() async {
-    try {
-      final options = await getIt<BranchRepository>().assignable();
-      if (!mounted) return;
-      setState(() => _branchOptions = options);
-    } on ApiException {
-      // Non-fatal — filter bar just shows "All branches" only.
-    }
-  }
-
-  Future<void> _load() async {
-    setState(() => _error = null);
-    try {
-      final trend = await getIt<AnalyticsRepository>().attendanceTrends(
-        from: _range.start,
-        to: _range.end,
-        branchId: _branchId,
-      );
-      if (!mounted) return;
-      setState(() => _trend = trend);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
-    }
-  }
-
-  Future<void> _pickDateRange() async {
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      initialDateRange: _range,
-    );
-    if (picked == null) return;
-    setState(() => _range = picked);
-    _load();
-  }
-
-  void _onBranchChanged(String? branchId) {
-    setState(() => _branchId = branchId);
-    _load();
-  }
+  final AttendanceReportRow row;
+  final int index;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Filtered', style: AppText.eyebrow()),
-            Text('Attendance Report', style: AppText.display(size: 18)),
-          ],
-        ),
+    final mColor = peopleMethodColor(row.method);
+    final d = row.duration;
+    return PeopleCard(
+      index: index,
+      name: row.name,
+      subtitle: '${row.memberCode} · ${row.branch}',
+      color: RptColors.teal,
+      trailing: PeoplePill(
+        label: peopleMethodLabel(row.method),
+        color: mColor,
+        icon: peopleMethodIcon(row.method),
       ),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
-              child: ReportFilterBar(
-                branches: _branchOptions,
-                selectedBranchId: _branchId,
-                onBranchChanged: _onBranchChanged,
-                dateRange: _range,
-                onDateRangeTap: _pickDateRange,
-              ),
-            ),
-            ReportSummaryHeader(
-              type: 'attendance',
-              filters: ReportSummaryFilters(
-                from: _range.start,
-                to: _range.end,
-                branchId: _branchId,
-              ),
-            ),
-            Expanded(
-              child: _error != null
-                  ? AppErrorView(message: _error!, onRetry: _load)
-                  : _trend == null
-                      ? const AppLoadingView()
-                      : _buildContent(_trend!),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContent(List<TrendPoint> trend) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+      onTap: () => _showDetail(context, row),
       children: [
-        GlassCard(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Daily check-ins', style: AppText.eyebrow()),
-              const SizedBox(height: 10),
-              if (trend.isEmpty)
-                Text(
-                  'No data for this range.',
-                  style: AppText.body(color: AppColors.inkFaint),
-                )
-              else
-                SimpleBarChart(
-                  data: trend
-                      .map(
-                        (p) => BarDatum(
-                          label: p.date.substring(8, 10),
-                          value: p.value,
-                        ),
-                      )
-                      .toList(),
-                ),
-            ],
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _TimeBlock(
+                icon: Icons.login_rounded,
+                label: 'In',
+                value: peopleTime(row.checkIn),
+                color: RptColors.green,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _TimeBlock(
+                icon: Icons.logout_rounded,
+                label: 'Out',
+                value: row.checkOut == null
+                    ? 'Still in'
+                    : peopleTime(row.checkOut),
+                color: row.checkOut == null ? RptColors.amber : RptColors.rose,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _TimeBlock(
+                icon: Icons.timer_rounded,
+                label: 'Inside',
+                value: d == null ? '—' : peopleDuration(d),
+                color: RptColors.indigo,
+              ),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Icon(
+              Icons.calendar_today_rounded,
+              size: 12,
+              color: AppColors.inkFaint,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              peopleDate(row.date),
+              style: AppText.body(
+                size: 11.5,
+                weight: FontWeight.w700,
+                color: AppColors.inkFaint,
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
+}
+
+class _TimeBlock extends StatelessWidget {
+  const _TimeBlock({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 12, color: color),
+              const SizedBox(width: 4),
+              Text(
+                label.toUpperCase(),
+                style: AppText.body(
+                  size: 9.5,
+                  weight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppText.body(size: 12.5, weight: FontWeight.w800),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+void _showDetail(BuildContext context, AttendanceReportRow row) {
+  final d = row.duration;
+  unawaited(
+    showPeopleSheet(
+      context,
+      title: row.name,
+      subtitle: '${row.memberCode} · ${peopleDate(row.date)}',
+      color: RptColors.teal,
+      icon: Icons.how_to_reg_rounded,
+      tiles: [
+        TeamFieldTile(
+          icon: Icons.storefront_rounded,
+          label: 'Branch',
+          value: row.branch,
+          color: RptColors.sky,
+        ),
+        TeamFieldTile(
+          icon: peopleMethodIcon(row.method),
+          label: 'Method',
+          value: peopleMethodLabel(row.method),
+          color: peopleMethodColor(row.method),
+        ),
+        TeamFieldTile(
+          icon: Icons.login_rounded,
+          label: 'Check in',
+          value: peopleTime(row.checkIn),
+          color: RptColors.green,
+        ),
+        TeamFieldTile(
+          icon: Icons.logout_rounded,
+          label: 'Check out',
+          value: row.checkOut == null ? null : peopleTime(row.checkOut),
+          color: RptColors.rose,
+        ),
+        TeamFieldTile(
+          icon: Icons.timer_rounded,
+          label: 'Time inside',
+          value: d == null ? null : peopleDuration(d),
+          color: RptColors.indigo,
+        ),
+        TeamFieldTile(
+          icon: Icons.calendar_today_rounded,
+          label: 'Date',
+          value: peopleDate(row.date),
+          color: RptColors.amber,
+        ),
+      ],
+    ),
+  );
 }

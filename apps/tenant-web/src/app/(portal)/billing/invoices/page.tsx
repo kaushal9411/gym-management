@@ -40,7 +40,7 @@ export default function InvoicesPage() {
   };
 
   const list = invoices ?? [];
-  const currency = list[0]?.currency ?? 'USD';
+  const currency = list[0]?.currency ?? 'INR';
   const billable = list.filter((i) => i.currency === currency && i.status !== 'VOID' && i.status !== 'DRAFT');
   const totalInvoiced = billable.reduce((s, i) => s + i.total, 0);
   // Outstanding = OPEN (issued, unpaid) invoices.

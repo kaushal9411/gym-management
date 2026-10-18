@@ -6,6 +6,7 @@ import 'package:get_it/get_it.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:gym_saas_mobile/bloc/session/session_cubit.dart';
 import 'package:gym_saas_mobile/bloc/session/session_state.dart';
+import 'package:gym_saas_mobile/features/reports/presentation/analytics/analytics_logic.dart';
 import 'package:gym_saas_mobile/features/reports/presentation/analytics_screen.dart';
 import 'package:gym_saas_mobile/features/team/presentation/widgets/team_ui.dart';
 import 'package:gym_saas_mobile/models/branch_comparison_row.dart';
@@ -46,7 +47,9 @@ UserProfile _user(List<String> perms) => UserProfile(
 List<TrendPoint> _counts() => [
       for (var i = 1; i <= 10; i++)
         TrendPoint(
-            date: '2026-10-${i.toString().padLeft(2, '0')}', value: i * 3,),
+          date: '2026-10-${i.toString().padLeft(2, '0')}',
+          value: i * 3,
+        ),
     ];
 
 List<RevenueTrendPoint> _money() => [
@@ -150,7 +153,12 @@ void main() {
     );
   });
 
-  Future<void> pump(WidgetTester t, List<String> perms, Size size) async {
+  Future<void> pump(
+    WidgetTester t,
+    List<String> perms,
+    Size size, {
+    AnalyticsView? initial,
+  }) async {
     t.view.physicalSize = size * 2;
     t.view.devicePixelRatio = 2;
     addTearDown(t.view.reset);
@@ -160,7 +168,7 @@ void main() {
     await t.pumpWidget(
       BlocProvider<SessionCubit>.value(
         value: session,
-        child: const MaterialApp(home: AnalyticsScreen()),
+        child: MaterialApp(home: AnalyticsScreen(initialView: initial)),
       ),
     );
   }
@@ -261,6 +269,44 @@ void main() {
     await settle(t);
     expect(find.text('Could not load this view.'), findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('initialView opens that view directly and loads only it',
+      (t) async {
+    await pump(
+      t,
+      ['analytics:view'],
+      const Size(360, 740),
+      initial: AnalyticsView.revenue,
+    );
+    await settle(t);
+    expect(t.takeException(), isNull);
+    expect(find.text('TOTAL INCOME'), findsOneWidget);
+    verifyNever(
+      () => analytics.attendanceTrends(
+        from: any(named: 'from'),
+        to: any(named: 'to'),
+        branchId: any(named: 'branchId'),
+      ),
+    );
+  });
+
+  testWidgets('revenue focus: legend hides a series, inspect shows both',
+      (t) async {
+    await pump(
+      t,
+      ['analytics:view'],
+      const Size(360, 900),
+      initial: AnalyticsView.revenue,
+    );
+    await settle(t);
+    // Both series + both previous series are in the legend (compare is on).
+    expect(find.text('Income'), findsWidgets);
+    expect(find.text('Expenses'), findsWidgets);
+    expect(find.text('Income (previous)'), findsOneWidget);
+    await t.tap(find.text('Expenses').first);
+    await t.pump();
     expect(t.takeException(), isNull);
   });
 }

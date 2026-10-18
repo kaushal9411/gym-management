@@ -100,6 +100,8 @@ import '../../features/classes/presentation/class_schedule_screen.dart';
 import '../../features/classes/presentation/class_session_detail_screen.dart';
 import '../../features/receptionist/presentation/receptionist_reports_screen.dart';
 import '../../features/receptionist/presentation/search_members_screen.dart';
+import '../../features/reports/presentation/analytics/analytics_logic.dart'
+    show AnalyticsView;
 import '../../features/reports/presentation/analytics_screen.dart';
 import '../../features/reports/presentation/attendance_report_screen.dart';
 import '../../features/reports/presentation/branch_performance_screen.dart';
@@ -466,7 +468,12 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       ),
       GoRoute(
         path: AppRoutes.analytics,
-        builder: (context, state) => const AnalyticsScreen(),
+        builder: (context, state) => AnalyticsScreen(
+          // The Reports Center's analytics cards open a specific view.
+          initialView: state.extra is AnalyticsView
+              ? state.extra as AnalyticsView
+              : null,
+        ),
       ),
       GoRoute(
         path: AppRoutes.staffPerformanceReport,

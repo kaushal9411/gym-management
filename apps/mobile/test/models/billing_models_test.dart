@@ -178,9 +178,9 @@ void main() {
       expect(stats.counts.containsKey('PARTIALLY_REFUNDED'), isFalse);
     });
 
-    test('empty history falls back to USD and zeros', () {
+    test('empty history falls back to INR and zeros', () {
       final stats = PaymentHistoryStats.from(const []);
-      expect(stats.currency, 'USD');
+      expect(stats.currency, 'INR');
       expect(stats.total, 0);
       expect(stats.last, isNull);
       expect(stats.points, isEmpty);

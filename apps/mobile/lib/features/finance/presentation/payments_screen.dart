@@ -20,7 +20,6 @@ import '../../../models/membership_plan.dart';
 import '../../../repositories/branch_repository.dart';
 import '../../../repositories/membership_plan_repository.dart';
 import '../../../repositories/payment_repository.dart';
-import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/list_hero.dart';
 import '../../team/presentation/widgets/team_ui.dart';
@@ -28,15 +27,6 @@ import 'payment_actions.dart';
 import 'payments_ui.dart';
 import 'widgets/payment_card.dart';
 import 'widgets/payments_insights.dart';
-
-const paymentStatusTones = {
-  'SUCCESS': AppPillTone.success,
-  'PENDING': AppPillTone.warning,
-  'FAILED': AppPillTone.danger,
-  'REFUNDED': AppPillTone.neutral,
-  'PARTIALLY_REFUNDED': AppPillTone.warning,
-  'CANCELLED': AppPillTone.neutral,
-};
 
 const _sorts = [
   ('paymentDate:desc', 'Date · newest first'),

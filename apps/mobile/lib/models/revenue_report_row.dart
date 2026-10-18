@@ -1,4 +1,7 @@
-/// Mirrors `RevenueReportRow` (`GET /reports/revenue`).
+import 'payments_analytics.dart' show jsonMoney;
+
+/// Mirrors `RevenueReportRow` (`GET /reports/revenue`). `date` is a bare
+/// `YYYY-MM-DD` (a `@db.Date` column) and `amount` a DECIMAL string.
 class RevenueReportRow {
   const RevenueReportRow({
     required this.date,
@@ -14,9 +17,9 @@ class RevenueReportRow {
 
   factory RevenueReportRow.fromJson(Map<String, dynamic> json) =>
       RevenueReportRow(
-        date: json['date'] as String,
-        branch: json['branch'] as String,
-        method: json['method'] as String,
-        amount: double.parse(json['amount'] as String),
+        date: json['date']?.toString() ?? '',
+        branch: json['branch']?.toString() ?? '',
+        method: json['method']?.toString() ?? '',
+        amount: jsonMoney(json['amount']),
       );
 }

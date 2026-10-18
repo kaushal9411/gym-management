@@ -1,43 +1,44 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../bloc/session/session_cubit.dart';
+import '../../../bloc/session/session_state.dart';
 import '../../../core/di/service_locator.dart';
-import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../models/report_summary.dart';
-import '../../../models/branch_option.dart';
+import '../../../models/membership_plan.dart';
 import '../../../models/membership_report_row.dart';
-import '../../../repositories/branch_repository.dart';
+import '../../../models/report_summary.dart';
+import '../../../repositories/membership_plan_repository.dart';
 import '../../../repositories/reports_repository.dart';
-import '../../../shared/widgets/app_pill.dart';
-import '../../../shared/widgets/app_state_views.dart';
-import 'widgets/load_more_button.dart';
-import 'widgets/report_filter_bar.dart';
-import 'widgets/report_summary_header.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import 'kit/kit.dart';
+import 'people/people_report_page.dart';
+import 'people/people_ui.dart';
 
-const _statusTones = {
-  'ACTIVE': AppPillTone.success,
-  'FROZEN': AppPillTone.warning,
-  'INACTIVE': AppPillTone.neutral,
-};
+/// `/reports/membership` — the report-type id (summary + list + export).
+const kMembershipReportType = 'membership';
 
-const _statusFilters = [
-  (label: 'All', value: null),
-  (label: 'Active', value: 'ACTIVE'),
-  (label: 'Frozen', value: 'FROZEN'),
-  (label: 'Inactive', value: 'INACTIVE'),
+const _statusChips = <RptChip<String>>[
+  RptChip('', 'All'),
+  RptChip('ACTIVE', 'Active', dot: RptColors.green),
+  RptChip('INACTIVE', 'Inactive', dot: RptColors.slate),
+  RptChip('FROZEN', 'Frozen', dot: RptColors.sky),
 ];
 
-String _fmtIsoDate(String? iso) {
-  if (iso == null) return '—';
-  final parts = iso.split('-');
-  return '${parts[2]}/${parts[1]}/${parts[0]}';
-}
-
-/// Reports Center's "Membership Report" — "Members with plan, status, and
-/// dates," matching web's report of the same name (`GET /reports/membership`).
-/// No date-range filter: the endpoint itself doesn't apply `dateFrom`/`dateTo`.
+/// Reports Center's "Membership Report" — "Members with plan, status and
+/// dates", matching web's report of the same name: hero with the summary
+/// figures, branch scope (no date range — the endpoint does not apply one),
+/// Status chips + Plan picker (web's two extra filters), the summary
+/// (total members, **Members by status** donut, **Active memberships by
+/// plan** bars) and the member rows with a validity bar.
+///
+/// Gating (unchanged): no client gate on the screen; the summary hides
+/// without `reports:view` / on 403; the Plan picker is offered only with
+/// `memberships:view` (the key `GET /membership-plans` needs). Export + Print
+/// (status and plan included): `PeopleReportPage`.
 class MembershipReportScreen extends StatefulWidget {
   const MembershipReportScreen({super.key});
 
@@ -46,276 +47,269 @@ class MembershipReportScreen extends StatefulWidget {
 }
 
 class _MembershipReportScreenState extends State<MembershipReportScreen> {
-  final _items = <MembershipReportRow>[];
-  List<BranchOption> _branchOptions = [];
-  String? _error;
-  String? _branchId;
-  String? _status;
-  bool _loading = true;
-  bool _loadingMore = false;
-  int _page = 1;
-  int _total = 0;
-  int _totalPages = 1;
+  String _status = '';
+  String? _planId;
+  List<MembershipPlan> _plans = const [];
 
   @override
   void initState() {
     super.initState();
-    _loadBranchOptions();
-    _load();
-  }
-
-  Future<void> _loadBranchOptions() async {
-    try {
-      final options = await getIt<BranchRepository>().assignable();
-      if (!mounted) return;
-      setState(() => _branchOptions = options);
-    } on ApiException {
-      // Non-fatal — filter bar just shows "All branches" only.
+    final s = context.read<SessionCubit>().state;
+    if (s is SessionAuthenticatedStaff &&
+        s.user.hasPermission('memberships:view')) {
+      unawaited(_loadPlans());
     }
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+  Future<void> _loadPlans() async {
     try {
-      final result = await getIt<ReportsRepository>().membership(
-        branchId: _branchId,
-        memberStatus: _status,
+      final r = await getIt<MembershipPlanRepository>().list(
+        limit: 100,
+        sortBy: 'name',
+        sortDir: 'asc',
       );
-      if (!mounted) return;
-      setState(() {
-        _items
-          ..clear()
-          ..addAll(result.items);
-        _page = result.page;
-        _total = result.total;
-        _totalPages = result.totalPages;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) setState(() => _plans = r.items);
+    } catch (_) {
+      // Non-fatal — the Plan picker simply stays hidden.
     }
   }
 
-  Future<void> _loadMore() async {
-    setState(() => _loadingMore = true);
-    try {
-      final result = await getIt<ReportsRepository>().membership(
-        branchId: _branchId,
-        memberStatus: _status,
-        page: _page + 1,
-      );
-      if (!mounted) return;
-      setState(() {
-        _items.addAll(result.items);
-        _page = result.page;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _loadingMore = false);
+  Future<void> _pickPlan() async {
+    final v = await pickOneSheet(
+      context,
+      title: 'Plan',
+      options: [for (final p in _plans) (p.id, p.name)],
+      current: _planId,
+      clearLabel: 'All plans',
+    );
+    if (v == null) return;
+    setState(() => _planId = v.isEmpty ? null : v);
+  }
+
+  String get _planLabel {
+    for (final p in _plans) {
+      if (p.id == _planId) return p.name;
     }
-  }
-
-  void _onBranchChanged(String? branchId) {
-    setState(() => _branchId = branchId);
-    _load();
-  }
-
-  void _onStatusChanged(String? status) {
-    setState(() => _status = status);
-    _load();
+    return 'All plans';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Plan, status & dates', style: AppText.eyebrow()),
-            Text('Membership Report', style: AppText.display(size: 18)),
-          ],
-        ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
-              child: ReportFilterBar(
-                branches: _branchOptions,
-                selectedBranchId: _branchId,
-                onBranchChanged: _onBranchChanged,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              child: Row(
-                children: [
-                  for (final f in _statusFilters) ...[
-                    _StatusChip(
-                      label: f.label,
-                      selected: _status == f.value,
-                      onTap: () => _onStatusChanged(f.value),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            ReportSummaryHeader(
-              type: 'membership',
-              filters: ReportSummaryFilters(
-                branchId: _branchId,
-                memberStatus: _status,
-              ),
-            ),
-            Expanded(
-              child: _error != null && _items.isEmpty
-                  ? AppErrorView(message: _error!, onRetry: _load)
-                  : _loading
-                      ? const AppLoadingView()
-                      : _items.isEmpty
-                          ? const AppEmptyState(
-                              icon: Icons.groups_rounded,
-                              title: 'No members found',
-                              message: 'Try a different branch or status.',
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
-                              itemCount:
-                                  _items.length + (_page < _totalPages ? 1 : 0),
-                              itemBuilder: (context, i) {
-                                if (i == _items.length) {
-                                  return LoadMoreButton(
-                                    loading: _loadingMore,
-                                    onPressed: _loadMore,
-                                    shownCount: _items.length,
-                                    totalCount: _total,
-                                  );
-                                }
-                                return _MembershipRow(row: _items[i]);
-                              },
-                            ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.staffSoft : AppColors.surface3,
-          borderRadius: BorderRadius.circular(AppRadii.pill),
-          border: Border.all(
-            color: selected ? AppColors.staffB : Colors.transparent,
-          ),
-        ),
-        child: Text(
-          label,
-          style: AppText.body(
-            size: 11,
-            weight: FontWeight.w700,
-            color: selected ? AppColors.staffPillFg : AppColors.inkSoft,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MembershipRow extends StatelessWidget {
-  const _MembershipRow({required this.row});
-
-  final MembershipReportRow row;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return PeopleReportPage<MembershipReportRow>(
+      type: kMembershipReportType,
+      title: 'Membership Report',
+      subtitle: 'Members with plan, status and dates',
+      accent: RptAccent.members,
+      noun: 'members',
+      resultsTitle: 'Members',
+      emptyTitle: 'No members found',
+      emptyMessage: 'Try a different branch, status or plan.',
+      emptyIcon: Icons.groups_rounded,
+      extraKey: '$_status|$_planId',
+      extraFilters: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Expanded(
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              color: AppColors.surface2,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: AppColors.line),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  row.name,
-                  style: AppText.body(size: 13, weight: FontWeight.w700),
+                Text('STATUS', style: AppText.eyebrow()),
+                const SizedBox(height: 8),
+                RptFilterChips<String>(
+                  chips: _statusChips,
+                  value: _status,
+                  color: RptAccent.members.color,
+                  onChanged: (v) => setState(() => _status = v),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '${row.memberCode} · ${row.branch}',
-                  style: AppText.body(size: 11, color: AppColors.inkFaint),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  row.plan ?? 'No plan',
-                  style: AppText.body(
-                    size: 12,
-                    weight: FontWeight.w600,
-                    color: row.plan == null
-                        ? AppColors.inkFaint
-                        : AppColors.staffPillFg,
-                  ),
-                ),
-                if (row.startDate != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    '${_fmtIsoDate(row.startDate)} – ${_fmtIsoDate(row.endDate)}',
-                    style: AppText.body(size: 11, color: AppColors.inkFaint),
+                if (_plans.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text('PLAN', style: AppText.eyebrow()),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TeamToolbarButton(
+                      icon: Icons.card_membership_rounded,
+                      label: _planLabel,
+                      active: _planId != null,
+                      onTap: _pickPlan,
+                    ),
                   ),
                 ],
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          AppPill(
-            label: row.status,
-            tone: _statusTones[row.status] ?? AppPillTone.neutral,
-          ),
         ],
       ),
+      summaryFilters: (q) => ReportSummaryFilters(
+        branchId: q.branchId,
+        memberStatus: _status.isEmpty ? null : _status,
+        planId: _planId,
+      ),
+      fetch: (q, page, limit) => getIt<ReportsRepository>().membership(
+        branchId: q.branchId,
+        memberStatus: _status.isEmpty ? null : _status,
+        planId: _planId,
+        page: page,
+        limit: limit,
+      ),
+      itemBuilder: (context, row, i) => _MembershipCard(row: row, index: i),
     );
   }
+}
+
+/// Validity of a membership as `(elapsed fraction, days left, colour)`;
+/// null when the row has no dates.
+({double elapsed, int daysLeft, Color color})? _validity(
+  MembershipReportRow row,
+) {
+  final s = DateTime.tryParse(row.startDate ?? '');
+  final e = DateTime.tryParse(row.endDate ?? '');
+  final left = peopleDaysUntil(row.endDate);
+  if (s == null || e == null || left == null) return null;
+  final total = e.difference(s).inDays;
+  final done = DateTime.now().difference(s).inDays;
+  final elapsed = total <= 0 ? 1.0 : (done / total).clamp(0.0, 1.0);
+  final color = left < 0
+      ? RptColors.rose
+      : left <= 7
+          ? RptColors.rose
+          : left <= 14
+              ? RptColors.amber
+              : peopleStatusColor(row.status);
+  return (elapsed: elapsed, daysLeft: left, color: color);
+}
+
+String _leftText(int days) {
+  if (days < 0) return 'Ended ${-days} day${days == -1 ? '' : 's'} ago';
+  if (days == 0) return 'Ends today';
+  return '$days day${days == 1 ? '' : 's'} left';
+}
+
+class _MembershipCard extends StatelessWidget {
+  const _MembershipCard({required this.row, required this.index});
+
+  final MembershipReportRow row;
+  final int index;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = peopleStatusColor(row.status);
+    final v = _validity(row);
+    return PeopleCard(
+      index: index,
+      name: row.name,
+      subtitle: '${row.memberCode} · ${row.branch}',
+      color: color,
+      trailing: PeoplePill(
+        label: prettyEnum(row.status),
+        color: color,
+        dot: true,
+      ),
+      onTap: () => _showDetail(context, row),
+      children: [
+        if (row.plan == null)
+          Text(
+            'No plan',
+            style: AppText.body(
+              size: 12,
+              weight: FontWeight.w700,
+              color: AppColors.inkFaint,
+            ),
+          )
+        else if (v == null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: PeoplePill(
+              label: row.plan!,
+              color: RptColors.indigo,
+              icon: Icons.card_membership_rounded,
+            ),
+          )
+        else ...[
+          PeopleBar(
+            label: row.plan,
+            valueText: _leftText(v.daysLeft),
+            value: v.elapsed,
+            color: v.color,
+          ),
+          Text(
+            '${peopleDate(row.startDate)}  →  ${peopleDate(row.endDate)}',
+            style: AppText.body(
+              size: 11,
+              weight: FontWeight.w600,
+              color: AppColors.inkFaint,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+void _showDetail(BuildContext context, MembershipReportRow row) {
+  final color = peopleStatusColor(row.status);
+  final v = _validity(row);
+  unawaited(
+    showPeopleSheet(
+      context,
+      title: row.name,
+      subtitle: '${row.memberCode} · ${prettyEnum(row.status)}',
+      color: color,
+      icon: Icons.assignment_ind_rounded,
+      tiles: [
+        TeamFieldTile(
+          icon: Icons.badge_rounded,
+          label: 'Member ID',
+          value: row.memberCode,
+          color: RptColors.indigo,
+        ),
+        TeamFieldTile(
+          icon: Icons.storefront_rounded,
+          label: 'Branch',
+          value: row.branch,
+          color: RptColors.sky,
+        ),
+        TeamFieldTile(
+          icon: Icons.verified_rounded,
+          label: 'Status',
+          value: prettyEnum(row.status),
+          color: color,
+        ),
+        TeamFieldTile(
+          icon: Icons.card_membership_rounded,
+          label: 'Plan',
+          value: row.plan,
+          color: RptColors.violet,
+        ),
+        TeamFieldTile(
+          icon: Icons.event_available_rounded,
+          label: 'Start date',
+          value: row.startDate == null ? null : peopleDate(row.startDate),
+          color: RptColors.teal,
+        ),
+        TeamFieldTile(
+          icon: Icons.event_busy_rounded,
+          label: 'End date',
+          value: row.endDate == null ? null : peopleDate(row.endDate),
+          color: RptColors.amber,
+        ),
+      ],
+      extra: [
+        if (v != null)
+          PeopleBar(
+            label: 'Membership elapsed',
+            valueText: _leftText(v.daysLeft),
+            value: v.elapsed,
+            color: v.color,
+            height: 9,
+          ),
+      ],
+    ),
+  );
 }

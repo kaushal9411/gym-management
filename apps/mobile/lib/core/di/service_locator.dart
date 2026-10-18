@@ -10,6 +10,7 @@ import '../../bloc/finance/payments_analytics_cubit.dart';
 import '../../bloc/platform/platform_config_cubit.dart';
 import '../../bloc/reports/reports_overview_cubit.dart';
 import '../../bloc/session/session_cubit.dart';
+import '../export/export_sink.dart';
 import '../../repositories/analytics_repository.dart';
 import '../../repositories/announcement_repository.dart';
 import '../../repositories/attendance_repository.dart';
@@ -111,6 +112,8 @@ void setupServiceLocator() {
   getIt.registerLazySingleton<ReportsRepository>(
     () => ReportsRepository(getIt()),
   );
+  // Where report exports go (temp file + share sheet, system print dialog).
+  getIt.registerLazySingleton<ExportSink>(() => const PlatformExportSink());
   getIt.registerLazySingleton<ScheduledReportRepository>(
     () => ScheduledReportRepository(getIt()),
   );

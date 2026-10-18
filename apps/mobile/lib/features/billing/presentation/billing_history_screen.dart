@@ -52,7 +52,7 @@ class PaymentHistoryStats {
 
   factory PaymentHistoryStats.from(List<BillingPayment> list) {
     final paid = list.where((p) => p.isSucceeded).toList();
-    final currency = list.isEmpty ? 'USD' : list.first.currency;
+    final currency = list.isEmpty ? 'INR' : list.first.currency;
     final same = paid.where((p) => p.currency == currency).toList();
     final total = same.fold<double>(0, (s, p) => s + p.amount);
     BillingPayment? last;

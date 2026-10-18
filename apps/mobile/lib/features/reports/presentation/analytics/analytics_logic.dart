@@ -4,9 +4,19 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../models/revenue_trend_point.dart';
 import '../../../../models/trend_point.dart';
 import '../../../team/presentation/widgets/team_ui.dart';
+import '../kit/kit.dart' show RptFormat, rptPreviousRange;
 
 /// How a view's numbers are written (web's `ValueFormat`).
 enum AnalyticsFormat { money, number, percent }
+
+extension AnalyticsFormatX on AnalyticsFormat {
+  /// The report kit's equivalent.
+  RptFormat get rpt => switch (this) {
+        AnalyticsFormat.money => RptFormat.money,
+        AnalyticsFormat.number => RptFormat.number,
+        AnalyticsFormat.percent => RptFormat.percent,
+      };
+}
 
 String formatAnalytics(AnalyticsFormat f, double v) => switch (f) {
       AnalyticsFormat.money => Formatters.currency(v),
@@ -92,6 +102,17 @@ extension AnalyticsViewX on AnalyticsView {
         AnalyticsView.retention => TeamColors.fuchsia,
         AnalyticsView.collection => TeamColors.sky,
         AnalyticsView.branches => TeamColors.amber,
+      };
+
+  /// The export endpoint's report type (web: `analytics-${slug}`).
+  String get exportType => switch (this) {
+        AnalyticsView.revenue => 'analytics-revenue-trends',
+        AnalyticsView.attendance => 'analytics-attendance-trends',
+        AnalyticsView.membershipGrowth => 'analytics-membership-growth',
+        AnalyticsView.newMembers => 'analytics-new-member-growth',
+        AnalyticsView.retention => 'analytics-retention',
+        AnalyticsView.collection => 'analytics-payment-collection',
+        AnalyticsView.branches => 'analytics-branch-comparison',
       };
 
   bool get isSnapshot => this == AnalyticsView.retention;
@@ -195,26 +216,8 @@ List<AnalyticsRow> mergeSeries(
 
 /// The range of equal length that ends the day before [from] (web's
 /// `previousRange`). Inputs and outputs are `YYYY-MM-DD`.
-({String from, String to}) previousRange(String from, String to) {
-  final f = DateTime.utc(
-    int.parse(from.substring(0, 4)),
-    int.parse(from.substring(5, 7)),
-    int.parse(from.substring(8, 10)),
-  );
-  final t = DateTime.utc(
-    int.parse(to.substring(0, 4)),
-    int.parse(to.substring(5, 7)),
-    int.parse(to.substring(8, 10)),
-  );
-  final days = t.difference(f).inDays + 1;
-  String fmt(DateTime d) => '${d.year.toString().padLeft(4, '0')}-'
-      '${d.month.toString().padLeft(2, '0')}-'
-      '${d.day.toString().padLeft(2, '0')}';
-  return (
-    from: fmt(f.subtract(Duration(days: days))),
-    to: fmt(f.subtract(const Duration(days: 1))),
-  );
-}
+({String from, String to}) previousRange(String from, String to) =>
+    rptPreviousRange(from, to);
 
 /// Summary numbers for the stats row (web's `computeStats`).
 class AnalyticsStats {

@@ -1,267 +1,151 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/di/service_locator.dart';
-import '../../../core/network/api_exception.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../models/report_summary.dart';
-import '../../../models/branch_option.dart';
 import '../../../models/expiring_membership_row.dart';
-import '../../../repositories/branch_repository.dart';
 import '../../../repositories/reports_repository.dart';
-import '../../../shared/widgets/app_state_views.dart';
-import 'widgets/load_more_button.dart';
-import 'widgets/report_filter_bar.dart';
-import 'widgets/report_summary_header.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import 'kit/kit.dart';
+import 'people/people_report_page.dart';
+import 'people/people_ui.dart';
 
-String _fmtIsoDate(String iso) {
-  final parts = iso.split('-');
-  return '${parts[2]}/${parts[1]}/${parts[0]}';
-}
-
-Color _urgencyColor(int daysRemaining) {
-  if (daysRemaining <= 7) return AppColors.danger;
-  if (daysRemaining <= 15) return AppColors.warning;
-  return AppColors.staffPillFg;
-}
+/// `/reports/expiring-memberships` — the report-type id (summary + list +
+/// export).
+const kExpiringReportType = 'expiring-memberships';
 
 /// Reports Center's "Expiring Memberships" — "Memberships ending within 30
-/// days," matching web's report of the same name
-/// (`GET /reports/expiring-memberships`, sorted soonest-first server side).
-/// The 30-day window is the server's default and isn't exposed as a filter
-/// on web either — only `branchId` is filterable here.
-class ExpiringMembershipsScreen extends StatefulWidget {
+/// days", matching web's report: a point-in-time snapshot (branch scope
+/// only; the 30-day window is the server default and not a filter on web
+/// either), the summary (**Expiring in 30 days**, **Expiring by window** and
+/// **Expiring by plan** bars) and the member rows, soonest first, each with a
+/// days-left ring coloured like web's pill (<= 7 rose, <= 14 amber, else
+/// green). Linked from the dashboard ("Expiring in 30d", "View all").
+/// Export + Print: `PeopleReportPage`.
+class ExpiringMembershipsScreen extends StatelessWidget {
   const ExpiringMembershipsScreen({super.key});
 
   @override
-  State<ExpiringMembershipsScreen> createState() =>
-      _ExpiringMembershipsScreenState();
-}
-
-class _ExpiringMembershipsScreenState extends State<ExpiringMembershipsScreen> {
-  final _items = <ExpiringMembershipRow>[];
-  List<BranchOption> _branchOptions = [];
-  String? _error;
-  String? _branchId;
-  bool _loading = true;
-  bool _loadingMore = false;
-  int _page = 1;
-  int _total = 0;
-  int _totalPages = 1;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadBranchOptions();
-    _load();
-  }
-
-  Future<void> _loadBranchOptions() async {
-    try {
-      final options = await getIt<BranchRepository>().assignable();
-      if (!mounted) return;
-      setState(() => _branchOptions = options);
-    } on ApiException {
-      // Non-fatal — filter bar just shows "All branches" only.
-    }
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final result = await getIt<ReportsRepository>()
-          .expiringMemberships(branchId: _branchId);
-      if (!mounted) return;
-      setState(() {
-        _items
-          ..clear()
-          ..addAll(result.items);
-        _page = result.page;
-        _total = result.total;
-        _totalPages = result.totalPages;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _loadMore() async {
-    setState(() => _loadingMore = true);
-    try {
-      final result = await getIt<ReportsRepository>()
-          .expiringMemberships(branchId: _branchId, page: _page + 1);
-      if (!mounted) return;
-      setState(() {
-        _items.addAll(result.items);
-        _page = result.page;
-      });
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _loadingMore = false);
-    }
-  }
-
-  void _onBranchChanged(String? branchId) {
-    setState(() => _branchId = branchId);
-    _load();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Ending within 30 days', style: AppText.eyebrow()),
-            Text('Expiring Memberships', style: AppText.display(size: 18)),
-          ],
-        ),
+    return PeopleReportPage<ExpiringMembershipRow>(
+      type: kExpiringReportType,
+      title: 'Expiring Memberships',
+      subtitle: 'Memberships ending within 30 days',
+      accent: RptAccent.members,
+      noun: 'expiring',
+      resultsTitle: 'Expiring soon',
+      emptyTitle: 'No memberships expiring soon',
+      emptyMessage: 'Nothing ends in the next 30 days for this branch.',
+      emptyIcon: Icons.hourglass_bottom_rounded,
+      fetch: (q, page, limit) => getIt<ReportsRepository>().expiringMemberships(
+        branchId: q.branchId,
+        page: page,
+        limit: limit,
       ),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
-              child: ReportFilterBar(
-                branches: _branchOptions,
-                selectedBranchId: _branchId,
-                onBranchChanged: _onBranchChanged,
-              ),
-            ),
-            ReportSummaryHeader(
-              type: 'expiring-memberships',
-              filters: ReportSummaryFilters(
-                branchId: _branchId,
-              ),
-            ),
-            Expanded(
-              child: _error != null && _items.isEmpty
-                  ? AppErrorView(message: _error!, onRetry: _load)
-                  : _loading
-                      ? const AppLoadingView()
-                      : _items.isEmpty
-                          ? const AppEmptyState(
-                              icon: Icons.event_available_rounded,
-                              title: 'Nothing expiring soon',
-                              message:
-                                  'No memberships end in the next 30 days.',
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                              itemCount:
-                                  _items.length + (_page < _totalPages ? 1 : 0),
-                              itemBuilder: (context, i) {
-                                if (i == _items.length) {
-                                  return LoadMoreButton(
-                                    loading: _loadingMore,
-                                    onPressed: _loadMore,
-                                    shownCount: _items.length,
-                                    totalCount: _total,
-                                  );
-                                }
-                                return _ExpiringRow(row: _items[i]);
-                              },
-                            ),
-            ),
-          ],
-        ),
-      ),
+      itemBuilder: (context, row, i) => _ExpiringCard(row: row, index: i),
     );
   }
 }
 
-class _ExpiringRow extends StatelessWidget {
-  const _ExpiringRow({required this.row});
+String _daysText(int d) => d <= 0 ? 'Today' : '$d day${d == 1 ? '' : 's'}';
+
+class _ExpiringCard extends StatelessWidget {
+  const _ExpiringCard({required this.row, required this.index});
 
   final ExpiringMembershipRow row;
+  final int index;
 
   @override
   Widget build(BuildContext context) {
-    final color = _urgencyColor(row.daysRemaining);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+    final color = peopleUrgencyColor(row.daysRemaining);
+    return PeopleCard(
+      index: index,
+      name: row.name,
+      subtitle: '${row.memberCode} · ${row.branch}',
+      color: color,
+      leading: PeopleRing(
+        value: row.daysRemaining / 30,
+        color: color,
+        child: Text(
+          '${row.daysRemaining < 0 ? 0 : row.daysRemaining}',
+          style: AppText.display(size: 15),
+        ),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.14),
-              shape: BoxShape.circle,
+      onTap: () => _showDetail(context, row),
+      children: [
+        Row(
+          children: [
+            Flexible(
+              child: PeoplePill(
+                label: row.plan,
+                color: RptColors.indigo,
+                icon: Icons.card_membership_rounded,
+              ),
             ),
-            alignment: Alignment.center,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '${row.daysRemaining}',
-                  style: AppText.tabular(
-                    size: 14,
-                    weight: FontWeight.w800,
-                    color: color,
-                  ),
-                ),
-                Text(
-                  'days',
-                  style: AppText.body(
-                    size: 8,
-                    weight: FontWeight.w700,
-                    color: color,
-                  ),
-                ),
-              ],
+            const SizedBox(width: 8),
+            PeoplePill(
+              label: 'Ends ${peopleDate(row.endDate)}',
+              color: color,
+              icon: Icons.event_busy_rounded,
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  row.name,
-                  style: AppText.body(size: 13, weight: FontWeight.w700),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${row.memberCode} · ${row.branch}',
-                  style: AppText.body(size: 11, color: AppColors.inkFaint),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${row.plan} · ends ${_fmtIsoDate(row.endDate)}',
-                  style: AppText.body(
-                    size: 11,
-                    weight: FontWeight.w600,
-                    color: AppColors.inkSoft,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+          ],
+        ),
+      ],
     );
   }
+}
+
+void _showDetail(BuildContext context, ExpiringMembershipRow row) {
+  final color = peopleUrgencyColor(row.daysRemaining);
+  unawaited(
+    showPeopleSheet(
+      context,
+      title: row.name,
+      subtitle: '${row.memberCode} · ends ${peopleDate(row.endDate)}',
+      color: color,
+      icon: Icons.hourglass_bottom_rounded,
+      tiles: [
+        TeamFieldTile(
+          icon: Icons.badge_rounded,
+          label: 'Member ID',
+          value: row.memberCode,
+          color: RptColors.indigo,
+        ),
+        TeamFieldTile(
+          icon: Icons.storefront_rounded,
+          label: 'Branch',
+          value: row.branch,
+          color: RptColors.sky,
+        ),
+        TeamFieldTile(
+          icon: Icons.card_membership_rounded,
+          label: 'Plan',
+          value: row.plan,
+          color: RptColors.violet,
+        ),
+        TeamFieldTile(
+          icon: Icons.event_busy_rounded,
+          label: 'End date',
+          value: peopleDate(row.endDate),
+          color: RptColors.amber,
+        ),
+        TeamFieldTile(
+          icon: Icons.hourglass_bottom_rounded,
+          label: 'Days remaining',
+          value: _daysText(row.daysRemaining),
+          color: color,
+        ),
+      ],
+      extra: [
+        PeopleBar(
+          label: 'Of the 30-day window left',
+          valueText: _daysText(row.daysRemaining),
+          value: row.daysRemaining / 30,
+          color: color,
+          height: 9,
+        ),
+      ],
+    ),
+  );
 }

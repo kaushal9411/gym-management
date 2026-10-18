@@ -1,23 +1,33 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../core/di/service_locator.dart';
-import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../models/report_summary.dart';
-import '../../../models/branch_option.dart';
+import '../../../models/paginated_result.dart';
 import '../../../models/trainer_performance_row.dart';
-import '../../../repositories/branch_repository.dart';
 import '../../../repositories/reports_repository.dart';
-import '../../../shared/widgets/app_card.dart';
-import '../../../shared/widgets/app_state_views.dart';
-import 'widgets/report_filter_bar.dart';
-import 'widgets/report_summary_header.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import 'kit/kit.dart';
+import 'people/people_report_page.dart';
+import 'people/people_ui.dart';
 
-/// Reports Center's "Trainer Performance" card — "Assigned members and
-/// active plans," matching web's report of the same name. Backs
-/// `GET /reports/trainer-performance`. Branch-filterable only — this is a
-/// live snapshot, not a date-ranged report.
+/// `/reports/trainer-performance` — the report-type id (summary + list +
+/// export). Behind the Hub's "Trainer Performance" tile and
+/// `AppRoutes.staffPerformanceReport`.
+const kStaffPerformanceReportType = 'trainer-performance';
+
+const _rankColors = [RptColors.amber, RptColors.slate, RptColors.rose];
+
+/// Reports Center's "Trainer Performance" — "Assigned members and active
+/// plans", matching web's report: a live snapshot (branch scope only), the
+/// summary (**Trainers**, **Assigned members**, **Avg members / trainer**
+/// and the **Assigned members per trainer** ranked bars) and one card per
+/// trainer — rank badge, assigned members (with a bar against the busiest
+/// trainer), active workout plans and active diet plans. Sorted by assigned
+/// members, busiest first (web's suggested sort).
+/// Export + Print: `PeopleReportPage`.
 class StaffPerformanceScreen extends StatefulWidget {
   const StaffPerformanceScreen({super.key});
 
@@ -26,130 +36,183 @@ class StaffPerformanceScreen extends StatefulWidget {
 }
 
 class _StaffPerformanceScreenState extends State<StaffPerformanceScreen> {
-  List<TrainerPerformanceRow>? _rows;
-  List<BranchOption> _branchOptions = [];
-  String? _error;
-  String? _branchId;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadBranchOptions();
-    _load();
-  }
-
-  Future<void> _loadBranchOptions() async {
-    try {
-      final options = await getIt<BranchRepository>().assignable();
-      if (!mounted) return;
-      setState(() => _branchOptions = options);
-    } on ApiException {
-      // Non-fatal — filter bar just shows "All branches" only.
-    }
-  }
-
-  Future<void> _load() async {
-    setState(() => _error = null);
-    try {
-      final rows = await getIt<ReportsRepository>()
-          .trainerPerformance(branchId: _branchId);
-      if (!mounted) return;
-      setState(() => _rows = rows);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
-    }
-  }
-
-  void _onBranchChanged(String? branchId) {
-    setState(() => _branchId = branchId);
-    _load();
-  }
+  /// Largest `assignedMembers` of the rows last fetched (bar scale).
+  int _max = 0;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('By trainer', style: AppText.eyebrow()),
-            Text('Trainer Performance', style: AppText.display(size: 18)),
-          ],
-        ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 8),
-              child: ReportFilterBar(
-                branches: _branchOptions,
-                selectedBranchId: _branchId,
-                onBranchChanged: _onBranchChanged,
-              ),
-            ),
-            ReportSummaryHeader(
-              type: 'trainer-performance',
-              filters: ReportSummaryFilters(
-                branchId: _branchId,
-              ),
-            ),
-            Expanded(
-              child: _error != null
-                  ? AppErrorView(message: _error!, onRetry: _load)
-                  : _rows == null
-                      ? const AppLoadingView()
-                      : _rows!.isEmpty
-                          ? const AppEmptyState(
-                              icon: Icons.emoji_events_outlined,
-                              title: 'No trainers yet',
-                              message:
-                                  'Assign a Trainer role to a staff member to see them here.',
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                              itemCount: _rows!.length,
-                              itemBuilder: (context, i) {
-                                final row = _rows![i];
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: AppCard(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          row.name,
-                                          style: AppText.body(
-                                            size: 14,
-                                            weight: FontWeight.w700,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          '${row.assignedMembers} members · ${row.activeWorkoutPlans} workout plans · ${row.activeDietPlans} diet plans',
-                                          style: AppText.body(
-                                            size: 11,
-                                            color: AppColors.inkFaint,
-                                            weight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-            ),
-          ],
-        ),
-      ),
+    return PeopleReportPage<TrainerPerformanceRow>(
+      type: kStaffPerformanceReportType,
+      title: 'Trainer Performance',
+      subtitle: 'Assigned members and active plans',
+      accent: RptAccent.staff,
+      noun: 'trainers',
+      resultsTitle: 'Trainers',
+      emptyTitle: 'No trainers yet',
+      emptyMessage:
+          'Assign the Trainer role to a staff member to see them here.',
+      emptyIcon: Icons.emoji_events_outlined,
+      fetch: (q, page, limit) async {
+        final rows = await getIt<ReportsRepository>()
+            .trainerPerformance(branchId: q.branchId);
+        final sorted = [...rows]
+          ..sort((a, b) => b.assignedMembers.compareTo(a.assignedMembers));
+        _max = sorted.isEmpty ? 0 : sorted.first.assignedMembers;
+        return PaginatedResult(
+          items: sorted,
+          total: sorted.length,
+          page: 1,
+          limit: sorted.length,
+          totalPages: 1,
+        );
+      },
+      itemBuilder: (context, row, i) =>
+          _TrainerCard(row: row, rank: i + 1, max: _max),
     );
   }
+}
+
+class _RankBadge extends StatelessWidget {
+  const _RankBadge({required this.rank});
+
+  final int rank;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = rank <= 3 ? _rankColors[rank - 1] : RptColors.slate;
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [color, color.withValues(alpha: 0.45)],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: rank == 1
+          ? const Icon(
+              Icons.emoji_events_rounded,
+              color: Colors.white,
+              size: 22,
+            )
+          : Text(
+              '#$rank',
+              style: AppText.display(size: 15, color: Colors.white),
+            ),
+    );
+  }
+}
+
+class _TrainerCard extends StatelessWidget {
+  const _TrainerCard({
+    required this.row,
+    required this.rank,
+    required this.max,
+  });
+
+  final TrainerPerformanceRow row;
+  final int rank;
+  final int max;
+
+  @override
+  Widget build(BuildContext context) {
+    return PeopleCard(
+      index: rank - 1,
+      name: row.name,
+      subtitle: 'Rank $rank · ${row.assignedMembers} assigned',
+      color: RptColors.fuchsia,
+      leading: _RankBadge(rank: rank),
+      onTap: () => _showDetail(context, row, max),
+      children: [
+        PeopleBar(
+          label: 'Assigned members',
+          valueText: '${row.assignedMembers}',
+          value: max <= 0 ? 0 : row.assignedMembers / max,
+          color: RptColors.fuchsia,
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: PeopleStat(
+                icon: Icons.groups_rounded,
+                value: '${row.assignedMembers}',
+                label: 'Members',
+                color: RptColors.indigo,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: PeopleStat(
+                icon: Icons.fitness_center_rounded,
+                value: '${row.activeWorkoutPlans}',
+                label: 'Workout plans',
+                color: RptColors.teal,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: PeopleStat(
+                icon: Icons.restaurant_rounded,
+                value: '${row.activeDietPlans}',
+                label: 'Diet plans',
+                color: RptColors.amber,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+void _showDetail(BuildContext context, TrainerPerformanceRow row, int max) {
+  unawaited(
+    showPeopleSheet(
+      context,
+      title: row.name,
+      subtitle: 'Trainer',
+      color: RptColors.fuchsia,
+      icon: Icons.emoji_events_rounded,
+      tiles: [
+        TeamFieldTile(
+          icon: Icons.groups_rounded,
+          label: 'Assigned members',
+          value: '${row.assignedMembers}',
+          color: RptColors.indigo,
+        ),
+        TeamFieldTile(
+          icon: Icons.fitness_center_rounded,
+          label: 'Active workout plans',
+          value: '${row.activeWorkoutPlans}',
+          color: RptColors.teal,
+        ),
+        TeamFieldTile(
+          icon: Icons.restaurant_rounded,
+          label: 'Active diet plans',
+          value: '${row.activeDietPlans}',
+          color: RptColors.amber,
+        ),
+      ],
+      extra: [
+        PeopleBar(
+          label: 'Load vs the busiest trainer',
+          valueText: '${row.assignedMembers} of $max',
+          value: max <= 0 ? 0 : row.assignedMembers / max,
+          color: RptColors.fuchsia,
+          height: 10,
+        ),
+        Text(
+          'Plans are counted per trainer across all branches; assigned members follow the branch filter.',
+          style: AppText.body(
+            size: 11,
+            weight: FontWeight.w600,
+            color: AppColors.inkFaint,
+          ),
+        ),
+      ],
+    ),
+  );
 }
