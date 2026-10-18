@@ -17,6 +17,7 @@ import '../../../models/gym_member.dart';
 import '../../../repositories/member_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/menu_button.dart';
 
 /// Design frame "4. My clients" — members with this Trainer as their
 /// assigned trainer (`GET /members?trainerId={self}`). The design's inline
@@ -74,6 +75,8 @@ class _MyClientsScreenState extends State<MyClientsScreen> {
           children: [
             Row(
               children: [
+                const MenuButton(),
+                const SizedBox(width: 10),
                 Expanded(
                   child: BlocBuilder<PaginatedListCubit<GymMember>,
                       PaginatedListState<GymMember>>(

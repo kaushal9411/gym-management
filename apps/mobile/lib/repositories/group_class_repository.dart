@@ -39,6 +39,30 @@ class GroupClassRepository {
     }
   }
 
+  /// Every class, soft-deleted included (as web's list loads them), paged at
+  /// the API's 100-row maximum. The catalog filters / searches / sorts on the
+  /// device: the list validator reads `isActive` with `z.coerce.boolean`, so a
+  /// server-side `isActive=false` is coerced to `true` and the "Inactive"
+  /// filter would return the active classes.
+  Future<List<GroupClass>> listAll({
+    bool includeDeleted = true,
+    int maxPages = 10,
+  }) async {
+    final all = <GroupClass>[];
+    var page = 1;
+    while (page <= maxPages) {
+      final result = await list(
+        page: page,
+        limit: 100,
+        includeDeleted: includeDeleted,
+      );
+      all.addAll(result.items);
+      if (page >= result.totalPages || result.items.isEmpty) break;
+      page++;
+    }
+    return all;
+  }
+
   /// Active-only, unfiltered — for assign/booking pickers.
   Future<List<GroupClass>> listAssignable() async {
     try {

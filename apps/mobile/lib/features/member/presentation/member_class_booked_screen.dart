@@ -6,6 +6,9 @@ import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/class_session.dart';
 import '../../../shared/widgets/app_button.dart';
+import '../../classes/presentation/class_ui.dart';
+import '../../manager/presentation/widgets/member_detail_anim.dart';
+import '../../team/presentation/widgets/team_ui.dart' show TeamCenter;
 
 class ClassBookedArgs {
   const ClassBookedArgs({required this.session, required this.day});
@@ -14,9 +17,12 @@ class ClassBookedArgs {
   final DateTime day;
 }
 
-/// Design frame "7a. Booked". The design's "Add to calendar" button is not
-/// built — the app has no calendar/url_launcher package, the same reason
-/// the Receptionist invoice "Download PDF" was dropped in Chunk 5.
+/// "You're in!" confirmation shown right after booking a class (member
+/// palette). The design's "Add to calendar" button is not built - the app has
+/// no calendar/url_launcher package, the same reason the Receptionist invoice
+/// "Download PDF" was dropped in Chunk 5. Web has no separate confirmation
+/// page (it toasts "Booked in!"); this page is existing mobile behaviour and
+/// is kept as is.
 class MemberClassBookedScreen extends StatelessWidget {
   const MemberClassBookedScreen({required this.args, super.key});
 
@@ -34,87 +40,126 @@ class MemberClassBookedScreen extends StatelessWidget {
       appBar: AppBar(backgroundColor: AppColors.bg, elevation: 0),
       body: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-          child: Column(
-            children: [
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0x2EC6F135), Color(0x1A14E0B4)],
+        child: TeamCenter(
+          maxWidth: 640,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+            child: Column(
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppColors.memberA.withValues(alpha: 0.2),
+                        AppColors.memberB.withValues(alpha: 0.12),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(AppRadii.card),
+                    border: Border.all(color: AppColors.glassBorder),
                   ),
-                  borderRadius: BorderRadius.circular(AppRadii.card),
-                  border: Border.all(color: AppColors.glassBorder),
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: const BoxDecoration(
-                        gradient: AppColors.memberGrad,
-                        shape: BoxShape.circle,
+                  child: Column(
+                    children: [
+                      PopIn(
+                        index: 0,
+                        child: Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            gradient: AppColors.memberGrad,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.memberB.withValues(alpha: 0.4),
+                                blurRadius: 22,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          alignment: Alignment.center,
+                          child: Icon(
+                            Icons.check_rounded,
+                            size: 34,
+                            color: AppColors.memberOnGrad,
+                          ),
+                        ),
                       ),
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.check_rounded,
-                        size: 30,
-                        color: AppColors.memberOnGrad,
+                      const SizedBox(height: 14),
+                      FadeUp(
+                        index: 1,
+                        child: Text(
+                          "You're in!",
+                          style: AppText.display(size: 24),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    Text("You're in!", style: AppText.display(size: 22)),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${session.groupClass.name} · ${session.startTime}',
-                      style: AppText.body(
-                        size: 13,
-                        color: AppColors.inkFaint,
+                      const SizedBox(height: 2),
+                      FadeUp(
+                        index: 2,
+                        child: Text(
+                          '${session.groupClass.name} · '
+                          '${classTime(session.startTime)}',
+                          textAlign: TextAlign.center,
+                          style: AppText.body(
+                            size: 13,
+                            color: AppColors.inkFaint,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(AppRadii.card),
-                  border: Border.all(color: AppColors.line),
-                ),
-                child: Column(
-                  children: [
-                    if (session.trainer != null)
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(AppRadii.card),
+                    border: Border.all(color: AppColors.line),
+                  ),
+                  child: Column(
+                    children: [
                       _DetailRow(
-                        label: 'Coach',
-                        value: session.trainer!.name,
+                        label: 'Date',
+                        value: fmtDayKey(session.dayKey),
                       ),
-                    _DetailRow(
-                      label: 'Spot',
-                      value: '$takenSpots of ${session.capacity}',
-                    ),
-                    _DetailRow(
-                      label: 'Time',
-                      value: '${session.startTime} – ${session.endTime}',
-                    ),
-                  ],
+                      if (session.trainer != null)
+                        _DetailRow(
+                          label: 'Coach',
+                          value: session.trainer!.name,
+                        ),
+                      if (session.branch != null)
+                        _DetailRow(
+                          label: 'Branch',
+                          value: session.branch!.name,
+                        ),
+                      _DetailRow(
+                        label: 'Spot',
+                        value: '$takenSpots of ${session.capacity}',
+                      ),
+                      _DetailRow(
+                        label: 'Time',
+                        value: classTimeRange(
+                          session.startTime,
+                          session.endTime,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const Spacer(),
-              AppButton(
-                label: 'Done',
-                role: AppRole.member,
-                onPressed: () => context.pop(),
-              ),
-            ],
+                const Spacer(),
+                AppButton(
+                  label: 'Done',
+                  role: AppRole.member,
+                  onPressed: () => context.pop(),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -143,9 +188,12 @@ class _DetailRow extends StatelessWidget {
               weight: FontWeight.w600,
             ),
           ),
-          Text(
-            value,
-            style: AppText.body(size: 13, weight: FontWeight.w700),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: AppText.body(size: 13, weight: FontWeight.w700),
+            ),
           ),
         ],
       ),

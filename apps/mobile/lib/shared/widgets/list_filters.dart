@@ -55,15 +55,13 @@ class FilterChipsRow<T> extends StatelessWidget {
                   backgroundColor: AppColors.surface2,
                   selectedColor: role.soft,
                   side: BorderSide(
-                    color:
-                        o.value == selected ? role.b : AppColors.line,
+                    color: o.value == selected ? role.b : AppColors.line,
                   ),
                   labelStyle: AppText.body(
                     size: 12,
                     weight: FontWeight.w700,
-                    color: o.value == selected
-                        ? role.pillFg
-                        : AppColors.inkSoft,
+                    color:
+                        o.value == selected ? role.pillFg : AppColors.inkSoft,
                   ),
                 ),
               ),

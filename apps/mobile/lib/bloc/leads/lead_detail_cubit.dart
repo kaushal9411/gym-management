@@ -58,6 +58,23 @@ class LeadDetailCubit extends Cubit<LeadDetailState> {
       if (!isClosed) emit(LeadDetailLoaded(l));
     } on ApiException catch (e) {
       if (!isClosed) emit(LeadDetailError(e.message));
+    } on Object {
+      if (!isClosed) emit(const LeadDetailError('Could not load this lead.'));
+    }
+  }
+
+  /// Re-fetch WITHOUT flashing the loading spinner (pull-to-refresh, after
+  /// an edit). Falls back to the error state only when nothing is shown yet.
+  Future<void> refresh() async {
+    final shown = lead;
+    if (shown == null) return load();
+    try {
+      final l = await _repo.getById(leadId);
+      if (!isClosed) emit(LeadDetailLoaded(l));
+    } on ApiException {
+      // keep showing the last good copy
+    } on Object {
+      // keep showing the last good copy
     }
   }
 
@@ -74,7 +91,10 @@ class LeadDetailCubit extends Cubit<LeadDetailState> {
       return null;
     } on ApiException catch (e) {
       if (!isClosed) emit(LeadDetailLoaded(current));
-      return e.errorFor('lostReason') ?? e.message;
+      return e.errorFor('lostReason') ?? e.detailedMessage;
+    } on Object {
+      if (!isClosed) emit(LeadDetailLoaded(current));
+      return 'Something went wrong. Please try again.';
     }
   }
 
@@ -123,6 +143,9 @@ class LeadDetailCubit extends Cubit<LeadDetailState> {
     } on ApiException catch (e) {
       if (!isClosed) emit(LeadDetailLoaded(current));
       return e.message;
+    } on Object {
+      if (!isClosed) emit(LeadDetailLoaded(current));
+      return 'Something went wrong. Please try again.';
     }
   }
 
@@ -139,7 +162,13 @@ class LeadDetailCubit extends Cubit<LeadDetailState> {
       return (member: r.member, error: null);
     } on ApiException catch (e) {
       if (!isClosed) emit(LeadDetailLoaded(current));
-      return (member: null, error: e.message);
+      return (member: null, error: e.detailedMessage);
+    } on Object {
+      if (!isClosed) emit(LeadDetailLoaded(current));
+      return (
+        member: null,
+        error: 'Something went wrong. Please try again.',
+      );
     }
   }
 }

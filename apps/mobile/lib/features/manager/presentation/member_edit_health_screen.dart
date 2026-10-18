@@ -3,13 +3,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../models/gym_member.dart';
 import '../../../repositories/member_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
-import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/member_edit_scaffold.dart';
 
 /// Design frame "7f. Edit health & docs" — the health/fitness fields only.
 /// Documents aren't built here: `uploadMemberDocumentSchema` needs a
@@ -60,10 +57,16 @@ class _MemberEditHealthScreenState extends State<MemberEditHealthScreen> {
         'notes': _orNull(_notesController.text),
       });
       if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Health details updated successfully'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       context.pop();
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.message);
+      setState(() => _error = e.detailedMessage);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -73,61 +76,68 @@ class _MemberEditHealthScreenState extends State<MemberEditHealthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Text('Health & Notes · ${widget.member.name}'),
-      ),
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_error != null) ...[
-                const SizedBox(height: 8),
-                FormAlert(message: _error!),
-              ],
-              const SizedBox(height: 16),
-              Text('Health & fitness', style: AppText.eyebrow()),
-              const SizedBox(height: 10),
-              AppLabeledField(
-                label: 'Medical conditions',
-                hintText: 'e.g. Asthma, diabetes (optional)',
-                controller: _medicalController,
-              ),
-              const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'Allergies',
-                hintText: 'e.g. Peanuts, dust (optional)',
-                controller: _allergiesController,
-              ),
-              const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'Fitness goals',
-                hintText: 'e.g. Weight loss, muscle gain',
-                controller: _fitnessGoalsController,
-              ),
-              const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'Notes',
-                hintText: 'Any other notes about this member',
-                controller: _notesController,
-              ),
-              const SizedBox(height: 24),
-              AppButton(
-                label: 'Save changes',
-                loading: _saving,
-                onPressed: _save,
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
+    const rose = Color(0xFFFF5C7A);
+    const amber = Color(0xFFF59E0B);
+    const green = Color(0xFF10B981);
+    const teal = Color(0xFF14B8A6);
+    return MemberEditScaffold(
+      member: widget.member,
+      title: 'Health & Notes',
+      icon: Icons.favorite_rounded,
+      color: rose,
+      saving: _saving,
+      onSave: _save,
+      error: _error,
+      sections: [
+        FormSection(
+          icon: Icons.favorite_rounded,
+          color: rose,
+          title: 'Health & fitness',
+          subtitle: 'Medical details staff should know',
+          children: [
+            AppLabeledField(
+              label: 'Medical conditions',
+              hintText: 'e.g. Asthma, diabetes (optional)',
+              icon: Icons.medical_services_rounded,
+              iconColor: rose,
+              controller: _medicalController,
+            ),
+            const SizedBox(height: 14),
+            AppLabeledField(
+              label: 'Allergies',
+              hintText: 'e.g. Peanuts, dust (optional)',
+              icon: Icons.warning_amber_rounded,
+              iconColor: amber,
+              controller: _allergiesController,
+            ),
+            const SizedBox(height: 14),
+            AppLabeledField(
+              label: 'Fitness goals',
+              hintText: 'e.g. Weight loss, muscle gain',
+              icon: Icons.emoji_events_rounded,
+              iconColor: green,
+              controller: _fitnessGoalsController,
+            ),
+          ],
         ),
-      ),
+        FormSection(
+          icon: Icons.sticky_note_2_rounded,
+          color: teal,
+          title: 'Notes',
+          subtitle: 'Anything else worth remembering',
+          children: [
+            AppLabeledField(
+              label: 'Notes',
+              hintText: 'Any other notes about this member',
+              icon: Icons.edit_note_rounded,
+              iconColor: teal,
+              controller: _notesController,
+              minLines: 3,
+              maxLines: 6,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -11,30 +12,34 @@ import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/lead.dart';
 import '../../../repositories/lead_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
 import '../../../shared/widgets/app_state_views.dart';
-import '../../../shared/widgets/category_chip_selector.dart';
+import '../../manager/presentation/widgets/member_detail_anim.dart';
+import 'lead_actions.dart';
 import 'lead_form_screen.dart';
 import 'lead_ui.dart';
 import 'widgets/lead_convert_sheet.dart';
+import 'widgets/lead_widgets.dart';
 
 /// Lead detail — `GET /leads/:id` (+ activities newest-first,
-/// `convertedMember`). Header (call / WhatsApp, source, status, assignee,
-/// age, follow-up badge), pipeline stepper, action buttons, activity
-/// composer and timeline. Every action is permission-gated through
-/// [leadsCan]: Edit/Stage/Reopen/Log = `leads:update`, Convert =
-/// `leads:convert`, Assign = `leads:assign`, Delete = `leads:delete`
-/// (a receptionist sees none of the last two).
+/// `convertedMember`). Gradient hero (spinning-ring avatar, status / source /
+/// branch pills, call / WhatsApp / edit, Convert CTA), summary tiles, an
+/// animated pipeline stepper with the stage actions, then two tabs:
+/// **Activity** (composer + timeline) and **Details** (contact, interest &
+/// plan, source, notes, conversion / lost, key dates — every field web's
+/// side panels show). Every action is permission-gated through [leadsCan]:
+/// Edit/Stage/Reopen/Log = `leads:update`, Convert = `leads:convert`,
+/// Assign = `leads:assign`, Delete = `leads:delete` (a receptionist sees
+/// none of the last two).
 ///
 /// CONVERTED is reachable only through Convert (the API 422s a status
 /// change to it); a CONVERTED lead is terminal here — only the timeline and
 /// the member link remain. The 6 demo CONVERTED leads have no member, so the
 /// member link is optional.
 ///
-/// Dropped vs web: inline follow-up reschedule chips (the composer's
-/// "Next follow-up" covers it), activity outcome field, lost-note on the
-/// header card for converted leads.
+/// Dropped vs web: nothing — web's "Reopen" (always back to New) is covered
+/// by the stage picker (any open stage); web has no restore for deleted
+/// leads and neither does the API.
 class LeadDetailScreen extends StatelessWidget {
   const LeadDetailScreen({super.key, required this.leadId});
 
@@ -49,59 +54,63 @@ class LeadDetailScreen extends StatelessWidget {
   }
 }
 
-class _DetailView extends StatelessWidget {
+class _DetailView extends StatefulWidget {
   const _DetailView();
 
-  void _toast(BuildContext c, String m) =>
-      ScaffoldMessenger.of(c).showSnackBar(SnackBar(content: Text(m)));
+  @override
+  State<_DetailView> createState() => _DetailViewState();
+}
 
-  Future<void> _stage(
-    BuildContext context,
-    Lead lead, {
-    bool reopen = false,
-  }) async {
+class _DetailViewState extends State<_DetailView> {
+  int _tab = 0;
+
+  Future<void> _stage(BuildContext context, Lead lead) async {
     final cubit = context.read<LeadDetailCubit>();
-    final options = reopen
-        ? LeadStatus.pipeline.where((s) => s.isOpen).toList()
-        : [
-            ...LeadStatus.pipeline.where((s) => s.isOpen && s != lead.status),
-            LeadStatus.lost,
-          ];
-    final res = await pickOne<LeadStatus>(
+    await pickAndChangeStage(
       context,
-      title: reopen ? 'Reopen lead as' : 'Move to stage',
-      options: [for (final s in options) PickerOption(s, s.label)],
+      lead,
+      (status, reason, note) => cubit.changeStatus(
+        status,
+        lostReason: reason,
+        lostNote: note,
+      ),
     );
-    final target = res?.picked;
-    if (target == null || !context.mounted) return;
-    LeadLostReason? reason;
-    String? note;
-    if (target == LeadStatus.lost) {
-      final r = await _askLostReason(context);
-      if (r == null || !context.mounted) return;
-      reason = r.reason;
-      note = r.note;
-    }
+  }
+
+  Future<void> _markLost(BuildContext context) async {
+    final cubit = context.read<LeadDetailCubit>();
+    final r = await showLeadSheet<({LeadLostReason reason, String? note})>(
+      context,
+      (_) => const LeadLostSheet(),
+    );
+    if (r == null || !context.mounted) return;
     final err = await cubit.changeStatus(
-      target,
-      lostReason: reason,
-      lostNote: note,
+      LeadStatus.lost,
+      lostReason: r.reason,
+      lostNote: r.note,
     );
     if (context.mounted) {
-      _toast(context, err ?? 'Moved to ${target.label}');
+      leadToast(context, err ?? 'Marked as lost', error: err != null);
     }
   }
 
-  Future<({LeadLostReason reason, String? note})?> _askLostReason(
-    BuildContext context,
-  ) {
-    return showModalBottomSheet<({LeadLostReason reason, String? note})>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: AppColors.surface,
-      builder: (_) => const _LostSheet(),
+  Future<void> _reschedule(BuildContext context, Lead lead) async {
+    final cubit = context.read<LeadDetailCubit>();
+    final when =
+        await pickDateTime(context, initial: lead.nextFollowUpAt?.toLocal());
+    if (when == null || !context.mounted) return;
+    final err = await cubit.addActivity(
+      LeadActivityType.followUp,
+      note: 'Follow-up rescheduled',
+      nextFollowUpAt: when,
     );
+    if (context.mounted) {
+      leadToast(
+        context,
+        err ?? 'Follow-up set for ${fmtWhen(when)}',
+        error: err != null,
+      );
+    }
   }
 
   Future<void> _assign(BuildContext context, Lead lead) async {
@@ -112,6 +121,7 @@ class _DetailView extends StatelessWidget {
       final res = await pickOne<LeadAssignee>(
         context,
         title: 'Assign to',
+        icon: Icons.person_add_alt_rounded,
         options: [
           const PickerOption<LeadAssignee>(null, 'Unassigned'),
           for (final a in list) PickerOption(a, a.name, sub: a.role),
@@ -119,9 +129,15 @@ class _DetailView extends StatelessWidget {
       );
       if (res == null || !context.mounted) return;
       final err = await cubit.assign(res.picked?.id);
-      if (context.mounted) _toast(context, err ?? 'Assignment updated');
+      if (context.mounted) {
+        leadToast(context, err ?? 'Assignment updated', error: err != null);
+      }
     } on ApiException catch (e) {
-      if (context.mounted) _toast(context, e.message);
+      if (context.mounted) leadToast(context, e.message, error: true);
+    } on Object {
+      if (context.mounted) {
+        leadToast(context, 'Could not load staff', error: true);
+      }
     }
   }
 
@@ -131,14 +147,30 @@ class _DetailView extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        icon: Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: LeadColors.rose.withValues(alpha: 0.16),
+          ),
+          child: const Icon(
+            Icons.delete_forever_rounded,
+            color: LeadColors.rose,
+            size: 26,
+          ),
+        ),
         title: const Text('Delete lead?'),
         content: Text(
-          '${lead.name} and their activity history will be removed.',
+          '${lead.name} and their activity history will be removed from the '
+          'pipeline and reports.',
+          textAlign: TextAlign.center,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: const Text('Keep lead'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -154,10 +186,10 @@ class _DetailView extends StatelessWidget {
     final err = await cubit.delete();
     if (!context.mounted) return;
     if (err == null) {
-      _toast(context, 'Lead deleted');
+      leadToast(context, 'Lead deleted');
       context.pop();
     } else {
-      _toast(context, err);
+      leadToast(context, err, error: true);
     }
   }
 
@@ -167,27 +199,44 @@ class _DetailView extends StatelessWidget {
       AppRoutes.leadForm,
       extra: LeadFormArgs(lead: lead),
     );
-    if (saved != null) await cubit.load();
+    if (saved != null) await cubit.refresh();
   }
 
   Future<void> _convert(BuildContext context, Lead lead) async {
     final cubit = context.read<LeadDetailCubit>();
-    final member = await showModalBottomSheet<ConvertedMember>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      backgroundColor: AppColors.surface,
-      builder: (_) => LeadConvertSheet(lead: lead, onSubmit: cubit.convert),
+    final member = await showLeadSheet<ConvertedMember>(
+      context,
+      (_) => LeadConvertSheet(lead: lead, onSubmit: cubit.convert),
     );
     if (member == null || !context.mounted) return;
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surface2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        icon: PopIn(
+          index: 0,
+          child: Container(
+            width: 60,
+            height: 60,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [LeadColors.green, LeadColors.teal],
+              ),
+            ),
+            child: const Icon(
+              Icons.verified_rounded,
+              color: Colors.white,
+              size: 30,
+            ),
+          ),
+        ),
         title: const Text('Member created'),
         content: Text(
           '${member.name}${member.memberId.isEmpty ? '' : ' (${member.memberId})'} '
           'is now a member.',
+          textAlign: TextAlign.center,
         ),
         actions: [
           TextButton(
@@ -216,30 +265,35 @@ class _DetailView extends StatelessWidget {
         final canAssign = leadsCan(context, 'leads:assign');
         final canUpdate = leadsCan(context, 'leads:update');
         final canConvert = leadsCan(context, 'leads:convert');
+        final hero = lead != null;
+        final top = MediaQuery.of(context).padding.top + kToolbarHeight - 8;
         return Scaffold(
           backgroundColor: AppColors.bg,
+          extendBodyBehindAppBar: hero,
           appBar: AppBar(
-            backgroundColor: AppColors.bg,
+            backgroundColor: hero ? Colors.transparent : AppColors.bg,
+            foregroundColor: hero ? Colors.white : null,
             elevation: 0,
-            title: Text(lead?.name ?? 'Lead'),
+            scrolledUnderElevation: 0,
+            title: Text(
+              'Lead',
+              style: AppText.display(
+                size: 18,
+                color: hero ? Colors.white : null,
+              ),
+            ),
             actions: [
-              if (lead != null &&
-                  canUpdate &&
-                  lead.status != LeadStatus.converted)
-                IconButton(
-                  tooltip: 'Edit lead',
-                  icon: const Icon(Icons.edit_outlined),
-                  onPressed: busy ? null : () => _edit(context, lead),
-                ),
               if (lead != null && (canAssign || canDelete))
                 PopupMenuButton<String>(
                   tooltip: 'More',
                   color: AppColors.surface2,
+                  icon:
+                      const Icon(Icons.more_vert_rounded, color: Colors.white),
                   onSelected: (v) => v == 'assign'
                       ? _assign(context, lead)
                       : _delete(context, lead),
                   itemBuilder: (_) => [
-                    if (canAssign)
+                    if (canAssign && lead.status != LeadStatus.converted)
                       const PopupMenuItem(
                         value: 'assign',
                         child: Text('Assign'),
@@ -265,41 +319,76 @@ class _DetailView extends StatelessWidget {
             LeadDetailLoaded(:final lead) => RefreshIndicator(
                 color: AppColors.staffB,
                 backgroundColor: AppColors.surface2,
-                onRefresh: () => context.read<LeadDetailCubit>().load(),
+                edgeOffset: top,
+                onRefresh: () => context.read<LeadDetailCubit>().refresh(),
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(18, 4, 18, 40),
+                  padding: const EdgeInsets.only(bottom: 40),
                   children: [
-                    _Header(lead: lead),
-                    const SizedBox(height: 12),
-                    _Stepper(lead: lead),
-                    const SizedBox(height: 12),
-                    _Actions(
+                    _Hero(
                       lead: lead,
+                      topInset: top,
+                      canEdit: canUpdate && lead.status != LeadStatus.converted,
+                      canConvert:
+                          canConvert && lead.status != LeadStatus.converted,
                       busy: busy,
-                      canUpdate: canUpdate,
-                      canConvert: canConvert,
-                      canAssign: canAssign,
-                      onStage: () => _stage(context, lead),
-                      onReopen: () => _stage(context, lead, reopen: true),
+                      onEdit: () => _edit(context, lead),
                       onConvert: () => _convert(context, lead),
-                      onAssign: () => _assign(context, lead),
                     ),
-                    if (canUpdate) ...[
-                      const SizedBox(height: 14),
-                      _Composer(lead: lead, busy: busy),
-                    ],
-                    const SizedBox(height: 18),
-                    Text('ACTIVITY', style: AppText.eyebrow()),
-                    const SizedBox(height: 8),
-                    if (lead.activities.isEmpty)
-                      Text(
-                        'No activity yet.',
-                        style:
-                            AppText.body(size: 13, color: AppColors.inkFaint),
-                      )
-                    else
-                      for (final a in lead.activities) _ActivityTile(a),
+                    const SizedBox(height: 14),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _SummaryTiles(
+                        lead: lead,
+                        onFollowUp: canUpdate && lead.isOpen && !busy
+                            ? () => _reschedule(context, lead)
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: FadeUp(
+                        index: 2,
+                        child: _PipelinePanel(
+                          lead: lead,
+                          busy: busy,
+                          canUpdate: canUpdate,
+                          canAssign: canAssign,
+                          onStage: () => _stage(context, lead),
+                          onLost: () => _markLost(context),
+                          onAssign: () => _assign(context, lead),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    LeadTabBar(
+                      tabs: const ['Activity', 'Details'],
+                      selected: _tab,
+                      onSelected: (i) => setState(() => _tab = i),
+                    ),
+                    const SizedBox(height: 14),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        key: ValueKey(_tab),
+                        children: _tab == 0
+                            ? [
+                                if (canUpdate) ...[
+                                  FadeUp(
+                                    index: 0,
+                                    child: _Composer(lead: lead, busy: busy),
+                                  ),
+                                  const SizedBox(height: 14),
+                                ],
+                                FadeUp(
+                                  index: 1,
+                                  child: _Timeline(lead.activities),
+                                ),
+                              ]
+                            : _detailPanels(context, lead),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -308,130 +397,719 @@ class _DetailView extends StatelessWidget {
       },
     );
   }
+
+  List<Widget> _detailPanels(BuildContext context, Lead lead) {
+    final member = lead.convertedMember;
+    final panels = <Widget>[
+      LeadPanel(
+        icon: Icons.contact_phone_rounded,
+        color: LeadColors.indigo,
+        title: 'Contact',
+        child: LeadFieldGrid(
+          tiles: [
+            LeadFieldTile(
+              icon: Icons.call_rounded,
+              label: 'Phone',
+              value: lead.phone,
+              color: LeadColors.green,
+              onTap: () => leadCall(context, lead.phone),
+            ),
+            LeadFieldTile(
+              icon: Icons.mail_rounded,
+              label: 'Email',
+              value: lead.email,
+              color: LeadColors.sky,
+              onTap: lead.email == null
+                  ? null
+                  : () => leadEmail(context, lead.email!),
+            ),
+            LeadFieldTile(
+              icon: Icons.wc_rounded,
+              label: 'Gender',
+              value: _genderLabel(lead.gender),
+              color: LeadColors.fuchsia,
+            ),
+            LeadFieldTile(
+              icon: Icons.storefront_rounded,
+              label: 'Branch',
+              value: lead.branch?.name,
+              color: LeadColors.amber,
+            ),
+          ],
+        ),
+      ),
+      LeadPanel(
+        icon: Icons.track_changes_rounded,
+        color: LeadColors.violet,
+        title: 'Interest & plan',
+        child: LeadFieldGrid(
+          tiles: [
+            LeadFieldTile(
+              icon: Icons.card_membership_rounded,
+              label: 'Interested plan',
+              value: lead.interestedPlan?.name,
+              color: LeadColors.violet,
+            ),
+            LeadFieldTile(
+              icon: Icons.event_available_rounded,
+              label: 'Expected join',
+              value: lead.expectedJoinDate == null
+                  ? null
+                  : fmtDay(lead.expectedJoinDate),
+              color: LeadColors.green,
+            ),
+            LeadFieldTile(
+              icon: Icons.flag_rounded,
+              label: 'Goal / interest',
+              value: lead.interest,
+              color: LeadColors.rose,
+              maxLines: 6,
+            ),
+          ],
+        ),
+      ),
+      LeadPanel(
+        icon: leadSourceIcon(lead.source),
+        color: leadSourceColor(lead.source),
+        title: 'Source',
+        child: LeadFieldGrid(
+          tiles: [
+            LeadFieldTile(
+              icon: leadSourceIcon(lead.source),
+              label: 'Channel',
+              value: lead.source.label,
+              color: leadSourceColor(lead.source),
+            ),
+            LeadFieldTile(
+              icon: Icons.notes_rounded,
+              label: 'Detail',
+              value: lead.sourceDetail,
+              color: leadSourceColor(lead.source),
+              maxLines: 4,
+            ),
+          ],
+        ),
+      ),
+      LeadPanel(
+        icon: Icons.sticky_note_2_rounded,
+        color: LeadColors.amber,
+        title: 'Notes',
+        child: lead.notes == null || lead.notes!.isEmpty
+            ? const LeadEmptyLine('No notes.')
+            : Text(
+                lead.notes!,
+                style: AppText.body(size: 13.5, color: AppColors.inkSoft),
+              ),
+      ),
+      if (lead.status == LeadStatus.converted)
+        LeadPanel(
+          icon: Icons.verified_rounded,
+          color: LeadColors.green,
+          title: 'Conversion',
+          child: Column(
+            children: [
+              LeadFieldGrid(
+                tiles: [
+                  LeadFieldTile(
+                    icon: Icons.event_rounded,
+                    label: 'Converted on',
+                    value: lead.convertedAt == null
+                        ? null
+                        : fmtDay(lead.convertedAt),
+                    color: LeadColors.green,
+                  ),
+                  LeadFieldTile(
+                    icon: Icons.badge_rounded,
+                    label: 'Member',
+                    value: member == null
+                        ? 'Not linked to a member record'
+                        : '${member.name}'
+                            '${member.memberId.isEmpty ? '' : ' (${member.memberId})'}',
+                    color: LeadColors.teal,
+                    onTap: member == null
+                        ? null
+                        : () => context.push(
+                              AppRoutes.memberDetail,
+                              extra: member.id,
+                            ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      if (lead.status == LeadStatus.lost)
+        LeadPanel(
+          icon: Icons.cancel_rounded,
+          color: LeadColors.rose,
+          title: 'Lost',
+          child: LeadFieldGrid(
+            tiles: [
+              LeadFieldTile(
+                icon: Icons.flag_rounded,
+                label: 'Reason',
+                value: lead.lostReason == null
+                    ? null
+                    : LeadLostReason.labelOf(lead.lostReason!),
+                color: LeadColors.rose,
+              ),
+              LeadFieldTile(
+                icon: Icons.event_busy_rounded,
+                label: 'Lost on',
+                value: lead.lostAt == null ? null : fmtDay(lead.lostAt),
+                color: LeadColors.rose,
+              ),
+              LeadFieldTile(
+                icon: Icons.notes_rounded,
+                label: 'Note',
+                value: lead.lostNote,
+                color: LeadColors.rose,
+                maxLines: 6,
+              ),
+            ],
+          ),
+        ),
+      LeadPanel(
+        icon: Icons.calendar_month_rounded,
+        color: LeadColors.indigo,
+        title: 'Key dates',
+        child: LeadFieldGrid(
+          tiles: [
+            LeadFieldTile(
+              icon: Icons.alarm_rounded,
+              label: 'Next follow-up',
+              value: lead.nextFollowUpAt == null
+                  ? null
+                  : fmtWhen(lead.nextFollowUpAt),
+              color: leadFollowUpColor(lead.followUpState),
+            ),
+            LeadFieldTile(
+              icon: Icons.history_rounded,
+              label: 'Last activity',
+              value: lead.lastActivityAt == null
+                  ? null
+                  : fmtWhen(lead.lastActivityAt),
+              color: LeadColors.teal,
+            ),
+            LeadFieldTile(
+              icon: Icons.add_circle_rounded,
+              label: 'Created',
+              value: lead.createdAt == null
+                  ? null
+                  : '${fmtWhen(lead.createdAt)}'
+                      '${lead.createdBy == null ? '' : ' by ${lead.createdBy!.name}'}',
+              color: LeadColors.slate,
+              maxLines: 3,
+            ),
+            LeadFieldTile(
+              icon: Icons.update_rounded,
+              label: 'Updated',
+              value: lead.updatedAt == null ? null : fmtWhen(lead.updatedAt),
+              color: LeadColors.slate,
+            ),
+          ],
+        ),
+      ),
+    ];
+    return [
+      for (var i = 0; i < panels.length; i++) ...[
+        if (i > 0) const SizedBox(height: 12),
+        FadeUp(index: i, child: panels[i]),
+      ],
+    ];
+  }
+
+  static String? _genderLabel(String? g) {
+    if (g == null) return null;
+    for (final o in leadGenderOptions) {
+      if (o.$1 == g) return o.$2;
+    }
+    return g;
+  }
 }
 
-BoxDecoration _card() => BoxDecoration(
-      color: AppColors.surface2,
-      borderRadius: BorderRadius.circular(AppRadii.card),
-      border: Border.all(color: AppColors.line),
-    );
+// ── hero ─────────────────────────────────────────────────────────────────
 
-class _Header extends StatelessWidget {
-  const _Header({required this.lead});
+class _Hero extends StatelessWidget {
+  const _Hero({
+    required this.lead,
+    required this.topInset,
+    required this.canEdit,
+    required this.canConvert,
+    required this.busy,
+    required this.onEdit,
+    required this.onConvert,
+  });
 
   final Lead lead;
+  final double topInset;
+  final bool canEdit;
+  final bool canConvert;
+  final bool busy;
+  final VoidCallback onEdit;
+  final VoidCallback onConvert;
 
   @override
   Widget build(BuildContext context) {
+    final color = leadStatusColor(lead.status);
+    final hasPhone = lead.phone.isNotEmpty;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        const Positioned.fill(
+          child: MeshHeroBackground(
+            radius: BorderRadius.vertical(bottom: Radius.circular(34)),
+            child: SizedBox.expand(),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(16, 8 + topInset, 16, 22),
+          child: SizedBox(
+            width: double.infinity,
+            child: Column(
+              children: [
+                FadeUp(
+                  index: 0,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      SpinningRing(
+                        size: 104,
+                        child:
+                            LeadAvatar(name: lead.name, size: 96, color: color),
+                      ),
+                      Positioned(
+                        left: 4,
+                        top: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: PulseDot(color: color, size: 10),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                FadeUp(
+                  index: 1,
+                  child: Text(
+                    lead.name,
+                    textAlign: TextAlign.center,
+                    style: AppText.display(size: 27, color: Colors.white),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                FadeUp(
+                  index: 2,
+                  child: Text(
+                    [
+                      lead.phone,
+                      if (lead.email != null && lead.email!.isNotEmpty)
+                        lead.email!,
+                    ].join(' · '),
+                    textAlign: TextAlign.center,
+                    style: AppText.body(
+                      size: 12.5,
+                      weight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.88),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                FadeUp(
+                  index: 3,
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      LeadStatusPill(lead.status, onDark: true),
+                      LeadHeroPill(
+                        lead.sourceDetail == null || lead.sourceDetail!.isEmpty
+                            ? lead.source.label
+                            : '${lead.source.label} · ${lead.sourceDetail}',
+                        icon: leadSourceIcon(lead.source),
+                      ),
+                      if (lead.branch != null)
+                        LeadHeroPill(
+                          lead.branch!.name,
+                          icon: Icons.place_outlined,
+                        ),
+                      LeadHeroPill(
+                        lead.assignedTo?.name ?? 'Unassigned',
+                        icon: Icons.person_rounded,
+                      ),
+                      if (lead.isOpen && lead.nextFollowUpAt != null)
+                        FollowUpBadge(lead, onDark: true),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                FadeUp(
+                  index: 4,
+                  child: Row(
+                    children: [
+                      if (hasPhone)
+                        Expanded(
+                          child: LeadHeroAction(
+                            label: 'Call',
+                            icon: Icons.call_rounded,
+                            onTap: () => leadCall(context, lead.phone),
+                          ),
+                        ),
+                      if (hasPhone) const SizedBox(width: 8),
+                      if (hasPhone)
+                        Expanded(
+                          child: LeadHeroAction(
+                            label: 'WhatsApp',
+                            icon: Icons.chat_rounded,
+                            onTap: () => leadWhatsApp(context, lead.phone),
+                          ),
+                        ),
+                      if (hasPhone && canEdit) const SizedBox(width: 8),
+                      if (canEdit)
+                        Expanded(
+                          child: LeadHeroAction(
+                            label: 'Edit',
+                            icon: Icons.edit_rounded,
+                            onTap: busy ? null : onEdit,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (canConvert) ...[
+                  const SizedBox(height: 10),
+                  FadeUp(
+                    index: 5,
+                    child: ShimmerButton(
+                      colors: const [
+                        LeadColors.green,
+                        LeadColors.teal,
+                      ],
+                      onTap: busy ? null : onConvert,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.how_to_reg_rounded,
+                            size: 18,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Convert to member',
+                            style: AppText.body(
+                              size: 14.5,
+                              weight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── summary tiles ────────────────────────────────────────────────────────
+
+class _SummaryTiles extends StatelessWidget {
+  const _SummaryTiles({required this.lead, required this.onFollowUp});
+
+  final Lead lead;
+  final VoidCallback? onFollowUp;
+
+  @override
+  Widget build(BuildContext context) {
+    final age = lead.ageDays();
+    final manual = lead.activities.where((a) => !a.isSystem).length;
+    final fuColor = leadFollowUpColor(lead.followUpState);
+    final fuText = !lead.isOpen
+        ? 'Closed'
+        : lead.nextFollowUpAt == null
+            ? 'None set'
+            : switch (lead.followUpState) {
+                'overdue' => 'Overdue',
+                'today' => 'Today',
+                _ => fmtWhen(lead.nextFollowUpAt),
+              };
+    return Row(
+      children: [
+        Expanded(
+          child: FadeUp(
+            index: 0,
+            child: _Tile(
+              icon: Icons.hourglass_bottom_rounded,
+              color: LeadColors.indigo,
+              label: 'Days as lead',
+              value: age == null
+                  ? const Text('–')
+                  : CountUp(
+                      value: age,
+                      style:
+                          AppText.display(size: 22, color: LeadColors.indigo),
+                    ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: FadeUp(
+            index: 1,
+            child: _Tile(
+              icon: Icons.forum_rounded,
+              color: LeadColors.teal,
+              label: 'Touchpoints',
+              value: CountUp(
+                value: manual,
+                style: AppText.display(size: 22, color: LeadColors.teal),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: FadeUp(
+            index: 2,
+            child: _Tile(
+              icon: Icons.alarm_rounded,
+              color: fuColor,
+              label: onFollowUp == null ? 'Follow-up' : 'Follow-up · tap',
+              onTap: onFollowUp,
+              value: Text(
+                fuText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.display(size: 15, color: fuColor),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Tile extends StatelessWidget {
+  const _Tile({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.value,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String label;
+  final Widget value;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          height: 84,
+          padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [color.withValues(alpha: 0.16), Colors.transparent],
+            ),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: color.withValues(alpha: 0.24)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 16, color: color),
+              const Spacer(),
+              value,
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppText.body(
+                  size: 10,
+                  color: AppColors.inkFaint,
+                  weight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── pipeline ─────────────────────────────────────────────────────────────
+
+/// Highest open-pipeline index this lead ever reached (from the timeline),
+/// so a LOST lead still shows how far it got.
+int _reachedIndex(Lead lead) {
+  var idx = 0;
+  for (final a in lead.activities) {
+    for (final st in [a.toStatus, a.fromStatus]) {
+      if (st == null) continue;
+      final i = LeadStatus.pipeline.indexOf(LeadStatus.parse(st));
+      if (i > idx) idx = i;
+    }
+  }
+  return idx;
+}
+
+class _PipelinePanel extends StatelessWidget {
+  const _PipelinePanel({
+    required this.lead,
+    required this.busy,
+    required this.canUpdate,
+    required this.canAssign,
+    required this.onStage,
+    required this.onLost,
+    required this.onAssign,
+  });
+
+  final Lead lead;
+  final bool busy;
+  final bool canUpdate;
+  final bool canAssign;
+  final VoidCallback onStage;
+  final VoidCallback onLost;
+  final VoidCallback onAssign;
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = LeadStatus.pipeline;
+    final lost = lead.status == LeadStatus.lost;
+    final cur = lost ? _reachedIndex(lead) : steps.indexOf(lead.status);
+    final color = leadStatusColor(lead.status);
+    final subtitle = lost
+        ? 'Lost — reopen to continue'
+        : lead.status == LeadStatus.converted
+            ? 'Joined as a member'
+            : 'Where this lead is in the funnel';
     final member = lead.convertedMember;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: _card(),
+    final buttons = <Widget>[
+      if (canUpdate && lead.isOpen)
+        _PillButton(
+          label: 'Move stage',
+          icon: Icons.swap_horiz_rounded,
+          color: LeadColors.indigo,
+          onTap: busy ? null : onStage,
+        ),
+      if (canUpdate && lead.isOpen)
+        _PillButton(
+          label: 'Mark lost',
+          icon: Icons.cancel_rounded,
+          color: LeadColors.rose,
+          onTap: busy ? null : onLost,
+        ),
+      if (canUpdate && lost)
+        _PillButton(
+          label: 'Reopen',
+          icon: Icons.restart_alt_rounded,
+          color: LeadColors.teal,
+          onTap: busy ? null : onStage,
+        ),
+      if (canAssign && lead.status != LeadStatus.converted)
+        _PillButton(
+          label: 'Assign',
+          icon: Icons.person_add_alt_rounded,
+          color: LeadColors.violet,
+          onTap: busy ? null : onAssign,
+        ),
+    ];
+    return LeadPanel(
+      icon: leadStatusIcon(lead.status),
+      color: color,
+      title: 'Pipeline progress',
+      subtitle: subtitle,
+      badge: lead.status.label,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(lead.name, style: AppText.display(size: 20)),
-              ),
-              LeadStatusPill(lead.status),
-            ],
+          LayoutBuilder(
+            builder: (context, c) {
+              final w = c.maxWidth / steps.length;
+              return SizedBox(
+                height: 64,
+                child: Stack(
+                  children: [
+                    for (var i = 0; i < steps.length - 1; i++)
+                      Positioned(
+                        top: 14,
+                        left: w * i + w / 2 + 14,
+                        width: w - 28,
+                        child: Container(
+                          height: 3,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(3),
+                            color: i < cur
+                                ? (lost
+                                    ? LeadColors.slate
+                                    : leadStatusColor(steps[i + 1]))
+                                : AppColors.line,
+                          ),
+                        ),
+                      ),
+                    for (var i = 0; i < steps.length; i++)
+                      Positioned(
+                        left: w * i,
+                        width: w,
+                        top: 0,
+                        child: PopIn(
+                          index: i,
+                          child: _StepNode(
+                            status: steps[i],
+                            done: i <= cur,
+                            current: !lost && i == cur,
+                            muted: lost,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              );
+            },
           ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  lead.phone,
-                  style: AppText.body(size: 14, weight: FontWeight.w700),
+          if (lost && lead.lostReason != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Lost: ${LeadLostReason.labelOf(lead.lostReason!)}'
+                '${lead.lostNote == null || lead.lostNote!.isEmpty ? '' : ' — ${lead.lostNote}'}',
+                style: AppText.body(
+                  size: 12.5,
+                  weight: FontWeight.w700,
+                  color: LeadColors.rose,
                 ),
-              ),
-              if (lead.phone.isNotEmpty) ...[
-                LeadIconAction(
-                  icon: Icons.call_rounded,
-                  tooltip: 'Call',
-                  color: AppColors.success,
-                  onTap: () => leadCall(context, lead.phone),
-                ),
-                const SizedBox(width: 8),
-                LeadIconAction(
-                  icon: Icons.chat_rounded,
-                  tooltip: 'WhatsApp',
-                  color: AppColors.success,
-                  onTap: () => leadWhatsApp(context, lead.phone),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 14,
-            runSpacing: 6,
-            children: [
-              LeadMetaChip(
-                Icons.campaign_outlined,
-                lead.sourceDetail == null || lead.sourceDetail!.isEmpty
-                    ? lead.source.label
-                    : '${lead.source.label} · ${lead.sourceDetail}',
-              ),
-              LeadMetaChip(
-                Icons.person_outline_rounded,
-                lead.assignedTo?.name ?? 'Unassigned',
-              ),
-              if (leadAgeText(lead).isNotEmpty)
-                LeadMetaChip(Icons.schedule_rounded, leadAgeText(lead)),
-              if (lead.branch != null)
-                LeadMetaChip(Icons.storefront_outlined, lead.branch!.name),
-              if (lead.interestedPlan != null)
-                LeadMetaChip(
-                  Icons.card_membership_outlined,
-                  lead.interestedPlan!.name,
-                ),
-              if (lead.email != null && lead.email!.isNotEmpty)
-                LeadMetaChip(Icons.mail_outline_rounded, lead.email!),
-              if (lead.expectedJoinDate != null)
-                LeadMetaChip(
-                  Icons.event_outlined,
-                  'Joins ${fmtDay(lead.expectedJoinDate)}',
-                ),
-            ],
-          ),
-          if (lead.isOpen && lead.nextFollowUpAt != null) ...[
-            const SizedBox(height: 10),
-            FollowUpBadge(lead),
-          ],
-          if (lead.interest != null && lead.interest!.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            Text(
-              'Goal: ${lead.interest}',
-              style: AppText.body(size: 13, color: AppColors.inkSoft),
-            ),
-          ],
-          if (lead.notes != null && lead.notes!.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(
-              lead.notes!,
-              style: AppText.body(size: 13, color: AppColors.inkFaint),
-            ),
-          ],
-          if (lead.status == LeadStatus.lost) ...[
-            const SizedBox(height: 10),
-            Text(
-              'Lost: ${lead.lostReason == null ? 'no reason recorded' : LeadLostReason.labelOf(lead.lostReason!)}'
-              '${lead.lostNote == null || lead.lostNote!.isEmpty ? '' : ' — ${lead.lostNote}'}',
-              style: AppText.body(
-                size: 13,
-                color: AppColors.danger,
-                weight: FontWeight.w600,
               ),
             ),
-          ],
           if (lead.status == LeadStatus.converted) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 4),
             if (member != null)
               Material(
-                color: AppColors.successSoft,
+                color: LeadColors.green.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(AppRadii.field),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(AppRadii.field),
@@ -443,8 +1121,8 @@ class _Header extends StatelessWidget {
                       children: [
                         const Icon(
                           Icons.verified_rounded,
-                          color: AppColors.success,
-                          size: 18,
+                          color: LeadColors.green,
+                          size: 20,
                         ),
                         const SizedBox(width: 8),
                         Expanded(
@@ -453,14 +1131,14 @@ class _Header extends StatelessWidget {
                             '${member.memberId.isEmpty ? '' : ' · ${member.memberId}'}',
                             style: AppText.body(
                               size: 13,
-                              weight: FontWeight.w700,
-                              color: AppColors.success,
+                              weight: FontWeight.w800,
+                              color: LeadColors.green,
                             ),
                           ),
                         ),
                         const Icon(
                           Icons.chevron_right_rounded,
-                          color: AppColors.success,
+                          color: LeadColors.green,
                         ),
                       ],
                     ),
@@ -471,8 +1149,12 @@ class _Header extends StatelessWidget {
               Text(
                 'Converted${lead.convertedAt == null ? '' : ' on ${fmtDay(lead.convertedAt)}'}'
                 ' — no linked member record.',
-                style: AppText.body(size: 13, color: AppColors.success),
+                style: AppText.body(size: 13, color: LeadColors.green),
               ),
+          ],
+          if (buttons.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(spacing: 8, runSpacing: 8, children: buttons),
           ],
         ],
       ),
@@ -480,144 +1162,121 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _Stepper extends StatelessWidget {
-  const _Stepper({required this.lead});
+class _StepNode extends StatelessWidget {
+  const _StepNode({
+    required this.status,
+    required this.done,
+    required this.current,
+    required this.muted,
+  });
 
-  final Lead lead;
+  final LeadStatus status;
+  final bool done;
+  final bool current;
+  final bool muted;
 
   @override
   Widget build(BuildContext context) {
-    final steps = LeadStatus.pipeline;
-    final idx =
-        lead.status == LeadStatus.lost ? -1 : steps.indexOf(lead.status);
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-      decoration: _card(),
-      child: SizedBox(
-        height: 68,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          itemCount: steps.length,
-          separatorBuilder: (_, __) => Container(
-            width: 14,
-            height: 2,
-            margin: const EdgeInsets.only(top: 13),
-            color: AppColors.line,
+    final c = muted ? LeadColors.slate : leadStatusColor(status);
+    return Column(
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: done
+                ? LinearGradient(
+                    colors: [c, Color.lerp(c, LeadColors.fuchsia, 0.4)!],
+                  )
+                : null,
+            color: done ? null : AppColors.surface2,
+            border: Border.all(
+              color: done || current ? c : AppColors.line,
+              width: 2,
+            ),
+            boxShadow: current
+                ? [
+                    BoxShadow(
+                      color: c.withValues(alpha: 0.5),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                    ),
+                  ]
+                : null,
           ),
-          itemBuilder: (_, i) {
-            final done = idx >= 0 && i <= idx;
-            final current = i == idx;
-            final c = lead.status == LeadStatus.lost
-                ? AppColors.inkFaint
-                : leadStatusColor(steps[i]);
-            return SizedBox(
-              width: 66,
-              child: Column(
-                children: [
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: done ? c : Colors.transparent,
-                      border: Border.all(
-                        color: done || current ? c : AppColors.line,
-                        width: 2,
-                      ),
-                    ),
-                    child: done
-                        ? const Icon(
-                            Icons.check_rounded,
-                            size: 16,
-                            color: Colors.white,
-                          )
-                        : null,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    steps[i].label,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppText.body(
-                      size: 10,
-                      weight: current ? FontWeight.w800 : FontWeight.w600,
-                      color: current ? AppColors.ink : AppColors.inkFaint,
-                    ),
-                  ),
-                ],
+          child: Icon(
+            done ? leadStatusIcon(status) : Icons.circle_outlined,
+            size: done ? 15 : 10,
+            color: done ? Colors.white : AppColors.inkFaint,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          status.label,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: AppText.body(
+            size: 9.5,
+            weight: current ? FontWeight.w800 : FontWeight.w600,
+            color: current ? AppColors.ink : AppColors.inkFaint,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PillButton extends StatelessWidget {
+  const _PillButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Opacity(
+        opacity: onTap == null ? 0.5 : 1,
+        child: Container(
+          height: 38,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(99),
+            border: Border.all(color: color.withValues(alpha: 0.45)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: AppText.body(
+                  size: 12.5,
+                  weight: FontWeight.w800,
+                  color: color,
+                ),
               ),
-            );
-          },
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _Actions extends StatelessWidget {
-  const _Actions({
-    required this.lead,
-    required this.busy,
-    required this.canUpdate,
-    required this.canConvert,
-    required this.canAssign,
-    required this.onStage,
-    required this.onReopen,
-    required this.onConvert,
-    required this.onAssign,
-  });
-
-  final Lead lead;
-  final bool busy;
-  final bool canUpdate;
-  final bool canConvert;
-  final bool canAssign;
-  final VoidCallback onStage;
-  final VoidCallback onReopen;
-  final VoidCallback onConvert;
-  final VoidCallback onAssign;
-
-  @override
-  Widget build(BuildContext context) {
-    final buttons = <Widget>[
-      if (canUpdate && lead.isOpen)
-        AppButton(
-          label: 'Change stage',
-          icon: Icons.swap_horiz_rounded,
-          variant: AppButtonVariant.ghost,
-          fullWidth: false,
-          loading: false,
-          onPressed: busy ? null : onStage,
-        ),
-      if (canUpdate && lead.status == LeadStatus.lost)
-        AppButton(
-          label: 'Reopen',
-          icon: Icons.restart_alt_rounded,
-          variant: AppButtonVariant.ghost,
-          fullWidth: false,
-          onPressed: busy ? null : onReopen,
-        ),
-      if (canConvert && lead.status != LeadStatus.converted)
-        AppButton(
-          label: 'Convert to member',
-          icon: Icons.how_to_reg_rounded,
-          fullWidth: false,
-          onPressed: busy ? null : onConvert,
-        ),
-      if (canAssign && lead.status != LeadStatus.converted)
-        AppButton(
-          label: 'Assign',
-          icon: Icons.person_add_alt_rounded,
-          variant: AppButtonVariant.ghost,
-          fullWidth: false,
-          onPressed: busy ? null : onAssign,
-        ),
-    ];
-    if (buttons.isEmpty) return const SizedBox.shrink();
-    return Wrap(spacing: 8, runSpacing: 8, children: buttons);
-  }
-}
+// ── composer ─────────────────────────────────────────────────────────────
 
 class _Composer extends StatefulWidget {
   const _Composer({required this.lead, required this.busy});
@@ -631,6 +1290,7 @@ class _Composer extends StatefulWidget {
 
 class _ComposerState extends State<_Composer> {
   final _note = TextEditingController();
+  final _outcome = TextEditingController();
   LeadActivityType _type = LeadActivityType.call;
   DateTime? _next;
   String? _error;
@@ -638,6 +1298,7 @@ class _ComposerState extends State<_Composer> {
   @override
   void dispose() {
     _note.dispose();
+    _outcome.dispose();
     super.dispose();
   }
 
@@ -652,17 +1313,21 @@ class _ComposerState extends State<_Composer> {
       return;
     }
     setState(() => _error = null);
+    final label = _type.label;
     final err = await context.read<LeadDetailCubit>().addActivity(
           _type,
           note: note,
+          outcome: _outcome.text.trim(),
           nextFollowUpAt: _next,
         );
     if (!mounted) return;
     if (err != null) {
       setState(() => _error = err);
     } else {
+      leadToast(context, '$label logged');
       setState(() {
         _note.clear();
+        _outcome.clear();
         _next = null;
       });
     }
@@ -671,35 +1336,61 @@ class _ComposerState extends State<_Composer> {
   @override
   Widget build(BuildContext context) {
     final open = widget.lead.isOpen;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: _card(),
+    return LeadPanel(
+      icon: Icons.add_comment_rounded,
+      color: LeadColors.violet,
+      title: 'Log activity',
+      subtitle: 'Calls, visits, notes and follow-ups',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('LOG ACTIVITY', style: AppText.eyebrow()),
-          const SizedBox(height: 10),
-          CategoryChipSelector<LeadActivityType>(
-            options: LeadActivityType.manual,
-            labelOf: (t) => t.label,
+          LeadChipGroup<LeadActivityType>(
+            label: 'TYPE',
+            icon: Icons.category_rounded,
+            color: LeadColors.violet,
+            options: [
+              for (final t in LeadActivityType.manual)
+                if (open || t != LeadActivityType.followUp) t,
+            ],
             value: _type,
-            onChanged: (t) => setState(() => _type = t),
+            labelOf: (t) => t.label,
+            iconOf: leadActivityIcon,
+            colorOf: leadActivityColor,
+            onChanged: (t) => setState(() => _type = t ?? _type),
           ),
           const SizedBox(height: 12),
           AppLabeledField(
             label: _type == LeadActivityType.note ? 'Note' : 'Note (optional)',
             controller: _note,
+            icon: Icons.sticky_note_2_rounded,
+            iconColor: leadActivityColor(_type),
+            hintText: _type == LeadActivityType.note
+                ? 'Write a note…'
+                : 'What was discussed?',
             minLines: 2,
             maxLines: 4,
             errorText: _error,
           ),
+          const SizedBox(height: 12),
+          AppLabeledField(
+            label: 'Outcome (optional)',
+            controller: _outcome,
+            icon: Icons.fact_check_rounded,
+            iconColor: LeadColors.green,
+            hintText: 'Interested, call back…',
+            inputFormatters: [LengthLimitingTextInputFormatter(120)],
+          ),
           if (open) ...[
             const SizedBox(height: 12),
-            LeadPickerField(
+            LeadValueField(
               label: _type == LeadActivityType.followUp
                   ? 'Follow-up at'
                   : 'Next follow-up (optional)',
-              value: _next == null ? null : fmtWhen(_next),
+              icon: Icons.alarm_rounded,
+              color: LeadColors.amber,
+              text: _next == null ? null : fmtWhen(_next),
+              hint: 'Pick date & time',
+              trailingIcon: Icons.calendar_month_rounded,
               onTap: () async {
                 final d = await pickDateTime(context, initial: _next);
                 if (d != null) setState(() => _next = d);
@@ -708,10 +1399,31 @@ class _ComposerState extends State<_Composer> {
             ),
           ],
           const SizedBox(height: 14),
-          AppButton(
-            label: 'Log activity',
-            loading: widget.busy,
-            onPressed: widget.busy ? null : _log,
+          ShimmerButton(
+            colors: const [
+              LeadColors.indigo,
+              LeadColors.violet,
+              LeadColors.fuchsia,
+            ],
+            onTap: widget.busy ? null : _log,
+            padding: const EdgeInsets.symmetric(vertical: 13),
+            child: widget.busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(
+                    'Log activity',
+                    style: AppText.body(
+                      size: 14.5,
+                      weight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
         ],
       ),
@@ -719,25 +1431,40 @@ class _ComposerState extends State<_Composer> {
   }
 }
 
-IconData _activityIcon(LeadActivityType? t) => switch (t) {
-      LeadActivityType.call => Icons.call_rounded,
-      LeadActivityType.whatsapp => Icons.chat_rounded,
-      LeadActivityType.email => Icons.mail_outline_rounded,
-      LeadActivityType.visit => Icons.directions_walk_rounded,
-      LeadActivityType.trial => Icons.fitness_center_rounded,
-      LeadActivityType.followUp => Icons.event_repeat_rounded,
-      LeadActivityType.note => Icons.sticky_note_2_outlined,
-      LeadActivityType.statusChange => Icons.swap_horiz_rounded,
-      LeadActivityType.assignment => Icons.person_add_alt_rounded,
-      LeadActivityType.created => Icons.add_circle_outline_rounded,
-      LeadActivityType.converted => Icons.verified_rounded,
-      null => Icons.circle_outlined,
-    };
+// ── timeline ─────────────────────────────────────────────────────────────
+
+class _Timeline extends StatelessWidget {
+  const _Timeline(this.activities);
+
+  final List<LeadActivity> activities;
+
+  @override
+  Widget build(BuildContext context) {
+    return LeadPanel(
+      icon: Icons.history_rounded,
+      color: LeadColors.indigo,
+      title: 'Activity',
+      badge: '${activities.length} events',
+      child: activities.isEmpty
+          ? const LeadEmptyLine('No activity yet.')
+          : Column(
+              children: [
+                for (var i = 0; i < activities.length; i++)
+                  _ActivityTile(
+                    activities[i],
+                    last: i == activities.length - 1,
+                  ),
+              ],
+            ),
+    );
+  }
+}
 
 class _ActivityTile extends StatelessWidget {
-  const _ActivityTile(this.a);
+  const _ActivityTile(this.a, {required this.last});
 
   final LeadActivity a;
+  final bool last;
 
   String get _title {
     if (a.type == LeadActivityType.statusChange) {
@@ -752,20 +1479,79 @@ class _ActivityTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final system = a.isSystem;
-    final who = a.createdBy?.name;
+    final c = leadActivityColor(a.type);
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 34,
+            child: Column(
+              children: [
+                Container(
+                  width: system ? 24 : 32,
+                  height: system ? 24 : 32,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: c.withValues(alpha: system ? 0.12 : 0.18),
+                    border: Border.all(color: c.withValues(alpha: 0.5)),
+                  ),
+                  child: Icon(
+                    leadActivityIcon(a.type),
+                    size: system ? 12 : 16,
+                    color: c,
+                  ),
+                ),
+                if (!last)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      margin: const EdgeInsets.symmetric(vertical: 3),
+                      color: AppColors.line,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: last ? 0 : 10),
+              child: system
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: _body(context, c, system),
+                    )
+                  : Container(
+                      padding: const EdgeInsets.all(11),
+                      decoration: BoxDecoration(
+                        color: c.withValues(alpha: 0.07),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: c.withValues(alpha: 0.2)),
+                      ),
+                      child: _body(context, c, system),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _body(BuildContext context, Color c, bool system) {
     final meta = [
-      if (who != null && who.isNotEmpty) who,
-      if (a.createdAt != null) fmtWhen(a.createdAt),
+      if (a.createdBy?.name != null && a.createdBy!.name.isNotEmpty)
+        a.createdBy!.name,
+      if (a.createdAt != null) relativeTime(a.createdAt),
     ].join(' · ');
-    // System events: compact, muted, no card. Manual: full card.
-    final body = Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           _title,
           style: AppText.body(
             size: system ? 12.5 : 13.5,
-            weight: system ? FontWeight.w600 : FontWeight.w800,
+            weight: system ? FontWeight.w700 : FontWeight.w800,
             color: system ? AppColors.inkSoft : AppColors.ink,
           ),
         ),
@@ -777,149 +1563,35 @@ class _ActivityTile extends StatelessWidget {
               style: AppText.body(size: 13, color: AppColors.inkSoft),
             ),
           ),
+        if (a.outcome != null && a.outcome!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: LeadTagChip(
+              icon: Icons.fact_check_rounded,
+              label: a.outcome!,
+              color: LeadColors.green,
+              maxWidth: 260,
+            ),
+          ),
         if (a.scheduledFor != null)
           Padding(
-            padding: const EdgeInsets.only(top: 3),
-            child: Text(
-              'Scheduled ${fmtWhen(a.scheduledFor)}',
-              style: AppText.body(size: 12, color: AppColors.warning),
+            padding: const EdgeInsets.only(top: 6),
+            child: LeadTagChip(
+              icon: Icons.event_rounded,
+              label: 'Scheduled ${fmtWhen(a.scheduledFor)}',
+              color: LeadColors.amber,
+              maxWidth: 260,
             ),
           ),
         if (meta.isNotEmpty)
           Padding(
-            padding: const EdgeInsets.only(top: 3),
+            padding: const EdgeInsets.only(top: 4),
             child: Text(
               meta,
               style: AppText.body(size: 11, color: AppColors.inkFaint),
             ),
           ),
       ],
-    );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Container(
-        padding: EdgeInsets.all(system ? 8 : 12),
-        decoration: system
-            ? BoxDecoration(
-                border: Border(
-                  left: BorderSide(
-                    color: AppColors.line.withValues(alpha: 0.9),
-                    width: 2,
-                  ),
-                ),
-              )
-            : _card(),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              _activityIcon(a.type),
-              size: system ? 16 : 20,
-              color: system ? AppColors.inkFaint : AppColors.staffB,
-            ),
-            const SizedBox(width: 10),
-            Expanded(child: body),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _LostSheet extends StatefulWidget {
-  const _LostSheet();
-
-  @override
-  State<_LostSheet> createState() => _LostSheetState();
-}
-
-class _LostSheetState extends State<_LostSheet> {
-  LeadLostReason? _reason;
-  final _note = TextEditingController();
-  String? _error;
-
-  @override
-  void dispose() {
-    _note.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          18,
-          0,
-          18,
-          16 + MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Why was this lead lost?', style: AppText.display(size: 18)),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final r in LeadLostReason.values)
-                    ChoiceChip(
-                      label: Text(r.label),
-                      selected: _reason == r,
-                      showCheckmark: false,
-                      onSelected: (_) => setState(() {
-                        _reason = r;
-                        _error = null;
-                      }),
-                      backgroundColor: AppColors.surface2,
-                      selectedColor: AppColors.dangerSoft,
-                      side: BorderSide(
-                        color: _reason == r ? AppColors.danger : AppColors.line,
-                      ),
-                      labelStyle: AppText.body(
-                        size: 12,
-                        weight: FontWeight.w700,
-                        color:
-                            _reason == r ? AppColors.danger : AppColors.inkSoft,
-                      ),
-                    ),
-                ],
-              ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    _error!,
-                    style: AppText.body(size: 12, color: AppColors.danger),
-                  ),
-                ),
-              const SizedBox(height: 12),
-              AppLabeledField(
-                label: 'Note (optional)',
-                controller: _note,
-                minLines: 1,
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16),
-              AppButton(
-                label: 'Mark as lost',
-                onPressed: () {
-                  if (_reason == null) {
-                    setState(() => _error = 'Pick a reason');
-                    return;
-                  }
-                  final n = _note.text.trim();
-                  Navigator.of(context).pop(
-                    (reason: _reason!, note: n.isEmpty ? null : n),
-                  );
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

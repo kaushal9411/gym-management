@@ -58,7 +58,7 @@ class PlanMeal {
         id: json['id'] as String,
         food: Food.fromJson(json['food'] as Map<String, dynamic>),
         mealType: MealTypeX.fromApi(json['mealType'] as String),
-        sortOrder: json['sortOrder'] as int? ?? 0,
+        sortOrder: _int(json['sortOrder']) ?? 0,
         quantity: double.tryParse('${json['quantity'] ?? 1}') ?? 1,
         notes: json['notes'] as String?,
       );
@@ -116,6 +116,8 @@ class DietPlan {
   final DateTime? deletedAt;
   final List<PlanMeal> meals;
 
+  bool get isDeleted => deletedAt != null;
+
   Map<MealType, List<PlanMeal>> get mealsByType {
     final grouped = <MealType, List<PlanMeal>>{};
     for (final m in meals) {
@@ -127,10 +129,10 @@ class DietPlan {
   factory DietPlan.fromJson(Map<String, dynamic> json) => DietPlan(
         id: json['id'] as String,
         name: json['name'] as String,
-        dailyCalories: json['dailyCalories'] as int?,
-        durationDays: json['durationDays'] as int,
+        dailyCalories: _int(json['dailyCalories']),
+        durationDays: _int(json['durationDays']) ?? 0,
         isActive: json['isActive'] as bool? ?? true,
-        activeMemberCount: json['activeMemberCount'] as int? ?? 0,
+        activeMemberCount: _int(json['activeMemberCount']) ?? 0,
         goal: json['goal'] as String?,
         description: json['description'] as String?,
         trainer: json['trainer'] == null
@@ -152,4 +154,10 @@ class DietPlan {
                 .map((e) => PlanMeal.fromJson(e as Map<String, dynamic>))
                 .toList(),
       );
+}
+
+int? _int(Object? v) {
+  if (v == null) return null;
+  if (v is num) return v.toInt();
+  return int.tryParse(v.toString());
 }

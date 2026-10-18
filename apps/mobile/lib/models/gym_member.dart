@@ -153,6 +153,25 @@ class PlanUsage {
       );
 }
 
+/// One row of `GET /members/:id/guest-visits`.
+class GuestVisit {
+  const GuestVisit({
+    required this.id,
+    required this.guestName,
+    required this.visitedAt,
+  });
+
+  final String id;
+  final String? guestName;
+  final DateTime visitedAt;
+
+  factory GuestVisit.fromJson(Map<String, dynamic> json) => GuestVisit(
+        id: json['id'] as String,
+        guestName: json['guestName'] as String?,
+        visitedAt: DateTime.parse(json['visitedAt'] as String),
+      );
+}
+
 class GymMember {
   const GymMember({
     required this.id,
@@ -196,6 +215,21 @@ class GymMember {
     this.allergies,
     this.fitnessGoals,
     this.notes,
+    this.lastCheckInAt,
+    this.visitsThisMonth = 0,
+    this.biometricId,
+    this.fatherNameOrAadhaar,
+    this.maritalStatus,
+    this.anniversary,
+    this.goal,
+    this.registrationFee,
+    this.bodyType,
+    this.foodPreference,
+    this.awarenessSource,
+    this.healthScreeningOtherDetails,
+    this.referredByName,
+    this.referredByMemberCode,
+    this.healthFlags = const {},
   });
 
   final String id;
@@ -261,6 +295,32 @@ class GymMember {
   final String? fitnessGoals;
   final String? notes;
 
+  /// Most recent attendance check-in — `null` if never checked in. Filled
+  /// on the list endpoint only (mirrors `MemberListItemDto`); null on a
+  /// `GymMember` read off the detail endpoint.
+  final DateTime? lastCheckInAt;
+
+  /// Attendance check-ins since the 1st of the current month. `0` on a
+  /// `GymMember` read off the detail endpoint (list endpoint only).
+  final int visitsThisMonth;
+
+  /// Detail-only extended profile (`GET /members/:id`).
+  final String? biometricId;
+  final String? fatherNameOrAadhaar;
+  final String? maritalStatus;
+  final String? anniversary;
+  final String? goal;
+  final String? registrationFee;
+  final String? bodyType;
+  final String? foodPreference;
+  final String? awarenessSource;
+  final String? healthScreeningOtherDetails;
+  final String? referredByName;
+  final String? referredByMemberCode;
+
+  /// Health-screening checklist, label -> ticked.
+  final Map<String, bool> healthFlags;
+
   factory GymMember.fromJson(Map<String, dynamic> json) => GymMember(
         id: json['id'] as String,
         memberId: json['memberId'] as String,
@@ -317,8 +377,8 @@ class GymMember {
         gender: json['gender'] as String?,
         dateOfBirth: json['dateOfBirth'] as String?,
         bloodGroup: json['bloodGroup'] as String?,
-        height: (json['height'] as num?)?.toDouble(),
-        weight: (json['weight'] as num?)?.toDouble(),
+        height: double.tryParse(json['height']?.toString() ?? ''),
+        weight: double.tryParse(json['weight']?.toString() ?? ''),
         occupation: json['occupation'] as String?,
         addressLine: json['addressLine'] as String?,
         city: json['city'] as String?,
@@ -332,5 +392,36 @@ class GymMember {
         allergies: json['allergies'] as String?,
         fitnessGoals: json['fitnessGoals'] as String?,
         notes: json['notes'] as String?,
+        lastCheckInAt: json['lastCheckInAt'] == null
+            ? null
+            : DateTime.parse(json['lastCheckInAt'] as String),
+        visitsThisMonth: json['visitsThisMonth'] as int? ?? 0,
+        biometricId: json['biometricId'] as String?,
+        fatherNameOrAadhaar: json['fatherNameOrAadhaar'] as String?,
+        maritalStatus: json['maritalStatus'] as String?,
+        anniversary: json['anniversary'] as String?,
+        goal: json['goal'] as String?,
+        registrationFee: json['registrationFee']?.toString(),
+        bodyType: json['bodyType'] as String?,
+        foodPreference: json['foodPreference'] as String?,
+        awarenessSource: json['awarenessSource'] as String?,
+        healthScreeningOtherDetails:
+            json['healthScreeningOtherDetails'] as String?,
+        referredByName: (json['referredByMember']
+            as Map<String, dynamic>?)?['name'] as String?,
+        referredByMemberCode: (json['referredByMember']
+            as Map<String, dynamic>?)?['memberId'] as String?,
+        healthFlags: {
+          for (final e in const {
+            'healthHeartCondition': 'Heart condition',
+            'healthPainDuringActivity': 'Pain during activity',
+            'healthDizzinessOrBalance': 'Dizziness / balance',
+            'healthDiabetesOrBp': 'Diabetes / BP',
+            'healthAsthma': 'Asthma',
+            'healthBoneOrJointProblem': 'Bone / joint problem',
+            'healthOtherCondition': 'Other condition',
+          }.entries)
+            e.value: json[e.key] as bool? ?? false,
+        },
       );
 }

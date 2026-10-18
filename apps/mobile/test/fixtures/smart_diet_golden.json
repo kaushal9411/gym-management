@@ -1,0 +1,2657 @@
+{
+ "maleCut#0": {
+  "status": "ok",
+  "targets": {
+   "age": 36,
+   "bmr": 1822.5,
+   "vpw": 4,
+   "tdee": 2824.875,
+   "raw": 2259.9,
+   "kcal": 2260,
+   "p": 170,
+   "c": 250,
+   "f": 65,
+   "floored": false,
+   "pCapped": true
+  },
+  "review": [],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Egg whites, boiled",
+      3.25
+     ],
+     [
+      "Idli",
+      1.5
+     ],
+     [
+      "Banana",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "PRE_WORKOUT",
+    "items": [
+     [
+      "Sweet potato, boiled",
+      1.5
+     ],
+     [
+      "Dates",
+      1.25
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Chicken breast, grilled",
+      1.25
+     ],
+     [
+      "White rice, steamed",
+      1.5
+     ],
+     [
+      "Cucumber and tomato salad",
+      4
+     ],
+     [
+      "Ghee",
+      3
+     ]
+    ]
+   },
+   {
+    "type": "POST_WORKOUT",
+    "items": [
+     [
+      "Whey protein",
+      1.25
+     ],
+     [
+      "Orange",
+      2
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Rohu fish, grilled",
+      2
+     ],
+     [
+      "Brown rice, cooked",
+      1.5
+     ],
+     [
+      "Broccoli, steamed",
+      3.75
+     ],
+     [
+      "Olive oil",
+      4
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 2293.75,
+   "p": 181,
+   "c": 278.275,
+   "f": 52.949999999999996,
+   "sugar": 91.5,
+   "sodium": 1335.5
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 88.5 + 6.25 x 178 - 5 x 36 + 5 = 1,823 kcal",
+   "Activity x1.55 (Moderately active, 4 visits a week) gives 2,825 kcal",
+   "Goal weight loss -20% gives 2,260 kcal, rounded to 2,260",
+   "Protein 170 g (capped at 30% of calories), fat 65 g, carbohydrate 250 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian, eggetarian, non-veg. Excluded for allergens: none"
+  ]
+ },
+ "maleCut#swap": {
+  "swaps": [
+   [
+    "Tofu, firm",
+    1.25
+   ],
+   [
+    "Curd, thick (hung)",
+    1.75
+   ],
+   [
+    "Soy milk, unsweetened",
+    2
+   ],
+   [
+    "Egg, boiled",
+    2.25
+   ],
+   [
+    "Paneer",
+    0.75
+   ],
+   [
+    "Milk, toned",
+    1.25
+   ]
+  ],
+  "afterSwap": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Tofu, firm",
+      1.25,
+      true
+     ],
+     [
+      "Idli",
+      1.5,
+      false
+     ],
+     [
+      "Banana",
+      1,
+      false
+     ]
+    ]
+   },
+   {
+    "type": "PRE_WORKOUT",
+    "items": [
+     [
+      "Sweet potato, boiled",
+      1.5,
+      false
+     ],
+     [
+      "Dates",
+      1.25,
+      false
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Chicken breast, grilled",
+      1.25,
+      false
+     ],
+     [
+      "White rice, steamed",
+      1.5,
+      false
+     ],
+     [
+      "Cucumber and tomato salad",
+      4,
+      false
+     ],
+     [
+      "Ghee",
+      3,
+      false
+     ]
+    ]
+   },
+   {
+    "type": "POST_WORKOUT",
+    "items": [
+     [
+      "Whey protein",
+      1.25,
+      false
+     ],
+     [
+      "Orange",
+      2,
+      false
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Rohu fish, grilled",
+      2,
+      false
+     ],
+     [
+      "Brown rice, cooked",
+      1.5,
+      false
+     ],
+     [
+      "Broccoli, steamed",
+      3.75,
+      false
+     ],
+     [
+      "Olive oil",
+      4,
+      false
+     ]
+    ]
+   }
+  ],
+  "afterSetQty": [
+   [
+    "Chicken breast, grilled",
+    3.25,
+    true
+   ],
+   [
+    "White rice, steamed",
+    1.5,
+    false
+   ],
+   [
+    "Cucumber and tomato salad",
+    4,
+    false
+   ],
+   [
+    "Ghee",
+    3,
+    false
+   ]
+  ]
+ },
+ "maleCut#1": {
+  "status": "ok",
+  "targets": {
+   "age": 36,
+   "bmr": 1822.5,
+   "vpw": 4,
+   "tdee": 2824.875,
+   "raw": 2259.9,
+   "kcal": 2260,
+   "p": 170,
+   "c": 250,
+   "f": 65,
+   "floored": false,
+   "pCapped": true
+  },
+  "review": [],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Tofu, firm",
+      1.25
+     ],
+     [
+      "Whole wheat bread",
+      1.5
+     ],
+     [
+      "Papaya",
+      1.5
+     ]
+    ]
+   },
+   {
+    "type": "PRE_WORKOUT",
+    "items": [
+     [
+      "Sweet potato, boiled",
+      1.5
+     ],
+     [
+      "Banana",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Chicken breast, grilled",
+      1.25
+     ],
+     [
+      "White rice, steamed",
+      2
+     ],
+     [
+      "Lauki sabzi",
+      1.75
+     ],
+     [
+      "Ghee",
+      1.5
+     ]
+    ]
+   },
+   {
+    "type": "POST_WORKOUT",
+    "items": [
+     [
+      "Egg whites, boiled",
+      2.75
+     ],
+     [
+      "White rice, steamed",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Rohu fish, grilled",
+      2
+     ],
+     [
+      "Roti, whole wheat",
+      1.75
+     ],
+     [
+      "Broccoli, steamed",
+      3.75
+     ],
+     [
+      "Olive oil",
+      1.75
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 2290.75,
+   "p": 174.22500000000002,
+   "c": 289.675,
+   "f": 52.425,
+   "sugar": 56.175,
+   "sodium": 1896.25
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 88.5 + 6.25 x 178 - 5 x 36 + 5 = 1,823 kcal",
+   "Activity x1.55 (Moderately active, 4 visits a week) gives 2,825 kcal",
+   "Goal weight loss -20% gives 2,260 kcal, rounded to 2,260",
+   "Protein 170 g (capped at 30% of calories), fat 65 g, carbohydrate 250 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian, eggetarian, non-veg. Excluded for allergens: none"
+  ]
+ },
+ "maleCut#2": {
+  "status": "ok",
+  "targets": {
+   "age": 36,
+   "bmr": 1822.5,
+   "vpw": 4,
+   "tdee": 2824.875,
+   "raw": 2259.9,
+   "kcal": 2260,
+   "p": 170,
+   "c": 250,
+   "f": 65,
+   "floored": false,
+   "pCapped": true
+  },
+  "review": [],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Curd, thick (hung)",
+      1.75
+     ],
+     [
+      "Whole wheat bread",
+      1.5
+     ],
+     [
+      "Banana",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "PRE_WORKOUT",
+    "items": [
+     [
+      "Poha",
+      0.5
+     ],
+     [
+      "Dates",
+      1.25
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Rohu fish, grilled",
+      1.75
+     ],
+     [
+      "White rice, steamed",
+      2
+     ],
+     [
+      "Broccoli, steamed",
+      3
+     ],
+     [
+      "Ghee",
+      3
+     ]
+    ]
+   },
+   {
+    "type": "POST_WORKOUT",
+    "items": [
+     [
+      "Egg whites, boiled",
+      2.75
+     ],
+     [
+      "White rice, steamed",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Chicken breast, grilled",
+      1.5
+     ],
+     [
+      "White rice, steamed",
+      1.5
+     ],
+     [
+      "Cucumber and tomato salad",
+      4
+     ],
+     [
+      "Ghee",
+      1.5
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 2279,
+   "p": 166.05,
+   "c": 286.925,
+   "f": 52.699999999999996,
+   "sugar": 68.525,
+   "sodium": 1448.25
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 88.5 + 6.25 x 178 - 5 x 36 + 5 = 1,823 kcal",
+   "Activity x1.55 (Moderately active, 4 visits a week) gives 2,825 kcal",
+   "Goal weight loss -20% gives 2,260 kcal, rounded to 2,260",
+   "Protein 170 g (capped at 30% of calories), fat 65 g, carbohydrate 250 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian, eggetarian, non-veg. Excluded for allergens: none"
+  ]
+ },
+ "maleCut#5": {
+  "status": "ok",
+  "targets": {
+   "age": 36,
+   "bmr": 1822.5,
+   "vpw": 4,
+   "tdee": 2824.875,
+   "raw": 2259.9,
+   "kcal": 2260,
+   "p": 170,
+   "c": 250,
+   "f": 65,
+   "floored": false,
+   "pCapped": true
+  },
+  "review": [],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Egg whites, boiled",
+      3.25
+     ],
+     [
+      "Idli",
+      1.5
+     ],
+     [
+      "Banana",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "PRE_WORKOUT",
+    "items": [
+     [
+      "Whole wheat bread",
+      0.75
+     ],
+     [
+      "Dates",
+      1.25
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Soya chunks, cooked",
+      1.5
+     ],
+     [
+      "White rice, steamed",
+      1.5
+     ],
+     [
+      "Cucumber and tomato salad",
+      4
+     ],
+     [
+      "Ghee",
+      2.25
+     ]
+    ]
+   },
+   {
+    "type": "POST_WORKOUT",
+    "items": [
+     [
+      "Whey protein",
+      1.25
+     ],
+     [
+      "Banana",
+      1.25
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Rohu fish, grilled",
+      2
+     ],
+     [
+      "Roti, whole wheat",
+      1.75
+     ],
+     [
+      "Lauki sabzi",
+      2.25
+     ],
+     [
+      "Olive oil",
+      4
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 2289,
+   "p": 171.05,
+   "c": 286.025,
+   "f": 53.175,
+   "sugar": 81.9,
+   "sodium": 1974
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 88.5 + 6.25 x 178 - 5 x 36 + 5 = 1,823 kcal",
+   "Activity x1.55 (Moderately active, 4 visits a week) gives 2,825 kcal",
+   "Goal weight loss -20% gives 2,260 kcal, rounded to 2,260",
+   "Protein 170 g (capped at 30% of calories), fat 65 g, carbohydrate 250 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian, eggetarian, non-veg. Excluded for allergens: none"
+  ]
+ },
+ "femaleVeg#0": {
+  "status": "ok",
+  "targets": {
+   "age": 31,
+   "bmr": 1276.5,
+   "vpw": 2,
+   "tdee": 1755.1875,
+   "raw": 1930.7062500000002,
+   "kcal": 1930,
+   "p": 115,
+   "c": 245,
+   "f": 55,
+   "floored": false,
+   "pCapped": false
+  },
+  "review": [],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Tofu, firm",
+      1.25
+     ],
+     [
+      "Idli",
+      1.5
+     ],
+     [
+      "Banana",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "MORNING_SNACK",
+    "items": [
+     [
+      "Apple",
+      1
+     ],
+     [
+      "Chia seeds",
+      1.75
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Soya chunks, cooked",
+      1.5
+     ],
+     [
+      "White rice, steamed",
+      1.75
+     ],
+     [
+      "Cucumber and tomato salad",
+      4
+     ],
+     [
+      "Olive oil",
+      2.25
+     ]
+    ]
+   },
+   {
+    "type": "EVENING_SNACK",
+    "items": [
+     [
+      "Soy milk, unsweetened",
+      1.25
+     ],
+     [
+      "Orange",
+      1.5
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Soya chunks, cooked",
+      1.25
+     ],
+     [
+      "Brown rice, cooked",
+      1.25
+     ],
+     [
+      "Broccoli, steamed",
+      2.75
+     ],
+     [
+      "Olive oil",
+      1.25
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 1938.25,
+   "p": 119.725,
+   "c": 279.75,
+   "f": 44.775,
+   "sugar": 68.925,
+   "sodium": 622.25
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 58 + 6.25 x 162 - 5 x 31 - 161 = 1,277 kcal",
+   "Activity x1.375 (Lightly active, 2 visits a week) gives 1,755 kcal",
+   "Goal muscle building +10% gives 1,931 kcal, rounded to 1,930",
+   "Protein 115 g (2.0 g per kg), fat 55 g, carbohydrate 245 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian. Excluded for allergens: lactose, nuts"
+  ]
+ },
+ "femaleVeg#1": {
+  "status": "ok",
+  "targets": {
+   "age": 31,
+   "bmr": 1276.5,
+   "vpw": 2,
+   "tdee": 1755.1875,
+   "raw": 1930.7062500000002,
+   "kcal": 1930,
+   "p": 115,
+   "c": 245,
+   "f": 55,
+   "floored": false,
+   "pCapped": false
+  },
+  "review": [],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Soy milk, unsweetened",
+      2
+     ],
+     [
+      "Whole wheat bread",
+      1.5
+     ],
+     [
+      "Papaya",
+      1.5
+     ]
+    ]
+   },
+   {
+    "type": "MORNING_SNACK",
+    "items": [
+     [
+      "Orange",
+      1.5
+     ],
+     [
+      "Sprouts chaat",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Soya chunks, cooked",
+      1.5
+     ],
+     [
+      "White rice, steamed",
+      1.75
+     ],
+     [
+      "Lauki sabzi",
+      1.75
+     ],
+     [
+      "Olive oil",
+      1.5
+     ]
+    ]
+   },
+   {
+    "type": "EVENING_SNACK",
+    "items": [
+     [
+      "Roasted chana",
+      1
+     ],
+     [
+      "Apple",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Tofu, firm",
+      1.25
+     ],
+     [
+      "Roti, whole wheat",
+      1.25
+     ],
+     [
+      "Broccoli, steamed",
+      2.75
+     ],
+     [
+      "Olive oil",
+      1.25
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 1950.5,
+   "p": 112.14999999999999,
+   "c": 286.75,
+   "f": 47.4,
+   "sugar": 76.3,
+   "sodium": 1415
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 58 + 6.25 x 162 - 5 x 31 - 161 = 1,277 kcal",
+   "Activity x1.375 (Lightly active, 2 visits a week) gives 1,755 kcal",
+   "Goal muscle building +10% gives 1,931 kcal, rounded to 1,930",
+   "Protein 115 g (2.0 g per kg), fat 55 g, carbohydrate 245 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian. Excluded for allergens: lactose, nuts"
+  ]
+ },
+ "femaleVeg#2": {
+  "status": "ok",
+  "targets": {
+   "age": 31,
+   "bmr": 1276.5,
+   "vpw": 2,
+   "tdee": 1755.1875,
+   "raw": 1930.7062500000002,
+   "kcal": 1930,
+   "p": 115,
+   "c": 245,
+   "f": 55,
+   "floored": false,
+   "pCapped": false
+  },
+  "review": [],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Besan chilla",
+      1
+     ],
+     [
+      "Whole wheat bread",
+      1.25
+     ],
+     [
+      "Banana",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "MORNING_SNACK",
+    "items": [
+     [
+      "Apple",
+      1
+     ],
+     [
+      "Soy milk, unsweetened",
+      1.25
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Tofu, firm",
+      1.25
+     ],
+     [
+      "White rice, steamed",
+      1.5
+     ],
+     [
+      "Broccoli, steamed",
+      2.75
+     ],
+     [
+      "Olive oil",
+      2.25
+     ]
+    ]
+   },
+   {
+    "type": "EVENING_SNACK",
+    "items": [
+     [
+      "Sprouts chaat",
+      1
+     ],
+     [
+      "Orange",
+      1.5
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Soya chunks, cooked",
+      1.75
+     ],
+     [
+      "White rice, steamed",
+      1.25
+     ],
+     [
+      "Cucumber and tomato salad",
+      4
+     ],
+     [
+      "Olive oil",
+      1.25
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 1964.25,
+   "p": 112.175,
+   "c": 294.25,
+   "f": 44.724999999999994,
+   "sugar": 76.425,
+   "sodium": 1038.5
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 58 + 6.25 x 162 - 5 x 31 - 161 = 1,277 kcal",
+   "Activity x1.375 (Lightly active, 2 visits a week) gives 1,755 kcal",
+   "Goal muscle building +10% gives 1,931 kcal, rounded to 1,930",
+   "Protein 115 g (2.0 g per kg), fat 55 g, carbohydrate 245 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian. Excluded for allergens: lactose, nuts"
+  ]
+ },
+ "femaleVeg#5": {
+  "status": "ok",
+  "targets": {
+   "age": 31,
+   "bmr": 1276.5,
+   "vpw": 2,
+   "tdee": 1755.1875,
+   "raw": 1930.7062500000002,
+   "kcal": 1930,
+   "p": 115,
+   "c": 245,
+   "f": 55,
+   "floored": false,
+   "pCapped": false
+  },
+  "review": [],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Tofu, firm",
+      3
+     ],
+     [
+      "Idli",
+      1.25
+     ],
+     [
+      "Banana",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "MORNING_SNACK",
+    "items": [
+     [
+      "Orange",
+      1.5
+     ],
+     [
+      "Chia seeds",
+      1.75
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Moong dal, cooked",
+      1.25
+     ],
+     [
+      "White rice, steamed",
+      1.25
+     ],
+     [
+      "Cucumber and tomato salad",
+      4
+     ],
+     [
+      "Olive oil",
+      0.5
+     ]
+    ]
+   },
+   {
+    "type": "EVENING_SNACK",
+    "items": [
+     [
+      "Soy milk, unsweetened",
+      1.25
+     ],
+     [
+      "Banana",
+      0.75
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Rajma, cooked",
+      1
+     ],
+     [
+      "Roti, whole wheat",
+      1.25
+     ],
+     [
+      "Lauki sabzi",
+      1.75
+     ],
+     [
+      "Olive oil",
+      0.75
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 1999,
+   "p": 112.64999999999999,
+   "c": 285.375,
+   "f": 54.42499999999999,
+   "sugar": 65.425,
+   "sodium": 1103
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 58 + 6.25 x 162 - 5 x 31 - 161 = 1,277 kcal",
+   "Activity x1.375 (Lightly active, 2 visits a week) gives 1,755 kcal",
+   "Goal muscle building +10% gives 1,931 kcal, rounded to 1,930",
+   "Protein 115 g (2.0 g per kg), fat 55 g, carbohydrate 245 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian. Excluded for allergens: lactose, nuts"
+  ]
+ },
+ "veganDiabetic#0": {
+  "status": "ok",
+  "targets": {
+   "age": 41,
+   "bmr": 1652.5,
+   "vpw": 1,
+   "tdee": 1983,
+   "raw": 1983,
+   "kcal": 1980,
+   "p": 110,
+   "c": 260,
+   "f": 55,
+   "floored": false,
+   "pCapped": false
+  },
+  "review": [
+   "Diabetes noted. Sugary foods are down-weighted and daily sugar is checked against 10% of calories.",
+   "Blood pressure or heart condition noted. High-sodium foods are down-weighted and daily sodium is checked against 2,000 mg."
+  ],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Besan chilla",
+      1
+     ],
+     [
+      "Oats",
+      0.5
+     ],
+     [
+      "Papaya",
+      0.75
+     ]
+    ]
+   },
+   {
+    "type": "MORNING_SNACK",
+    "items": [
+     [
+      "Orange",
+      1.5
+     ],
+     [
+      "Almonds",
+      1.5
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Rajma, cooked",
+      4
+     ],
+     [
+      "White rice, steamed",
+      0.5
+     ],
+     [
+      "Cucumber and tomato salad",
+      4
+     ],
+     [
+      "Olive oil",
+      2.25
+     ]
+    ]
+   },
+   {
+    "type": "EVENING_SNACK",
+    "items": [
+     [
+      "Roasted chana",
+      1
+     ],
+     [
+      "Roasted peanuts",
+      0.75
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Moong dal, cooked",
+      1.25
+     ],
+     [
+      "Brown rice, cooked",
+      0.5
+     ],
+     [
+      "Broccoli, steamed",
+      2.75
+     ],
+     [
+      "Olive oil",
+      0.5
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 2067.75,
+   "p": 106,
+   "c": 329.525,
+   "f": 44.12500000000001,
+   "sugar": 54.6,
+   "sodium": 582.25
+  },
+  "warnings": [
+   "Sugar from these foods is 55 g, above the guide of 52 g (10% of calories)."
+  ],
+  "explain": [
+   "BMR = 10 x 79 + 6.25 x 170 - 5 x 41 + 5 = 1,653 kcal",
+   "Activity x1.2 (Sedentary, 1 visits a week) gives 1,983 kcal",
+   "Goal general fitness +0% gives 1,983 kcal, rounded to 1,980",
+   "Protein 110 g (1.4 g per kg), fat 55 g, carbohydrate 260 g from the remaining calories",
+   "Foods allowed: vegan. Excluded for allergens: soy"
+  ]
+ },
+ "veganDiabetic#1": {
+  "status": "ok",
+  "targets": {
+   "age": 41,
+   "bmr": 1652.5,
+   "vpw": 1,
+   "tdee": 1983,
+   "raw": 1983,
+   "kcal": 1980,
+   "p": 110,
+   "c": 260,
+   "f": 55,
+   "floored": false,
+   "pCapped": false
+  },
+  "review": [
+   "Diabetes noted. Sugary foods are down-weighted and daily sugar is checked against 10% of calories.",
+   "Blood pressure or heart condition noted. High-sodium foods are down-weighted and daily sodium is checked against 2,000 mg."
+  ],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Besan chilla",
+      1
+     ],
+     [
+      "Roti, whole wheat",
+      0.75
+     ],
+     [
+      "Banana",
+      0.75
+     ]
+    ]
+   },
+   {
+    "type": "MORNING_SNACK",
+    "items": [
+     [
+      "Apple",
+      0.5
+     ],
+     [
+      "Roasted peanuts",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Rajma, cooked",
+      3.75
+     ],
+     [
+      "White rice, steamed",
+      0.5
+     ],
+     [
+      "Palak sabzi",
+      1.75
+     ],
+     [
+      "Olive oil",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "EVENING_SNACK",
+    "items": [
+     [
+      "Roasted chana",
+      1
+     ],
+     [
+      "Almonds",
+      1.25
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Moong dal, cooked",
+      1.25
+     ],
+     [
+      "White rice, steamed",
+      0.5
+     ],
+     [
+      "Broccoli, steamed",
+      2.75
+     ],
+     [
+      "Olive oil",
+      0.5
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 2006.25,
+   "p": 104.87499999999999,
+   "c": 315.875,
+   "f": 44.474999999999994,
+   "sugar": 39.724999999999994,
+   "sodium": 943
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 79 + 6.25 x 170 - 5 x 41 + 5 = 1,653 kcal",
+   "Activity x1.2 (Sedentary, 1 visits a week) gives 1,983 kcal",
+   "Goal general fitness +0% gives 1,983 kcal, rounded to 1,980",
+   "Protein 110 g (1.4 g per kg), fat 55 g, carbohydrate 260 g from the remaining calories",
+   "Foods allowed: vegan. Excluded for allergens: soy"
+  ]
+ },
+ "veganDiabetic#2": {
+  "status": "ok",
+  "targets": {
+   "age": 41,
+   "bmr": 1652.5,
+   "vpw": 1,
+   "tdee": 1983,
+   "raw": 1983,
+   "kcal": 1980,
+   "p": 110,
+   "c": 260,
+   "f": 55,
+   "floored": false,
+   "pCapped": false
+  },
+  "review": [
+   "Diabetes noted. Sugary foods are down-weighted and daily sugar is checked against 10% of calories.",
+   "Blood pressure or heart condition noted. High-sodium foods are down-weighted and daily sodium is checked against 2,000 mg."
+  ],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Besan chilla",
+      1
+     ],
+     [
+      "Roti, whole wheat",
+      0.5
+     ],
+     [
+      "Papaya",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "MORNING_SNACK",
+    "items": [
+     [
+      "Orange",
+      1.5
+     ],
+     [
+      "Roasted peanuts",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Moong dal, cooked",
+      1.25
+     ],
+     [
+      "White rice, steamed",
+      0.5
+     ],
+     [
+      "Broccoli, steamed",
+      2.75
+     ],
+     [
+      "Olive oil",
+      2
+     ]
+    ]
+   },
+   {
+    "type": "EVENING_SNACK",
+    "items": [
+     [
+      "Roasted chana",
+      1
+     ],
+     [
+      "Almonds",
+      1.25
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Rajma, cooked",
+      4
+     ],
+     [
+      "Roti, whole wheat",
+      0.5
+     ],
+     [
+      "Cucumber and tomato salad",
+      4
+     ],
+     [
+      "Olive oil",
+      0.5
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 2074.25,
+   "p": 107,
+   "c": 330.625,
+   "f": 44.25,
+   "sugar": 57.474999999999994,
+   "sodium": 702.25
+  },
+  "warnings": [
+   "Sugar from these foods is 57 g, above the guide of 52 g (10% of calories)."
+  ],
+  "explain": [
+   "BMR = 10 x 79 + 6.25 x 170 - 5 x 41 + 5 = 1,653 kcal",
+   "Activity x1.2 (Sedentary, 1 visits a week) gives 1,983 kcal",
+   "Goal general fitness +0% gives 1,983 kcal, rounded to 1,980",
+   "Protein 110 g (1.4 g per kg), fat 55 g, carbohydrate 260 g from the remaining calories",
+   "Foods allowed: vegan. Excluded for allergens: soy"
+  ]
+ },
+ "veganDiabetic#5": {
+  "status": "ok",
+  "targets": {
+   "age": 41,
+   "bmr": 1652.5,
+   "vpw": 1,
+   "tdee": 1983,
+   "raw": 1983,
+   "kcal": 1980,
+   "p": 110,
+   "c": 260,
+   "f": 55,
+   "floored": false,
+   "pCapped": false
+  },
+  "review": [
+   "Diabetes noted. Sugary foods are down-weighted and daily sugar is checked against 10% of calories.",
+   "Blood pressure or heart condition noted. High-sodium foods are down-weighted and daily sodium is checked against 2,000 mg."
+  ],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Besan chilla",
+      1
+     ],
+     [
+      "Oats",
+      0.5
+     ],
+     [
+      "Papaya",
+      0.5
+     ]
+    ]
+   },
+   {
+    "type": "MORNING_SNACK",
+    "items": [
+     [
+      "Banana",
+      0.5
+     ],
+     [
+      "Almonds",
+      0.5
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Chana, boiled",
+      2.75
+     ],
+     [
+      "White rice, steamed",
+      0.5
+     ],
+     [
+      "Cucumber and tomato salad",
+      4
+     ],
+     [
+      "Olive oil",
+      0.5
+     ]
+    ]
+   },
+   {
+    "type": "EVENING_SNACK",
+    "items": [
+     [
+      "Roasted chana",
+      0.5
+     ],
+     [
+      "Peanut butter, natural",
+      0.5
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Moong dal, cooked",
+      4
+     ],
+     [
+      "White rice, steamed",
+      0.5
+     ],
+     [
+      "Cucumber and tomato salad",
+      4
+     ],
+     [
+      "Olive oil",
+      0.5
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 2121,
+   "p": 106.97500000000001,
+   "c": 358.55,
+   "f": 34.175,
+   "sugar": 61.75,
+   "sodium": 892
+  },
+  "warnings": [
+   "Calories are 107% of target, outside the 5% tolerance.",
+   "Sugar from these foods is 62 g, above the guide of 53 g (10% of calories)."
+  ],
+  "explain": [
+   "BMR = 10 x 79 + 6.25 x 170 - 5 x 41 + 5 = 1,653 kcal",
+   "Activity x1.2 (Sedentary, 1 visits a week) gives 1,983 kcal",
+   "Goal general fitness +0% gives 1,983 kcal, rounded to 1,980",
+   "Protein 110 g (1.4 g per kg), fat 55 g, carbohydrate 260 g from the remaining calories",
+   "Foods allowed: vegan. Excluded for allergens: soy"
+  ]
+ },
+ "eggGain#0": {
+  "status": "ok",
+  "targets": {
+   "age": 25,
+   "bmr": 1510.75,
+   "vpw": 6,
+   "tdee": 2606.0437500000003,
+   "raw": 2996.9503125,
+   "kcal": 3000,
+   "p": 100,
+   "c": 460,
+   "f": 85,
+   "floored": false,
+   "pCapped": false
+  },
+  "review": [
+   "Blood pressure or heart condition noted. High-sodium foods are down-weighted and daily sodium is checked against 2,000 mg."
+  ],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Egg whites, boiled",
+      1.5
+     ],
+     [
+      "Dosa, plain",
+      2.5
+     ],
+     [
+      "Banana",
+      2.5
+     ]
+    ]
+   },
+   {
+    "type": "PRE_WORKOUT",
+    "items": [
+     [
+      "Sweet potato, boiled",
+      3
+     ],
+     [
+      "Dates",
+      3
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Soya chunks, cooked",
+      0.75
+     ],
+     [
+      "White rice, steamed",
+      2.5
+     ],
+     [
+      "Cucumber and tomato salad",
+      4
+     ],
+     [
+      "Ghee",
+      4
+     ]
+    ]
+   },
+   {
+    "type": "POST_WORKOUT",
+    "items": [
+     [
+      "Whey protein",
+      0.5
+     ],
+     [
+      "Orange",
+      4
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Tofu, firm",
+      1
+     ],
+     [
+      "Brown rice, cooked",
+      2.5
+     ],
+     [
+      "Broccoli, steamed",
+      4
+     ],
+     [
+      "Olive oil",
+      4
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 2875.5,
+   "p": 111.05,
+   "c": 495.3,
+   "f": 63.425000000000004,
+   "sugar": 176.70000000000002,
+   "sodium": 970.5
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 62 + 6.25 x 175 - 5 x 25 - 78 = 1,511 kcal",
+   "Activity x1.725 (Very active, 6 visits a week) gives 2,606 kcal",
+   "Goal weight gain +15% gives 2,997 kcal, rounded to 3,000",
+   "Protein 100 g (1.6 g per kg), fat 85 g, carbohydrate 460 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian, eggetarian. Excluded for allergens: gluten"
+  ]
+ },
+ "eggGain#1": {
+  "status": "ok",
+  "targets": {
+   "age": 25,
+   "bmr": 1510.75,
+   "vpw": 6,
+   "tdee": 2606.0437500000003,
+   "raw": 2996.9503125,
+   "kcal": 3000,
+   "p": 100,
+   "c": 460,
+   "f": 85,
+   "floored": false,
+   "pCapped": false
+  },
+  "review": [
+   "Blood pressure or heart condition noted. High-sodium foods are down-weighted and daily sodium is checked against 2,000 mg."
+  ],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Tofu, firm",
+      0.75
+     ],
+     [
+      "Idli",
+      2.25
+     ],
+     [
+      "Papaya",
+      3.5
+     ]
+    ]
+   },
+   {
+    "type": "PRE_WORKOUT",
+    "items": [
+     [
+      "Sweet potato, boiled",
+      2.75
+     ],
+     [
+      "Banana",
+      2.25
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Soya chunks, cooked",
+      0.5
+     ],
+     [
+      "White rice, steamed",
+      2.5
+     ],
+     [
+      "Palak sabzi",
+      4
+     ],
+     [
+      "Ghee",
+      4
+     ]
+    ]
+   },
+   {
+    "type": "POST_WORKOUT",
+    "items": [
+     [
+      "Whey protein",
+      0.5
+     ],
+     [
+      "White rice, steamed",
+      1.75
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Soya chunks, cooked",
+      0.75
+     ],
+     [
+      "Brown rice, cooked",
+      2.5
+     ],
+     [
+      "Broccoli, steamed",
+      4
+     ],
+     [
+      "Olive oil",
+      4
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 2868.25,
+   "p": 110.95,
+   "c": 470.75,
+   "f": 68.025,
+   "sugar": 95.375,
+   "sodium": 1522.5
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 62 + 6.25 x 175 - 5 x 25 - 78 = 1,511 kcal",
+   "Activity x1.725 (Very active, 6 visits a week) gives 2,606 kcal",
+   "Goal weight gain +15% gives 2,997 kcal, rounded to 3,000",
+   "Protein 100 g (1.6 g per kg), fat 85 g, carbohydrate 460 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian, eggetarian. Excluded for allergens: gluten"
+  ]
+ },
+ "eggGain#2": {
+  "status": "ok",
+  "targets": {
+   "age": 25,
+   "bmr": 1510.75,
+   "vpw": 6,
+   "tdee": 2606.0437500000003,
+   "raw": 2996.9503125,
+   "kcal": 3000,
+   "p": 100,
+   "c": 460,
+   "f": 85,
+   "floored": false,
+   "pCapped": false
+  },
+  "review": [
+   "Blood pressure or heart condition noted. High-sodium foods are down-weighted and daily sodium is checked against 2,000 mg."
+  ],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Curd, thick (hung)",
+      1.75
+     ],
+     [
+      "Idli",
+      2.25
+     ],
+     [
+      "Banana",
+      2.25
+     ]
+    ]
+   },
+   {
+    "type": "PRE_WORKOUT",
+    "items": [
+     [
+      "Poha",
+      1.25
+     ],
+     [
+      "Dates",
+      2.75
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Tofu, firm",
+      1
+     ],
+     [
+      "White rice, steamed",
+      2.5
+     ],
+     [
+      "Broccoli, steamed",
+      4
+     ],
+     [
+      "Ghee",
+      4
+     ]
+    ]
+   },
+   {
+    "type": "POST_WORKOUT",
+    "items": [
+     [
+      "Whey protein",
+      0.5
+     ],
+     [
+      "White rice, steamed",
+      1.75
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Soya chunks, cooked",
+      0.75
+     ],
+     [
+      "White rice, steamed",
+      2
+     ],
+     [
+      "Cucumber and tomato salad",
+      4
+     ],
+     [
+      "Ghee",
+      4
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 2883.75,
+   "p": 110.35,
+   "c": 466.25,
+   "f": 71.39999999999999,
+   "sugar": 115.52499999999999,
+   "sodium": 1054.75
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 62 + 6.25 x 175 - 5 x 25 - 78 = 1,511 kcal",
+   "Activity x1.725 (Very active, 6 visits a week) gives 2,606 kcal",
+   "Goal weight gain +15% gives 2,997 kcal, rounded to 3,000",
+   "Protein 100 g (1.6 g per kg), fat 85 g, carbohydrate 460 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian, eggetarian. Excluded for allergens: gluten"
+  ]
+ },
+ "eggGain#5": {
+  "status": "ok",
+  "targets": {
+   "age": 25,
+   "bmr": 1510.75,
+   "vpw": 6,
+   "tdee": 2606.0437500000003,
+   "raw": 2996.9503125,
+   "kcal": 3000,
+   "p": 100,
+   "c": 460,
+   "f": 85,
+   "floored": false,
+   "pCapped": false
+  },
+  "review": [
+   "Blood pressure or heart condition noted. High-sodium foods are down-weighted and daily sodium is checked against 2,000 mg."
+  ],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Egg whites, boiled",
+      1.75
+     ],
+     [
+      "Dosa, plain",
+      2.5
+     ],
+     [
+      "Banana",
+      2
+     ]
+    ]
+   },
+   {
+    "type": "PRE_WORKOUT",
+    "items": [
+     [
+      "Sweet potato, boiled",
+      2.5
+     ],
+     [
+      "Dates",
+      2.5
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Rajma, cooked",
+      1.5
+     ],
+     [
+      "White rice, steamed",
+      2.5
+     ],
+     [
+      "Cucumber and tomato salad",
+      4
+     ],
+     [
+      "Ghee",
+      4
+     ]
+    ]
+   },
+   {
+    "type": "POST_WORKOUT",
+    "items": [
+     [
+      "Whey protein",
+      0.75
+     ],
+     [
+      "Banana",
+      2
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Tofu, firm",
+      1.25
+     ],
+     [
+      "White rice, steamed",
+      2
+     ],
+     [
+      "Cucumber and tomato salad",
+      4
+     ],
+     [
+      "Olive oil",
+      4
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 2878.5,
+   "p": 114.75,
+   "c": 484.225,
+   "f": 64.1,
+   "sugar": 142.975,
+   "sodium": 900.5
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 62 + 6.25 x 175 - 5 x 25 - 78 = 1,511 kcal",
+   "Activity x1.725 (Very active, 6 visits a week) gives 2,606 kcal",
+   "Goal weight gain +15% gives 2,997 kcal, rounded to 3,000",
+   "Protein 100 g (1.6 g per kg), fat 85 g, carbohydrate 460 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian, eggetarian. Excluded for allergens: gluten"
+  ]
+ },
+ "rehab#0": {
+  "status": "ok",
+  "targets": {
+   "age": 76,
+   "bmr": 1146.5,
+   "vpw": 0,
+   "tdee": 1375.8,
+   "raw": 1375.8,
+   "kcal": 1380,
+   "p": 105,
+   "c": 150,
+   "f": 40,
+   "floored": false,
+   "pCapped": true
+  },
+  "review": [
+   "Kidney condition noted. A trainer or doctor must review protein before this plan is used.",
+   "Age 65 or older. A trainer must review this draft.",
+   "Rehabilitation goals are always held for trainer review."
+  ],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Tofu, firm",
+      0.75
+     ],
+     [
+      "Idli",
+      1
+     ],
+     [
+      "Banana",
+      0.75
+     ]
+    ]
+   },
+   {
+    "type": "MORNING_SNACK",
+    "items": [
+     [
+      "Apple",
+      0.75
+     ],
+     [
+      "Roasted peanuts",
+      0.75
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Soya chunks, cooked",
+      1.75
+     ],
+     [
+      "White rice, steamed",
+      1
+     ],
+     [
+      "Cucumber and tomato salad",
+      3.25
+     ],
+     [
+      "Ghee",
+      0.5
+     ]
+    ]
+   },
+   {
+    "type": "EVENING_SNACK",
+    "items": [
+     [
+      "Curd, thick (hung)",
+      0.75
+     ],
+     [
+      "Almonds",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Soya chunks, cooked",
+      1
+     ],
+     [
+      "Brown rice, cooked",
+      1
+     ],
+     [
+      "Broccoli, steamed",
+      2
+     ],
+     [
+      "Olive oil",
+      0.5
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 1421.5,
+   "p": 102.35,
+   "c": 188.85,
+   "f": 33.574999999999996,
+   "sugar": 41.724999999999994,
+   "sodium": 394.25
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 70 + 6.25 x 158 - 5 x 76 - 161 = 1,147 kcal",
+   "Activity x1.2 (Sedentary, 0 visits a week) gives 1,376 kcal",
+   "Goal rehabilitation +0% gives 1,376 kcal, rounded to 1,380",
+   "Protein 105 g (capped at 30% of calories), fat 40 g, carbohydrate 150 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian. Excluded for allergens: none"
+  ]
+ },
+ "rehab#1": {
+  "status": "ok",
+  "targets": {
+   "age": 76,
+   "bmr": 1146.5,
+   "vpw": 0,
+   "tdee": 1375.8,
+   "raw": 1375.8,
+   "kcal": 1380,
+   "p": 105,
+   "c": 150,
+   "f": 40,
+   "floored": false,
+   "pCapped": true
+  },
+  "review": [
+   "Kidney condition noted. A trainer or doctor must review protein before this plan is used.",
+   "Age 65 or older. A trainer must review this draft.",
+   "Rehabilitation goals are always held for trainer review."
+  ],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Curd, thick (hung)",
+      1.25
+     ],
+     [
+      "Whole wheat bread",
+      0.75
+     ],
+     [
+      "Papaya",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "MORNING_SNACK",
+    "items": [
+     [
+      "Orange",
+      1
+     ],
+     [
+      "Almonds",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Soya chunks, cooked",
+      2
+     ],
+     [
+      "White rice, steamed",
+      1
+     ],
+     [
+      "Lauki sabzi",
+      1.25
+     ],
+     [
+      "Ghee",
+      0.5
+     ]
+    ]
+   },
+   {
+    "type": "EVENING_SNACK",
+    "items": [
+     [
+      "Soy milk, unsweetened",
+      1
+     ],
+     [
+      "Roasted peanuts",
+      0.5
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Tofu, firm",
+      1
+     ],
+     [
+      "Roti, whole wheat",
+      1
+     ],
+     [
+      "Broccoli, steamed",
+      2
+     ],
+     [
+      "Olive oil",
+      0.5
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 1423.5,
+   "p": 102.82499999999999,
+   "c": 166.85,
+   "f": 43.825,
+   "sugar": 40.4,
+   "sodium": 864
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 70 + 6.25 x 158 - 5 x 76 - 161 = 1,147 kcal",
+   "Activity x1.2 (Sedentary, 0 visits a week) gives 1,376 kcal",
+   "Goal rehabilitation +0% gives 1,376 kcal, rounded to 1,380",
+   "Protein 105 g (capped at 30% of calories), fat 40 g, carbohydrate 150 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian. Excluded for allergens: none"
+  ]
+ },
+ "rehab#2": {
+  "status": "ok",
+  "targets": {
+   "age": 76,
+   "bmr": 1146.5,
+   "vpw": 0,
+   "tdee": 1375.8,
+   "raw": 1375.8,
+   "kcal": 1380,
+   "p": 105,
+   "c": 150,
+   "f": 40,
+   "floored": false,
+   "pCapped": true
+  },
+  "review": [
+   "Kidney condition noted. A trainer or doctor must review protein before this plan is used.",
+   "Age 65 or older. A trainer must review this draft.",
+   "Rehabilitation goals are always held for trainer review."
+  ],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Soy milk, unsweetened",
+      1.5
+     ],
+     [
+      "Whole wheat bread",
+      0.75
+     ],
+     [
+      "Banana",
+      0.75
+     ]
+    ]
+   },
+   {
+    "type": "MORNING_SNACK",
+    "items": [
+     [
+      "Apple",
+      0.75
+     ],
+     [
+      "Almonds",
+      1
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Tofu, firm",
+      1
+     ],
+     [
+      "White rice, steamed",
+      1
+     ],
+     [
+      "Broccoli, steamed",
+      2
+     ],
+     [
+      "Ghee",
+      0.5
+     ]
+    ]
+   },
+   {
+    "type": "EVENING_SNACK",
+    "items": [
+     [
+      "Curd, thick (hung)",
+      0.75
+     ],
+     [
+      "Roasted peanuts",
+      0.5
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Soya chunks, cooked",
+      2
+     ],
+     [
+      "White rice, steamed",
+      0.75
+     ],
+     [
+      "Cucumber and tomato salad",
+      3.5
+     ],
+     [
+      "Ghee",
+      0.5
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 1419.25,
+   "p": 100.22500000000001,
+   "c": 179.1,
+   "f": 39.50000000000001,
+   "sugar": 45.15,
+   "sodium": 540
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 70 + 6.25 x 158 - 5 x 76 - 161 = 1,147 kcal",
+   "Activity x1.2 (Sedentary, 0 visits a week) gives 1,376 kcal",
+   "Goal rehabilitation +0% gives 1,376 kcal, rounded to 1,380",
+   "Protein 105 g (capped at 30% of calories), fat 40 g, carbohydrate 150 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian. Excluded for allergens: none"
+  ]
+ },
+ "rehab#5": {
+  "status": "ok",
+  "targets": {
+   "age": 76,
+   "bmr": 1146.5,
+   "vpw": 0,
+   "tdee": 1375.8,
+   "raw": 1375.8,
+   "kcal": 1380,
+   "p": 105,
+   "c": 150,
+   "f": 40,
+   "floored": false,
+   "pCapped": true
+  },
+  "review": [
+   "Kidney condition noted. A trainer or doctor must review protein before this plan is used.",
+   "Age 65 or older. A trainer must review this draft.",
+   "Rehabilitation goals are always held for trainer review."
+  ],
+  "slots": [
+   {
+    "type": "BREAKFAST",
+    "items": [
+     [
+      "Tofu, firm",
+      3.5
+     ],
+     [
+      "Idli",
+      0.5
+     ],
+     [
+      "Banana",
+      0.5
+     ]
+    ]
+   },
+   {
+    "type": "MORNING_SNACK",
+    "items": [
+     [
+      "Orange",
+      0.5
+     ],
+     [
+      "Roasted peanuts",
+      0.5
+     ]
+    ]
+   },
+   {
+    "type": "LUNCH",
+    "items": [
+     [
+      "Paneer",
+      0.5
+     ],
+     [
+      "White rice, steamed",
+      0.5
+     ],
+     [
+      "Cucumber and tomato salad",
+      3.25
+     ],
+     [
+      "Ghee",
+      0.5
+     ]
+    ]
+   },
+   {
+    "type": "EVENING_SNACK",
+    "items": [
+     [
+      "Curd, thick (hung)",
+      0.75
+     ],
+     [
+      "Peanut butter, natural",
+      0.75
+     ]
+    ]
+   },
+   {
+    "type": "DINNER",
+    "items": [
+     [
+      "Rajma, cooked",
+      0.75
+     ],
+     [
+      "Roti, whole wheat",
+      0.5
+     ],
+     [
+      "Lauki sabzi",
+      1.25
+     ],
+     [
+      "Olive oil",
+      0.5
+     ]
+    ]
+   }
+  ],
+  "totals": {
+   "kcal": 1430.25,
+   "p": 101.57499999999999,
+   "c": 124.1,
+   "f": 66.025,
+   "sugar": 33.35,
+   "sodium": 592.75
+  },
+  "warnings": [],
+  "explain": [
+   "BMR = 10 x 70 + 6.25 x 158 - 5 x 76 - 161 = 1,147 kcal",
+   "Activity x1.2 (Sedentary, 0 visits a week) gives 1,376 kcal",
+   "Goal rehabilitation +0% gives 1,376 kcal, rounded to 1,380",
+   "Protein 105 g (capped at 30% of calories), fat 40 g, carbohydrate 150 g from the remaining calories",
+   "Foods allowed: vegan, vegetarian. Excluded for allergens: none"
+  ]
+ },
+ "minor#0": {
+  "status": "blocked",
+  "blocks": [
+   "Under 18. Automatic plans are not offered for minors, so a trainer should build this plan by hand."
+  ]
+ },
+ "minor#1": {
+  "status": "blocked",
+  "blocks": [
+   "Under 18. Automatic plans are not offered for minors, so a trainer should build this plan by hand."
+  ]
+ },
+ "minor#2": {
+  "status": "blocked",
+  "blocks": [
+   "Under 18. Automatic plans are not offered for minors, so a trainer should build this plan by hand."
+  ]
+ },
+ "minor#5": {
+  "status": "blocked",
+  "blocks": [
+   "Under 18. Automatic plans are not offered for minors, so a trainer should build this plan by hand."
+  ]
+ },
+ "missing#0": {
+  "status": "missing",
+  "missing": [
+   "sex",
+   "dob",
+   "weight",
+   "goal"
+  ]
+ },
+ "missing#1": {
+  "status": "missing",
+  "missing": [
+   "sex",
+   "dob",
+   "weight",
+   "goal"
+  ]
+ },
+ "missing#2": {
+  "status": "missing",
+  "missing": [
+   "sex",
+   "dob",
+   "weight",
+   "goal"
+  ]
+ },
+ "missing#5": {
+  "status": "missing",
+  "missing": [
+   "sex",
+   "dob",
+   "weight",
+   "goal"
+  ]
+ }
+}

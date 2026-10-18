@@ -3,17 +3,24 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../models/staff_member.dart';
 import '../../../repositories/staff_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
-import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/option_picker_field.dart';
+import '../../team/presentation/widgets/team_ui.dart';
 
-/// Design frame "5b-i. Personal info" — same split rationale as
-/// `MemberEditPersonalScreen`: `firstName`/`lastName` stay untouched here
-/// since [StaffMember.name] is already the combined display name.
+const staffGenderOptions = [
+  ('MALE', 'Male'),
+  ('FEMALE', 'Female'),
+  ('OTHER', 'Other'),
+  ('PREFER_NOT_TO_SAY', 'Prefer not to say'),
+];
+
+/// Edit a staff member's personal details (`PATCH /staff/:id`) — identity,
+/// address, emergency contact and notes, i.e. everything web's "Personal
+/// details" / "Address & emergency contact" / "Notes" cards edit. Only the
+/// fields that actually changed are sent; cleared optional fields go as
+/// `null`. The profile photo is changed from the profile hero.
 class StaffEditPersonalScreen extends StatefulWidget {
   const StaffEditPersonalScreen({super.key, required this.staff});
 
@@ -25,166 +32,318 @@ class StaffEditPersonalScreen extends StatefulWidget {
 }
 
 class _StaffEditPersonalScreenState extends State<StaffEditPersonalScreen> {
-  late final _genderController =
-      TextEditingController(text: widget.staff.gender ?? '');
-  late final _dobController =
-      TextEditingController(text: widget.staff.dateOfBirth ?? '');
-  late final _addressController =
-      TextEditingController(text: widget.staff.addressLine ?? '');
-  late final _cityController =
-      TextEditingController(text: widget.staff.city ?? '');
-  late final _emergencyNameController =
-      TextEditingController(text: widget.staff.emergencyContactName ?? '');
-  late final _emergencyPhoneController =
-      TextEditingController(text: widget.staff.emergencyContactPhone ?? '');
-  late final _emergencyRelationController = TextEditingController(
-    text: widget.staff.emergencyContactRelation ?? '',
-  );
-  late final _notesController =
-      TextEditingController(text: widget.staff.notes ?? '');
+  StaffMember get s => widget.staff;
+
+  late final _first = TextEditingController(text: s.firstName);
+  late final _last = TextEditingController(text: s.lastName);
+  late final _email = TextEditingController(text: s.email);
+  late final _phone = TextEditingController(text: s.phone ?? '');
+  late final _employeeId = TextEditingController(text: s.employeeId);
+  late final _address = TextEditingController(text: s.addressLine ?? '');
+  late final _city = TextEditingController(text: s.city ?? '');
+  late final _state = TextEditingController(text: s.state ?? '');
+  late final _country = TextEditingController(text: s.country ?? '');
+  late final _postal = TextEditingController(text: s.postalCode ?? '');
+  late final _emName =
+      TextEditingController(text: s.emergencyContactName ?? '');
+  late final _emPhone =
+      TextEditingController(text: s.emergencyContactPhone ?? '');
+  late final _emRelation =
+      TextEditingController(text: s.emergencyContactRelation ?? '');
+  late final _notes = TextEditingController(text: s.notes ?? '');
+  late String? _gender = s.gender;
+  late DateTime? _dob = parseIsoDate(s.dateOfBirth);
+  late DateTime _joined = s.joiningDate;
   bool _saving = false;
   String? _error;
 
   @override
   void dispose() {
-    _genderController.dispose();
-    _dobController.dispose();
-    _addressController.dispose();
-    _cityController.dispose();
-    _emergencyNameController.dispose();
-    _emergencyPhoneController.dispose();
-    _emergencyRelationController.dispose();
-    _notesController.dispose();
+    for (final c in [
+      _first,
+      _last,
+      _email,
+      _phone,
+      _employeeId,
+      _address,
+      _city,
+      _state,
+      _country,
+      _postal,
+      _emName,
+      _emPhone,
+      _emRelation,
+      _notes,
+    ]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   Future<void> _save() async {
+    final changes = <String, dynamic>{};
+    void req(String key, TextEditingController c, String old) {
+      final v = c.text.trim();
+      if (v != old) changes[key] = v;
+    }
+
+    void opt(String key, TextEditingController c, String? old) {
+      final v = c.text.trim();
+      if (v != (old ?? '')) changes[key] = v.isEmpty ? null : v;
+    }
+
+    final first = _first.text.trim();
+    final last = _last.text.trim();
+    final email = _email.text.trim();
+    if (first.isEmpty || last.isEmpty) {
+      setState(() => _error = 'First and last name are required');
+      return;
+    }
+    if (!RegExp(r'^\S+@\S+\.\S+$').hasMatch(email)) {
+      setState(() => _error = 'Enter a valid email address');
+      return;
+    }
+    if (_employeeId.text.trim().isEmpty) {
+      setState(() => _error = 'Employee ID cannot be empty');
+      return;
+    }
+    if (_phone.text.trim().isEmpty && (s.phone ?? '').isNotEmpty) {
+      setState(
+        () => _error = "A phone number can't be removed once set — "
+            'replace it instead',
+      );
+      return;
+    }
+    req('firstName', _first, s.firstName);
+    req('lastName', _last, s.lastName);
+    req('email', _email, s.email);
+    if (_phone.text.trim() != (s.phone ?? '')) {
+      changes['phone'] = _phone.text.trim();
+    }
+    req('employeeId', _employeeId, s.employeeId);
+    if (_gender != s.gender) changes['gender'] = _gender;
+    final oldDob = parseIsoDate(s.dateOfBirth);
+    if (_dob != oldDob) {
+      changes['dateOfBirth'] = _dob == null ? null : isoDate(_dob!);
+    }
+    if (isoDate(_joined) != isoDate(s.joiningDate)) {
+      changes['joiningDate'] = isoDate(_joined);
+    }
+    opt('addressLine', _address, s.addressLine);
+    opt('city', _city, s.city);
+    opt('state', _state, s.state);
+    opt('country', _country, s.country);
+    opt('postalCode', _postal, s.postalCode);
+    opt('emergencyContactName', _emName, s.emergencyContactName);
+    opt('emergencyContactPhone', _emPhone, s.emergencyContactPhone);
+    opt('emergencyContactRelation', _emRelation, s.emergencyContactRelation);
+    opt('notes', _notes, s.notes);
+
+    if (changes.isEmpty) {
+      context.pop();
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
     });
     try {
-      await getIt<StaffRepository>().update(widget.staff.id, {
-        'gender': _orNull(_genderController.text),
-        'dateOfBirth': _orNull(_dobController.text),
-        'addressLine': _orNull(_addressController.text),
-        'city': _orNull(_cityController.text),
-        'emergencyContactName': _orNull(_emergencyNameController.text),
-        'emergencyContactPhone': _orNull(_emergencyPhoneController.text),
-        'emergencyContactRelation': _orNull(_emergencyRelationController.text),
-        'notes': _orNull(_notesController.text),
-      });
+      await getIt<StaffRepository>().update(s.id, changes);
       if (!mounted) return;
+      teamSnack(context, 'Personal details saved.');
       context.pop();
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.message);
+      setState(() => _error = e.detailedMessage);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not save ($e)');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  String? _orNull(String v) => v.trim().isEmpty ? null : v.trim();
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Text('Personal Info · ${widget.staff.name}'),
-      ),
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_error != null) ...[
-                const SizedBox(height: 8),
-                FormAlert(message: _error!),
-              ],
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'Gender',
-                      hintText: 'e.g. Male, Female',
-                      controller: _genderController,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'Date of birth',
-                      hintText: 'YYYY-MM-DD',
-                      controller: _dobController,
-                      keyboardType: TextInputType.datetime,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'Address line',
-                hintText: 'Street, building, area',
-                controller: _addressController,
-              ),
-              const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'City',
-                hintText: 'e.g. Mumbai',
-                controller: _cityController,
-              ),
-              const SizedBox(height: 18),
-              Text('Emergency contact', style: AppText.eyebrow()),
-              const SizedBox(height: 10),
-              AppLabeledField(
-                label: 'Name',
-                hintText: 'e.g. Priya Sharma',
-                controller: _emergencyNameController,
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'Phone',
-                      hintText: 'e.g. 9876543210',
-                      controller: _emergencyPhoneController,
-                      keyboardType: TextInputType.phone,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'Relation',
-                      hintText: 'e.g. Spouse',
-                      controller: _emergencyRelationController,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'Notes',
-                hintText: 'Any other notes about this staff member',
-                controller: _notesController,
-              ),
-              const SizedBox(height: 24),
-              AppButton(
-                label: 'Save changes',
-                loading: _saving,
-                onPressed: _save,
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
+    return TeamEditScaffold(
+      name: s.name,
+      subtitle: s.employeeId,
+      avatarUrl: s.avatarUrl,
+      title: 'Personal info',
+      icon: Icons.person_rounded,
+      color: TeamColors.indigo,
+      saving: _saving,
+      onSave: _save,
+      error: _error,
+      sections: [
+        TeamFormSection(
+          icon: Icons.badge_rounded,
+          color: TeamColors.indigo,
+          title: 'Identity',
+          children: [
+            AppLabeledField(
+              label: 'First name',
+              controller: _first,
+              icon: Icons.person_rounded,
+              iconColor: TeamColors.indigo,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+            ),
+            AppLabeledField(
+              label: 'Last name',
+              controller: _last,
+              icon: Icons.person_outline_rounded,
+              iconColor: TeamColors.indigo,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+            ),
+            AppLabeledField(
+              label: 'Email',
+              controller: _email,
+              icon: Icons.mail_rounded,
+              iconColor: TeamColors.sky,
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+            ),
+            AppLabeledField(
+              label: 'Phone',
+              controller: _phone,
+              icon: Icons.call_rounded,
+              iconColor: TeamColors.green,
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.next,
+            ),
+            AppLabeledField(
+              label: 'Employee ID',
+              controller: _employeeId,
+              icon: Icons.numbers_rounded,
+              iconColor: TeamColors.violet,
+              hintText: 'Letters, numbers and hyphens',
+              textInputAction: TextInputAction.next,
+            ),
+            OptionPickerField(
+              label: 'Gender',
+              options: staffGenderOptions,
+              value: _gender,
+              icon: Icons.wc_rounded,
+              iconColor: TeamColors.fuchsia,
+              onChanged: (v) => setState(() => _gender = v),
+            ),
+            TeamDateField(
+              label: 'Date of birth',
+              icon: Icons.cake_rounded,
+              iconColor: TeamColors.rose,
+              value: _dob,
+              lastDate: DateTime.now(),
+              onChanged: (d) => setState(() => _dob = d),
+            ),
+            TeamDateField(
+              label: 'Joining date',
+              icon: Icons.event_rounded,
+              iconColor: TeamColors.amber,
+              value: _joined,
+              clearable: false,
+              onChanged: (d) {
+                if (d != null) setState(() => _joined = d);
+              },
+            ),
+          ],
         ),
-      ),
+        TeamFormSection(
+          icon: Icons.home_rounded,
+          color: TeamColors.teal,
+          title: 'Address',
+          children: [
+            AppLabeledField(
+              label: 'Address',
+              controller: _address,
+              icon: Icons.place_rounded,
+              iconColor: TeamColors.teal,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.next,
+            ),
+            AppLabeledField(
+              label: 'City',
+              controller: _city,
+              icon: Icons.location_city_rounded,
+              iconColor: TeamColors.teal,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+            ),
+            AppLabeledField(
+              label: 'State',
+              controller: _state,
+              icon: Icons.map_rounded,
+              iconColor: TeamColors.teal,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+            ),
+            AppLabeledField(
+              label: 'Country',
+              controller: _country,
+              icon: Icons.public_rounded,
+              iconColor: TeamColors.teal,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+            ),
+            AppLabeledField(
+              label: 'Postal code',
+              controller: _postal,
+              icon: Icons.markunread_mailbox_rounded,
+              iconColor: TeamColors.teal,
+              textInputAction: TextInputAction.next,
+            ),
+          ],
+        ),
+        TeamFormSection(
+          icon: Icons.emergency_rounded,
+          color: TeamColors.rose,
+          title: 'Emergency contact',
+          children: [
+            AppLabeledField(
+              label: 'Name',
+              controller: _emName,
+              icon: Icons.person_outline_rounded,
+              iconColor: TeamColors.rose,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+            ),
+            AppLabeledField(
+              label: 'Phone',
+              controller: _emPhone,
+              icon: Icons.call_rounded,
+              iconColor: TeamColors.rose,
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.next,
+            ),
+            AppLabeledField(
+              label: 'Relation',
+              controller: _emRelation,
+              icon: Icons.family_restroom_rounded,
+              iconColor: TeamColors.rose,
+              hintText: 'e.g. Spouse',
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+            ),
+          ],
+        ),
+        TeamFormSection(
+          icon: Icons.sticky_note_2_rounded,
+          color: TeamColors.amber,
+          title: 'Notes',
+          children: [
+            AppLabeledField(
+              label: 'Notes',
+              controller: _notes,
+              icon: Icons.notes_rounded,
+              iconColor: TeamColors.amber,
+              minLines: 3,
+              maxLines: 6,
+              textCapitalization: TextCapitalization.sentences,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

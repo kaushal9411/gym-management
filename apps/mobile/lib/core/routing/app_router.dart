@@ -3,6 +3,8 @@ import 'package:go_router/go_router.dart';
 import '../../bloc/session/session_cubit.dart';
 import '../../bloc/session/session_state.dart';
 import '../../features/announcements/presentation/announcement_form_screen.dart';
+import '../../features/attendance/presentation/attendance_history_screen.dart';
+import '../../features/attendance/presentation/attendance_today_screen.dart';
 import '../../features/announcements/presentation/schedule_announcement_screen.dart';
 import '../../features/announcements/presentation/announcements_screen.dart';
 import '../../features/auth/presentation/find_gym_screen.dart';
@@ -22,16 +24,20 @@ import '../../features/branches/presentation/branch_form_screen.dart';
 import '../../features/branches/presentation/branch_holidays_screen.dart';
 import '../../features/branches/presentation/branch_hours_screen.dart';
 import '../../features/branches/presentation/branches_list_screen.dart';
-import '../../features/catalog/presentation/classes_screen.dart';
-import '../../features/catalog/presentation/diet_plan_form_screen.dart';
-import '../../features/catalog/presentation/diet_plans_screen.dart';
-import '../../features/catalog/presentation/membership_plan_form_screen.dart';
-import '../../features/catalog/presentation/membership_plans_screen.dart';
-import '../../features/catalog/presentation/measured_members_screen.dart';
-import '../../features/catalog/presentation/member_measurements_detail_screen.dart';
-import '../../features/catalog/presentation/new_measurement_screen.dart';
-import '../../features/catalog/presentation/workout_plan_form_screen.dart';
-import '../../features/catalog/presentation/workout_plans_screen.dart';
+import '../../features/classes/presentation/classes_screen.dart';
+import '../../features/classes/presentation/classes_calendar_screen.dart';
+import '../../features/diet/presentation/diet_meals_screen.dart';
+import '../../features/diet/presentation/diet_plan_form_screen.dart';
+import '../../features/diet/presentation/diet_plan_profile_screen.dart';
+import '../../features/diet/presentation/diet_plans_list_screen.dart';
+import '../../features/diet/presentation/smart_diet_plan_screen.dart';
+import '../../features/plans/presentation/plan_form_screen.dart';
+import '../../features/plans/presentation/plan_detail_screen.dart';
+import '../../features/plans/presentation/plans_list_screen.dart';
+import '../../features/workouts/presentation/workout_plan_form_screen.dart';
+import '../../features/workouts/presentation/workout_plan_profile_screen.dart';
+import '../../features/workouts/presentation/workout_plans_list_screen.dart';
+import '../../features/workouts/presentation/workout_schedule_screen.dart';
 import '../../features/finance/presentation/expense_form_screen.dart';
 import '../../features/finance/presentation/expense_list_screen.dart';
 import '../../features/finance/presentation/finance_screen.dart';
@@ -51,6 +57,9 @@ import '../../features/member/presentation/member_gym_info_screen.dart';
 import '../../features/member/presentation/member_invoice_detail_screen.dart';
 import '../../features/member/presentation/member_invoices_screen.dart';
 import '../../features/member/presentation/member_measurements_screen.dart';
+import '../../features/measurements/presentation/measured_members_screen.dart';
+import '../../features/measurements/presentation/member_measurements_detail_screen.dart';
+import '../../features/measurements/presentation/new_measurement_screen.dart';
 import '../../features/member/presentation/member_notifications_screen.dart';
 import '../../features/member/presentation/member_payments_screen.dart';
 import '../../features/member/presentation/member_change_password_screen.dart';
@@ -61,6 +70,7 @@ import '../../features/manager/presentation/member_form_screen.dart';
 import '../../features/manager/presentation/member_freeze_screen.dart';
 import '../../features/manager/presentation/member_renew_screen.dart';
 import '../../features/manager/presentation/member_edit_address_screen.dart';
+import '../../features/manager/presentation/member_edit_extended_screen.dart';
 import '../../features/manager/presentation/member_edit_health_screen.dart';
 import '../../features/manager/presentation/member_edit_personal_screen.dart';
 import '../../features/manager/presentation/member_downgrade_screen.dart';
@@ -70,6 +80,7 @@ import '../../features/manager/presentation/staff_detail_screen.dart';
 import '../../features/manager/presentation/staff_edit_employment_screen.dart';
 import '../../features/manager/presentation/staff_edit_personal_screen.dart';
 import '../../features/manager/presentation/staff_form_screen.dart';
+import '../../features/manager/presentation/team_screen.dart';
 import '../../features/notifications/presentation/notification_template_form_screen.dart';
 import '../../features/notifications/presentation/notification_templates_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
@@ -80,15 +91,13 @@ import '../../features/profile/presentation/my_profile_screen.dart';
 import '../../features/profile/presentation/notification_preferences_screen.dart';
 import '../../features/profile/presentation/profile_data_screen.dart';
 import '../../features/receptionist/presentation/checked_in_screen.dart';
-import '../../features/receptionist/presentation/class_add_attendee_screen.dart';
-import '../../features/receptionist/presentation/class_form_screen.dart';
-import '../../features/receptionist/presentation/class_schedule_screen.dart';
-import '../../features/receptionist/presentation/class_session_detail_screen.dart';
+import '../../features/classes/presentation/class_add_attendee_screen.dart';
+import '../../features/classes/presentation/class_form_screen.dart';
+import '../../features/classes/presentation/class_schedule_screen.dart';
+import '../../features/classes/presentation/class_session_detail_screen.dart';
 import '../../features/receptionist/presentation/receptionist_reports_screen.dart';
 import '../../features/receptionist/presentation/search_members_screen.dart';
 import '../../features/reports/presentation/analytics_screen.dart';
-import '../../features/reports/presentation/attendance_dashboard_screen.dart';
-import '../../features/reports/presentation/attendance_history_screen.dart';
 import '../../features/reports/presentation/attendance_report_screen.dart';
 import '../../features/reports/presentation/branch_performance_screen.dart';
 import '../../features/reports/presentation/churn_report_screen.dart';
@@ -109,6 +118,7 @@ import '../../features/roles/presentation/roles_screen.dart';
 import '../../features/roles/presentation/user_detail_screen.dart';
 import '../../features/roles/presentation/user_edit_branches_screen.dart';
 import '../../features/roles/presentation/user_edit_permissions_screen.dart';
+import '../../features/roles/presentation/user_edit_profile_screen.dart';
 import '../../features/roles/presentation/user_edit_roles_screen.dart';
 import '../../features/roles/presentation/user_form_screen.dart';
 import '../../features/search/presentation/global_search_screen.dart';
@@ -135,6 +145,7 @@ import '../../features/trainer/presentation/day_editor_screen.dart';
 import '../../features/trainer/presentation/diet_plan_form_screen.dart';
 import '../../features/trainer/presentation/exercise_detail_screen.dart';
 import '../../features/trainer/presentation/exercise_form_screen.dart';
+import '../../features/team/presentation/staff_edit_branches_screen.dart';
 import '../../features/trainer/presentation/food_detail_screen.dart';
 import '../../features/trainer/presentation/food_form_screen.dart';
 import '../../features/trainer/presentation/meal_builder_screen.dart';
@@ -344,6 +355,11 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         ),
       ),
       GoRoute(
+        path: AppRoutes.membershipPlanDetail,
+        builder: (context, state) =>
+            PlanDetailScreen(planId: state.extra as String),
+      ),
+      GoRoute(
         path: AppRoutes.workoutPlans,
         builder: (context, state) => const WorkoutPlansScreen(),
       ),
@@ -354,6 +370,16 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         ),
       ),
       GoRoute(
+        path: AppRoutes.workoutPlanDetail,
+        builder: (context, state) =>
+            WorkoutPlanProfileScreen(planId: state.extra as String),
+      ),
+      GoRoute(
+        path: AppRoutes.workoutPlanSchedule,
+        builder: (context, state) =>
+            WorkoutScheduleScreen(planId: state.extra as String),
+      ),
+      GoRoute(
         path: AppRoutes.dietPlans,
         builder: (context, state) => const DietPlansScreen(),
       ),
@@ -362,6 +388,20 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         builder: (context, state) => DietPlanCatalogFormScreen(
           planId: state.extra as String?,
         ),
+      ),
+      GoRoute(
+        path: AppRoutes.dietPlanDetail,
+        builder: (context, state) =>
+            DietPlanProfileScreen(planId: state.extra as String),
+      ),
+      GoRoute(
+        path: AppRoutes.smartDietPlan,
+        builder: (context, state) => const SmartDietPlanScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.dietPlanMeals,
+        builder: (context, state) =>
+            DietMealsScreen(planId: state.extra as String),
       ),
       GoRoute(
         path: AppRoutes.measuredMembers,
@@ -542,6 +582,11 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
             UserEditBranchesScreen(user: state.extra as IamUser),
       ),
       GoRoute(
+        path: AppRoutes.userEditProfile,
+        builder: (context, state) =>
+            UserEditProfileScreen(user: state.extra as IamUser),
+      ),
+      GoRoute(
         path: AppRoutes.userEditPermissions,
         builder: (context, state) =>
             UserEditPermissionsScreen(user: state.extra as IamUser),
@@ -633,6 +678,15 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
             StaffEditEmploymentScreen(staff: state.extra as StaffMember),
       ),
       GoRoute(
+        path: AppRoutes.staffEditBranches,
+        builder: (context, state) =>
+            StaffEditBranchesScreen(staff: state.extra as StaffMember),
+      ),
+      GoRoute(
+        path: AppRoutes.staffRoster,
+        builder: (context, state) => const TeamScreen(standalone: true),
+      ),
+      GoRoute(
         path: AppRoutes.memberForm,
         builder: (context, state) => const MemberFormScreen(),
       ),
@@ -682,6 +736,11 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
             MemberEditAddressScreen(member: state.extra as GymMember),
       ),
       GoRoute(
+        path: AppRoutes.memberEditExtended,
+        builder: (context, state) =>
+            MemberEditExtendedScreen(member: state.extra as GymMember),
+      ),
+      GoRoute(
         path: AppRoutes.memberEditHealth,
         builder: (context, state) =>
             MemberEditHealthScreen(member: state.extra as GymMember),
@@ -697,7 +756,7 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       ),
       GoRoute(
         path: AppRoutes.attendance,
-        builder: (context, state) => const AttendanceDashboardScreen(),
+        builder: (context, state) => const AttendanceTodayScreen(),
       ),
       GoRoute(
         path: AppRoutes.attendanceHistory,
@@ -731,6 +790,11 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         path: AppRoutes.classSchedule,
         builder: (context, state) =>
             ClassScheduleScreen(groupClass: state.extra as GroupClass),
+      ),
+      GoRoute(
+        path: AppRoutes.classesCalendar,
+        builder: (context, state) =>
+            const ClassesCalendarScreen(standalone: true),
       ),
       GoRoute(
         path: AppRoutes.receptionistReports,

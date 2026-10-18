@@ -4,20 +4,18 @@ import 'package:go_router/go_router.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../models/branch.dart';
+import '../../../models/branch_option.dart';
 import '../../../models/iam_user.dart';
 import '../../../repositories/branch_repository.dart';
 import '../../../repositories/iam_user_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../team/presentation/widgets/team_ui.dart';
 
-/// `PUT /users/:id/branches` replaces the whole branch-access set. The
-/// per-branch `expiresAt` the API supports isn't exposed here — the design
-/// has no frame for it and it's an edge case (temporary access) not worth
-/// the extra picker UI in this pass; every assignment saved from mobile is
-/// open-ended, same simplification as skipping it elsewhere would.
+/// `PUT /users/:id/branches` replaces the whole branch-access set: either
+/// "all branches" or a list of branches with one primary and an optional
+/// per-branch expiry date (temporary access), exactly as web's branch access
+/// cards do.
 class UserEditBranchesScreen extends StatefulWidget {
   const UserEditBranchesScreen({required this.user, super.key});
 
@@ -27,21 +25,25 @@ class UserEditBranchesScreen extends StatefulWidget {
   State<UserEditBranchesScreen> createState() => _UserEditBranchesScreenState();
 }
 
-String? _findPrimaryId(List<UserBranchAccess> branches) {
-  for (final b in branches) {
-    if (b.isPrimary) return b.branchId;
-  }
-  return null;
-}
-
 class _UserEditBranchesScreenState extends State<UserEditBranchesScreen> {
-  List<Branch>? _branches;
-  late bool _allBranches = widget.user.allBranches;
+  List<BranchOption>? _options;
+  late bool _all = widget.user.allBranches;
   late final Set<String> _selected =
       widget.user.branches.map((b) => b.branchId).toSet();
-  late String? _primaryId = _findPrimaryId(widget.user.branches);
+  late String? _primary = _initialPrimary();
+  late final Map<String, DateTime?> _expiry = {
+    for (final b in widget.user.branches) b.branchId: b.expiresAt,
+  };
   bool _saving = false;
   String? _error;
+  String? _loadError;
+
+  String? _initialPrimary() {
+    for (final b in widget.user.branches) {
+      if (b.isPrimary) return b.branchId;
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -50,17 +52,58 @@ class _UserEditBranchesScreenState extends State<UserEditBranchesScreen> {
   }
 
   Future<void> _load() async {
+    setState(() => _loadError = null);
     try {
-      final result = await getIt<BranchRepository>().list(limit: 100);
+      final all = await getIt<BranchRepository>().assignable();
+      final known = {for (final b in all) b.id};
+      final extra = [
+        for (final b in widget.user.branches)
+          if (!known.contains(b.branchId))
+            BranchOption(id: b.branchId, name: b.branchName),
+      ];
       if (!mounted) return;
-      setState(() => _branches = result.items);
+      setState(() => _options = [...all, ...extra]);
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _loadError = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _loadError = '$e');
     }
   }
 
+  void _toggle(String id) {
+    setState(() {
+      if (!_selected.add(id)) {
+        _selected.remove(id);
+        _expiry.remove(id);
+        if (_primary == id) {
+          _primary = _selected.isEmpty ? null : _selected.first;
+        }
+      } else {
+        _primary ??= id;
+      }
+    });
+  }
+
+  Future<void> _pickExpiry(String id) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _expiry[id] ?? now.add(const Duration(days: 30)),
+      firstDate: now,
+      lastDate: DateTime(now.year + 10),
+      helpText: 'Access expires on',
+    );
+    if (picked != null) setState(() => _expiry[id] = picked);
+  }
+
   Future<void> _save() async {
+    if (!_all && _selected.isEmpty) {
+      setState(
+        () => _error = 'Pick at least one branch, or choose All '
+            'branches',
+      );
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
@@ -68,23 +111,36 @@ class _UserEditBranchesScreenState extends State<UserEditBranchesScreen> {
     try {
       await getIt<IamUserRepository>().setBranches(
         widget.user.id,
-        allBranches: _allBranches,
-        branches: _allBranches
+        allBranches: _all,
+        branches: _all
             ? const []
-            : _selected
-                .map(
-                  (id) => BranchAssignmentDraft(
+            : [
+                for (final id in _selected)
+                  BranchAssignmentDraft(
                     branchId: id,
-                    isPrimary: id == _primaryId,
+                    isPrimary: id == (_primary ?? _selected.first),
+                    expiresAt: _expiry[id] == null
+                        ? null
+                        : DateTime(
+                            _expiry[id]!.year,
+                            _expiry[id]!.month,
+                            _expiry[id]!.day,
+                            23,
+                            59,
+                            59,
+                          ),
                   ),
-                )
-                .toList(),
+              ],
       );
       if (!mounted) return;
+      teamSnack(context, 'Branch access updated.');
       context.pop();
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.message);
+      setState(() => _error = e.detailedMessage);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not save ($e)');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -92,195 +148,117 @@ class _UserEditBranchesScreenState extends State<UserEditBranchesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
+    final options = _options;
+    if (options == null) {
+      return Scaffold(
         backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        appBar: AppBar(
+          backgroundColor: AppColors.bg,
+          elevation: 0,
+          title: const Text('Branch access'),
+        ),
+        body: _loadError != null
+            ? AppErrorView(message: _loadError!, onRetry: _load)
+            : const AppLoadingView(),
+      );
+    }
+    return TeamEditScaffold(
+      name: widget.user.name,
+      subtitle: widget.user.email,
+      avatarUrl: widget.user.avatarUrl,
+      title: 'Branch access',
+      icon: Icons.account_tree_rounded,
+      color: TeamColors.amber,
+      saving: _saving,
+      onSave: _save,
+      error: _error,
+      sections: [
+        TeamFormSection(
+          icon: Icons.public_rounded,
+          color: TeamColors.amber,
+          title: 'Scope',
           children: [
-            Text('Edit branch access', style: AppText.display(size: 18)),
-            Text(widget.user.name, style: AppText.eyebrow()),
+            TeamToggleRow(
+              title: 'All branches',
+              subtitle: 'Access to every branch, including future ones',
+              icon: Icons.all_inclusive_rounded,
+              color: TeamColors.amber,
+              value: _all,
+              onChanged: (v) => setState(() => _all = v),
+            ),
           ],
         ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: _branches == null
-            ? _error != null
-                ? AppErrorView(message: _error!, onRetry: _load)
-                : const AppLoadingView()
-            : Padding(
-                padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        if (!_all)
+          TeamFormSection(
+            icon: Icons.account_tree_rounded,
+            color: TeamColors.teal,
+            title: 'Specific branches',
+            subtitle: '${_selected.length} selected · tap the star for primary',
+            children: [
+              for (final b in options)
+                Column(
                   children: [
-                    if (_error != null) ...[
-                      FormAlert(message: _error!),
-                      const SizedBox(height: 12),
-                    ],
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface2,
-                        borderRadius: BorderRadius.circular(AppRadii.card),
-                        border: Border.all(color: AppColors.line),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'All branches',
-                              style: AppText.body(
-                                size: 14,
-                                weight: FontWeight.w700,
+                    TeamChoiceCard(
+                      title: b.name,
+                      icon: Icons.place_rounded,
+                      color: TeamColors.teal,
+                      multi: true,
+                      selected: _selected.contains(b.id),
+                      onTap: () => _toggle(b.id),
+                    ),
+                    if (_selected.contains(b.id))
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
+                        child: Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () => setState(() => _primary = b.id),
+                              child: TeamTag(
+                                label: (_primary ?? _selected.first) == b.id
+                                    ? 'Primary'
+                                    : 'Make primary',
+                                color: TeamColors.amber,
+                                icon: (_primary ?? _selected.first) == b.id
+                                    ? Icons.star_rounded
+                                    : Icons.star_outline_rounded,
                               ),
                             ),
-                          ),
-                          Switch(
-                            value: _allBranches,
-                            activeThumbColor: AppColors.staffPillFg,
-                            onChanged: (v) => setState(() => _allBranches = v),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    if (!_allBranches) ...[
-                      Text('Assigned branches', style: AppText.eyebrow()),
-                      const SizedBox(height: 8),
-                      Expanded(
-                        child: ListView.separated(
-                          itemCount: _branches!.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 8),
-                          itemBuilder: (context, i) {
-                            final branch = _branches![i];
-                            final selected = _selected.contains(branch.id);
-                            final isPrimary = _primaryId == branch.id;
-                            return Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface2,
-                                borderRadius:
-                                    BorderRadius.circular(AppRadii.card),
-                                border: Border.all(
-                                  color: selected
-                                      ? AppColors.staffPillFg
-                                      : AppColors.line,
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => _pickExpiry(b.id),
+                              child: TeamTag(
+                                label: _expiry[b.id] == null
+                                    ? 'No expiry'
+                                    : 'Until ${fmtDate(_expiry[b.id])}',
+                                color: TeamColors.sky,
+                                icon: Icons.event_rounded,
+                              ),
+                            ),
+                            if (_expiry[b.id] != null) ...[
+                              const SizedBox(width: 6),
+                              GestureDetector(
+                                onTap: () =>
+                                    setState(() => _expiry[b.id] = null),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  size: 16,
+                                  color: AppColors.inkFaint,
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  Material(
-                                    color: Colors.transparent,
-                                    child: InkWell(
-                                      borderRadius:
-                                          BorderRadius.circular(AppRadii.tile),
-                                      onTap: () => setState(() {
-                                        if (selected) {
-                                          _selected.remove(branch.id);
-                                          if (_primaryId == branch.id) {
-                                            _primaryId = _selected.isEmpty
-                                                ? null
-                                                : _selected.first;
-                                          }
-                                        } else {
-                                          _selected.add(branch.id);
-                                          _primaryId ??= branch.id;
-                                        }
-                                      }),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(4),
-                                        child: Icon(
-                                          selected
-                                              ? Icons.check_box_rounded
-                                              : Icons
-                                                  .check_box_outline_blank_rounded,
-                                          size: 20,
-                                          color: selected
-                                              ? AppColors.staffPillFg
-                                              : AppColors.inkFaint,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      branch.name,
-                                      style: AppText.body(
-                                        size: 14,
-                                        weight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                  if (selected)
-                                    Material(
-                                      color: Colors.transparent,
-                                      child: InkWell(
-                                        borderRadius: BorderRadius.circular(
-                                          AppRadii.pill,
-                                        ),
-                                        onTap: () => setState(
-                                          () => _primaryId = branch.id,
-                                        ),
-                                        child: AppPillLike(
-                                          label: 'Primary',
-                                          active: isPrimary,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            );
-                          },
+                            ],
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 12),
-                    ] else
-                      const Spacer(),
-                    AppButton(
-                      label: 'Save branch access',
-                      loading: _saving,
-                      onPressed: _save,
-                    ),
                   ],
                 ),
-              ),
-      ),
-    );
-  }
-}
-
-/// A tappable pill toggle — the design system's `AppPill` is display-only,
-/// so this small local variant adds the tap affordance the "mark primary"
-/// action needs.
-class AppPillLike extends StatelessWidget {
-  const AppPillLike({required this.label, required this.active, super.key});
-
-  final String label;
-  final bool active;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        gradient: active ? AppColors.staffGrad : null,
-        color: active ? null : AppColors.surface3,
-        borderRadius: BorderRadius.circular(AppRadii.pill),
-      ),
-      child: Text(
-        label,
-        style: AppText.body(
-          size: 11,
-          weight: FontWeight.w800,
-          color: active ? Colors.white : AppColors.inkFaint,
-        ),
-      ),
+              if (options.isEmpty)
+                Text(
+                  'No branches found.',
+                  style: AppText.body(size: 13, color: AppColors.inkFaint),
+                ),
+            ],
+          ),
+      ],
     );
   }
 }

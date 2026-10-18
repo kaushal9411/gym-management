@@ -15,6 +15,7 @@ import '../../../models/food.dart';
 import '../../../repositories/food_repository.dart';
 import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/menu_button.dart';
 
 /// Design frame "7. Food library" — the Trainer shell's "Diet" tab root.
 /// Diet PLANS themselves (frame "8. Meal builder") are reached through the
@@ -73,6 +74,8 @@ class _FoodLibraryScreenState extends State<FoodLibraryScreen> {
           children: [
             Row(
               children: [
+                const MenuButton(),
+                const SizedBox(width: 10),
                 Expanded(
                   child: BlocBuilder<PaginatedListCubit<Food>,
                       PaginatedListState<Food>>(

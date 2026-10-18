@@ -17,8 +17,8 @@ class DietDailyLog {
 
   factory DietDailyLog.fromJson(Map<String, dynamic> json) => DietDailyLog(
         date: json['date'] as String,
-        waterIntakeMl: json['waterIntakeMl'] as int?,
-        weightKg: (json['weightKg'] as num?)?.toDouble(),
+        waterIntakeMl: (json['waterIntakeMl'] as num?)?.toInt(),
+        weightKg: double.tryParse(json['weightKg']?.toString() ?? ''),
         mealsStatus: (json['mealsStatus'] as Map<String, dynamic>? ?? {}).map(
           (k, v) => MapEntry(
             MealTypeX.fromApi(k),
@@ -77,8 +77,8 @@ class MemberDietProgress {
       id: json['id'] as String,
       dietPlanId: plan['id'] as String,
       dietPlanName: plan['name'] as String,
-      dailyCalories: plan['dailyCalories'] as int?,
-      durationDays: plan['durationDays'] as int? ?? 0,
+      dailyCalories: (plan['dailyCalories'] as num?)?.toInt(),
+      durationDays: (plan['durationDays'] as num?)?.toInt() ?? 0,
       mealTypes: ((plan['mealTypes'] as List?) ?? const [])
           .map((e) => MealTypeX.fromApi(e as String))
           .toList(),
@@ -87,10 +87,10 @@ class MemberDietProgress {
       endDate: json['endDate'] == null
           ? null
           : DateTime.parse(json['endDate'] as String),
-      progressPercent: json['progressPercent'] as int? ?? 0,
-      daysLogged: json['daysLogged'] as int? ?? 0,
-      latestWeightKg: (json['latestWeightKg'] as num?)?.toDouble(),
-      latestWaterIntakeMl: json['latestWaterIntakeMl'] as int?,
+      progressPercent: (json['progressPercent'] as num?)?.toInt() ?? 0,
+      daysLogged: (json['daysLogged'] as num?)?.toInt() ?? 0,
+      latestWeightKg: double.tryParse(json['latestWeightKg']?.toString() ?? ''),
+      latestWaterIntakeMl: (json['latestWaterIntakeMl'] as num?)?.toInt(),
       dailyLogs: ((json['dailyLogs'] as List?) ?? const [])
           .map((e) => DietDailyLog.fromJson(e as Map<String, dynamic>))
           .toList(),

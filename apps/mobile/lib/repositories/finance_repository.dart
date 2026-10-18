@@ -49,11 +49,23 @@ class FinanceRepository {
     required String memberId,
     required double amount,
     required String method,
+    String? membershipId,
+    double? discount,
+    double? tax,
+    String? status,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/payments',
-        data: {'memberId': memberId, 'amount': amount, 'method': method},
+        data: {
+          'memberId': memberId,
+          'amount': amount,
+          'method': method,
+          if (membershipId != null) 'membershipId': membershipId,
+          if (discount != null && discount > 0) 'discount': discount,
+          if (tax != null && tax > 0) 'tax': tax,
+          if (status != null) 'status': status,
+        },
       );
       return MemberPayment.fromJson(
         response.data!['data'] as Map<String, dynamic>,

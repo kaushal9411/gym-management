@@ -3,20 +3,18 @@ import 'package:flutter/material.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/permission_group.dart';
 import '../../../repositories/tenant_role_repository.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../manager/presentation/widgets/member_detail_anim.dart';
+import '../../team/presentation/widgets/team_ui.dart';
 
-/// The web app's `/permissions` page (the full 114-key catalog, grouped by
-/// resource) — a different thing from the "Matrix" tab, which compares
-/// roles against a hand-picked subset. This is read-only: creating or
-/// editing permissions has no endpoint anywhere, web included, since the
-/// registry itself is fixed and only role/user *grants* against it are
-/// editable (that's what Roles/Users are for). Reuses
-/// `TenantRoleRepository.listPermissions()` — same `GET /permissions` the
-/// role form's picker already calls.
+/// The web app's `/permissions` "Registry" view — the full catalog of
+/// `resource:action` keys, grouped by resource, searchable. Read-only:
+/// creating or editing permissions has no endpoint anywhere (web included);
+/// only role / user *grants* against the fixed registry are editable (that's
+/// what Roles and Users are for). Needs `permissions:read`.
 class PermissionsRegistryTab extends StatefulWidget {
   const PermissionsRegistryTab({super.key});
 
@@ -28,6 +26,7 @@ class _PermissionsRegistryTabState extends State<PermissionsRegistryTab> {
   List<PermissionGroup>? _groups;
   String _search = '';
   String? _error;
+  final Set<String> _open = {};
 
   @override
   void initState() {
@@ -42,149 +41,161 @@ class _PermissionsRegistryTabState extends State<PermissionsRegistryTab> {
       if (!mounted) return;
       setState(() => _groups = groups);
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _error = '$e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_groups == null) {
+    final groups = _groups;
+    if (groups == null) {
       return _error != null
           ? AppErrorView(message: _error!, onRetry: _load)
           : const AppLoadingView();
     }
+    final q = _search.toLowerCase();
+    final total = groups.fold<int>(0, (a, g) => a + g.permissions.length);
 
-    final query = _search.trim().toLowerCase();
-    final filtered = query.isEmpty
-        ? _groups!
-        : _groups!
-            .map(
-              (g) => PermissionGroup(
-                resource: g.resource,
-                permissions: g.permissions
-                    .where(
-                      (p) =>
-                          p.key.toLowerCase().contains(query) ||
-                          (p.description?.toLowerCase().contains(query) ??
-                              false),
-                    )
-                    .toList(),
-              ),
-            )
-            .where((g) => g.permissions.isNotEmpty)
-            .toList();
-    final total = _groups!.fold<int>(0, (sum, g) => sum + g.permissions.length);
-
-    return Column(
-      children: [
+    final cards = <Widget>[];
+    for (var gi = 0; gi < groups.length; gi++) {
+      final g = groups[gi];
+      final color = TeamColors.rotation[gi % TeamColors.rotation.length];
+      final items = q.isEmpty
+          ? g.permissions
+          : g.permissions
+              .where(
+                (p) =>
+                    p.key.toLowerCase().contains(q) ||
+                    (p.description ?? '').toLowerCase().contains(q),
+              )
+              .toList();
+      if (items.isEmpty) continue;
+      final open = q.isNotEmpty || _open.contains(g.resource);
+      cards.add(
         Padding(
-          padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-          child: TextField(
-            onChanged: (v) => setState(() => _search = v),
-            style: AppText.body(size: 14, weight: FontWeight.w600),
-            decoration: InputDecoration(
-              hintText: 'Search $total permissions…',
-              hintStyle: AppText.body(size: 14, color: AppColors.inkFaint),
-              filled: true,
-              fillColor: AppColors.surface2,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 12,
+          padding: const EdgeInsets.only(bottom: 10),
+          child: FadeUp(
+            index: cards.length,
+            child: TeamSectionCard(
+              icon: Icons.key_rounded,
+              color: color,
+              title: g.resource.replaceAll('-', ' '),
+              subtitle: '${g.permissions.length} permission'
+                  '${g.permissions.length == 1 ? '' : 's'}',
+              trailing: IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  open ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+                  color: AppColors.inkFaint,
+                ),
+                onPressed: q.isNotEmpty
+                    ? null
+                    : () => setState(() {
+                          if (!_open.add(g.resource)) _open.remove(g.resource);
+                        }),
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadii.field),
-                borderSide: BorderSide(color: AppColors.line),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(AppRadii.field),
-                borderSide: BorderSide(color: AppColors.line),
-              ),
+              child: open
+                  ? Column(
+                      children: [
+                        for (final p in items)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 5),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.13),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    p.key,
+                                    style: AppText.body(
+                                      size: 11.5,
+                                      weight: FontWeight.w800,
+                                      color: color,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    p.description ?? '',
+                                    style: AppText.body(
+                                      size: 11.5,
+                                      color: AppColors.inkFaint,
+                                      weight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    )
+                  : Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final p in g.permissions.take(6))
+                          TeamTag(
+                            label: p.key.split(':').last,
+                            color: color,
+                          ),
+                        if (g.permissions.length > 6)
+                          TeamTag(
+                            label: '+${g.permissions.length - 6}',
+                            color: AppColors.inkFaint,
+                          ),
+                      ],
+                    ),
             ),
           ),
         ),
-        Expanded(
-          child: filtered.isEmpty
-              ? const AppEmptyState(
-                  icon: Icons.search_off_rounded,
-                  title: 'No matching permissions',
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
-                  itemCount: filtered.length,
-                  itemBuilder: (context, i) =>
-                      _ResourceGroupCard(group: filtered[i]),
-                ),
+      );
+    }
+
+    return RefreshIndicator(
+      color: AppColors.staffB,
+      backgroundColor: AppColors.surface2,
+      onRefresh: _load,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(
+          18 + teamSideInset(context),
+          0,
+          18 + teamSideInset(context),
+          24,
         ),
-      ],
-    );
-  }
-}
-
-class _ResourceGroupCard extends StatelessWidget {
-  const _ResourceGroupCard({required this.group});
-
-  final PermissionGroup group;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  group.resource,
-                  style: AppText.body(size: 13, weight: FontWeight.w800),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TeamSearchField(
+                    hint: 'Search $total permissions…',
+                    onSearch: (v) => setState(() => _search = v),
+                  ),
                 ),
-              ),
-              Text(
-                '${group.permissions.length}',
-                style: AppText.body(size: 11, color: AppColors.inkFaint),
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(height: 8),
-          for (final permission in group.permissions)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Text(
-                      permission.key,
-                      style: AppText.body(
-                        size: 11.5,
-                        weight: FontWeight.w700,
-                        color: AppColors.staffPillFg,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 3,
-                    child: Text(
-                      permission.description ?? '—',
-                      style: AppText.body(
-                        size: 11.5,
-                        color: AppColors.inkFaint,
-                      ),
-                    ),
-                  ),
-                ],
+          if (cards.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 40),
+              child: AppEmptyState(
+                icon: Icons.search_off_rounded,
+                title: 'No permissions match',
+                message: 'Try a different search.',
               ),
             ),
+          ...cards,
         ],
       ),
     );

@@ -10,6 +10,7 @@ import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/menu_button.dart';
 import '../../../shared/widgets/notification_bell_icon.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../reports/presentation/widgets/report_filter_bar.dart';
@@ -74,6 +75,8 @@ class _DashboardView extends StatelessWidget {
         children: [
           Row(
             children: [
+              const MenuButton(),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,8 +234,11 @@ class _UnavailableNotice extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline_rounded,
-              size: 18, color: AppColors.warning,),
+          const Icon(
+            Icons.info_outline_rounded,
+            size: 18,
+            color: AppColors.warning,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

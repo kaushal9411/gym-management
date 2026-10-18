@@ -5,7 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../../bloc/platform/platform_config_cubit.dart';
 import '../../../bloc/session/session_cubit.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
@@ -16,6 +15,7 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../models/staff_profile.dart';
 import '../../../repositories/profile_repository.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/staff_logout_dialog.dart';
 import '../../../shared/widgets/user_avatar.dart';
 
 class _MenuEntry {
@@ -214,46 +214,7 @@ class _MyProfileScreenState extends State<MyProfileScreen> {
     );
   }
 
-  Future<void> _confirmLogout() async {
-    final appName = context.read<PlatformConfigCubit>().state.appName;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.surface2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.card),
-        ),
-        title: Text('Log out of $appName?', style: AppText.display(size: 18)),
-        content: Text(
-          "You'll need your email and password to sign back in.",
-          style: AppText.body(size: 13, color: AppColors.inkFaint),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => dialogContext.pop(false),
-            child: Text(
-              'Cancel',
-              style: AppText.body(size: 13, weight: FontWeight.w700),
-            ),
-          ),
-          TextButton(
-            onPressed: () => dialogContext.pop(true),
-            child: Text(
-              'Log out',
-              style: AppText.body(
-                size: 13,
-                weight: FontWeight.w700,
-                color: AppColors.danger,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && mounted) {
-      await context.read<SessionCubit>().signOut();
-    }
-  }
+  Future<void> _confirmLogout() => showStaffLogoutDialog(context);
 
   @override
   Widget build(BuildContext context) {

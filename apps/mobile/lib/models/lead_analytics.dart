@@ -197,6 +197,7 @@ class LeadAnalytics {
     required this.bySource,
     required this.byStaff,
     required this.byPlan,
+    required this.topBranches,
     required this.lostReasons,
     required this.ageing,
   });
@@ -220,6 +221,7 @@ class LeadAnalytics {
   final List<LeadCohortRow> bySource;
   final List<LeadCohortRow> byStaff;
   final List<LeadCohortRow> byPlan;
+  final List<LeadCohortRow> topBranches;
   final List<LeadLostReasonRow> lostReasons;
   final List<LeadAgeingBucket> ageing;
 
@@ -261,6 +263,15 @@ class LeadAnalytics {
             (e) => LeadCohortRow.fromJson(
               e,
               keyField: 'planId',
+              nameField: 'name',
+            ),
+          )
+          .toList(),
+      topBranches: jsonList(j['topBranches'])
+          .map(
+            (e) => LeadCohortRow.fromJson(
+              e,
+              keyField: 'branchId',
               nameField: 'name',
             ),
           )

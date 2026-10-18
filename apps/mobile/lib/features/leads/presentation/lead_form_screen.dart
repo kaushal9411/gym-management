@@ -5,7 +5,6 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/branch_option.dart';
 import '../../../models/lead.dart';
@@ -13,11 +12,10 @@ import '../../../models/membership_plan.dart';
 import '../../../repositories/branch_repository.dart';
 import '../../../repositories/lead_repository.dart';
 import '../../../repositories/membership_plan_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
-import '../../../shared/widgets/app_state_views.dart';
-import '../../../shared/widgets/category_chip_selector.dart';
+import '../../../shared/widgets/member_edit_scaffold.dart';
 import 'lead_ui.dart';
+import 'widgets/lead_widgets.dart';
 
 /// Route argument: pass [lead] to edit, omit to create.
 class LeadFormArgs {
@@ -28,15 +26,17 @@ class LeadFormArgs {
 
 /// Create / edit a lead — `POST /leads`, `PATCH /leads/:id`.
 ///
-/// Edit sends ONLY changed keys (`null` clears an optional field). The
-/// assignee picker shows on CREATE only and only with `leads:assign` (the
-/// API refuses assigning someone else without it, and `PATCH /leads/:id`
-/// cannot change the assignee — that's the detail screen's Assign action).
-/// A 409 shows a banner listing the matching lead/member with links to open
-/// them; 422 `errors[].field` map onto the inline field errors.
+/// Gradient banner + coloured sections (Contact, Enquiry, Follow-up, Notes)
+/// in the same language as the member edit screens. Edit sends ONLY changed
+/// keys (`null` clears an optional field). The assignee picker shows on
+/// CREATE only and only with `leads:assign` (the API refuses assigning
+/// someone else without it, and `PATCH /leads/:id` cannot change the
+/// assignee — that's the detail screen's Assign action). A 409 shows a
+/// banner listing the matching lead/member with links to open them; 422
+/// `errors[].field` map onto the inline field errors.
 ///
-/// Dropped vs web: gender (not captured by the staff app's member forms
-/// either), branch-scoped plan filtering.
+/// Gender is the backend enum (`MALE|FEMALE|OTHER|PREFER_NOT_TO_SAY`), sent
+/// as the wire value. Dropped vs web: branch-scoped plan filtering.
 class LeadFormScreen extends StatefulWidget {
   const LeadFormScreen({super.key, this.args = const LeadFormArgs()});
 
@@ -57,6 +57,7 @@ class _LeadFormScreenState extends State<LeadFormScreen> {
   final _interest = TextEditingController();
   final _notes = TextEditingController();
   LeadSource _source = LeadSource.walkIn;
+  String? _gender;
   LeadRef? _plan;
   LeadRef? _branch;
   LeadRef? _assignee;
@@ -80,6 +81,7 @@ class _LeadFormScreenState extends State<LeadFormScreen> {
       _interest.text = l.interest ?? '';
       _notes.text = l.notes ?? '';
       _source = l.source;
+      _gender = l.gender;
       _plan = l.interestedPlan;
       _branch = l.branch;
       _followUp = l.nextFollowUpAt?.toLocal();
@@ -121,6 +123,7 @@ class _LeadFormScreenState extends State<LeadFormScreen> {
         'name': _name.text.trim(),
         'phone': _phone.text.trim(),
         if (_clean(_email) != null) 'email': _clean(_email),
+        if (_gender != null) 'gender': _gender,
         'source': _source.api,
         if (_clean(_sourceDetail) != null)
           'sourceDetail': _clean(_sourceDetail),
@@ -142,6 +145,7 @@ class _LeadFormScreenState extends State<LeadFormScreen> {
     diff('name', _name.text.trim(), o.name);
     diff('phone', _phone.text.trim(), o.phone);
     diff('email', _clean(_email), o.email);
+    diff('gender', _gender, o.gender);
     diff('source', _source.api, o.source.api);
     diff('sourceDetail', _clean(_sourceDetail), o.sourceDetail);
     diff('branchId', _branch?.id, o.branch?.id);
@@ -159,8 +163,19 @@ class _LeadFormScreenState extends State<LeadFormScreen> {
     return p;
   }
 
+  static const _knownFields = {
+    'name',
+    'phone',
+    'email',
+    'sourceDetail',
+    'interest',
+    'notes',
+    'nextFollowUpAt',
+    'expectedJoinDate',
+  };
+
   Future<void> _save() async {
-    if (!_validate()) return;
+    if (_saving || !_validate()) return;
     final repo = getIt<LeadRepository>();
     Map<String, dynamic>? patch;
     if (_editing) {
@@ -180,6 +195,7 @@ class _LeadFormScreenState extends State<LeadFormScreen> {
           ? await repo.update(_lead!.id, patch!)
           : await repo.create(_createBody());
       if (!mounted) return;
+      leadToast(context, _editing ? 'Lead updated' : 'Lead created');
       context.pop(saved);
     } on LeadDuplicateException catch (e) {
       if (!mounted) return;
@@ -190,11 +206,20 @@ class _LeadFormScreenState extends State<LeadFormScreen> {
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
+        var unmapped = false;
         for (final f in e.fieldErrors) {
-          if (f.field != null) _errors[f.field!] = f.message;
+          if (f.field != null && _knownFields.contains(f.field)) {
+            _errors[f.field!] = f.message;
+          } else {
+            unmapped = true;
+          }
         }
-        _formError = e.fieldErrors.isEmpty ? e.message : null;
+        _formError =
+            (e.fieldErrors.isEmpty || unmapped) ? e.detailedMessage : null;
       });
+    } on Object {
+      if (!mounted) return;
+      setState(() => _formError = 'Something went wrong. Please try again.');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -208,7 +233,7 @@ class _LeadFormScreenState extends State<LeadFormScreen> {
       final res = await pickOne<MembershipPlan>(
         context,
         title: 'Interested plan',
-        selected: null,
+        icon: Icons.card_membership_rounded,
         options: [
           const PickerOption<MembershipPlan>(null, 'None'),
           for (final p in r.items) PickerOption(p, p.name),
@@ -222,7 +247,9 @@ class _LeadFormScreenState extends State<LeadFormScreen> {
         });
       }
     } on ApiException catch (e) {
-      _toast(e.message);
+      if (mounted) leadToast(context, e.message, error: true);
+    } on Object {
+      if (mounted) leadToast(context, 'Could not load plans', error: true);
     }
   }
 
@@ -233,6 +260,7 @@ class _LeadFormScreenState extends State<LeadFormScreen> {
       final res = await pickOne<BranchOption>(
         context,
         title: 'Branch',
+        icon: Icons.storefront_rounded,
         options: [
           const PickerOption<BranchOption>(null, 'None'),
           for (final x in b) PickerOption(x, x.name),
@@ -246,7 +274,9 @@ class _LeadFormScreenState extends State<LeadFormScreen> {
         });
       }
     } on ApiException catch (e) {
-      _toast(e.message);
+      if (mounted) leadToast(context, e.message, error: true);
+    } on Object {
+      if (mounted) leadToast(context, 'Could not load branches', error: true);
     }
   }
 
@@ -257,6 +287,7 @@ class _LeadFormScreenState extends State<LeadFormScreen> {
       final res = await pickOne<LeadAssignee>(
         context,
         title: 'Assign to',
+        icon: Icons.person_add_alt_rounded,
         options: [
           const PickerOption<LeadAssignee>(null, 'Me (default)'),
           for (final x in a) PickerOption(x, x.name, sub: x.role),
@@ -270,12 +301,11 @@ class _LeadFormScreenState extends State<LeadFormScreen> {
         });
       }
     } on ApiException catch (e) {
-      _toast(e.message);
+      if (mounted) leadToast(context, e.message, error: true);
+    } on Object {
+      if (mounted) leadToast(context, 'Could not load staff', error: true);
     }
   }
-
-  void _toast(String m) =>
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 
   Future<void> _openDuplicate(LeadDuplicate d) async {
     if (d.isMember) {
@@ -289,143 +319,203 @@ class _LeadFormScreenState extends State<LeadFormScreen> {
   Widget build(BuildContext context) {
     final canAssign = !_editing && leadsCan(context, 'leads:assign');
     final canFollowUp = !_editing || (_lead?.isOpen ?? true);
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Text(_editing ? 'Edit lead' : 'New lead'),
+    return LeadFormScaffold(
+      title: _editing ? 'Edit lead' : 'New lead',
+      subtitle:
+          _editing ? _lead!.name : 'Capture an enquiry and start the follow-up',
+      icon: _editing ? Icons.edit_note_rounded : Icons.person_add_alt_1_rounded,
+      banner: LeadHeroPill(
+        _editing ? _lead!.status.label : 'New enquiry',
+        icon: _editing ? leadStatusIcon(_lead!.status) : Icons.bolt_rounded,
       ),
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_formError != null) FormAlert(message: _formError!),
-              if (_dups.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                for (final d in _dups)
-                  _DuplicateTile(d, () => _openDuplicate(d)),
-              ],
-              const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'Name',
-                controller: _name,
-                errorText: _errors['name'],
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'Phone',
-                controller: _phone,
-                errorText: _errors['phone'],
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'Email (optional)',
-                controller: _email,
-                errorText: _errors['email'],
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 14),
-              Text('Source', style: AppText.eyebrow()),
-              const SizedBox(height: 8),
-              CategoryChipSelector<LeadSource>(
-                options: LeadSource.values,
-                labelOf: (s) => s.label,
-                value: _source,
-                onChanged: (s) => setState(() => _source = s),
-              ),
-              const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'Source detail (optional)',
-                hintText: 'e.g. Instagram reel, referred by Ravi',
-                controller: _sourceDetail,
-                errorText: _errors['sourceDetail'],
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 14),
-              LeadPickerField(
-                label: 'Interested plan',
-                value: _plan?.name,
-                onTap: _pickPlan,
-                onClear: () => setState(() => _plan = null),
-              ),
-              const SizedBox(height: 14),
-              LeadPickerField(
-                label: 'Branch',
-                value: _branch?.name,
-                onTap: _pickBranch,
-                onClear: () => setState(() => _branch = null),
-              ),
-              if (canAssign) ...[
-                const SizedBox(height: 14),
-                LeadPickerField(
-                  label: 'Assigned to',
-                  value: _assignee?.name,
-                  hint: 'Me (default)',
-                  onTap: _pickAssignee,
-                  onClear: () => setState(() => _assignee = null),
-                ),
-              ],
-              const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'Goal / interest (optional)',
-                hintText: 'e.g. Weight loss, strength training',
-                controller: _interest,
-                errorText: _errors['interest'],
-                minLines: 1,
-                maxLines: 3,
-              ),
-              if (canFollowUp) ...[
-                const SizedBox(height: 14),
-                LeadPickerField(
-                  label: 'Next follow-up',
-                  value: _followUp == null ? null : fmtWhen(_followUp),
-                  error: _errors['nextFollowUpAt'],
-                  onTap: () async {
-                    final d = await pickDateTime(context, initial: _followUp);
-                    if (d != null) setState(() => _followUp = d);
-                  },
-                  onClear: () => setState(() => _followUp = null),
-                ),
-              ],
-              const SizedBox(height: 14),
-              LeadPickerField(
-                label: 'Expected join date',
-                value: _joinDate == null ? null : fmtDay(_joinDate),
-                error: _errors['expectedJoinDate'],
+      saving: _saving,
+      onSave: _save,
+      saveLabel: _editing ? 'Save changes' : 'Create lead',
+      error: _formError,
+      extra: [
+        for (final d in _dups) _DuplicateTile(d, () => _openDuplicate(d)),
+        if (_dups.isNotEmpty) const SizedBox(height: 14),
+      ],
+      sections: [
+        FormSection(
+          icon: Icons.contact_phone_rounded,
+          color: LeadColors.indigo,
+          title: 'Contact',
+          subtitle: 'Who is enquiring',
+          children: [
+            AppLabeledField(
+              label: 'Name',
+              controller: _name,
+              icon: Icons.person_rounded,
+              iconColor: LeadColors.indigo,
+              hintText: 'e.g. Asha Rao',
+              errorText: _errors['name'],
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 14),
+            AppLabeledField(
+              label: 'Phone',
+              controller: _phone,
+              icon: Icons.call_rounded,
+              iconColor: LeadColors.green,
+              hintText: 'e.g. 9876543210',
+              errorText: _errors['phone'],
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 14),
+            AppLabeledField(
+              label: 'Email (optional)',
+              controller: _email,
+              icon: Icons.mail_rounded,
+              iconColor: LeadColors.sky,
+              errorText: _errors['email'],
+              keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 14),
+            LeadChipGroup<String>(
+              label: 'GENDER (OPTIONAL)',
+              icon: Icons.wc_rounded,
+              color: LeadColors.fuchsia,
+              options: [for (final g in leadGenderOptions) g.$1],
+              value: _gender,
+              allowClear: true,
+              labelOf: (v) => leadGenderOptions.firstWhere((g) => g.$1 == v).$2,
+              onChanged: (v) => setState(() => _gender = v),
+            ),
+          ],
+        ),
+        FormSection(
+          icon: Icons.campaign_rounded,
+          color: LeadColors.teal,
+          title: 'Enquiry',
+          subtitle: 'Where they came from and what they want',
+          children: [
+            LeadChipGroup<LeadSource>(
+              label: 'SOURCE',
+              icon: Icons.campaign_rounded,
+              color: LeadColors.teal,
+              options: LeadSource.values,
+              value: _source,
+              labelOf: (s) => s.label,
+              iconOf: leadSourceIcon,
+              colorOf: leadSourceColor,
+              onChanged: (s) => setState(() => _source = s ?? _source),
+            ),
+            const SizedBox(height: 14),
+            AppLabeledField(
+              label: 'Source detail (optional)',
+              controller: _sourceDetail,
+              icon: Icons.notes_rounded,
+              iconColor: LeadColors.teal,
+              hintText: 'e.g. Instagram reel, referred by Ravi',
+              errorText: _errors['sourceDetail'],
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 14),
+            LeadValueField(
+              label: 'Interested plan',
+              icon: Icons.card_membership_rounded,
+              color: LeadColors.violet,
+              text: _plan?.name,
+              hint: 'Not decided',
+              onTap: _pickPlan,
+              onClear: () => setState(() => _plan = null),
+            ),
+            const SizedBox(height: 14),
+            LeadValueField(
+              label: 'Branch',
+              icon: Icons.storefront_rounded,
+              color: LeadColors.amber,
+              text: _branch?.name,
+              hint: 'Not set',
+              onTap: _pickBranch,
+              onClear: () => setState(() => _branch = null),
+            ),
+            const SizedBox(height: 14),
+            AppLabeledField(
+              label: 'Goal / interest (optional)',
+              controller: _interest,
+              icon: Icons.flag_rounded,
+              iconColor: LeadColors.rose,
+              hintText: 'e.g. Weight loss, strength training',
+              errorText: _errors['interest'],
+              minLines: 1,
+              maxLines: 3,
+            ),
+          ],
+        ),
+        FormSection(
+          icon: Icons.event_repeat_rounded,
+          color: LeadColors.amber,
+          title: 'Follow-up',
+          subtitle: 'When to reach out and who owns it',
+          children: [
+            if (canFollowUp) ...[
+              LeadValueField(
+                label: 'Next follow-up',
+                icon: Icons.alarm_rounded,
+                color: LeadColors.amber,
+                text: _followUp == null ? null : fmtWhen(_followUp),
+                hint: 'Pick date & time',
+                error: _errors['nextFollowUpAt'],
+                trailingIcon: Icons.calendar_month_rounded,
                 onTap: () async {
-                  final d = await pickDate(context, initial: _joinDate);
-                  if (d != null) setState(() => _joinDate = d);
+                  final d = await pickDateTime(context, initial: _followUp);
+                  if (d != null) setState(() => _followUp = d);
                 },
-                onClear: () => setState(() => _joinDate = null),
+                onClear: () => setState(() => _followUp = null),
               ),
               const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'Notes (optional)',
-                controller: _notes,
-                errorText: _errors['notes'],
-                minLines: 2,
-                maxLines: 5,
-              ),
-              const SizedBox(height: 24),
-              AppButton(
-                label: _editing ? 'Save changes' : 'Create lead',
-                loading: _saving,
-                onPressed: _save,
+            ],
+            LeadValueField(
+              label: 'Expected join date',
+              icon: Icons.event_available_rounded,
+              color: LeadColors.green,
+              text: _joinDate == null ? null : fmtDay(_joinDate),
+              hint: 'Pick a date',
+              error: _errors['expectedJoinDate'],
+              trailingIcon: Icons.calendar_month_rounded,
+              onTap: () async {
+                final d = await pickDate(context, initial: _joinDate);
+                if (d != null) setState(() => _joinDate = d);
+              },
+              onClear: () => setState(() => _joinDate = null),
+            ),
+            if (canAssign) ...[
+              const SizedBox(height: 14),
+              LeadValueField(
+                label: 'Assigned to',
+                icon: Icons.person_add_alt_rounded,
+                color: LeadColors.indigo,
+                text: _assignee?.name,
+                hint: 'Me (default)',
+                onTap: _pickAssignee,
+                onClear: () => setState(() => _assignee = null),
               ),
             ],
-          ),
+          ],
         ),
-      ),
+        FormSection(
+          icon: Icons.sticky_note_2_rounded,
+          color: LeadColors.fuchsia,
+          title: 'Notes',
+          subtitle: 'Anything the next person should know',
+          children: [
+            AppLabeledField(
+              label: 'Notes (optional)',
+              controller: _notes,
+              icon: Icons.edit_note_rounded,
+              iconColor: LeadColors.fuchsia,
+              errorText: _errors['notes'],
+              minLines: 3,
+              maxLines: 6,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -442,25 +532,25 @@ class _DuplicateTile extends StatelessWidget {
         ? 'Member${dup.memberCode == null ? '' : ' ${dup.memberCode}'}'
         : 'Lead${dup.status == null ? '' : ' · ${LeadStatus.parse(dup.status).label}'}';
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: AppColors.warningSoft,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.field),
+          borderRadius: BorderRadius.circular(16),
           side: BorderSide(color: AppColors.warning.withValues(alpha: 0.5)),
         ),
         child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadii.field),
+          borderRadius: BorderRadius.circular(16),
           onTap: onTap,
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 52),
+            constraints: const BoxConstraints(minHeight: 56),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
                   const Icon(
                     Icons.copy_all_rounded,
-                    size: 18,
+                    size: 20,
                     color: AppColors.warning,
                   ),
                   const SizedBox(width: 10),
@@ -476,7 +566,7 @@ class _DuplicateTile extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '$what · same ${dup.matchedOn.join(' & ')}',
+                          '$what · same ${dup.matchedOn.join(' & ')} · tap to open',
                           style: AppText.body(
                             size: 11.5,
                             color: AppColors.inkSoft,

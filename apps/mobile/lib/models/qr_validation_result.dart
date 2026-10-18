@@ -4,12 +4,14 @@ class QrValidationMember {
     required this.memberId,
     required this.name,
     required this.status,
+    this.profilePhotoUrl,
   });
 
   final String id;
   final String memberId;
   final String name;
   final String status;
+  final String? profilePhotoUrl;
 
   factory QrValidationMember.fromJson(Map<String, dynamic> json) =>
       QrValidationMember(
@@ -17,6 +19,7 @@ class QrValidationMember {
         memberId: json['memberId'] as String,
         name: json['name'] as String,
         status: json['status'] as String,
+        profilePhotoUrl: json['profilePhotoUrl'] as String?,
       );
 }
 

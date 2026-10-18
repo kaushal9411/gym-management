@@ -35,10 +35,16 @@ class AppRoutes {
 
   static const membershipPlans = '/catalog/membership-plans';
   static const membershipPlanForm = '/catalog/membership-plans/form';
+  static const membershipPlanDetail = '/catalog/membership-plans/detail';
   static const workoutPlans = '/catalog/workout-plans';
   static const workoutPlanForm = '/catalog/workout-plans/form';
+  static const workoutPlanDetail = '/catalog/workout-plans/detail';
+  static const workoutPlanSchedule = '/catalog/workout-plans/schedule';
   static const dietPlans = '/catalog/diet-plans';
   static const dietPlanForm = '/catalog/diet-plans/form';
+  static const dietPlanDetail = '/catalog/diet-plans/detail';
+  static const dietPlanMeals = '/catalog/diet-plans/meals';
+  static const smartDietPlan = '/catalog/diet-plans/smart';
   static const classes = '/catalog/classes';
   static const measuredMembers = '/catalog/measurements';
   static const newMeasurement = '/catalog/measurements/new';
@@ -101,6 +107,9 @@ class AppRoutes {
   static const staffDetail = '/staff/detail';
   static const staffEditPersonal = '/staff/edit-personal';
   static const staffEditEmployment = '/staff/edit-employment';
+  static const staffEditBranches = '/staff/edit-branches';
+  static const staffRoster = '/staff/roster';
+  static const userEditProfile = '/users/edit-profile';
 
   static const memberForm = '/members/manage/form';
   static const memberDetail = '/members/manage/detail';
@@ -112,6 +121,7 @@ class AppRoutes {
   static const memberEditPersonal = '/members/manage/edit-personal';
   static const memberEditAddress = '/members/manage/edit-address';
   static const memberEditHealth = '/members/manage/edit-health';
+  static const memberEditExtended = '/members/manage/edit-extended';
 
   static const checkedIn = '/attendance/checked-in';
   static const searchMembers = '/attendance/search';
@@ -123,6 +133,10 @@ class AppRoutes {
   static const classAddAttendee = '/classes/add-attendee';
   static const classForm = '/classes/form';
   static const classSchedule = '/classes/schedule';
+
+  /// Pushed class calendar (web's `/classes/calendar`), opened from the
+  /// catalog's hero. The Receptionist's Classes tab embeds the same screen.
+  static const classesCalendar = '/classes/calendar';
   static const receptionistReports = '/reports/receptionist';
 
   // Trainer module (Chunk 4)

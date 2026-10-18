@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../bloc/common/paginated_list_cubit.dart';
-import '../../../bloc/common/paginated_list_state.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../models/diet_plan_summary.dart';
 import '../../../models/gym_member.dart';
 import '../../../repositories/diet_plan_repository.dart';
-import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/list_hero.dart';
+import '../../diet/presentation/diet_plans_list_screen.dart'
+    show filterDietPlans;
+import '../../diet/presentation/widgets/diet_plan_card.dart';
+import '../../plans/presentation/plan_ui.dart' show PlanHeroChip;
+import '../../team/presentation/widgets/team_ui.dart';
 
 class DietPlanFormArgs {
   const DietPlanFormArgs({required this.member});
@@ -28,10 +29,15 @@ class MealBuilderArgs {
   final GymMember member;
 }
 
-/// Reached from [AssignPlanScreen]'s "Diet plan" row — same reasoning as
-/// [TrainerWorkoutPlansScreen]: the design jumps straight to a specific
-/// open plan in "8. Meal builder", so this picker/create list is the
-/// minimal glue screen between the two.
+/// Reached from [AssignPlanScreen]'s "Diet plan" row - the Trainer's
+/// per-client entry into diet plans (the other entry is the Owner / Manager
+/// catalog; both share `DietPlanRepository`). Same gradient [ListHero] as the
+/// catalog list, search + status filters and the same rich plan cards
+/// (duration, kcal, goal, members, trainer); tapping a card opens the plan to
+/// assign it to [member], and "+" creates a new plan first. Lists every
+/// non-deleted plan, exactly what it listed before (it used to show only the
+/// first page). Controls are unchanged (this flow has never been gated per
+/// action; the server still enforces `diets:*`).
 class TrainerDietPlansScreen extends StatefulWidget {
   const TrainerDietPlansScreen({required this.member, super.key});
 
@@ -42,142 +48,190 @@ class TrainerDietPlansScreen extends StatefulWidget {
 }
 
 class _TrainerDietPlansScreenState extends State<TrainerDietPlansScreen> {
-  late final _cubit = PaginatedListCubit<DietPlanSummary>(
-    (page) => getIt<DietPlanRepository>().list(page: page),
-  )..load();
+  List<DietPlanSummary>? _all;
+  bool _loading = true;
+  String? _error;
+
+  String _search = '';
+  String _status = '';
 
   @override
-  void dispose() {
-    _cubit.close();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+    try {
+      final all =
+          await getIt<DietPlanRepository>().listAll(includeDeleted: false);
+      if (!mounted) return;
+      setState(() {
+        _all = all;
+        _loading = false;
+        _error = null;
+      });
+    } on ApiException catch (e) {
+      _fail(e.message);
+    } catch (e) {
+      _fail('Could not load diet plans ($e)');
+    }
+  }
+
+  void _fail(String message) {
+    if (!mounted) return;
+    if (_all != null) {
+      setState(() => _loading = false);
+      teamSnack(context, message, error: true);
+    } else {
+      setState(() {
+        _loading = false;
+        _error = message;
+      });
+    }
   }
 
   Future<void> _createPlan() async {
-    final created = await context.push<bool>(
+    await context.push<bool>(
       AppRoutes.trainerDietPlanForm,
       extra: DietPlanFormArgs(member: widget.member),
     );
-    if (created == true) _cubit.load();
+    if (mounted) _load(silent: true);
+  }
+
+  Future<void> _open(DietPlanSummary plan) async {
+    await context.push(
+      AppRoutes.trainerDietPlanDetail,
+      extra: MealBuilderArgs(planId: plan.id, member: widget.member),
+    );
+    if (mounted) _load(silent: true);
+  }
+
+  int _count(String status) {
+    final all = _all ?? const <DietPlanSummary>[];
+    return switch (status) {
+      'active' => all.where((p) => p.isActive).length,
+      'inactive' => all.where((p) => !p.isActive).length,
+      _ => all.length,
+    };
   }
 
   @override
   Widget build(BuildContext context) {
+    final top = MediaQuery.of(context).padding.top;
+    final all = _all;
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Assign to ${widget.member.name}', style: AppText.eyebrow()),
-            Text('Diet plans', style: AppText.display(size: 18)),
+      body: RefreshIndicator(
+        color: AppColors.staffB,
+        backgroundColor: AppColors.surface2,
+        onRefresh: () => _load(silent: true),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: ListHero(
+                title: 'Diet plans',
+                subtitle: 'Assign to ${widget.member.name}'
+                    '${all == null ? '' : ' · ${all.length} '
+                        '${all.length == 1 ? 'plan' : 'plans'}'}',
+                topInset: top,
+                side: 18 + teamSideInset(context),
+                leading: ListHeroButton(
+                  icon: Icons.arrow_back_rounded,
+                  onTap: () => context.pop(),
+                ),
+                trailing: [
+                  ListHeroButton(icon: Icons.add_rounded, onTap: _createPlan),
+                ],
+                chips: [
+                  for (final f in const [
+                    (label: 'All', value: ''),
+                    (label: 'Active', value: 'active'),
+                    (label: 'Inactive', value: 'inactive'),
+                  ])
+                    PlanHeroChip(
+                      label: '${f.label} · ${_count(f.value)}',
+                      selected: _status == f.value,
+                      onTap: () => setState(() => _status = f.value),
+                    ),
+                ],
+              ),
+            ),
+            if (all != null)
+              SliverToBoxAdapter(
+                child: TeamCenter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+                    child: TeamSearchField(
+                      hint: 'Search name or goal…',
+                      onSearch: (v) => setState(() => _search = v),
+                    ),
+                  ),
+                ),
+              ),
+            ..._body(),
           ],
-        ),
-        actions: [
-          IconButton(
-            onPressed: _createPlan,
-            icon: const Icon(Icons.add_rounded),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: BlocProvider.value(
-          value: _cubit,
-          child: BlocBuilder<PaginatedListCubit<DietPlanSummary>,
-              PaginatedListState<DietPlanSummary>>(
-            builder: (context, state) {
-              return switch (state) {
-                PaginatedListLoading() => const AppLoadingView(),
-                PaginatedListError(:final message) =>
-                  AppErrorView(message: message, onRetry: _cubit.load),
-                PaginatedListLoaded(:final items) when items.isEmpty =>
-                  AppEmptyState(
-                    icon: Icons.restaurant_outlined,
-                    title: 'No diet plans yet',
-                    message: 'Create one to assign to ${widget.member.name}.',
-                  ),
-                PaginatedListLoaded(:final items) => ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                    itemCount: items.length,
-                    itemBuilder: (context, i) {
-                      final plan = items[i];
-                      return _PlanCard(
-                        plan: plan,
-                        onTap: () => context.push(
-                          AppRoutes.trainerDietPlanDetail,
-                          extra: MealBuilderArgs(
-                            planId: plan.id,
-                            member: widget.member,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-              };
-            },
-          ),
         ),
       ),
     );
   }
-}
 
-class _PlanCard extends StatelessWidget {
-  const _PlanCard({required this.plan, required this.onTap});
-
-  final DietPlanSummary plan;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        onTap: onTap,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(AppRadii.card),
-            border: Border.all(color: AppColors.line),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      plan.name,
-                      style: AppText.body(size: 14, weight: FontWeight.w700),
-                    ),
-                    Text(
-                      '${plan.activeMemberCount} active',
-                      style: AppText.body(size: 11, color: AppColors.inkFaint),
-                    ),
-                  ],
-                ),
-              ),
-              if (plan.dailyCalories != null)
-                AppPill(
-                  label: '${plan.dailyCalories} kcal',
-                  tone: AppPillTone.roleTint,
-                ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: AppColors.inkFaint,
-              ),
-            ],
+  List<Widget> _body() {
+    if (_loading && _all == null) {
+      return const [
+        SliverFillRemaining(hasScrollBody: false, child: AppLoadingView()),
+      ];
+    }
+    if (_error != null && _all == null) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: AppErrorView(message: _error!, onRetry: _load),
+        ),
+      ];
+    }
+    final items = filterDietPlans(
+      _all ?? const [],
+      search: _search,
+      status: _status,
+    );
+    if (items.isEmpty) {
+      final filtered = _search.isNotEmpty || _status.isNotEmpty;
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: AppEmptyState(
+            icon: Icons.restaurant_outlined,
+            title: filtered
+                ? 'No diet plans match these filters'
+                : 'No diet plans yet',
+            message: filtered
+                ? 'Try clearing a filter or the search.'
+                : 'Create one to assign to ${widget.member.name}.',
           ),
         ),
+      ];
+    }
+    return [
+      teamCardSliver<DietPlanSummary>(
+        context,
+        items: items,
+        padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
+        builder: (p, i) => DietPlanCard(
+          key: ValueKey('plan-${p.id}'),
+          plan: p,
+          primaryLabel: 'Choose plan',
+          onTap: () => _open(p),
+          onMenu: (_) => _open(p),
+        ),
       ),
-    );
+    ];
   }
 }

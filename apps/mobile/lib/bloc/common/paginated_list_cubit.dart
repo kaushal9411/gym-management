@@ -5,10 +5,8 @@ import '../../models/paginated_result.dart';
 import 'paginated_list_state.dart';
 
 /// Generic "load page 1 / load more" cubit for any endpoint that returns a
-/// [PaginatedResult]. `BranchListCubit` predates this and has its own
-/// (structurally identical) state classes — not migrated here to avoid
-/// touching already-verified code; new list screens should use this instead
-/// of copying that pattern a third time.
+/// [PaginatedResult]. The dashboard / finance cubits predate it and keep
+/// their own state classes; new list screens should use this one.
 class PaginatedListCubit<T> extends Cubit<PaginatedListState<T>> {
   PaginatedListCubit(this._fetchPage) : super(PaginatedListLoading<T>());
 

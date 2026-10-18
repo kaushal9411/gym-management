@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
 
-import '../../bloc/branches/branch_list_cubit.dart';
 import '../../bloc/dashboard/dashboard_cubit.dart';
 import '../../bloc/dashboard/owner_dashboard_cubit.dart';
 import '../../bloc/theme/theme_cubit.dart';
@@ -202,7 +201,6 @@ void setupServiceLocator() {
   getIt.registerFactory<DashboardCubit>(
     () => DashboardCubit(getIt(), getIt(), getIt(), getIt(), getIt()),
   );
-  getIt.registerFactory<BranchListCubit>(() => BranchListCubit(getIt()));
   getIt.registerFactory<FinanceSummaryCubit>(
     () => FinanceSummaryCubit(getIt(), getIt(), getIt(), getIt()),
   );

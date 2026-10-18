@@ -51,8 +51,9 @@ class BodyMeasurement {
   final String? notes;
   final BodyMeasurementRecorder? recordedBy;
 
+  /// DECIMAL columns arrive as strings ("78.50"); tolerate real numbers too.
   static double? _num(dynamic v) =>
-      v == null ? null : double.tryParse(v as String);
+      v == null ? null : double.tryParse(v.toString());
 
   factory BodyMeasurement.fromJson(Map<String, dynamic> json) =>
       BodyMeasurement(
@@ -150,6 +151,7 @@ class MeasuredMemberOption {
     required this.memberCode,
     required this.profilePhotoUrl,
     required this.branchName,
+    this.branchId = '',
     required this.trainerName,
     required this.latest,
     required this.count,
@@ -160,6 +162,9 @@ class MeasuredMemberOption {
   final String memberCode;
   final String? profilePhotoUrl;
   final String branchName;
+
+  /// The member's branch id (for the branch filter); '' if the API omits it.
+  final String branchId;
   final String? trainerName;
   final BodyMeasurement latest;
   final int count;
@@ -173,6 +178,8 @@ class MeasuredMemberOption {
       memberCode: member['memberId'] as String,
       profilePhotoUrl: member['profilePhotoUrl'] as String?,
       branchName: (member['branch'] as Map<String, dynamic>)['name'] as String,
+      branchId: ((member['branch'] as Map<String, dynamic>)['id'] ?? '')
+          .toString(),
       trainerName: trainer?['name'] as String?,
       latest: BodyMeasurement.fromJson(json['latest'] as Map<String, dynamic>),
       count: json['count'] as int,

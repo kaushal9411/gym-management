@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/slide_drawer_scaffold.dart';
 import '../../../shared/widgets/glass_bottom_nav.dart';
 import 'exercise_library_screen.dart';
 import 'food_library_screen.dart';
 import 'my_clients_screen.dart';
 import 'trainer_menu_screen.dart';
 
-/// Trainer shell — the 4-tab bottom nav from design frame "5. Exercise
-/// library" (Home/Workouts/Diet/Menu), the only role with 4 tabs instead
-/// of 5: Trainer has no finance/branch-management surface.
+/// Trainer shell — the 3-tab bottom nav from design frame "5. Exercise
+/// library" (Home/Workouts/Diet), the only role with 3 tabs instead of 4:
+/// Trainer has no finance/branch-management surface. A hamburger-triggered
+/// [TrainerMenuScreen] drawer replaces the former 4th "Menu" tab.
 class TrainerShell extends StatefulWidget {
   const TrainerShell({super.key});
 
@@ -24,20 +26,19 @@ class _TrainerShellState extends State<TrainerShell> {
     MyClientsScreen(),
     ExerciseLibraryScreen(),
     FoodLibraryScreen(),
-    TrainerMenuScreen(),
   ];
 
   static const _navItems = [
     GlassNavItem(icon: Icons.home_rounded, label: 'Home'),
     GlassNavItem(icon: Icons.fitness_center_rounded, label: 'Workouts'),
     GlassNavItem(icon: Icons.restaurant_rounded, label: 'Diet'),
-    GlassNavItem(icon: Icons.menu_rounded, label: 'Menu'),
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return SlideDrawerScaffold(
       backgroundColor: AppColors.bg,
+      drawer: const TrainerMenuScreen(),
       body: SafeArea(
         bottom: false,
         child: IndexedStack(index: _index, children: _tabs),

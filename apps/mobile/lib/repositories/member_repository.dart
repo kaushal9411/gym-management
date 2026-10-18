@@ -2,12 +2,30 @@ import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
 import '../models/gym_member.dart';
+import '../models/member_stats.dart';
 import '../models/paginated_result.dart';
 
 class MemberRepository {
   MemberRepository(this._dio);
 
   final Dio _dio;
+
+  /// `GET /members/stats` — counts + short lists for the list screen's KPI
+  /// tiles and report panels (same endpoint web's `MembersKpis`/
+  /// `MembersInsights` read).
+  Future<MemberStats> stats({String? branchId}) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/members/stats',
+        queryParameters: {if (branchId != null) 'branchId': branchId},
+      );
+      return MemberStats.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
 
   Future<PaginatedResult<GymMember>> list({
     int page = 1,
@@ -63,6 +81,7 @@ class MemberRepository {
     required String branchId,
     String? trainerId,
     String? fitnessGoals,
+    Map<String, dynamic> extra = const {},
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -77,6 +96,8 @@ class MemberRepository {
           if (trainerId != null) 'trainerId': trainerId,
           if (fitnessGoals != null && fitnessGoals.isNotEmpty)
             'fitnessGoals': fitnessGoals,
+          for (final e in extra.entries)
+            if (e.value != null) e.key: e.value,
         },
       );
       return GymMember.fromJson(
@@ -104,20 +125,25 @@ class MemberRepository {
     }
   }
 
-  Future<void> assignMembership(
+  /// Returns the updated member (its `membershipHistory.first` is the new
+  /// membership — the add-member wizard needs its id to attach a payment).
+  Future<GymMember> assignMembership(
     String memberId,
     String planId, {
     DateTime? startDate,
+    double? targetWeight,
   }) async {
     try {
-      await _dio.put<void>(
+      final response = await _dio.put<Map<String, dynamic>>(
         '/members/$memberId/membership',
         data: {
           'planId': planId,
           if (startDate != null)
             'startDate': startDate.toIso8601String().substring(0, 10),
+          if (targetWeight != null) 'targetWeight': targetWeight,
         },
       );
+      return GymMember.fromJson(response.data!['data'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -129,15 +155,34 @@ class MemberRepository {
     try {
       await _dio.post<void>(
         '/members/$memberId/guest-visits',
-        data: {if (guestName != null && guestName.isNotEmpty) 'guestName': guestName},
+        data: {
+          if (guestName != null && guestName.isNotEmpty) 'guestName': guestName,
+        },
       );
     } on DioException catch (e) {
       throw _mapError(e);
     }
   }
 
+  Future<List<GuestVisit>> listGuestVisits(String memberId) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/members/$memberId/guest-visits',
+      );
+      return (response.data!['data'] as List)
+          .map((e) => GuestVisit.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   /// Backs `MembershipPlan.ptSessionsIncluded` — same quota pattern as `logGuestVisit`.
-  Future<void> logPtSession(String memberId, {String? trainerId, String? notes}) async {
+  Future<void> logPtSession(
+    String memberId, {
+    String? trainerId,
+    String? notes,
+  }) async {
     try {
       await _dio.post<void>(
         '/members/$memberId/pt-sessions',

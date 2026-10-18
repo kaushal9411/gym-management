@@ -38,28 +38,21 @@ class Food {
         id: json['id'] as String,
         name: json['name'] as String,
         servingSize: json['servingSize'] as String?,
-        calories: json['calories'] as int?,
-        protein: json['protein'] == null
-            ? null
-            : double.parse(json['protein'] as String),
-        carbohydrates: json['carbohydrates'] == null
-            ? null
-            : double.parse(json['carbohydrates'] as String),
-        fat: json['fat'] == null ? null : double.parse(json['fat'] as String),
+        calories: (json['calories'] as num?)?.toInt(),
+        protein: _dec(json['protein']),
+        carbohydrates: _dec(json['carbohydrates']),
+        fat: _dec(json['fat']),
         isActive: json['isActive'] as bool? ?? true,
         category: json['category'] as String?,
-        fiber: json['fiber'] == null
-            ? null
-            : double.parse(json['fiber'] as String),
-        sugar: json['sugar'] == null
-            ? null
-            : double.parse(json['sugar'] as String),
-        sodium: json['sodium'] == null
-            ? null
-            : double.parse(json['sodium'] as String),
+        fiber: _dec(json['fiber']),
+        sugar: _dec(json['sugar']),
+        sodium: _dec(json['sodium']),
         notes: json['notes'] as String?,
         deletedAt: json['deletedAt'] == null
             ? null
             : DateTime.parse(json['deletedAt'] as String),
       );
 }
+
+/// Decimal columns arrive as strings (`"12.50"`); tolerate numbers too.
+double? _dec(Object? v) => double.tryParse(v?.toString() ?? '');

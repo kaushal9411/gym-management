@@ -1,4 +1,6 @@
-/// Mirrors `DietPlanListItemDto` (`GET /diet-plans`).
+/// Mirrors `DietPlanListItemDto` (`GET /diet-plans`). Every field parses
+/// tolerantly - a count or calorie target that arrives as a string must not
+/// take the whole list down.
 class DietPlanSummary {
   const DietPlanSummary({
     required this.id,
@@ -26,22 +28,28 @@ class DietPlanSummary {
   /// Non-null means soft-deleted.
   final DateTime? deletedAt;
 
+  bool get isDeleted => deletedAt != null;
+
   factory DietPlanSummary.fromJson(Map<String, dynamic> json) =>
       DietPlanSummary(
         id: json['id'] as String,
         name: json['name'] as String,
-        dailyCalories: json['dailyCalories'] as int?,
-        durationDays: json['durationDays'] as int? ?? 0,
+        dailyCalories: _int(json['dailyCalories']),
+        durationDays: _int(json['durationDays']) ?? 0,
         trainerName:
             (json['trainer'] as Map<String, dynamic>?)?['name'] as String?,
-        activeMemberCount: json['activeMemberCount'] as int? ?? 0,
+        activeMemberCount: _int(json['activeMemberCount']) ?? 0,
         goal: json['goal'] as String?,
         isActive: json['isActive'] as bool? ?? true,
-        createdAt: json['createdAt'] == null
-            ? null
-            : DateTime.parse(json['createdAt'] as String),
-        deletedAt: json['deletedAt'] == null
-            ? null
-            : DateTime.parse(json['deletedAt'] as String),
+        createdAt: _date(json['createdAt']),
+        deletedAt: _date(json['deletedAt']),
       );
 }
+
+int? _int(Object? v) {
+  if (v == null) return null;
+  if (v is num) return v.toInt();
+  return int.tryParse(v.toString());
+}
+
+DateTime? _date(Object? v) => v is String ? DateTime.tryParse(v) : null;

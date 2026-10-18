@@ -217,6 +217,7 @@ class Lead {
     this.expectedJoinDate,
     this.lostReason,
     this.lostNote,
+    this.lostAt,
     this.notes,
     this.convertedMemberId,
     this.convertedAt,
@@ -249,6 +250,7 @@ class Lead {
   final String? expectedJoinDate;
   final String? lostReason;
   final String? lostNote;
+  final DateTime? lostAt;
   final String? notes;
   final String? convertedMemberId;
   final DateTime? convertedAt;
@@ -291,6 +293,7 @@ class Lead {
           : null,
       lostReason: j['lostReason'] as String?,
       lostNote: j['lostNote'] as String?,
+      lostAt: _date(j['lostAt']),
       notes: j['notes'] as String?,
       convertedMemberId: j['convertedMemberId'] as String?,
       convertedAt: _date(j['convertedAt']),
@@ -433,6 +436,14 @@ class LeadConvertResult {
   final Lead lead;
   final ConvertedMember? member;
 }
+
+/// Backend `gender` enum (`createLeadSchema`) as (wire value, label).
+const leadGenderOptions = [
+  ('MALE', 'Male'),
+  ('FEMALE', 'Female'),
+  ('OTHER', 'Other'),
+  ('PREFER_NOT_TO_SAY', 'Prefer not to say'),
+];
 
 /// Digits only, `91`-prefixed when a bare 10-digit number (same rule as the
 /// Members list's WhatsApp button and web).

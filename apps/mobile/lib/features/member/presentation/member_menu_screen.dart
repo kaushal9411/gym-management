@@ -9,73 +9,59 @@ import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../shared/widgets/app_button.dart';
-import '../../../shared/widgets/user_avatar.dart';
-
-class _MenuEntry {
-  const _MenuEntry({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.route,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final String route;
-}
+import '../../../shared/widgets/app_drawer.dart';
+import '../../../shared/widgets/menu_entry.dart';
 
 const _entries = [
-  _MenuEntry(
+  MenuEntry(
     icon: Icons.calendar_month_outlined,
     title: 'My Attendance',
     subtitle: 'Visit history',
     route: AppRoutes.memberAttendance,
   ),
-  _MenuEntry(
+  MenuEntry(
     icon: Icons.notifications_none_rounded,
     title: 'Notifications',
     subtitle: 'Membership, payments, and gym updates',
     route: AppRoutes.memberNotifications,
   ),
-  _MenuEntry(
+  MenuEntry(
     icon: Icons.receipt_long_outlined,
     title: 'Invoices',
     subtitle: 'Payment history',
     route: AppRoutes.memberInvoices,
   ),
-  _MenuEntry(
+  MenuEntry(
     icon: Icons.payments_outlined,
     title: 'Payments',
     subtitle: 'Receipts and refunds',
     route: AppRoutes.memberPayments,
   ),
-  _MenuEntry(
+  MenuEntry(
     icon: Icons.straighten_outlined,
     title: 'Body Measurements',
     subtitle: 'Your progress over time',
     route: AppRoutes.memberMeasurements,
   ),
-  _MenuEntry(
+  MenuEntry(
     icon: Icons.person_outline_rounded,
     title: 'Profile',
     subtitle: 'Your details',
     route: AppRoutes.memberProfile,
   ),
-  _MenuEntry(
+  MenuEntry(
     icon: Icons.storefront_outlined,
     title: 'Gym info',
     subtitle: 'Hours, address and contact',
     route: AppRoutes.memberGymInfo,
   ),
-  _MenuEntry(
+  MenuEntry(
     icon: Icons.brightness_6_outlined,
     title: 'Appearance',
     subtitle: 'Light or dark theme',
     route: AppRoutes.appearance,
   ),
-  _MenuEntry(
+  MenuEntry(
     icon: Icons.download_outlined,
     title: 'Download my data',
     subtitle: 'GDPR export',
@@ -101,38 +87,13 @@ class MemberMenuScreen extends StatelessWidget {
         ? session.member.profilePhotoUrl
         : null;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 90),
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Menu', style: AppText.eyebrow()),
-                  Text(name, style: AppText.display(size: 22)),
-                ],
-              ),
-            ),
-            UserAvatar(
-              avatarUrl: photoUrl,
-              name: name,
-              role: AppRole.member,
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        ..._entries.map((entry) => _MenuTile(entry: entry)),
-        const SizedBox(height: 8),
-        AppButton(
-          label: 'Log out',
-          role: AppRole.member,
-          variant: AppButtonVariant.ghost,
-          foregroundColor: AppColors.danger,
-          onPressed: () => showMemberLogoutDialog(context),
-        ),
-      ],
+    return AppDrawer(
+      role: AppRole.member,
+      avatarUrl: photoUrl,
+      name: name,
+      subtitle: 'Member',
+      sections: const {'': _entries},
+      onSignOut: () => showMemberLogoutDialog(context),
     );
   }
 }
@@ -177,76 +138,5 @@ Future<void> showMemberLogoutDialog(BuildContext context) async {
   );
   if (confirmed == true && context.mounted) {
     await context.read<SessionCubit>().signOut();
-  }
-}
-
-class _MenuTile extends StatelessWidget {
-  const _MenuTile({required this.entry});
-
-  final _MenuEntry entry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadii.card),
-          onTap: () => context.push(entry.route),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.surface2,
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              border: Border.all(color: AppColors.line),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.memberSoft,
-                    borderRadius: BorderRadius.circular(AppRadii.tile),
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(
-                    entry.icon,
-                    size: 18,
-                    color: AppColors.memberPillFg,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        entry.title,
-                        style: AppText.body(size: 13, weight: FontWeight.w700),
-                      ),
-                      Text(
-                        entry.subtitle,
-                        style: AppText.body(
-                          size: 11,
-                          color: AppColors.inkFaint,
-                          weight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 18,
-                  color: AppColors.inkFaint,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }

@@ -18,12 +18,15 @@ class AppLabeledField extends StatefulWidget {
     this.errorText,
     this.autofillHints,
     this.onSubmitted,
+    this.onChanged,
     this.textInputAction,
     this.autofocus = false,
     this.inputFormatters,
     this.readOnly = false,
     this.onTap,
     this.suffixIcon,
+    this.icon,
+    this.iconColor,
     this.hintText,
     this.minLines,
     this.maxLines = 1,
@@ -37,6 +40,7 @@ class AppLabeledField extends StatefulWidget {
   final String? errorText;
   final Iterable<String>? autofillHints;
   final ValueChanged<String>? onSubmitted;
+  final ValueChanged<String>? onChanged;
   final TextInputAction? textInputAction;
   final bool autofocus;
   final List<TextInputFormatter>? inputFormatters;
@@ -51,6 +55,10 @@ class AppLabeledField extends StatefulWidget {
   final bool readOnly;
   final VoidCallback? onTap;
   final Widget? suffixIcon;
+
+  /// Optional leading icon chip (used by the member edit forms).
+  final IconData? icon;
+  final Color? iconColor;
 
   /// Multi-line growth — pass e.g. `minLines: 3, maxLines: 6` for a
   /// description/notes textarea. Defaults preserve the single-line field.
@@ -94,6 +102,7 @@ class _AppLabeledFieldState extends State<AppLabeledField> {
             textCapitalization: widget.textCapitalization,
             autofillHints: widget.autofillHints,
             onSubmitted: widget.onSubmitted,
+            onChanged: widget.onChanged,
             textInputAction: widget.textInputAction,
             autofocus: widget.autofocus,
             minLines: widget.minLines,
@@ -116,6 +125,26 @@ class _AppLabeledFieldState extends State<AppLabeledField> {
               ),
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              prefixIcon: widget.icon == null
+                  ? null
+                  : Padding(
+                      padding: const EdgeInsets.only(left: 10, right: 6),
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(9),
+                          color: (widget.iconColor ?? const Color(0xFF8B5CF6))
+                              .withValues(alpha: 0.16),
+                        ),
+                        child: Icon(
+                          widget.icon,
+                          size: 15,
+                          color: widget.iconColor ?? const Color(0xFF8B5CF6),
+                        ),
+                      ),
+                    ),
+              prefixIconConstraints: const BoxConstraints(),
               suffixIcon: widget.obscureText
                   ? IconButton(
                       icon: Icon(

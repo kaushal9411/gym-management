@@ -1,11 +1,14 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../models/lead_analytics.dart';
+import '../lead_ui.dart';
 
-const leadEnquiryColor = AppColors.staffB;
-const leadConvertedColor = AppColors.success;
+const leadEnquiryColor = LeadColors.indigo;
+const leadConvertedColor = LeadColors.green;
 
 class LeadLegendDot extends StatelessWidget {
   const LeadLegendDot(this.color, this.label, {super.key});
@@ -35,12 +38,14 @@ class LeadLegendDot extends StatelessWidget {
       );
 }
 
-/// Enquiries vs converted per day (`daily`). Wider than the viewport for
-/// long ranges (Month / Year), so it scrolls horizontally.
+/// Enquiries vs converted per day (`daily`), drawn in with a gradient area
+/// under the enquiries line. Wider than the viewport for long ranges
+/// (Month / Year / Custom), so it scrolls horizontally.
 class LeadTrendChart extends StatelessWidget {
-  const LeadTrendChart({super.key, required this.daily});
+  const LeadTrendChart({super.key, required this.daily, this.height = 120});
 
   final List<LeadDailyPoint> daily;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
@@ -73,13 +78,19 @@ class LeadTrendChart extends StatelessWidget {
             return SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               reverse: true,
-              child: SizedBox(
-                width: w,
-                height: 120,
-                child: CustomPaint(
-                  painter: _TwoLinePainter(
-                    daily.map((d) => d.newLeads.toDouble()).toList(),
-                    daily.map((d) => d.converted.toDouble()).toList(),
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 1500),
+                curve: Curves.easeOutCubic,
+                builder: (context, t, _) => SizedBox(
+                  width: w,
+                  height: height,
+                  child: CustomPaint(
+                    painter: _TwoLinePainter(
+                      daily.map((d) => d.newLeads.toDouble()).toList(),
+                      daily.map((d) => d.converted.toDouble()).toList(),
+                      t,
+                    ),
                   ),
                 ),
               ),
@@ -106,10 +117,11 @@ class LeadTrendChart extends StatelessWidget {
 }
 
 class _TwoLinePainter extends CustomPainter {
-  _TwoLinePainter(this.a, this.b);
+  _TwoLinePainter(this.a, this.b, this.t);
 
   final List<double> a;
   final List<double> b;
+  final double t;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -121,40 +133,76 @@ class _TwoLinePainter extends CustomPainter {
     final dx = n > 1 ? size.width / (n - 1) : 0.0;
     Offset pt(List<double> s, int i) => Offset(
           n > 1 ? dx * i : size.width / 2,
-          size.height - (s[i] / maxV) * (size.height - 10) - 4,
+          size.height - (s[i] / maxV) * (size.height - 12) - 4,
         );
+    final grid = Paint()
+      ..color = AppColors.line
+      ..strokeWidth = 1;
     canvas.drawLine(
       Offset(0, size.height - 0.5),
       Offset(size.width, size.height - 0.5),
+      grid,
+    );
+    canvas.drawLine(
+      Offset(0, size.height / 2),
+      Offset(size.width, size.height / 2),
       Paint()
-        ..color = AppColors.line
+        ..color = AppColors.line.withValues(alpha: 0.5)
         ..strokeWidth = 1,
     );
-    void draw(List<double> s, Color c) {
+
+    void draw(List<double> s, Color c, {bool area = false}) {
+      if (n < 2) {
+        canvas.drawCircle(pt(s, 0), 3.5, Paint()..color = c);
+        return;
+      }
       final path = Path()..moveTo(pt(s, 0).dx, pt(s, 0).dy);
       for (var i = 1; i < n; i++) {
         path.lineTo(pt(s, i).dx, pt(s, i).dy);
       }
+      final metric = path.computeMetrics().first;
+      final drawn = metric.extractPath(0, metric.length * t);
+      if (area) {
+        final end = metric.getTangentForOffset(metric.length * t)?.position;
+        if (end != null) {
+          final fill = Path.from(drawn)
+            ..lineTo(end.dx, size.height)
+            ..lineTo(pt(s, 0).dx, size.height)
+            ..close();
+          canvas.drawPath(
+            fill,
+            Paint()
+              ..shader = LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [c.withValues(alpha: 0.28), c.withValues(alpha: 0)],
+              ).createShader(Offset.zero & size),
+          );
+        }
+      }
       canvas.drawPath(
-        path,
+        drawn,
         Paint()
           ..color = c
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2
+          ..strokeWidth = 2.6
+          ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
     }
 
-    draw(a, leadEnquiryColor);
+    draw(a, leadEnquiryColor, area: true);
     draw(b, leadConvertedColor);
   }
 
   @override
-  bool shouldRepaint(covariant _TwoLinePainter old) => old.a != a || old.b != b;
+  bool shouldRepaint(covariant _TwoLinePainter old) =>
+      old.a != a || old.b != b || old.t != t;
 }
 
 /// Last 12 calendar months, cohort-based (`monthly`): enquiries bar and
-/// converted bar per month with the month's conversion rate underneath.
+/// converted bar per month (growing in) with the month's conversion rate
+/// underneath.
 class LeadMonthlyChart extends StatelessWidget {
   const LeadMonthlyChart({super.key, required this.monthly});
 
@@ -187,60 +235,67 @@ class LeadMonthlyChart extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          reverse: true,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              for (final m in monthly)
-                SizedBox(
-                  width: 40,
-                  child: Column(
-                    children: [
-                      Text(
-                        '${m.newLeads}',
-                        style: AppText.tabular(size: 10),
-                      ),
-                      SizedBox(
-                        height: 80,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _bar(m.newLeads / maxV, leadEnquiryColor),
-                            const SizedBox(width: 3),
-                            _bar(m.converted / maxV, leadConvertedColor),
-                          ],
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1),
+          duration: const Duration(milliseconds: 1200),
+          curve: Curves.easeOutCubic,
+          builder: (context, t, _) => SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            reverse: true,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (final m in monthly)
+                  SizedBox(
+                    width: 40,
+                    child: Column(
+                      children: [
+                        Text(
+                          '${m.newLeads}',
+                          style: AppText.tabular(size: 10),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _names[((int.tryParse(
-                                      m.month.length >= 7
-                                          ? m.month.substring(5, 7)
-                                          : '1',
-                                    ) ??
-                                    1) -
-                                1)
-                            .clamp(0, 11)],
-                        style: AppText.body(
-                          size: 10,
-                          weight: FontWeight.w700,
-                          color: AppColors.inkSoft,
+                        SizedBox(
+                          height: 80,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _bar(m.newLeads / maxV * t, leadEnquiryColor),
+                              const SizedBox(width: 3),
+                              _bar(m.converted / maxV * t, leadConvertedColor),
+                            ],
+                          ),
                         ),
-                      ),
-                      Text(
-                        m.newLeads == 0
-                            ? '–'
-                            : '${(m.conversionRate * 100).round()}%',
-                        style:
-                            AppText.body(size: 9.5, color: AppColors.inkFaint),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Text(
+                          _names[((int.tryParse(
+                                        m.month.length >= 7
+                                            ? m.month.substring(5, 7)
+                                            : '1',
+                                      ) ??
+                                      1) -
+                                  1)
+                              .clamp(0, 11)],
+                          style: AppText.body(
+                            size: 10,
+                            weight: FontWeight.w700,
+                            color: AppColors.inkSoft,
+                          ),
+                        ),
+                        Text(
+                          m.newLeads == 0
+                              ? '–'
+                              : '${(m.conversionRate * 100).round()}%',
+                          style: AppText.body(
+                            size: 9.5,
+                            color: AppColors.inkFaint,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ],
@@ -249,10 +304,62 @@ class LeadMonthlyChart extends StatelessWidget {
 
   Widget _bar(double f, Color c) => Container(
         width: 11,
-        height: (f * 80).clamp(f > 0 ? 3 : 0, 80),
+        height: math.min(80, math.max(f > 0 ? 3 : 0, f * 80)),
         decoration: BoxDecoration(
-          color: c,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [c, c.withValues(alpha: 0.55)],
+          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
         ),
       );
+}
+
+/// Segmented bar splitting [parts] (value, colour) proportionally; grows in
+/// from the left on first build.
+class LeadSegmentBar extends StatelessWidget {
+  const LeadSegmentBar({super.key, required this.parts, this.height = 14});
+
+  final List<(int, Color)> parts;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = parts.fold<int>(0, (a, p) => a + p.$1);
+    if (total == 0) return SizedBox(height: height);
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 1100),
+      curve: Curves.easeOutCubic,
+      builder: (context, t, _) => ClipRRect(
+        borderRadius: BorderRadius.circular(99),
+        child: Container(
+          height: height,
+          color: AppColors.surface3,
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: t,
+            child: Row(
+              children: [
+                for (final p in parts)
+                  if (p.$1 > 0)
+                    Expanded(
+                      flex: p.$1,
+                      child: Container(
+                        margin: const EdgeInsets.only(right: 1.5),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [p.$2, p.$2.withValues(alpha: 0.7)],
+                          ),
+                        ),
+                      ),
+                    ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

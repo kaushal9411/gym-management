@@ -12,6 +12,7 @@ import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../shared/widgets/menu_button.dart';
 import 'widgets/reports_insights_header.dart';
 
 class _ReportEntry {
@@ -191,11 +192,24 @@ class _ReportsCenterScreenState extends State<ReportsCenterScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(18, 16, 18, 90),
           children: [
-            Text(
-              '$total named reports · ${_sections.length} categories',
-              style: AppText.eyebrow(),
+            Row(
+              children: [
+                const MenuButton(),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$total named reports · ${_sections.length} categories',
+                        style: AppText.eyebrow(),
+                      ),
+                      Text('Reports Center', style: AppText.display(size: 22)),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            Text('Reports Center', style: AppText.display(size: 22)),
             const SizedBox(height: 4),
             Text(
               'Covering members, attendance, finance, staff, and branches.',

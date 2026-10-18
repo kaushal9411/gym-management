@@ -5,7 +5,7 @@ import '../../core/theme/app_colors.dart';
 
 /// The "⋯" status-actions menu (Duplicate / Activate‑Deactivate / Delete /
 /// Restore) + its confirm-dialog wording, extracted from
-/// `membership_plans_screen.dart`/`membership_plan_form_screen.dart` once
+/// the Membership Plans screens (`features/plans`) once
 /// the exact same menu was needed a second and third time (Workout Plans,
 /// Diet Plans, Classes). Each callback is the actual repository call —
 /// this widget only owns "which items make sense for the current status"

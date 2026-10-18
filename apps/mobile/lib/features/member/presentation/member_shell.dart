@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/slide_drawer_scaffold.dart';
 import '../../../shared/widgets/glass_bottom_nav.dart';
 import 'member_classes_screen.dart';
 import 'member_dashboard_screen.dart';
@@ -8,9 +9,10 @@ import 'member_diet_screen.dart';
 import 'member_menu_screen.dart';
 import 'member_workout_screen.dart';
 
-/// The member plane's shell — the design's 5-tab nav (Home/Workout/Diet/
-/// Classes/Menu) in the member palette (lime→teal), the only shell in the
-/// app that isn't staff-accented.
+/// The member plane's shell — the design's 4-tab nav (Home/Workout/Diet/
+/// Classes) in the member palette (lime→teal), the only shell in the app
+/// that isn't staff-accented. A hamburger-triggered [MemberMenuScreen]
+/// drawer replaces the former 5th "Menu" tab.
 class MemberShell extends StatefulWidget {
   const MemberShell({super.key});
 
@@ -26,7 +28,6 @@ class _MemberShellState extends State<MemberShell> {
     GlassNavItem(icon: Icons.fitness_center_rounded, label: 'Workout'),
     GlassNavItem(icon: Icons.restaurant_rounded, label: 'Diet'),
     GlassNavItem(icon: Icons.event_note_rounded, label: 'Classes'),
-    GlassNavItem(icon: Icons.menu_rounded, label: 'Menu'),
   ];
 
   @override
@@ -38,11 +39,11 @@ class _MemberShellState extends State<MemberShell> {
       const MemberWorkoutScreen(),
       const MemberDietScreen(),
       const MemberClassesScreen(),
-      const MemberMenuScreen(),
     ];
 
-    return Scaffold(
+    return SlideDrawerScaffold(
       backgroundColor: AppColors.bg,
+      drawer: const MemberMenuScreen(),
       body: SafeArea(
         bottom: false,
         child: IndexedStack(index: _index, children: tabs),

@@ -5,39 +5,38 @@ import 'package:go_router/go_router.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/app_currency.dart';
 import '../../../models/staff_member.dart';
 import '../../../repositories/staff_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
-import '../../../shared/widgets/app_state_views.dart';
-import '../../../shared/widgets/category_chip_selector.dart';
+import '../../team/presentation/widgets/team_ui.dart';
 
-const _employmentTypes = {
-  'FULL_TIME': 'Full-time',
-  'PART_TIME': 'Part-time',
-  'CONTRACT': 'Contract',
-  'INTERN': 'Intern',
-};
-const _salaryTypes = {
-  'MONTHLY': 'Monthly',
-  'HOURLY': 'Hourly',
-  'DAILY': 'Daily',
-  'PER_SESSION': 'Per session',
-};
-const _workStatuses = {
-  'WORKING': 'Working',
-  'ON_LEAVE': 'On leave',
-  'NOTICE_PERIOD': 'Notice period',
-  'TERMINATED': 'Terminated',
-};
-const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const staffEmploymentTypes = [
+  ('FULL_TIME', 'Full-time'),
+  ('PART_TIME', 'Part-time'),
+  ('CONTRACT', 'Contract'),
+  ('INTERN', 'Intern'),
+];
+const staffSalaryTypes = [
+  ('MONTHLY', 'Monthly'),
+  ('HOURLY', 'Hourly'),
+  ('DAILY', 'Daily'),
+  ('PER_SESSION', 'Per session'),
+];
+const staffWorkStatuses = [
+  ('WORKING', 'Working'),
+  ('ON_LEAVE', 'On leave'),
+  ('NOTICE_PERIOD', 'Notice period'),
+  ('TERMINATED', 'Terminated'),
+];
+const staffWeekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-/// Design frame "5b-ii. Employment details" — `weeklyOff` is a single
-/// free-form string server-side (not an array), so the multi-select here
-/// joins the chosen days with ", " to match what `updateStaffSchema`
-/// actually stores.
+/// Employment details (`PATCH /staff/:id`) — type, work status, salary type /
+/// amount, shift and weekly off. `weeklyOff` is one free-form string
+/// server-side; it is written as `MONDAY,TUESDAY` (what web writes) and both
+/// that and the older `Mon, Tue` form are read back. Only changed fields are
+/// sent. All enum values go on the wire as the backend's UPPER_SNAKE strings.
 class StaffEditEmploymentScreen extends StatefulWidget {
   const StaffEditEmploymentScreen({super.key, required this.staff});
 
@@ -49,53 +48,74 @@ class StaffEditEmploymentScreen extends StatefulWidget {
 }
 
 class _StaffEditEmploymentScreenState extends State<StaffEditEmploymentScreen> {
-  late final _salaryAmountController = TextEditingController(
-    text: widget.staff.salaryAmount?.toString() ?? '',
+  StaffMember get s => widget.staff;
+
+  late final _salary = TextEditingController(
+    text: s.salaryAmount == null
+        ? ''
+        : s.salaryAmount!.toStringAsFixed(s.salaryAmount! % 1 == 0 ? 0 : 2),
   );
-  late final _shiftController =
-      TextEditingController(text: widget.staff.shift ?? '');
-  late String _employmentType =
-      widget.staff.employmentType ?? _employmentTypes.keys.first;
-  late String _salaryType = widget.staff.salaryType ?? _salaryTypes.keys.first;
-  late String _workStatus = widget.staff.workStatus ?? _workStatuses.keys.first;
-  late final Set<String> _weeklyOff = (widget.staff.weeklyOff ?? '')
-      .split(',')
-      .map((d) => d.trim())
-      .where(_weekdays.contains)
-      .toSet();
+  late final _shift = TextEditingController(text: s.shift ?? '');
+  late String _employmentType = s.employmentType ?? 'FULL_TIME';
+  late String _salaryType = s.salaryType ?? 'MONTHLY';
+  late String _workStatus = s.workStatus ?? 'WORKING';
+  late final Set<String> _off = s.weeklyOffDays.toSet();
   bool _saving = false;
   String? _error;
 
   @override
   void dispose() {
-    _salaryAmountController.dispose();
-    _shiftController.dispose();
+    _salary.dispose();
+    _shift.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
+    final changes = <String, dynamic>{};
+    if (_employmentType != (s.employmentType ?? 'FULL_TIME')) {
+      changes['employmentType'] = _employmentType;
+    }
+    if (_workStatus != (s.workStatus ?? 'WORKING')) {
+      changes['workStatus'] = _workStatus;
+    }
+    if (_salaryType != (s.salaryType ?? 'MONTHLY')) {
+      changes['salaryType'] = _salaryType;
+    }
+    final amountText = _salary.text.trim();
+    final amount = double.tryParse(amountText);
+    if (amountText.isNotEmpty && amount == null) {
+      setState(() => _error = 'Enter a valid salary amount');
+      return;
+    }
+    if (amount != s.salaryAmount) changes['salaryAmount'] = amount;
+    final shift = _shift.text.trim();
+    if (shift != (s.shift ?? '')) {
+      changes['shift'] = shift.isEmpty ? null : shift;
+    }
+    final oldOff = s.weeklyOffDays.toSet();
+    if (_off.length != oldOff.length || !_off.containsAll(oldOff)) {
+      changes['weeklyOff'] = encodeWeeklyOff(_off);
+    }
+
+    if (changes.isEmpty) {
+      context.pop();
+      return;
+    }
     setState(() {
       _saving = true;
       _error = null;
     });
     try {
-      await getIt<StaffRepository>().update(widget.staff.id, {
-        'employmentType': _employmentType,
-        'salaryType': _salaryType,
-        'salaryAmount': double.tryParse(_salaryAmountController.text.trim()),
-        'shift': _shiftController.text.trim().isEmpty
-            ? null
-            : _shiftController.text.trim(),
-        'weeklyOff': _weeklyOff.isEmpty
-            ? null
-            : (_weekdays.where(_weeklyOff.contains).join(', ')),
-        'workStatus': _workStatus,
-      });
+      await getIt<StaffRepository>().update(s.id, changes);
       if (!mounted) return;
+      teamSnack(context, 'Employment details saved.');
       context.pop();
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.message);
+      setState(() => _error = e.detailedMessage);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not save ($e)');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -103,113 +123,133 @@ class _StaffEditEmploymentScreenState extends State<StaffEditEmploymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Text('Employment Details · ${widget.staff.name}'),
-      ),
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_error != null) ...[
-                const SizedBox(height: 8),
-                FormAlert(message: _error!),
+    return TeamEditScaffold(
+      name: s.name,
+      subtitle: '${s.role.label} · ${s.employeeId}',
+      avatarUrl: s.avatarUrl,
+      title: 'Employment',
+      icon: Icons.work_rounded,
+      color: TeamColors.violet,
+      saving: _saving,
+      onSave: _save,
+      error: _error,
+      sections: [
+        TeamFormSection(
+          icon: Icons.assignment_ind_rounded,
+          color: TeamColors.violet,
+          title: 'Status',
+          children: [
+            TeamChipGroup(
+              label: 'Employment type',
+              icon: Icons.assignment_ind_rounded,
+              color: TeamColors.violet,
+              options: staffEmploymentTypes,
+              selected: {_employmentType},
+              onToggle: (v) => setState(() => _employmentType = v),
+            ),
+            TeamChipGroup(
+              label: 'Work status',
+              icon: Icons.schedule_rounded,
+              color: TeamColors.teal,
+              options: staffWorkStatuses,
+              selected: {_workStatus},
+              onToggle: (v) => setState(() => _workStatus = v),
+            ),
+          ],
+        ),
+        TeamFormSection(
+          icon: Icons.payments_rounded,
+          color: TeamColors.green,
+          title: 'Salary',
+          children: [
+            TeamChipGroup(
+              label: 'Salary type',
+              icon: Icons.payments_rounded,
+              color: TeamColors.green,
+              options: staffSalaryTypes,
+              selected: {_salaryType},
+              onToggle: (v) => setState(() => _salaryType = v),
+            ),
+            AppLabeledField(
+              label: 'Salary amount (${AppCurrency.symbol})',
+              hintText: 'e.g. 25000',
+              icon: Icons.currency_rupee_rounded,
+              iconColor: TeamColors.green,
+              controller: _salary,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
               ],
-              const SizedBox(height: 16),
-              Text('Employment type', style: AppText.eyebrow()),
-              const SizedBox(height: 8),
-              CategoryChipSelector<String>(
-                options: _employmentTypes.keys.toList(),
-                labelOf: (k) => _employmentTypes[k]!,
-                value: _employmentType,
-                onChanged: (v) => setState(() => _employmentType = v),
-              ),
-              const SizedBox(height: 14),
-              Text('Work status', style: AppText.eyebrow()),
-              const SizedBox(height: 8),
-              CategoryChipSelector<String>(
-                options: _workStatuses.keys.toList(),
-                labelOf: (k) => _workStatuses[k]!,
-                value: _workStatus,
-                onChanged: (v) => setState(() => _workStatus = v),
-              ),
-              const SizedBox(height: 14),
-              Text('Salary type', style: AppText.eyebrow()),
-              const SizedBox(height: 8),
-              CategoryChipSelector<String>(
-                options: _salaryTypes.keys.toList(),
-                labelOf: (k) => _salaryTypes[k]!,
-                value: _salaryType,
-                onChanged: (v) => setState(() => _salaryType = v),
-              ),
-              const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'Salary amount',
-                hintText: 'e.g. 25000',
-                controller: _salaryAmountController,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-                ],
-              ),
-              const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'Shift',
-                hintText: 'e.g. 9 AM - 6 PM',
-                controller: _shiftController,
-              ),
-              const SizedBox(height: 14),
-              Text('Weekly off', style: AppText.eyebrow()),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: _weekdays.map((d) {
-                  final on = _weeklyOff.contains(d);
-                  return GestureDetector(
-                    onTap: () => setState(() {
-                      on ? _weeklyOff.remove(d) : _weeklyOff.add(d);
-                    }),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: on ? AppColors.staffGrad : null,
-                        color: on ? null : AppColors.surface3,
-                        borderRadius: BorderRadius.circular(AppRadii.pill),
-                      ),
-                      child: Text(
-                        d,
-                        style: AppText.body(
-                          size: 12,
-                          weight: FontWeight.w700,
-                          color: on ? Colors.white : AppColors.inkSoft,
+            ),
+          ],
+        ),
+        TeamFormSection(
+          icon: Icons.wb_twilight_rounded,
+          color: TeamColors.amber,
+          title: 'Schedule',
+          children: [
+            AppLabeledField(
+              label: 'Shift',
+              hintText: 'e.g. Morning (6am-2pm)',
+              icon: Icons.wb_twilight_rounded,
+              iconColor: TeamColors.amber,
+              controller: _shift,
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.weekend_rounded,
+                      size: 14,
+                      color: TeamColors.amber,
+                    ),
+                    const SizedBox(width: 6),
+                    Text('Weekly off', style: AppText.eyebrow()),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final d in staffWeekdays)
+                      GestureDetector(
+                        onTap: () => setState(() {
+                          _off.contains(d) ? _off.remove(d) : _off.add(d);
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 9,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: _off.contains(d) ? TeamColors.cta : null,
+                            color: _off.contains(d) ? null : AppColors.surface3,
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            d,
+                            style: AppText.body(
+                              size: 12,
+                              weight: FontWeight.w800,
+                              color: _off.contains(d)
+                                  ? Colors.white
+                                  : AppColors.inkSoft,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
-              AppButton(
-                label: 'Save changes',
-                loading: _saving,
-                onPressed: _save,
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
+                  ],
+                ),
+              ],
+            ),
+          ],
         ),
-      ),
+      ],
     );
   }
 }

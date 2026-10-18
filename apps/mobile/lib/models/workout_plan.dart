@@ -37,6 +37,9 @@ extension WeekDayX on WeekDay {
         (d) => d.apiValue == v,
         orElse: () => WeekDay.monday,
       );
+
+  /// The weekday of [d] in the device's calendar (`DateTime.monday == 1`).
+  static WeekDay fromDate(DateTime d) => WeekDay.values[d.weekday - 1];
 }
 
 enum WorkoutLevel { beginner, intermediate, advanced }
@@ -60,6 +63,14 @@ extension WorkoutLevelX on WorkoutLevel {
         _ => WorkoutLevel.beginner,
       };
 }
+
+int _int(Object? v, [int fallback = 0]) =>
+    v is num ? v.toInt() : int.tryParse(v?.toString() ?? '') ?? fallback;
+
+int? _intOrNull(Object? v) =>
+    v is num ? v.toInt() : int.tryParse(v?.toString() ?? '');
+
+DateTime? _date(Object? v) => v == null ? null : DateTime.tryParse('$v');
 
 class PlanExercise {
   const PlanExercise({
@@ -86,10 +97,10 @@ class PlanExercise {
         id: json['id'] as String,
         exercise: Exercise.fromJson(json['exercise'] as Map<String, dynamic>),
         dayOfWeek: WeekDayX.fromApi(json['dayOfWeek'] as String),
-        sets: json['sets'] as int?,
-        repetitions: json['repetitions'] as int?,
-        sortOrder: json['sortOrder'] as int? ?? 0,
-        restSeconds: json['restSeconds'] as int?,
+        sets: _intOrNull(json['sets']),
+        repetitions: _intOrNull(json['repetitions']),
+        sortOrder: _int(json['sortOrder']),
+        restSeconds: _intOrNull(json['restSeconds']),
         notes: json['notes'] as String?,
       );
 }
@@ -146,36 +157,56 @@ class WorkoutPlan {
   final DateTime? deletedAt;
   final List<PlanExercise> exercises;
 
+  bool get isDeleted => deletedAt != null;
+
+  /// Exercises grouped by day, each day in the plan's own `sortOrder`.
   Map<WeekDay, List<PlanExercise>> get exercisesByDay {
     final grouped = <WeekDay, List<PlanExercise>>{};
     for (final e in exercises) {
       (grouped[e.dayOfWeek] ??= []).add(e);
     }
+    for (final list in grouped.values) {
+      list.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    }
     return grouped;
+  }
+
+  /// Days of the week with at least one exercise.
+  int get trainingDays => exercisesByDay.length;
+
+  int get totalExercises => exercises.length;
+
+  /// Sum of the planned sets (exercises without a set count add nothing).
+  int get totalSets => exercises.fold(0, (a, e) => a + (e.sets ?? 0));
+
+  /// Distinct muscle groups the plan works, most-used first.
+  List<String> get muscleGroups {
+    final counts = <String, int>{};
+    for (final e in exercises) {
+      final g = e.exercise.muscleGroup?.trim();
+      if (g != null && g.isNotEmpty) counts[g] = (counts[g] ?? 0) + 1;
+    }
+    final keys = counts.keys.toList()
+      ..sort((a, b) => counts[b]!.compareTo(counts[a]!));
+    return keys;
   }
 
   factory WorkoutPlan.fromJson(Map<String, dynamic> json) => WorkoutPlan(
         id: json['id'] as String,
         name: json['name'] as String,
-        level: WorkoutLevelX.fromApi(json['level'] as String),
-        durationWeeks: json['durationWeeks'] as int,
+        level: WorkoutLevelX.fromApi(json['level'] as String? ?? 'BEGINNER'),
+        durationWeeks: _int(json['durationWeeks']),
         isActive: json['isActive'] as bool? ?? true,
-        activeMemberCount: json['activeMemberCount'] as int? ?? 0,
+        activeMemberCount: _int(json['activeMemberCount']),
         goal: json['goal'] as String?,
         description: json['description'] as String?,
         trainer: json['trainer'] == null
             ? null
             : PlanTrainer.fromJson(json['trainer'] as Map<String, dynamic>),
         notes: json['notes'] as String?,
-        createdAt: json['createdAt'] == null
-            ? null
-            : DateTime.parse(json['createdAt'] as String),
-        updatedAt: json['updatedAt'] == null
-            ? null
-            : DateTime.parse(json['updatedAt'] as String),
-        deletedAt: json['deletedAt'] == null
-            ? null
-            : DateTime.parse(json['deletedAt'] as String),
+        createdAt: _date(json['createdAt']),
+        updatedAt: _date(json['updatedAt']),
+        deletedAt: _date(json['deletedAt']),
         exercises: json['exercises'] == null
             ? const []
             : (json['exercises'] as List)

@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../shared/widgets/app_button.dart';
+import '../../attendance/presentation/attendance_ui.dart';
+import '../../manager/presentation/widgets/member_detail_anim.dart';
+import '../../team/presentation/widgets/team_ui.dart';
 
-/// Design frame "4a. Checked in".
+/// Design frame "4a. Checked in" — the confirmation after a front-desk
+/// check-in: animated gradient hero with a spinning-ring tick, the member's
+/// name and the time, and a "Scan next" button that pops back.
 class CheckedInScreen extends StatelessWidget {
   const CheckedInScreen({super.key, required this.memberName});
 
@@ -14,86 +17,142 @@ class CheckedInScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final hour = now.hour % 12 == 0 ? 12 : now.hour % 12;
-    final minute = now.minute.toString().padLeft(2, '0');
-    final period = now.hour >= 12 ? 'PM' : 'AM';
+    final top = MediaQuery.of(context).padding.top;
     return Scaffold(
       backgroundColor: AppColors.bg,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(28),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0x2E3DDC84), Color(0x0F14E0B4)],
-                  ),
-                  borderRadius: BorderRadius.circular(AppRadii.glass),
-                ),
+      body: Column(
+        children: [
+          MeshHeroBackground(
+            radius: const BorderRadius.vertical(bottom: Radius.circular(34)),
+            child: SizedBox(
+              width: double.infinity,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(18, top + 40, 18, 40),
                 child: Column(
                   children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: const BoxDecoration(
-                        color: AppColors.success,
-                        shape: BoxShape.circle,
+                    Floating(
+                      child: SpinningRing(
+                        size: 104,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [Color(0xFF10B981), Color(0xFF14B8A6)],
+                            ),
+                          ),
+                          child: const PopIn(
+                            index: 2,
+                            child: Icon(
+                              Icons.check_rounded,
+                              color: Colors.white,
+                              size: 52,
+                            ),
+                          ),
+                        ),
                       ),
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        Icons.check_rounded,
-                        color: Color(0xFF0B231D),
-                        size: 30,
+                    ),
+                    const SizedBox(height: 22),
+                    Text(
+                      'Checked in',
+                      style: AppText.display(size: 26, color: Colors.white),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      memberName,
+                      textAlign: TextAlign.center,
+                      style: AppText.body(
+                        size: 15,
+                        weight: FontWeight.w700,
+                        color: Colors.white.withValues(alpha: 0.9),
                       ),
                     ),
                     const SizedBox(height: 14),
-                    Text('Checked in', style: AppText.display(size: 20)),
-                    const SizedBox(height: 2),
-                    Text(
-                      memberName,
-                      style: AppText.body(color: AppColors.inkFaint),
-                    ),
+                    _WhenChip(time: fmtClock(DateTime.now())),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(AppRadii.card),
-                  border: Border.all(color: AppColors.line),
+            ),
+          ),
+          Expanded(
+            child: TeamCenter(
+              maxWidth: 640,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  18,
+                  24,
+                  18,
+                  18 + MediaQuery.of(context).padding.bottom,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
                   children: [
-                    Text(
-                      'Time',
-                      style: AppText.body(
-                        size: 13,
-                        color: AppColors.inkFaint,
-                        weight: FontWeight.w600,
+                    const Spacer(),
+                    ShimmerButton(
+                      colors: const [
+                        TeamColors.indigo,
+                        TeamColors.violet,
+                        TeamColors.fuchsia,
+                      ],
+                      onTap: () => context.pop(),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.qr_code_scanner_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Scan next',
+                            style: AppText.body(
+                              size: 15,
+                              weight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    Text(
-                      '$hour:$minute $period',
-                      style: AppText.body(size: 13, weight: FontWeight.w700),
-                    ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-              AppButton(label: 'Scan next', onPressed: () => context.pop()),
-            ],
+            ),
           ),
-        ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Translucent "9:41 AM" pill for the confirmation hero.
+class _WhenChip extends StatelessWidget {
+  const _WhenChip({required this.time});
+
+  final String time;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.32)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.schedule_rounded, size: 15, color: Colors.white),
+          const SizedBox(width: 6),
+          Text(
+            time,
+            style: AppText.body(
+              size: 13,
+              weight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+        ],
       ),
     );
   }

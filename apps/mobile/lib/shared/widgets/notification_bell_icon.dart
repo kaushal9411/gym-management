@@ -19,7 +19,11 @@ import '../../repositories/tenant_notification_repository.dart';
 /// visit to the notification list, so marking things read reflects back
 /// without waiting out the full interval.
 class NotificationBellIcon extends StatefulWidget {
-  const NotificationBellIcon({required this.isStaff, super.key, this.size = 38});
+  const NotificationBellIcon({
+    required this.isStaff,
+    super.key,
+    this.size = 38,
+  });
 
   final bool isStaff;
   final double size;
@@ -93,8 +97,10 @@ class _NotificationBellIconState extends State<NotificationBellIcon> {
                 top: -4,
                 right: -4,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                  constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  constraints:
+                      const BoxConstraints(minWidth: 18, minHeight: 18),
                   decoration: BoxDecoration(
                     color: AppColors.danger,
                     borderRadius: BorderRadius.circular(9),

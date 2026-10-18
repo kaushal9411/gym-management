@@ -12,6 +12,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/menu_button.dart';
 import '../../reports/presentation/widgets/donut_chart.dart';
 import '../../reports/presentation/widgets/report_filter_bar.dart';
 import 'widgets/revenue_expense_chart.dart';
@@ -73,8 +74,19 @@ class _FinanceTabView extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 90),
         children: [
-          Text('Overview', style: AppText.eyebrow()),
-          Text('Finance', style: AppText.display(size: 22)),
+          Row(
+            children: [
+              const MenuButton(),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Overview', style: AppText.eyebrow()),
+                  Text('Finance', style: AppText.display(size: 22)),
+                ],
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
           BlocBuilder<FinanceSummaryCubit, FinanceSummaryState>(
             builder: (context, state) {

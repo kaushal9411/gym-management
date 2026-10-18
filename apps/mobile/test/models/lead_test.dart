@@ -155,9 +155,73 @@ void main() {
       expect(f.activeFilterCount, 3);
       expect(const LeadFilters().toQuery(), isEmpty);
     });
+
+    test('plan / created-date / sort filters serialise', () {
+      const f = LeadFilters(
+        planId: 'p1',
+        planName: 'Gold',
+        createdFrom: '2026-09-01',
+        createdTo: '2026-09-30',
+        sortBy: 'nextFollowUpAt',
+        sortDir: 'asc',
+      );
+      expect(f.toQuery(), {
+        'interestedPlanId': 'p1',
+        'createdFrom': '2026-09-01',
+        'createdTo': '2026-09-30',
+        'sortBy': 'nextFollowUpAt',
+        'sortDir': 'asc',
+      });
+      // plan + created window count as one filter each; sort is not a filter.
+      expect(f.activeFilterCount, 2);
+      expect(f.isDefaultSort, isFalse);
+      final cleared = f.copyWith(clearPlan: true, clearCreated: true);
+      expect(cleared.planId, isNull);
+      expect(cleared.planName, isNull);
+      expect(cleared.createdFrom, isNull);
+      expect(cleared.sortBy, 'nextFollowUpAt');
+    });
+
+    test('lostAt and gender are parsed; gender options mirror the API enum',
+        () {
+      final l = Lead.fromJson(
+        item(
+          extra: {
+            'status': 'LOST',
+            'gender': 'PREFER_NOT_TO_SAY',
+            'lostAt': '2026-10-05T10:00:00.000Z',
+          },
+        ),
+      );
+      expect(l.gender, 'PREFER_NOT_TO_SAY');
+      expect(l.lostAt, isNotNull);
+      expect(
+        leadGenderOptions.map((g) => g.$1),
+        ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'],
+      );
+      expect(Lead.fromJson({}).lostAt, isNull);
+    });
   });
 
   group('LeadAnalytics', () {
+    test('topBranches are parsed as cohort rows', () {
+      final a = LeadAnalytics.fromJson({
+        'topBranches': [
+          {
+            'branchId': 'b1',
+            'name': 'Main',
+            'leads': 5,
+            'converted': 2,
+            'conversionRate': 0.4,
+          },
+        ],
+      });
+      expect(a.topBranches.single.name, 'Main');
+      expect(a.topBranches.single.leads, 5);
+      expect(a.topBranches.single.conversionRate, 0.4);
+      expect(LeadAnalytics.fromJson({}).topBranches, isEmpty);
+    });
+
     test('parses full payload', () {
       final a = LeadAnalytics.fromJson({
         'kpis': {

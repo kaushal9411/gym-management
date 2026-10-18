@@ -5,19 +5,23 @@ import 'package:go_router/go_router.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/permission_group.dart';
 import '../../../models/tenant_role.dart';
 import '../../../repositories/tenant_role_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../manager/presentation/widgets/member_detail_anim.dart';
+import '../../team/presentation/widgets/team_ui.dart';
 
-/// Design frame "13a. + Create role" — also doubles as Edit when [existing]
-/// is passed. `POST /roles` / `PATCH /roles/:roleId` both take the same
-/// shape (name/description/priority/isDefault/permissions), so one form
-/// covers both, matching `BranchFormScreen`'s create+edit pattern.
+/// Create / edit a custom role (`POST /roles` / `PATCH /roles/:id` — one form
+/// for both, as on web). Name, description, priority, "default for new users"
+/// and (edit only) active, plus a searchable permission picker: collapsible
+/// resource groups with a tri-state group checkbox and a row per
+/// `resource:action` key. The sticky bar shows how many are selected.
+///
+/// Role names must be 2-60 characters of letters, numbers, spaces, hyphens
+/// and underscores (the server's rule, checked here first).
 class RoleFormScreen extends StatefulWidget {
   const RoleFormScreen({super.key, this.existing});
 
@@ -28,57 +32,82 @@ class RoleFormScreen extends StatefulWidget {
 }
 
 class _RoleFormScreenState extends State<RoleFormScreen> {
-  late final _nameController =
-      TextEditingController(text: widget.existing?.name ?? '');
-  late final _descriptionController =
+  late final _name = TextEditingController(text: widget.existing?.name ?? '');
+  late final _description =
       TextEditingController(text: widget.existing?.description ?? '');
-  late final _priorityController = TextEditingController();
+  late final _priority = TextEditingController(
+    text: widget.existing == null ? '' : '${widget.existing!.priority}',
+  );
 
   List<PermissionGroup>? _groups;
-  late Set<String> _selected = {...?widget.existing?.permissions};
-  bool _isDefault = false;
+  late final Set<String> _selected = {...?widget.existing?.permissions};
+  final Set<String> _open = {};
+  late bool _isDefault = widget.existing?.isDefault ?? false;
   late bool _isActive = widget.existing?.isActive ?? true;
-  bool _loadingGroups = true;
+  String _query = '';
   bool _saving = false;
   String? _error;
+  String? _loadError;
 
   bool get _isEdit => widget.existing != null;
 
   @override
   void initState() {
     super.initState();
+    _name.addListener(() {
+      if (mounted) setState(() {});
+    });
     _loadPermissions();
   }
 
   Future<void> _loadPermissions() async {
+    setState(() => _loadError = null);
     try {
       final groups = await getIt<TenantRoleRepository>().listPermissions();
       if (!mounted) return;
       setState(() {
         _groups = groups;
-        _loadingGroups = false;
+        for (final g in groups) {
+          if (g.permissions.any((p) => _selected.contains(p.key))) {
+            _open.add(g.resource);
+          }
+        }
       });
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _loadingGroups = false;
-      });
+      if (mounted) setState(() => _loadError = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _loadError = '$e');
     }
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    _priorityController.dispose();
+    _name.dispose();
+    _description.dispose();
+    _priority.dispose();
     super.dispose();
   }
 
+  int get _total =>
+      _groups?.fold<int>(0, (a, g) => a + g.permissions.length) ?? 0;
+
   Future<void> _submit() async {
-    final name = _nameController.text.trim();
-    if (name.isEmpty) {
-      setState(() => _error = 'Role name is required');
+    final name = _name.text.trim();
+    if (name.length < 2) {
+      setState(() => _error = 'Role name must be at least 2 characters');
+      return;
+    }
+    if (!RegExp(r'^[a-zA-Z0-9][a-zA-Z0-9 _-]*$').hasMatch(name)) {
+      setState(
+        () => _error = 'Role name: letters, numbers, spaces, hyphens '
+            'and underscores only',
+      );
+      return;
+    }
+    final priorityText = _priority.text.trim();
+    final priority = int.tryParse(priorityText);
+    if (priorityText.isNotEmpty && (priority == null || priority > 1000)) {
+      setState(() => _error = 'Priority must be a number from 0 to 1000');
       return;
     }
     setState(() {
@@ -87,12 +116,11 @@ class _RoleFormScreenState extends State<RoleFormScreen> {
     });
     try {
       final repo = getIt<TenantRoleRepository>();
-      final priority = int.tryParse(_priorityController.text.trim());
       if (_isEdit) {
         await repo.update(
           widget.existing!.id,
           name: name,
-          description: _descriptionController.text.trim(),
+          description: _description.text.trim(),
           priority: priority,
           isDefault: _isDefault,
           isActive: _isActive,
@@ -101,270 +129,469 @@ class _RoleFormScreenState extends State<RoleFormScreen> {
       } else {
         await repo.create(
           name: name,
-          description: _descriptionController.text.trim(),
+          description: _description.text.trim(),
           priority: priority,
           isDefault: _isDefault,
           permissions: _selected.toList(),
         );
       }
       if (!mounted) return;
+      teamSnack(context, _isEdit ? 'Role saved.' : '$name created.');
       context.pop();
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.message);
+      setState(() => _error = e.detailedMessage);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not save the role ($e)');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
+  void _toggleGroup(PermissionGroup g) {
+    final keys = g.permissions.map((p) => p.key);
+    setState(() {
+      if (keys.every(_selected.contains)) {
+        _selected.removeAll(keys);
+      } else {
+        _selected.addAll(keys);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final totalPermissions =
-        _groups?.fold<int>(0, (sum, g) => sum + g.permissions.length) ?? 0;
+    final top = MediaQuery.of(context).padding.top + kToolbarHeight;
+    final groups = _groups;
+    final title = _isEdit ? 'Edit role' : 'New role';
 
     return Scaffold(
       backgroundColor: AppColors.bg,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: AppColors.bg,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
         elevation: 0,
-        title: Text(_isEdit ? 'Edit Role' : 'New Role'),
+        scrolledUnderElevation: 0,
+        title: Text(title),
       ),
-      body: SafeArea(
-        top: false,
-        child: _loadingGroups
-            ? const AppLoadingView()
-            : _groups == null
-                ? AppErrorView(message: _error!, onRetry: _loadPermissions)
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 18),
+      bottomNavigationBar: groups == null
+          ? null
+          : TeamBottomBar(
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (_error != null) ...[
-                          const SizedBox(height: 8),
-                          FormAlert(message: _error!),
-                        ],
-                        const SizedBox(height: 16),
-                        AppLabeledField(
-                          label: 'Role name',
-                          hintText: 'e.g. Shift Supervisor',
-                          controller: _nameController,
-                          textInputAction: TextInputAction.next,
+                        Text(
+                          '${_selected.length} / $_total',
+                          style: AppText.display(size: 17),
                         ),
-                        const SizedBox(height: 14),
-                        AppLabeledField(
-                          label: 'Description',
-                          hintText: 'What this role is for (optional)',
-                          controller: _descriptionController,
-                          textInputAction: TextInputAction.next,
-                        ),
-                        const SizedBox(height: 14),
-                        AppLabeledField(
-                          label: 'Priority',
-                          hintText: 'e.g. 10',
-                          controller: _priorityController,
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          textInputAction: TextInputAction.done,
-                        ),
-                        const SizedBox(height: 14),
-                        _ToggleRow(
-                          title: 'Default role for new users',
-                          value: _isDefault,
-                          onChanged: (v) => setState(() => _isDefault = v),
-                        ),
-                        if (_isEdit) ...[
-                          const SizedBox(height: 4),
-                          _ToggleRow(
-                            title: 'Active (assignable)',
-                            value: _isActive,
-                            onChanged: (v) => setState(() => _isActive = v),
-                          ),
-                        ],
-                        const SizedBox(height: 18),
-                        Text('Permissions', style: AppText.eyebrow()),
-                        const SizedBox(height: 10),
-                        for (final group in _groups!) ...[
-                          _PermissionGroupCard(
-                            group: group,
-                            selected: _selected,
-                            onChanged: (next) =>
-                                setState(() => _selected = next),
-                          ),
-                          const SizedBox(height: 10),
-                        ],
-                        Center(
-                          child: Text(
-                            '${_selected.length} of $totalPermissions permissions selected',
-                            style: AppText.eyebrow(),
+                        Text(
+                          'permissions',
+                          style: AppText.body(
+                            size: 11,
+                            color: AppColors.inkFaint,
+                            weight: FontWeight.w700,
                           ),
                         ),
-                        const SizedBox(height: 20),
-                        AppButton(
-                          label: _isEdit ? 'Save changes' : 'Create role',
-                          loading: _saving,
-                          onPressed: _submit,
-                        ),
-                        const SizedBox(height: 24),
                       ],
                     ),
                   ),
+                  Expanded(
+                    flex: 3,
+                    child: TeamGradientButton(
+                      label: _isEdit ? 'Save changes' : 'Create role',
+                      icon: Icons.check_rounded,
+                      loading: _saving,
+                      onTap: _submit,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+      body: groups == null
+          ? (_loadError != null
+              ? AppErrorView(message: _loadError!, onRetry: _loadPermissions)
+              : const AppLoadingView())
+          : ListView(
+              padding: const EdgeInsets.only(bottom: 24),
+              children: [
+                Container(
+                  padding: EdgeInsets.fromLTRB(
+                    18 + teamSideInset(context),
+                    top + 4,
+                    18 + teamSideInset(context),
+                    22,
+                  ),
+                  decoration: const BoxDecoration(
+                    borderRadius:
+                        BorderRadius.vertical(bottom: Radius.circular(30)),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF312E81),
+                        Color(0xFF7C3AED),
+                        Color(0xFFC026D3),
+                      ],
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      AnimatedRing(
+                        value: _total == 0 ? 0 : _selected.length / _total,
+                        size: 66,
+                        stroke: 8,
+                        colors: const [Color(0xFFFDE68A), Color(0xFF6EE7B7)],
+                        track: Colors.white.withValues(alpha: 0.2),
+                        child: const Icon(
+                          Icons.shield_rounded,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _name.text.trim().isEmpty
+                                  ? 'Untitled role'
+                                  : _name.text.trim(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppText.display(
+                                size: 22,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${_selected.length} of $_total permissions '
+                              'selected',
+                              style: AppText.body(
+                                size: 12.5,
+                                weight: FontWeight.w600,
+                                color: Colors.white.withValues(alpha: 0.88),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    16 + teamSideInset(context),
+                    16,
+                    16 + teamSideInset(context),
+                    0,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_error != null) ...[
+                        FormAlert(message: _error!),
+                        const SizedBox(height: 14),
+                      ],
+                      TeamFormSection(
+                        icon: Icons.badge_rounded,
+                        color: TeamColors.indigo,
+                        title: 'Role details',
+                        children: [
+                          AppLabeledField(
+                            label: 'Role name',
+                            hintText: 'e.g. Shift Supervisor',
+                            icon: Icons.shield_rounded,
+                            iconColor: TeamColors.indigo,
+                            controller: _name,
+                            textCapitalization: TextCapitalization.words,
+                            textInputAction: TextInputAction.next,
+                          ),
+                          AppLabeledField(
+                            label: 'Description',
+                            hintText: 'What this role is for (optional)',
+                            icon: Icons.notes_rounded,
+                            iconColor: TeamColors.violet,
+                            controller: _description,
+                            minLines: 2,
+                            maxLines: 4,
+                            textCapitalization: TextCapitalization.sentences,
+                          ),
+                          AppLabeledField(
+                            label: 'Priority',
+                            hintText: '0 - 1000 (optional)',
+                            icon: Icons.low_priority_rounded,
+                            iconColor: TeamColors.amber,
+                            controller: _priority,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                          ),
+                          TeamToggleRow(
+                            title: 'Default role for new users',
+                            subtitle: 'Pre-selected when adding people',
+                            icon: Icons.star_rounded,
+                            color: TeamColors.amber,
+                            value: _isDefault,
+                            onChanged: (v) => setState(() => _isDefault = v),
+                          ),
+                          if (_isEdit)
+                            TeamToggleRow(
+                              title: 'Active (assignable)',
+                              subtitle: 'Inactive roles can’t be given out',
+                              icon: Icons.check_circle_rounded,
+                              color: TeamColors.green,
+                              value: _isActive,
+                              onChanged: (v) => setState(() => _isActive = v),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Expanded(
+                            child:
+                                Text('PERMISSIONS', style: AppText.eyebrow()),
+                          ),
+                          GestureDetector(
+                            onTap: () => setState(() {
+                              for (final g in groups) {
+                                _selected
+                                    .addAll(g.permissions.map((p) => p.key));
+                              }
+                            }),
+                            child: Text(
+                              'Select all',
+                              style: AppText.body(
+                                size: 12,
+                                weight: FontWeight.w800,
+                                color: TeamColors.violet,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          GestureDetector(
+                            onTap: () => setState(_selected.clear),
+                            child: Text(
+                              'Clear',
+                              style: AppText.body(
+                                size: 12,
+                                weight: FontWeight.w800,
+                                color: TeamColors.rose,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      TeamSearchField(
+                        hint: 'Search permissions…',
+                        onSearch: (v) => setState(() => _query = v),
+                      ),
+                      const SizedBox(height: 10),
+                      for (var gi = 0; gi < groups.length; gi++)
+                        _groupCard(groups[gi], gi),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _groupCard(PermissionGroup g, int gi) {
+    final color = TeamColors.rotation[gi % TeamColors.rotation.length];
+    final q = _query.toLowerCase();
+    final items = q.isEmpty
+        ? g.permissions
+        : g.permissions
+            .where(
+              (p) =>
+                  p.key.toLowerCase().contains(q) ||
+                  (p.description ?? '').toLowerCase().contains(q),
+            )
+            .toList();
+    if (items.isEmpty) return const SizedBox.shrink();
+    final on = g.permissions.where((p) => _selected.contains(p.key)).length;
+    final all = on == g.permissions.length;
+    final open = q.isNotEmpty || _open.contains(g.resource);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: color.withValues(alpha: on > 0 ? 0.45 : 0.2),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: q.isNotEmpty
+                    ? null
+                    : () => setState(() {
+                          if (!_open.add(g.resource)) _open.remove(g.resource);
+                        }),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        color.withValues(alpha: 0.18),
+                        color.withValues(alpha: 0.02),
+                      ],
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      _Check(
+                        state: all ? 2 : (on > 0 ? 1 : 0),
+                        color: color,
+                        onTap: () => _toggleGroup(g),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          g.resource.replaceAll('-', ' '),
+                          style: AppText.body(
+                            size: 13.5,
+                            weight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      TeamTag(
+                        label: '$on/${g.permissions.length}',
+                        color: color,
+                      ),
+                      Icon(
+                        open
+                            ? Icons.expand_less_rounded
+                            : Icons.expand_more_rounded,
+                        color: AppColors.inkFaint,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (open)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+                child: Column(
+                  children: [
+                    for (final p in items)
+                      InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () => setState(() {
+                          if (!_selected.add(p.key)) _selected.remove(p.key);
+                        }),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 7,
+                            horizontal: 2,
+                          ),
+                          child: Row(
+                            children: [
+                              _Check(
+                                state: _selected.contains(p.key) ? 2 : 0,
+                                color: color,
+                                onTap: () => setState(() {
+                                  if (!_selected.add(p.key)) {
+                                    _selected.remove(p.key);
+                                  }
+                                }),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      p.key,
+                                      style: AppText.body(
+                                        size: 12.5,
+                                        weight: FontWeight.w800,
+                                        color: _selected.contains(p.key)
+                                            ? color
+                                            : AppColors.ink,
+                                      ),
+                                    ),
+                                    if (p.description != null &&
+                                        p.description!.isNotEmpty)
+                                      Text(
+                                        p.description!,
+                                        style: AppText.body(
+                                          size: 10.5,
+                                          color: AppColors.inkFaint,
+                                          weight: FontWeight.w600,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _PermissionGroupCard extends StatelessWidget {
-  const _PermissionGroupCard({
-    required this.group,
-    required this.selected,
-    required this.onChanged,
-  });
+/// Tri-state checkbox: 0 none, 1 some, 2 all.
+class _Check extends StatelessWidget {
+  const _Check({required this.state, required this.color, required this.onTap});
 
-  final PermissionGroup group;
-  final Set<String> selected;
-  final ValueChanged<Set<String>> onChanged;
-
-  bool get _allSelected =>
-      group.permissions.every((p) => selected.contains(p.key));
+  final int state;
+  final Color color;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                group.resource,
-                style: AppText.body(size: 13, weight: FontWeight.w700),
-              ),
-              GestureDetector(
-                onTap: () {
-                  final next = {...selected};
-                  final keys = group.permissions.map((p) => p.key);
-                  if (_allSelected) {
-                    next.removeAll(keys);
-                  } else {
-                    next.addAll(keys);
-                  }
-                  onChanged(next);
-                },
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    gradient: _allSelected ? AppColors.staffGrad : null,
-                    color: _allSelected ? null : AppColors.surface3,
-                    borderRadius: BorderRadius.circular(AppRadii.pill),
-                  ),
-                  child: Text(
-                    'Select all',
-                    style: AppText.body(
-                      size: 10,
-                      weight: FontWeight.w800,
-                      color: _allSelected ? Colors.white : AppColors.inkSoft,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: group.permissions.map((permission) {
-              final on = selected.contains(permission.key);
-              return GestureDetector(
-                onTap: () {
-                  final next = {...selected};
-                  on ? next.remove(permission.key) : next.add(permission.key);
-                  onChanged(next);
-                },
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    gradient: on ? AppColors.staffGrad : null,
-                    color: on ? null : AppColors.surface3,
-                    borderRadius: BorderRadius.circular(AppRadii.pill),
-                  ),
-                  child: Text(
-                    permission.key,
-                    style: AppText.body(
-                      size: 11,
-                      weight: FontWeight.w700,
-                      color: on ? Colors.white : AppColors.inkSoft,
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Matches `SecurityPolicyScreen`'s `_RoleToggleRow` visual exactly — same
-/// gradient track, same 26px height, same white knob.
-class _ToggleRow extends StatelessWidget {
-  const _ToggleRow({
-    required this.title,
-    required this.value,
-    required this.onChanged,
-  });
-
-  final String title;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: AppText.body(size: 13, weight: FontWeight.w700),
-          ),
-        ),
-        GestureDetector(
-          onTap: () => onChanged(!value),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            width: 44,
-            height: 26,
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              gradient: value ? AppColors.staffGrad : null,
-              color: value ? null : AppColors.surface3,
-              borderRadius: BorderRadius.circular(99),
-            ),
-            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-            child: Container(
-              width: 20,
-              height: 20,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: 22,
+          height: 22,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(7),
+            color: state == 0 ? Colors.transparent : color,
+            border: Border.all(
+              color: state == 0 ? AppColors.inkFaint : color,
+              width: 1.6,
             ),
           ),
+          child: state == 0
+              ? null
+              : Icon(
+                  state == 2 ? Icons.check_rounded : Icons.remove_rounded,
+                  size: 15,
+                  color: Colors.white,
+                ),
         ),
-      ],
+      ),
     );
   }
 }

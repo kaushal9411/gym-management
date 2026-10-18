@@ -1,213 +1,970 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../bloc/branches/branch_list_cubit.dart';
-import '../../../bloc/branches/branch_list_state.dart';
 import '../../../core/di/service_locator.dart';
+import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/branch.dart';
-import '../../../shared/widgets/app_pill.dart';
+import '../../../repositories/branch_repository.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/list_hero.dart';
+import '../../reports/presentation/widgets/donut_chart.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import 'branch_actions.dart';
+import 'branch_ui.dart';
+import 'widgets/branch_card.dart';
 
-/// Design frame "8. Branches".
-class BranchesListScreen extends StatelessWidget {
+const _sorts = [
+  ('name:asc', 'Name (A-Z)'),
+  ('name:desc', 'Name (Z-A)'),
+  ('branchCode:asc', 'Branch code (A-Z)'),
+  ('city:asc', 'City (A-Z)'),
+  ('createdAt:desc', 'Newest first'),
+  ('createdAt:asc', 'Oldest first'),
+];
+
+const _statusFilters = [
+  (label: 'All', value: '', color: TeamColors.indigo),
+  (label: 'Active', value: 'active', color: TeamColors.green),
+  (label: 'Inactive', value: 'inactive', color: TeamColors.amber),
+  (label: 'Deleted', value: 'deleted', color: TeamColors.rose),
+];
+
+/// Branches list, brought to parity with web's `/branches` page and the
+/// Members / Leads / Team design language: gradient hero, KPI tiles and
+/// insight panels that open bottom sheets, search + status chips + sort +
+/// cards / compact toggle, rich cards with a lifecycle menu (set default,
+/// activate / deactivate, delete, restore) and New branch.
+///
+/// All branches (soft-deleted included, as web does) are loaded once through
+/// [BranchRepository.listAll]; search, the status filter, sorting and every
+/// count are computed on the device. That keeps the KPIs unaffected by the
+/// filters (like web's second unfiltered query) and sidesteps the API's
+/// `isActive=false` coercion bug (see the repository). It is a pushed route,
+/// so it reloads on every visit and after every change made from it.
+///
+/// **Dropped vs. web**: nothing with an endpoint. The hero's overlapping
+/// avatar strip uses storefront glyphs (same as web's building icons). The
+/// "Total branches" tile counts live branches only (web counts deleted ones
+/// too); deleted ones get their own filter chip instead.
+class BranchesListScreen extends StatefulWidget {
   const BranchesListScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return BlocProvider<BranchListCubit>(
-      create: (_) => getIt<BranchListCubit>()..load(),
-      child: const _BranchesListView(),
-    );
-  }
+  State<BranchesListScreen> createState() => _BranchesListScreenState();
 }
 
-class _BranchesListView extends StatefulWidget {
-  const _BranchesListView();
+class _BranchesListScreenState extends State<BranchesListScreen> {
+  List<Branch>? _all;
+  bool _loading = true;
+  String? _error;
 
-  @override
-  State<_BranchesListView> createState() => _BranchesListViewState();
-}
-
-class _BranchesListViewState extends State<_BranchesListView> {
-  final _scrollController = ScrollController();
+  String _search = '';
+  String _status = '';
+  String _sort = 'name:asc';
+  bool _compact = false;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >
-          _scrollController.position.maxScrollExtent - 200) {
-        context.read<BranchListCubit>().loadMore();
-      }
-    });
+    _load();
   }
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+    try {
+      final all = await getIt<BranchRepository>().listAll();
+      if (!mounted) return;
+      setState(() {
+        _all = all;
+        _loading = false;
+        _error = null;
+      });
+    } on ApiException catch (e) {
+      _fail(e.message);
+    } catch (e) {
+      _fail('Could not load branches ($e)');
+    }
   }
+
+  void _fail(String message) {
+    if (!mounted) return;
+    if (_all != null) {
+      setState(() => _loading = false);
+      teamSnack(context, message, error: true);
+    } else {
+      setState(() {
+        _loading = false;
+        _error = message;
+      });
+    }
+  }
+
+  // ── derived data ──────────────────────────────────────────────────────────
+
+  List<Branch> get _live =>
+      (_all ?? const <Branch>[]).where((b) => !b.isDeleted).toList();
+
+  List<Branch> get _visible {
+    final q = _search.toLowerCase();
+    final list = (_all ?? const <Branch>[]).where((b) {
+      switch (_status) {
+        case 'active':
+          if (b.isDeleted || !b.isActive) return false;
+        case 'inactive':
+          if (b.isDeleted || b.isActive) return false;
+        case 'deleted':
+          if (!b.isDeleted) return false;
+      }
+      if (q.isEmpty) return true;
+      return [
+        b.name,
+        b.branchCode,
+        b.city,
+        b.state,
+        b.email,
+        b.phone,
+        b.addressLine1,
+      ].any((v) => v != null && v.toLowerCase().contains(q));
+    }).toList();
+    final parts = _sort.split(':');
+    final dir = parts[1] == 'desc' ? -1 : 1;
+    int cmp(Branch a, Branch b) {
+      switch (parts[0]) {
+        case 'branchCode':
+          return a.branchCode
+              .toLowerCase()
+              .compareTo(b.branchCode.toLowerCase());
+        case 'city':
+          return (a.city ?? '￿')
+              .toLowerCase()
+              .compareTo((b.city ?? '￿').toLowerCase());
+        case 'createdAt':
+          final x = a.createdAt, y = b.createdAt;
+          if (x == null && y == null) return 0;
+          if (x == null) return 1;
+          if (y == null) return -1;
+          return x.compareTo(y);
+        default:
+          return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      }
+    }
+
+    list.sort((a, b) => dir * cmp(a, b));
+    return list;
+  }
+
+  int _countFor(String status) {
+    final all = _all ?? const <Branch>[];
+    final live = _live;
+    return switch (status) {
+      'active' => live.where((b) => b.isActive).length,
+      'inactive' => live.where((b) => !b.isActive).length,
+      'deleted' => all.length - live.length,
+      _ => all.length,
+    };
+  }
+
+  bool get _hasFilters => _search.isNotEmpty || _status.isNotEmpty;
+
+  // ── actions ───────────────────────────────────────────────────────────────
+
+  Future<void> _open(Branch b) async {
+    if (b.isDeleted) {
+      _openDeletedSheet(b);
+      return;
+    }
+    await context.push(AppRoutes.branchDetail, extra: b.id);
+    if (mounted) _load(silent: true);
+  }
+
+  Future<void> _add() async {
+    final id = await context.push<String>(AppRoutes.branchForm);
+    if (!mounted) return;
+    await _load(silent: true);
+    if (id != null && mounted) {
+      await context.push(AppRoutes.branchDetail, extra: id);
+      if (mounted) _load(silent: true);
+    }
+  }
+
+  Future<void> _menu(Branch b, String value) async {
+    switch (value) {
+      case 'view':
+        await _open(b);
+      case 'edit':
+        await context.push(AppRoutes.branchForm, extra: b);
+        if (mounted) _load(silent: true);
+      default:
+        final action = BranchAction.values.firstWhere((a) => a.name == value);
+        if (await runBranchAction(context, b, action) && mounted) {
+          _load(silent: true);
+        }
+    }
+  }
+
+  void _setStatus(String s) => setState(() => _status = s);
+
+  Future<void> _pickSort() async {
+    final v = await pickOneSheet(
+      context,
+      title: 'Sort by',
+      options: [for (final s in _sorts) (s.$1, s.$2)],
+      current: _sort,
+    );
+    if (v == null || v.isEmpty) return;
+    setState(() => _sort = v);
+  }
+
+  // ── sheets ────────────────────────────────────────────────────────────────
+
+  void _openDeletedSheet(Branch b) {
+    final canRestore = teamCan(context, 'branches:restore');
+    showTeamSheet<void>(
+      context,
+      (sheetContext) => TeamSheetScaffold(
+        icon: Icons.delete_outline_rounded,
+        title: b.name,
+        subtitle: 'Deleted ${fmtDate(b.deletedAt)}',
+        color: TeamColors.rose,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TeamTileGrid(
+              tiles: [
+                TeamFieldTile(
+                  icon: Icons.tag_rounded,
+                  label: 'Branch code',
+                  value: b.branchCode,
+                  color: TeamColors.indigo,
+                ),
+                TeamFieldTile(
+                  icon: Icons.place_rounded,
+                  label: 'Location',
+                  value: b.location,
+                  color: TeamColors.amber,
+                ),
+                TeamFieldTile(
+                  icon: Icons.groups_rounded,
+                  label: 'Members',
+                  value: '${b.memberCount}',
+                  color: TeamColors.violet,
+                ),
+                TeamFieldTile(
+                  icon: Icons.badge_rounded,
+                  label: 'Staff',
+                  value: '${b.staffCount}',
+                  color: TeamColors.teal,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (canRestore)
+              TeamGradientButton(
+                label: 'Restore branch',
+                icon: Icons.restore_from_trash_rounded,
+                gradient: TeamColors.ctaGreen,
+                onTap: () async {
+                  Navigator.of(sheetContext).pop();
+                  if (await runBranchAction(context, b, BranchAction.restore) &&
+                      mounted) {
+                    _load(silent: true);
+                  }
+                },
+              )
+            else
+              Text(
+                'You do not have permission to restore branches.',
+                style: AppText.body(size: 12.5, color: AppColors.inkFaint),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// A branch-per-row sheet. [trailing] gives the right-hand text; when
+  /// [filter] is set a button applies it to the main list.
+  void _openBranchesSheet({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required List<Branch> rows,
+    String Function(Branch b)? trailing,
+    String? filter,
+    String? subtitle,
+  }) {
+    showTeamSheet<void>(
+      context,
+      (sheetContext) => TeamSheetScaffold(
+        icon: icon,
+        title: title,
+        subtitle: subtitle ??
+            '${rows.length} ${rows.length == 1 ? 'branch' : 'branches'}',
+        color: color,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (filter != null)
+              GestureDetector(
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _setStatus(filter);
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: color.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.filter_alt_rounded, size: 16, color: color),
+                      const SizedBox(width: 6),
+                      Text(
+                        filter.isEmpty
+                            ? 'Show everything in the main list'
+                            : 'Filter the main list',
+                        style: AppText.body(
+                          size: 12.5,
+                          weight: FontWeight.w800,
+                          color: color,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (rows.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'Nothing here right now.',
+                  style: AppText.body(size: 13, color: AppColors.inkFaint),
+                ),
+              )
+            else
+              for (final b in rows)
+                _BranchRow(
+                  branch: b,
+                  trailing: trailing?.call(b),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _open(b);
+                  },
+                ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── KPIs + insights ───────────────────────────────────────────────────────
+
+  List<TeamKpi> _kpis() {
+    final live = _live;
+    return [
+      TeamKpi(
+        label: 'Total branches',
+        value: live.length,
+        color: TeamColors.indigo,
+        icon: Icons.storefront_rounded,
+        active: _status.isEmpty,
+      ),
+      TeamKpi(
+        label: 'Active',
+        value: live.where((b) => b.isActive).length,
+        color: TeamColors.green,
+        icon: Icons.check_circle_rounded,
+        active: _status == 'active',
+      ),
+      TeamKpi(
+        label: 'Inactive',
+        value: live.where((b) => !b.isActive).length,
+        color: TeamColors.amber,
+        icon: Icons.pause_circle_rounded,
+        active: _status == 'inactive',
+      ),
+      TeamKpi(
+        label: 'Members across branches',
+        value: live.fold(0, (a, b) => a + b.memberCount),
+        color: TeamColors.violet,
+        icon: Icons.groups_rounded,
+      ),
+      TeamKpi(
+        label: 'Staff across branches',
+        value: live.fold(0, (a, b) => a + b.staffCount),
+        color: TeamColors.teal,
+        icon: Icons.badge_rounded,
+      ),
+      TeamKpi(
+        label: 'Total capacity',
+        value: live.fold(0, (a, b) => a + (b.capacity ?? 0)),
+        color: TeamColors.rose,
+        icon: Icons.speed_rounded,
+      ),
+    ];
+  }
+
+  void _onKpi(int i) {
+    final live = _live;
+    List<Branch> byDesc(int Function(Branch) f) =>
+        [...live]..sort((a, b) => f(b).compareTo(f(a)));
+    switch (i) {
+      case 0:
+        _openBranchesSheet(
+          title: 'Total branches',
+          icon: Icons.storefront_rounded,
+          color: TeamColors.indigo,
+          rows: live,
+          filter: '',
+        );
+      case 1:
+        _openBranchesSheet(
+          title: 'Active',
+          icon: Icons.check_circle_rounded,
+          color: TeamColors.green,
+          rows: live.where((b) => b.isActive).toList(),
+          filter: 'active',
+        );
+      case 2:
+        _openBranchesSheet(
+          title: 'Inactive',
+          icon: Icons.pause_circle_rounded,
+          color: TeamColors.amber,
+          rows: live.where((b) => !b.isActive).toList(),
+          filter: 'inactive',
+        );
+      case 3:
+        _openBranchesSheet(
+          title: 'Members across branches',
+          icon: Icons.groups_rounded,
+          color: TeamColors.violet,
+          rows: byDesc((b) => b.memberCount),
+          trailing: (b) => '${b.memberCount} members',
+        );
+      case 4:
+        _openBranchesSheet(
+          title: 'Staff across branches',
+          icon: Icons.badge_rounded,
+          color: TeamColors.teal,
+          rows: byDesc((b) => b.staffCount),
+          trailing: (b) => '${b.staffCount} staff',
+        );
+      default:
+        _openBranchesSheet(
+          title: 'Total capacity',
+          icon: Icons.speed_rounded,
+          color: TeamColors.rose,
+          rows: byDesc((b) => b.capacity ?? 0),
+          trailing: (b) => b.capacity == null
+              ? 'Not set'
+              : '${b.memberCount} / ${b.capacity}',
+        );
+    }
+  }
+
+  Widget _insights() {
+    final live = _live;
+    final active = live.where((b) => b.isActive).length;
+    final inactive = live.length - active;
+    final deleted = (_all ?? const <Branch>[]).length - live.length;
+    List<Branch> top(int Function(Branch) f) =>
+        ([...live]..sort((a, b) => f(b).compareTo(f(a))));
+    final byMembers = top((b) => b.memberCount);
+    final byStaff = top((b) => b.staffCount);
+    final withCap = live.where((b) => (b.capacity ?? 0) > 0).toList()
+      ..sort(
+        (a, b) => (b.memberCount / b.capacity!).compareTo(
+          a.memberCount / a.capacity!,
+        ),
+      );
+    return TeamAdaptive(
+      children: [
+        TeamInsightCard(
+          icon: Icons.donut_large_rounded,
+          title: 'Status mix',
+          color: TeamColors.indigo,
+          trailing: '${live.length} branches',
+          onTap: () => _openBranchesSheet(
+            title: 'Status mix',
+            icon: Icons.donut_large_rounded,
+            color: TeamColors.indigo,
+            rows: live,
+            filter: '',
+            trailing: (b) => branchStatus(b),
+          ),
+          child: DonutChart(
+            size: 84,
+            slices: [
+              if (active > 0)
+                DonutSlice(
+                  label: 'Active',
+                  value: active,
+                  color: TeamColors.green,
+                ),
+              if (inactive > 0)
+                DonutSlice(
+                  label: 'Inactive',
+                  value: inactive,
+                  color: TeamColors.amber,
+                ),
+              if (deleted > 0)
+                DonutSlice(
+                  label: 'Deleted',
+                  value: deleted,
+                  color: TeamColors.rose,
+                ),
+            ],
+          ),
+        ),
+        TeamInsightCard(
+          icon: Icons.groups_rounded,
+          title: 'Members per branch',
+          color: TeamColors.violet,
+          onTap: () => _openBranchesSheet(
+            title: 'Members per branch',
+            icon: Icons.groups_rounded,
+            color: TeamColors.violet,
+            rows: byMembers,
+            trailing: (b) => '${b.memberCount} members',
+          ),
+          child: TeamBarRows(
+            rows: [for (final b in byMembers.take(6)) (b.name, b.memberCount)],
+            colors: const [TeamColors.violet, TeamColors.indigo],
+          ),
+        ),
+        TeamInsightCard(
+          icon: Icons.badge_rounded,
+          title: 'Staff per branch',
+          color: TeamColors.teal,
+          onTap: () => _openBranchesSheet(
+            title: 'Staff per branch',
+            icon: Icons.badge_rounded,
+            color: TeamColors.teal,
+            rows: byStaff,
+            trailing: (b) => '${b.staffCount} staff',
+          ),
+          child: TeamBarRows(
+            rows: [for (final b in byStaff.take(6)) (b.name, b.staffCount)],
+            colors: const [TeamColors.teal, TeamColors.green],
+          ),
+        ),
+        TeamInsightCard(
+          icon: Icons.speed_rounded,
+          title: 'Capacity used',
+          color: TeamColors.rose,
+          trailing: withCap.isEmpty ? null : '${withCap.length} set',
+          onTap: withCap.isEmpty
+              ? null
+              : () => _openBranchesSheet(
+                    title: 'Capacity used',
+                    icon: Icons.speed_rounded,
+                    color: TeamColors.rose,
+                    rows: withCap,
+                    trailing: (b) =>
+                        '${(b.memberCount / b.capacity! * 100).round()}%',
+                  ),
+          child: withCap.isEmpty
+              ? Text(
+                  'Set a capacity on a branch to see how full it is.',
+                  style: AppText.body(size: 12.5, color: AppColors.inkFaint),
+                )
+              : Column(
+                  children: [
+                    for (var i = 0; i < withCap.take(4).length; i++) ...[
+                      if (i > 0) const SizedBox(height: 10),
+                      UsageBar(
+                        label: withCap[i].name,
+                        used: withCap[i].memberCount,
+                        limit: withCap[i].capacity,
+                      ),
+                    ],
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
+  // ── build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    final top = MediaQuery.of(context).padding.top;
+    final canCreate = teamCan(context, 'branches:create');
+    final canUpdate = teamCan(context, 'branches:update');
+    final canActivate = teamCan(context, 'branches:activate');
+    final canDelete = teamCan(context, 'branches:delete');
+    final canRestore = teamCan(context, 'branches:restore');
+
     return Scaffold(
       backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: BlocBuilder<BranchListCubit, BranchListState>(
-          builder: (context, state) {
-            final count = state is BranchListLoaded ? state.items.length : null;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  count == null ? 'Loading…' : '$count branches',
-                  style: AppText.eyebrow(),
-                ),
-                Text('Branches', style: AppText.display(size: 18)),
-              ],
-            );
-          },
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: Center(
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  gradient: AppColors.staffGrad,
-                  shape: BoxShape.circle,
-                ),
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  icon: const Icon(
-                    Icons.add_rounded,
-                    color: Colors.white,
-                    size: 20,
+      body: RefreshIndicator(
+        color: AppColors.staffB,
+        backgroundColor: AppColors.surface2,
+        onRefresh: () => _load(silent: true),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(child: _hero(top, canCreate)),
+            if (_all != null)
+              SliverToBoxAdapter(
+                child: TeamCenter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TeamKpiGrid(
+                          tiles: _kpis(),
+                          loading: false,
+                          onTap: _onKpi,
+                        ),
+                        if (_live.isNotEmpty) ...[
+                          const SizedBox(height: 14),
+                          _insights(),
+                        ],
+                        const SizedBox(height: 14),
+                        _toolbar(),
+                      ],
+                    ),
                   ),
-                  onPressed: () => context.push(AppRoutes.branchForm),
                 ),
+              ),
+            ..._body(
+              canUpdate: canUpdate,
+              canActivate: canActivate,
+              canDelete: canDelete,
+              canRestore: canRestore,
+              canCreate: canCreate,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _body({
+    required bool canUpdate,
+    required bool canActivate,
+    required bool canDelete,
+    required bool canRestore,
+    required bool canCreate,
+  }) {
+    if (_loading && _all == null) {
+      return const [
+        SliverFillRemaining(hasScrollBody: false, child: AppLoadingView()),
+      ];
+    }
+    if (_error != null && _all == null) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: AppErrorView(message: _error!, onRetry: _load),
+        ),
+      ];
+    }
+    final items = _visible;
+    if (items.isEmpty) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: AppEmptyState(
+            icon: Icons.storefront_outlined,
+            title: _hasFilters
+                ? 'No branches match these filters'
+                : 'No branches yet',
+            message: _hasFilters
+                ? 'Try clearing a filter or the search.'
+                : canCreate
+                    ? 'Add your first branch to get started.'
+                    : 'Nothing to show yet.',
+          ),
+        ),
+      ];
+    }
+    return [
+      teamCardSliver<Branch>(
+        context,
+        items: items,
+        padding: const EdgeInsets.fromLTRB(18, 0, 18, 32),
+        builder: (b, i) => _Rise(
+          index: i,
+          child: BranchCard(
+            key: ValueKey('branch-${b.id}'),
+            branch: b,
+            compact: _compact,
+            canUpdate: canUpdate,
+            actions: availableBranchActions(
+              b,
+              canUpdate: canUpdate,
+              canActivate: canActivate,
+              canDelete: canDelete,
+              canRestore: canRestore,
+            ),
+            onTap: () => _open(b),
+            onMenu: (v) => _menu(b, v),
+          ),
+        ),
+      ),
+    ];
+  }
+
+  Widget _toolbar() {
+    final sortLabel = _sorts.firstWhere((s) => s.$1 == _sort).$2;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TeamSearchField(
+          hint: 'Search name, code, city, email…',
+          onSearch: (v) => setState(() => _search = v),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: TeamToolbarButton(
+                icon: Icons.sort_rounded,
+                label: sortLabel,
+                onTap: _pickSort,
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            _ViewToggle(
+              compact: _compact,
+              onChanged: (v) => setState(() => _compact = v),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _hero(double top, bool canCreate) {
+    final all = _all;
+    final live = _live;
+    final deleted = all == null ? 0 : all.length - live.length;
+    final members = live.fold(0, (a, b) => a + b.memberCount);
+    final staff = live.fold(0, (a, b) => a + b.staffCount);
+    return ListHero(
+      title: 'Branches',
+      subtitle: all == null
+          ? 'Manage every location your gym operates from.'
+          : '${live.length} ${live.length == 1 ? 'branch' : 'branches'}'
+              '${deleted > 0 ? ' · $deleted deleted' : ''}'
+              ' · $members members · $staff staff',
+      topInset: top,
+      side: 18 + teamSideInset(context),
+      leading: ListHeroButton(
+        icon: Icons.arrow_back_rounded,
+        onTap: () => context.pop(),
       ),
-      body: BlocBuilder<BranchListCubit, BranchListState>(
-        builder: (context, state) {
-          return switch (state) {
-            BranchListLoading() => const AppLoadingView(),
-            BranchListError(:final message) => AppErrorView(
-                message: message,
-                onRetry: () => context.read<BranchListCubit>().load(),
+      trailing: [
+        if (canCreate) ListHeroButton(icon: Icons.add_rounded, onTap: _add),
+      ],
+      chips: [
+        for (final f in _statusFilters)
+          if (f.value != 'deleted' || deleted > 0)
+            _HeroChip(
+              label: '${f.label} · ${_countFor(f.value)}',
+              selected: _status == f.value,
+              onTap: () => _setStatus(f.value),
+            ),
+      ],
+    );
+  }
+}
+
+/// Frosted quick-action chip on the hero (white when selected), like the
+/// Team & Access hub's tab chips.
+class _HeroChip extends StatelessWidget {
+  const _HeroChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = selected ? const Color(0xFF6D28D9) : Colors.white;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.white.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(99),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            Text(
+              label,
+              style: AppText.body(
+                size: 12.5,
+                weight: FontWeight.w800,
+                color: fg,
               ),
-            BranchListLoaded(:final items) when items.isEmpty =>
-              const AppEmptyState(
-                icon: Icons.storefront_outlined,
-                title: 'No branches yet',
-                message: 'Tap + to add your first branch.',
-              ),
-            BranchListLoaded(:final items, :final loadingMore) =>
-              RefreshIndicator(
-                color: AppColors.staffB,
-                backgroundColor: AppColors.surface2,
-                onRefresh: () => context.read<BranchListCubit>().load(),
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                  itemCount: items.length + (loadingMore ? 1 : 0),
-                  itemBuilder: (context, i) {
-                    if (i >= items.length) {
-                      return const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.staffB,
-                            strokeWidth: 2,
-                          ),
-                        ),
-                      );
-                    }
-                    return _BranchCard(branch: items[i]);
-                  },
-                ),
-              ),
-          };
-        },
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _BranchCard extends StatelessWidget {
-  const _BranchCard({required this.branch});
+/// Cards / compact switch (web's grid / list toggle).
+class _ViewToggle extends StatelessWidget {
+  const _ViewToggle({required this.compact, required this.onChanged});
 
-  final Branch branch;
+  final bool compact;
+  final ValueChanged<bool> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(AppRadii.card),
-          onTap: () => context.push(AppRoutes.branchDetail, extra: branch.id),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surface2,
-              borderRadius: BorderRadius.circular(AppRadii.card),
-              border: Border.all(color: AppColors.line),
+    Widget btn(IconData icon, String tip, bool on, bool value) => Tooltip(
+          message: tip,
+          child: GestureDetector(
+            onTap: () => onChanged(value),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                gradient: on ? TeamColors.cta : null,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                size: 19,
+                color: on ? Colors.white : AppColors.inkFaint,
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          ),
+        );
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.surface2,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: AppColors.line),
+      ),
+      child: Row(
+        children: [
+          btn(Icons.grid_view_rounded, 'Cards', !compact, false),
+          btn(Icons.view_list_rounded, 'Compact list', compact, true),
+        ],
+      ),
+    );
+  }
+}
+
+/// Rises into place; capped delay so rows far down the list don't wait.
+class _Rise extends StatelessWidget {
+  const _Rise({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: Duration(milliseconds: 380 + (index.clamp(0, 6)) * 60),
+      curve: Curves.easeOutCubic,
+      builder: (context, t, child) => Opacity(
+        opacity: t,
+        child: Transform.translate(
+          offset: Offset(0, 14 * (1 - t)),
+          child: child,
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// A branch line inside the KPI / insight sheets.
+class _BranchRow extends StatelessWidget {
+  const _BranchRow({required this.branch, required this.onTap, this.trailing});
+
+  final Branch branch;
+  final String? trailing;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final b = branch;
+    final tone = branchTone(b);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 2),
+          child: Row(
+            children: [
+              BranchAvatar(name: b.name, color: tone, size: 30),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      branch.name,
-                      style: AppText.body(size: 15, weight: FontWeight.w700),
+                      b.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.body(size: 13, weight: FontWeight.w800),
                     ),
-                    if (branch.isDefault)
-                      const AppPill(
-                        label: 'Default',
-                        tone: AppPillTone.roleTint,
-                      )
-                    else if (branch.isActive)
-                      const AppPill(label: 'Active', tone: AppPillTone.success)
-                    else
-                      const AppPill(
-                        label: 'Inactive',
-                        tone: AppPillTone.danger,
+                    Text(
+                      [
+                        if (b.branchCode.isNotEmpty) b.branchCode,
+                        if (b.location.isNotEmpty) b.location,
+                      ].join(' · '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppText.body(
+                        size: 11,
+                        color: AppColors.inkFaint,
+                        weight: FontWeight.w600,
                       ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 4),
+              ),
+              if (trailing != null)
                 Text(
-                  [
-                    branch.branchCode,
-                    if (branch.city != null && branch.city!.isNotEmpty)
-                      branch.city,
-                    if (branch.capacity != null) 'cap. ${branch.capacity}',
-                  ].join(' · '),
+                  trailing!,
                   style: AppText.body(
                     size: 12,
-                    color: AppColors.inkFaint,
-                    weight: FontWeight.w600,
+                    weight: FontWeight.w800,
+                    color: tone,
                   ),
                 ),
-              ],
-            ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: AppColors.inkFaint,
+              ),
+            ],
           ),
         ),
       ),

@@ -1,69 +1,58 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../bloc/common/paginated_list_cubit.dart';
-import '../../../bloc/common/paginated_list_state.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../models/iam_user.dart';
-import '../../../models/invitation.dart';
 import '../../../models/tenant_role.dart';
-import '../../../repositories/iam_user_repository.dart';
-import '../../../repositories/invitation_repository.dart';
 import '../../../repositories/tenant_role_repository.dart';
-import '../../../shared/widgets/app_pill.dart';
-import '../../../shared/widgets/app_state_views.dart';
+import '../../manager/presentation/widgets/member_detail_anim.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import 'invitations_tab.dart';
+import '../../../shared/widgets/list_hero.dart';
+import 'permission_matrix_tab.dart';
 import 'permissions_registry_tab.dart';
+import 'roles_tab.dart';
+import 'users_tab.dart';
 
-/// The design's matrix rows. Each maps to the `resource` half of the
-/// `resource:action` permission keys `GET /roles` returns, so a role's
-/// access level is derived from real grants rather than hard-coded.
-const _matrixRows = <String, List<String>>{
-  'Members': ['members', 'memberships'],
-  'Finance': ['payments', 'invoices', 'expenses', 'income', 'finance'],
-  'Classes': ['classes', 'bookings'],
-  'Reports': ['reports', 'analytics'],
-  'Settings': ['settings', 'branches', 'roles', 'staff'],
-};
+enum _IamTab { users, roles, matrix, permissions, invitations }
 
-/// Columns, in the design's order (Own / Mgr / Trn / Rcp).
-const _matrixRoles = ['OWNER', 'MANAGER', 'TRAINER', 'RECEPTIONIST'];
-const _matrixHeaders = ['Own', 'Mgr', 'Trn', 'Rcp'];
+extension on _IamTab {
+  String get label => switch (this) {
+        _IamTab.users => 'Users',
+        _IamTab.roles => 'Roles',
+        _IamTab.matrix => 'Matrix',
+        _IamTab.permissions => 'Permissions',
+        _IamTab.invitations => 'Invites',
+      };
 
-/// Read-only actions — a role holding only these shows as "view", matching
-/// the design's third cell state.
-const _readActions = {'view', 'read'};
+  IconData get icon => switch (this) {
+        _IamTab.users => Icons.people_alt_rounded,
+        _IamTab.roles => Icons.shield_rounded,
+        _IamTab.matrix => Icons.grid_view_rounded,
+        _IamTab.permissions => Icons.key_rounded,
+        _IamTab.invitations => Icons.forward_to_inbox_rounded,
+      };
 
-const _userStatusTones = {
-  'ACTIVE': AppPillTone.success,
-  'PENDING_VERIFICATION': AppPillTone.warning,
-  'LOCKED': AppPillTone.danger,
-  'SUSPENDED': AppPillTone.danger,
-  'DEACTIVATED': AppPillTone.neutral,
-};
+  /// The permission web's nav / API needs for this view.
+  String get permission => switch (this) {
+        _IamTab.users => 'users:read',
+        _IamTab.roles => 'roles:read',
+        _IamTab.matrix => 'permissions:read',
+        _IamTab.permissions => 'permissions:read',
+        _IamTab.invitations => 'users:invite',
+      };
+}
 
-const _invitationStatusTones = {
-  'PENDING': AppPillTone.warning,
-  'ACCEPTED': AppPillTone.success,
-  'REVOKED': AppPillTone.neutral,
-  'EXPIRED': AppPillTone.danger,
-};
-
-enum _IamTab { matrix, roles, permissions, users, invitations }
-
-/// Design frame "13. Roles & permissions", extended to match the web app's
-/// `IamNav` grouping (Users/Roles/Permissions/Invitations as one "Staff &
-/// access" section) rather than staying a Roles-only screen — mobile had no
-/// Users or Invitations surface at all before this. Matrix/Roles are the
-/// original frame-13 content; Users/Invitations are new, built in the same
-/// visual language since no design frame exists for them.
+/// "Team & Access" hub — web's `IamNav` group (Users / Roles / Permissions
+/// registry + matrix / Invitations) as one tabbed screen under an animated
+/// gradient header. Each tab is only offered when the viewer holds the
+/// permission web's page needs, tabs are built lazily and kept alive so filters
+/// and scroll positions survive switching, and the HR **Staff directory**
+/// (`/staff`) is reachable from the Users tab for anyone with `staff:view`
+/// (Owners have no Team tab in their shell).
 class RolesScreen extends StatefulWidget {
   const RolesScreen({super.key});
 
@@ -72,715 +61,312 @@ class RolesScreen extends StatefulWidget {
 }
 
 class _RolesScreenState extends State<RolesScreen> {
+  final _usersKey = GlobalKey<UsersTabState>();
+  final _invitesKey = GlobalKey<InvitationsTabState>();
+
   List<TenantRole>? _roles;
-  String? _error;
-  _IamTab _tab = _IamTab.matrix;
+  String? _rolesError;
+  _IamTab? _tab;
+  final Set<_IamTab> _visited = {};
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadRoles();
   }
 
-  Future<void> _load() async {
-    setState(() => _error = null);
+  Future<void> _loadRoles() async {
+    if (!teamCan(context, 'roles:read')) {
+      setState(() => _roles = const []);
+      return;
+    }
+    setState(() => _rolesError = null);
     try {
       final roles = await getIt<TenantRoleRepository>().list();
       if (!mounted) return;
       setState(() => _roles = roles);
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _rolesError = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _rolesError = '$e');
     }
   }
 
-  Future<void> _onAddPressed() async {
-    switch (_tab) {
-      case _IamTab.matrix:
-      case _IamTab.roles:
-        await context.push(AppRoutes.roleForm);
-        _load();
-      case _IamTab.permissions:
-        return;
-      case _IamTab.users:
-        await context.push(
-          AppRoutes.userForm,
-          extra: _roles ?? const <TenantRole>[],
-        );
-        if (mounted) setState(() {});
-      case _IamTab.invitations:
-        await context.push(
-          AppRoutes.inviteUser,
-          extra: _roles ?? const <TenantRole>[],
-        );
-        if (mounted) setState(() {});
-    }
-  }
+  List<_IamTab> _visible() =>
+      _IamTab.values.where((t) => teamCan(context, t.permission)).toList();
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Text('Staff & Access', style: AppText.display(size: 18)),
-        actions: [
-          if (_tab != _IamTab.permissions)
-            IconButton(
-              icon: const Icon(Icons.add_rounded),
-              tooltip: 'Add',
-              onPressed: _onAddPressed,
-            ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: _error != null
-            ? AppErrorView(message: _error!, onRetry: _load)
-            : _roles == null
-                ? const AppLoadingView()
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(18, 4, 18, 12),
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: _IamTab.values.map((tab) {
-                              final selected = tab == _tab;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _tab = tab),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 7,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      gradient:
-                                          selected ? AppColors.staffGrad : null,
-                                      color:
-                                          selected ? null : AppColors.surface3,
-                                      borderRadius: BorderRadius.circular(
-                                        AppRadii.pill,
-                                      ),
-                                    ),
-                                    child: Text(
-                                      switch (tab) {
-                                        _IamTab.matrix => 'Matrix',
-                                        _IamTab.roles => 'Roles',
-                                        _IamTab.permissions => 'Permissions',
-                                        _IamTab.users => 'Users',
-                                        _IamTab.invitations => 'Invitations',
-                                      },
-                                      style: AppText.body(
-                                        size: 12,
-                                        weight: FontWeight.w700,
-                                        color: selected
-                                            ? Colors.white
-                                            : AppColors.inkSoft,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: switch (_tab) {
-                          _IamTab.matrix => _PermissionMatrix(roles: _roles!),
-                          _IamTab.roles => ListView.builder(
-                              padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
-                              itemCount: _roles!.length,
-                              itemBuilder: (context, i) =>
-                                  _RoleCard(role: _roles![i]),
-                            ),
-                          _IamTab.permissions => const PermissionsRegistryTab(),
-                          _IamTab.users => const _UsersTab(),
-                          _IamTab.invitations => const _InvitationsTab(),
-                        },
-                      ),
-                    ],
-                  ),
-      ),
+  Future<void> _newUser() async {
+    await context.push(
+      AppRoutes.userForm,
+      extra: _roles ?? const <TenantRole>[],
     );
-  }
-}
-
-/// Design frame "13"'s table: one row per resource group, one column per
-/// role, each cell resolved from that role's real permission keys.
-class _PermissionMatrix extends StatelessWidget {
-  const _PermissionMatrix({required this.roles});
-
-  final List<TenantRole> roles;
-
-  /// '✓' when the role can change the resource, 'view' when it can only
-  /// look, '—' when it has no grant at all.
-  String _cell(TenantRole? role, List<String> resources) {
-    if (role == null) return '—';
-    final keys = role.permissions
-        .where((p) => resources.contains(p.split(':').first))
-        .toList();
-    if (keys.isEmpty) return '—';
-    final hasWrite = keys.any((k) => !_readActions.contains(k.split(':').last));
-    return hasWrite ? '✓' : 'view';
+    await _usersKey.currentState?.reload();
+    _loadRoles();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final byName = {for (final r in roles) r.name: r};
+  Future<void> _invite() async {
+    await context.push(
+      AppRoutes.inviteUser,
+      extra: _roles ?? const <TenantRole>[],
+    );
+    _invitesKey.currentState?.reload();
+    await _usersKey.currentState?.reload();
+  }
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(AppRadii.card),
-            border: Border.all(color: AppColors.glassBorder),
-          ),
-          child: Column(
-            children: [
-              Row(
+  Future<void> _newRole() async {
+    await context.push(AppRoutes.roleForm);
+    await _loadRoles();
+  }
+
+  Future<void> _onAdd(_IamTab tab) async {
+    switch (tab) {
+      case _IamTab.users:
+        final canNew = teamCan(context, 'users:manage');
+        final canInvite = teamCan(context, 'users:invite');
+        if (canNew && canInvite) {
+          final pick = await showTeamSheet<String>(
+            context,
+            (ctx) => TeamSheetScaffold(
+              icon: Icons.person_add_alt_1_rounded,
+              title: 'Add someone',
+              color: TeamColors.indigo,
+              child: Column(
                 children: [
-                  Expanded(
-                    flex: 3,
-                    child: Text('Resource', style: AppText.eyebrow()),
+                  TeamActionTile(
+                    icon: Icons.person_add_rounded,
+                    label: 'New user',
+                    hint: 'Create the account now and set a password '
+                        'yourself',
+                    color: TeamColors.indigo,
+                    onTap: () => Navigator.of(ctx).pop('new'),
                   ),
-                  for (final header in _matrixHeaders)
-                    Expanded(
-                      child: Text(
-                        header,
-                        textAlign: TextAlign.center,
-                        style: AppText.eyebrow(),
-                      ),
-                    ),
+                  TeamActionTile(
+                    icon: Icons.forward_to_inbox_rounded,
+                    label: 'Invite by email',
+                    hint: 'They set their own password from an email link',
+                    color: TeamColors.fuchsia,
+                    onTap: () => Navigator.of(ctx).pop('invite'),
+                  ),
                 ],
               ),
-              for (final row in _matrixRows.entries)
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 7),
-                  decoration: BoxDecoration(
-                    border: Border(top: BorderSide(color: AppColors.line)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          row.key,
-                          style: AppText.body(
-                            size: 12,
-                            weight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      for (final roleName in _matrixRoles)
-                        Expanded(
-                          child: Builder(
-                            builder: (context) {
-                              final value = _cell(byName[roleName], row.value);
-                              return Text(
-                                value,
-                                textAlign: TextAlign.center,
-                                style: AppText.body(
-                                  size: value == 'view' ? 10 : 12,
-                                  weight: FontWeight.w700,
-                                  color: value == '✓'
-                                      ? AppColors.success
-                                      : AppColors.inkFaint,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RoleCard extends StatelessWidget {
-  const _RoleCard({required this.role});
-
-  final TenantRole role;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        onTap: () => context.push(AppRoutes.roleDetail, extra: role.id),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(AppRadii.card),
-            border: Border.all(color: AppColors.line),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          role.name,
-                          style:
-                              AppText.body(size: 14, weight: FontWeight.w700),
-                        ),
-                        const SizedBox(width: 8),
-                        AppPill(
-                          label: role.isSystem ? 'System' : 'Custom',
-                          tone: role.isSystem
-                              ? AppPillTone.neutral
-                              : AppPillTone.roleTint,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${role.userCount} user(s) · ${role.permissions.length} permissions',
-                      style: AppText.body(
-                        size: 11,
-                        color: AppColors.inkFaint,
-                        weight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 18,
-                color: AppColors.inkFaint,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _UsersTab extends StatefulWidget {
-  const _UsersTab();
-
-  @override
-  State<_UsersTab> createState() => _UsersTabState();
-}
-
-class _UsersTabState extends State<_UsersTab> {
-  final _searchController = TextEditingController();
-  Timer? _debounce;
-  late final _cubit = PaginatedListCubit<IamUser>(
-    (page) => getIt<IamUserRepository>().list(
-      page: page,
-      search: _searchController.text.trim(),
-    ),
-  )..load();
-
-  @override
-  void dispose() {
-    _debounce?.cancel();
-    _searchController.dispose();
-    _cubit.close();
-    super.dispose();
-  }
-
-  void _onSearchChanged(String _) {
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 400), _cubit.load);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocProvider.value(
-      value: _cubit,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              style: AppText.body(size: 14, weight: FontWeight.w600),
-              decoration: InputDecoration(
-                hintText: 'Search users…',
-                hintStyle: AppText.body(size: 14, color: AppColors.inkFaint),
-                filled: true,
-                fillColor: AppColors.surface2,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.field),
-                  borderSide: BorderSide(color: AppColors.line),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.field),
-                  borderSide: BorderSide(color: AppColors.line),
-                ),
-              ),
             ),
-          ),
-          Expanded(
-            child: BlocBuilder<PaginatedListCubit<IamUser>,
-                PaginatedListState<IamUser>>(
-              builder: (context, state) {
-                return switch (state) {
-                  PaginatedListLoading() => const AppLoadingView(),
-                  PaginatedListError(:final message) =>
-                    AppErrorView(message: message, onRetry: _cubit.load),
-                  PaginatedListLoaded(:final items) when items.isEmpty =>
-                    const AppEmptyState(
-                      icon: Icons.people_outline,
-                      title: 'No users found',
-                      message: 'Tap + to create a user directly.',
-                    ),
-                  PaginatedListLoaded(:final items) => RefreshIndicator(
-                      color: AppColors.staffB,
-                      backgroundColor: AppColors.surface2,
-                      onRefresh: () async => _cubit.load(),
-                      child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
-                        itemCount: items.length,
-                        itemBuilder: (context, i) => _UserCard(
-                          user: items[i],
-                          onTap: () async {
-                            await context.push(
-                              AppRoutes.userDetail,
-                              extra: items[i].id,
-                            );
-                            _cubit.load();
-                          },
-                        ),
-                      ),
-                    ),
-                };
-              },
-            ),
-          ),
-        ],
-      ),
-    );
+          );
+          if (pick == 'new') await _newUser();
+          if (pick == 'invite') await _invite();
+        } else if (canNew) {
+          await _newUser();
+        } else if (canInvite) {
+          await _invite();
+        }
+      case _IamTab.roles:
+        await _newRole();
+      case _IamTab.invitations:
+        await _invite();
+      case _IamTab.matrix:
+      case _IamTab.permissions:
+        return;
+    }
   }
-}
 
-class _UserCard extends StatelessWidget {
-  const _UserCard({required this.user, required this.onTap});
-
-  final IamUser user;
-  final VoidCallback onTap;
+  bool _canAdd(_IamTab tab) => switch (tab) {
+        _IamTab.users =>
+          teamCan(context, 'users:manage') || teamCan(context, 'users:invite'),
+        _IamTab.roles => teamCan(context, 'roles:manage-custom'),
+        _IamTab.invitations => teamCan(context, 'users:invite'),
+        _ => false,
+      };
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        onTap: onTap,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(AppRadii.card),
-            border: Border.all(color: AppColors.line),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  gradient: AppColors.staffGrad,
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  user.initials,
-                  style: AppText.body(
-                    size: 12,
-                    weight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user.name,
-                      style: AppText.body(size: 14, weight: FontWeight.w700),
-                    ),
-                    Text(
-                      user.roles.map((r) => r.name).join(', '),
-                      style: AppText.body(
-                        size: 11,
-                        color: AppColors.inkFaint,
-                        weight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              AppPill(
-                label: user.status.replaceAll('_', ' '),
-                tone: _userStatusTones[user.status] ?? AppPillTone.neutral,
-              ),
-            ],
+    final tabs = _visible();
+    final top = MediaQuery.of(context).padding.top + kToolbarHeight;
+    if (tabs.isEmpty) {
+      return Scaffold(
+        backgroundColor: AppColors.bg,
+        appBar: AppBar(
+          backgroundColor: AppColors.bg,
+          elevation: 0,
+          title: const Text('Team & Access'),
+        ),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(28),
+            child: Text("You don't have access to any Team & Access views."),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _InvitationsTab extends StatefulWidget {
-  const _InvitationsTab();
-
-  @override
-  State<_InvitationsTab> createState() => _InvitationsTabState();
-}
-
-class _InvitationsTabState extends State<_InvitationsTab> {
-  late final _cubit = PaginatedListCubit<Invitation>(
-    (page) => getIt<InvitationRepository>().list(page: page),
-  )..load();
-  String? _busyId;
-
-  @override
-  void dispose() {
-    _cubit.close();
-    super.dispose();
-  }
-
-  Future<void> _resend(Invitation invitation) async {
-    setState(() => _busyId = invitation.id);
-    try {
-      await getIt<InvitationRepository>().resend(invitation.id);
-      if (!mounted) return;
-      _cubit.load();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Invitation resent to ${invitation.email}')),
       );
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _busyId = null);
     }
-  }
+    final tab = (_tab != null && tabs.contains(_tab)) ? _tab! : tabs.first;
+    _visited.add(tab);
 
-  Future<void> _revoke(Invitation invitation) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppColors.surface2,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.card),
-        ),
-        title: Text('Revoke invitation?', style: AppText.display(size: 18)),
-        content: Text(
-          '${invitation.email} will no longer be able to accept this invite.',
-          style: AppText.body(size: 13, color: AppColors.inkFaint),
-        ),
+    return Scaffold(
+      backgroundColor: AppColors.bg,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: const Text('Team & Access'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(
-              'Keep',
-              style: AppText.body(size: 13, weight: FontWeight.w700),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text(
-              'Revoke',
-              style: AppText.body(
-                size: 13,
-                weight: FontWeight.w700,
-                color: AppColors.danger,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    setState(() => _busyId = invitation.id);
-    try {
-      await getIt<InvitationRepository>().revoke(invitation.id);
-      if (!mounted) return;
-      _cubit.load();
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _busyId = null);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocProvider.value(
-      value: _cubit,
-      child: BlocBuilder<PaginatedListCubit<Invitation>,
-          PaginatedListState<Invitation>>(
-        builder: (context, state) {
-          return switch (state) {
-            PaginatedListLoading() => const AppLoadingView(),
-            PaginatedListError(:final message) =>
-              AppErrorView(message: message, onRetry: _cubit.load),
-            PaginatedListLoaded(:final items) when items.isEmpty =>
-              const AppEmptyState(
-                icon: Icons.mail_outline_rounded,
-                title: 'No invitations yet',
-                message: 'Tap + to invite someone by email.',
-              ),
-            PaginatedListLoaded(:final items) => RefreshIndicator(
-                color: AppColors.staffB,
-                backgroundColor: AppColors.surface2,
-                onRefresh: () async => _cubit.load(),
-                child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 24),
-                  itemCount: items.length,
-                  itemBuilder: (context, i) => _InvitationCard(
-                    invitation: items[i],
-                    busy: _busyId == items[i].id,
-                    onResend: () => _resend(items[i]),
-                    onRevoke: () => _revoke(items[i]),
+          if (_canAdd(tab))
+            Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: GestureDetector(
+                onTap: () => _onAdd(tab),
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.add_rounded,
+                    color: Colors.white,
+                    size: 22,
                   ),
                 ),
               ),
-          };
-        },
+            ),
+        ],
       ),
-    );
-  }
-}
-
-class _InvitationCard extends StatelessWidget {
-  const _InvitationCard({
-    required this.invitation,
-    required this.busy,
-    required this.onResend,
-    required this.onRevoke,
-  });
-
-  final Invitation invitation;
-  final bool busy;
-  final VoidCallback onResend;
-  final VoidCallback onRevoke;
-
-  @override
-  Widget build(BuildContext context) {
-    final pending = invitation.status == 'PENDING' && !invitation.isExpired;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
+          MeshHeroBackground(
+            radius: const BorderRadius.vertical(bottom: Radius.circular(30)),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                18 + teamSideInset(context),
+                top + 2,
+                18 + teamSideInset(context),
+                18,
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: kListHeroBelowAppBar,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      invitation.email,
-                      style: AppText.body(size: 14, weight: FontWeight.w700),
+                    FadeUp(
+                      index: 0,
+                      child: Text(
+                        'Staff & access',
+                        style: AppText.display(size: 25, color: Colors.white),
+                      ),
                     ),
-                    Text(
-                      '${invitation.roleName} · invited by ${invitation.invitedByName}',
-                      style: AppText.body(
-                        size: 11,
-                        color: AppColors.inkFaint,
-                        weight: FontWeight.w600,
+                    const SizedBox(height: 2),
+                    FadeUp(
+                      index: 1,
+                      child: Text(
+                        'Manage your team, their roles, and what they can do.',
+                        style: AppText.body(
+                          size: 12.5,
+                          weight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: 0.88),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (final t in tabs) ...[
+                            GestureDetector(
+                              onTap: () => setState(() => _tab = t),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: t == tab
+                                      ? Colors.white
+                                      : Colors.white.withValues(alpha: 0.16),
+                                  borderRadius: BorderRadius.circular(99),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.35),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      t.icon,
+                                      size: 15,
+                                      color: t == tab
+                                          ? const Color(0xFF6D28D9)
+                                          : Colors.white,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      t.label,
+                                      style: AppText.body(
+                                        size: 12.5,
+                                        weight: FontWeight.w800,
+                                        color: t == tab
+                                            ? const Color(0xFF6D28D9)
+                                            : Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              AppPill(
-                label: invitation.isExpired ? 'EXPIRED' : invitation.status,
-                tone: invitation.isExpired
-                    ? AppPillTone.danger
-                    : _invitationStatusTones[invitation.status] ??
-                        AppPillTone.neutral,
-              ),
-            ],
+            ),
           ),
-          if (pending || invitation.isExpired) ...[
-            const SizedBox(height: 10),
-            Row(
+          const SizedBox(height: 14),
+          Expanded(
+            child: IndexedStack(
+              index: tabs.indexOf(tab),
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: busy ? null : onResend,
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: AppColors.line),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                    child: Text(
-                      'Resend',
-                      style: AppText.body(size: 12, weight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: busy ? null : onRevoke,
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: AppColors.line),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                    ),
-                    child: Text(
-                      'Revoke',
-                      style: AppText.body(
-                        size: 12,
-                        weight: FontWeight.w700,
-                        color: AppColors.danger,
-                      ),
-                    ),
-                  ),
-                ),
+                for (final t in tabs)
+                  _visited.contains(t) ? _tabBody(t) : const SizedBox.shrink(),
               ],
             ),
-          ],
+          ),
         ],
       ),
     );
+  }
+
+  Widget _tabBody(_IamTab t) {
+    switch (t) {
+      case _IamTab.users:
+        return UsersTab(
+          key: _usersKey,
+          roles: _roles ?? const [],
+          onOpenInvites: teamCan(context, 'users:invite')
+              ? () => setState(() => _tab = _IamTab.invitations)
+              : null,
+          onOpenStaff: teamCan(context, 'staff:view')
+              ? () => context.push(AppRoutes.staffRoster)
+              : null,
+        );
+      case _IamTab.roles:
+        return RolesTab(
+          roles: _roles,
+          error: _rolesError,
+          onReload: _loadRoles,
+        );
+      case _IamTab.matrix:
+        return const PermissionMatrixTab();
+      case _IamTab.permissions:
+        return const PermissionsRegistryTab();
+      case _IamTab.invitations:
+        return InvitationsTab(key: _invitesKey);
+    }
   }
 }

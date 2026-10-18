@@ -25,6 +25,12 @@ class LeadFilters {
     this.sources = const {},
     this.assignedTo,
     this.followUp,
+    this.planId,
+    this.planName,
+    this.createdFrom,
+    this.createdTo,
+    this.sortBy = 'createdAt',
+    this.sortDir = 'desc',
   });
 
   final String search;
@@ -39,10 +45,27 @@ class LeadFilters {
   /// 'overdue' | 'today' | 'upcoming' | 'none' | null
   final String? followUp;
 
+  /// Interested plan filter (id + display name for the chip).
+  final String? planId;
+  final String? planName;
+
+  /// `YYYY-MM-DD` created-date window (inclusive), either end optional.
+  final String? createdFrom;
+  final String? createdTo;
+
+  /// createdAt | updatedAt | name | nextFollowUpAt | lastActivityAt |
+  /// expectedJoinDate, with asc | desc.
+  final String sortBy;
+  final String sortDir;
+
+  bool get isDefaultSort => sortBy == 'createdAt' && sortDir == 'desc';
+
   int get activeFilterCount =>
       (sources.isEmpty ? 0 : 1) +
       (assignedTo == null ? 0 : 1) +
-      (followUp == null ? 0 : 1);
+      (followUp == null ? 0 : 1) +
+      (planId == null ? 0 : 1) +
+      (createdFrom == null && createdTo == null ? 0 : 1);
 
   LeadFilters copyWith({
     String? search,
@@ -53,6 +76,14 @@ class LeadFilters {
     bool clearAssignedTo = false,
     String? followUp,
     bool clearFollowUp = false,
+    String? planId,
+    String? planName,
+    bool clearPlan = false,
+    String? createdFrom,
+    String? createdTo,
+    bool clearCreated = false,
+    String? sortBy,
+    String? sortDir,
   }) =>
       LeadFilters(
         search: search ?? this.search,
@@ -60,6 +91,12 @@ class LeadFilters {
         sources: sources ?? this.sources,
         assignedTo: clearAssignedTo ? null : (assignedTo ?? this.assignedTo),
         followUp: clearFollowUp ? null : (followUp ?? this.followUp),
+        planId: clearPlan ? null : (planId ?? this.planId),
+        planName: clearPlan ? null : (planName ?? this.planName),
+        createdFrom: clearCreated ? null : (createdFrom ?? this.createdFrom),
+        createdTo: clearCreated ? null : (createdTo ?? this.createdTo),
+        sortBy: sortBy ?? this.sortBy,
+        sortDir: sortDir ?? this.sortDir,
       );
 
   Map<String, dynamic> toQuery() => {
@@ -68,6 +105,10 @@ class LeadFilters {
         if (sources.isNotEmpty) 'source': sources.map((s) => s.api).join(','),
         if (assignedTo != null) 'assignedTo': assignedTo,
         if (followUp != null) 'followUp': followUp,
+        if (planId != null) 'interestedPlanId': planId,
+        if (createdFrom != null) 'createdFrom': createdFrom,
+        if (createdTo != null) 'createdTo': createdTo,
+        if (!isDefaultSort) ...{'sortBy': sortBy, 'sortDir': sortDir},
       };
 }
 
@@ -222,11 +263,23 @@ class LeadRepository {
             : <LeadAssignee>[];
       });
 
-  /// [range]: today | 7d | 30d | month | year.
-  Future<LeadAnalytics> analytics({String range = '30d'}) => _run(() async {
+  /// [range]: today | 7d | 30d | month | year | custom (needs [dateFrom] and
+  /// [dateTo] as `YYYY-MM-DD`, at most 366 days apart).
+  Future<LeadAnalytics> analytics({
+    String range = '30d',
+    String? dateFrom,
+    String? dateTo,
+    String? branchId,
+  }) =>
+      _run(() async {
         final r = await _dio.get<Map<String, dynamic>>(
           '/leads/analytics',
-          queryParameters: {'range': range},
+          queryParameters: {
+            'range': range,
+            if (range == 'custom' && dateFrom != null) 'dateFrom': dateFrom,
+            if (range == 'custom' && dateTo != null) 'dateTo': dateTo,
+            if (branchId != null) 'branchId': branchId,
+          },
         );
         return LeadAnalytics.fromJson(r.data!['data'] as Map<String, dynamic>);
       });

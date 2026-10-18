@@ -4,92 +4,24 @@ import '../core/network/api_exception.dart';
 import '../models/membership_plan.dart';
 import '../models/paginated_result.dart';
 
-/// Full create/update field set — mirrors web's `PlanFormFields` exactly
-/// (`createMembershipPlanSchema`/`updateMembershipPlanSchema`). One input
-/// class for both create (`POST`) and update (`PATCH`): the mobile form
-/// always submits the complete current state of every field, so there's no
-/// need to distinguish "untouched" from "explicitly cleared."
-class MembershipPlanFormInput {
-  const MembershipPlanFormInput({
-    required this.name,
-    required this.durationValue,
-    required this.durationType,
-    required this.price,
-    this.planCode,
-    this.description,
-    this.category,
-    this.joiningFee,
-    this.taxPercentage,
-    this.discountPercentage,
-    this.displayOrder,
-    this.notes,
-    this.gymAccessAllBranches = false,
-    this.ptSessionsIncluded = 0,
-    this.groupClassesIncluded = 0,
-    this.dietConsultationIncluded = false,
-    this.lockerAccess = false,
-    this.guestPasses = 0,
-    this.freezeAllowed = false,
-    this.freezeDaysLimit,
-  });
-
-  final String name;
-  final String? planCode;
-  final String? description;
-  final String? category;
-  final int durationValue;
-  final MembershipDurationType durationType;
-  final double price;
-  final double? joiningFee;
-  final double? taxPercentage;
-  final double? discountPercentage;
-  final int? displayOrder;
-  final String? notes;
-  final bool gymAccessAllBranches;
-  final int ptSessionsIncluded;
-  final int groupClassesIncluded;
-  final bool dietConsultationIncluded;
-  final bool lockerAccess;
-  final int guestPasses;
-  final bool freezeAllowed;
-  final int? freezeDaysLimit;
-
-  Map<String, dynamic> toJson() => {
-        'name': name,
-        if (planCode != null && planCode!.isNotEmpty) 'planCode': planCode,
-        if (description != null) 'description': description,
-        if (category != null) 'category': category,
-        'durationValue': durationValue,
-        'durationType': durationType.apiValue,
-        'price': price,
-        if (joiningFee != null) 'joiningFee': joiningFee,
-        if (taxPercentage != null) 'taxPercentage': taxPercentage,
-        if (discountPercentage != null)
-          'discountPercentage': discountPercentage,
-        if (displayOrder != null) 'displayOrder': displayOrder,
-        if (notes != null) 'notes': notes,
-        'gymAccessAllBranches': gymAccessAllBranches,
-        'ptSessionsIncluded': ptSessionsIncluded,
-        'groupClassesIncluded': groupClassesIncluded,
-        'dietConsultationIncluded': dietConsultationIncluded,
-        'lockerAccess': lockerAccess,
-        'guestPasses': guestPasses,
-        'freezeAllowed': freezeAllowed,
-        if (freezeDaysLimit != null) 'freezeDaysLimit': freezeDaysLimit,
-      };
-}
-
 class MembershipPlanRepository {
   MembershipPlanRepository(this._dio);
 
   final Dio _dio;
 
+  /// `GET /membership-plans`. `isActive` is only ever sent as `true`: the
+  /// API validates it with `z.coerce.boolean()`, so the string `"false"`
+  /// coerces to `true` and an "inactive only" filter would silently return
+  /// the active plans (`false` is therefore ignored). Filter client-side on
+  /// the full set ([listAll]) for anything else.
   Future<PaginatedResult<MembershipPlan>> list({
     int page = 1,
     int limit = 20,
     String? search,
     bool? isActive,
     bool includeDeleted = false,
+    String? sortBy,
+    String? sortDir,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -98,8 +30,11 @@ class MembershipPlanRepository {
           'page': page,
           'limit': limit,
           if (search != null && search.isNotEmpty) 'search': search,
-          if (isActive != null) 'isActive': isActive,
-          if (includeDeleted) 'includeDeleted': includeDeleted,
+          if (isActive == true) 'isActive': true,
+          // Only ever send `true` (see the coerce note above).
+          if (includeDeleted) 'includeDeleted': true,
+          if (sortBy != null) 'sortBy': sortBy,
+          if (sortDir != null) 'sortDir': sortDir,
         },
       );
       return PaginatedResult.fromJson(
@@ -109,6 +44,30 @@ class MembershipPlanRepository {
     } on DioException catch (e) {
       throw _mapError(e);
     }
+  }
+
+  /// Every plan of the tenant (soft-deleted ones included by default) in one
+  /// list. A gym has a handful of plans, so the list screen loads them all
+  /// and searches / filters / sorts / counts on the device — the same trade
+  /// web makes for its KPI tiles. The API caps `limit` at 100, so this walks
+  /// pages (at most [maxPages]).
+  Future<List<MembershipPlan>> listAll({
+    bool includeDeleted = true,
+    int maxPages = 10,
+  }) async {
+    final all = <MembershipPlan>[];
+    var page = 1;
+    while (page <= maxPages) {
+      final result = await list(
+        page: page,
+        limit: 100,
+        includeDeleted: includeDeleted,
+      );
+      all.addAll(result.items);
+      if (!result.hasNextPage) break;
+      page++;
+    }
+    return all;
   }
 
   Future<MembershipPlan> getById(String planId) async {
@@ -123,11 +82,12 @@ class MembershipPlanRepository {
     }
   }
 
-  Future<MembershipPlan> create(MembershipPlanFormInput input) async {
+  /// `POST /membership-plans` with a raw body (`createMembershipPlanSchema`).
+  Future<MembershipPlan> create(Map<String, dynamic> body) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/membership-plans',
-        data: input.toJson(),
+        data: body,
       );
       return MembershipPlan.fromJson(
         response.data!['data'] as Map<String, dynamic>,
@@ -137,14 +97,17 @@ class MembershipPlanRepository {
     }
   }
 
+  /// `PATCH /membership-plans/:id` — send only the changed keys
+  /// (`updateMembershipPlanSchema` treats an absent key as "leave alone" and
+  /// rejects an empty body).
   Future<MembershipPlan> update(
     String planId,
-    MembershipPlanFormInput input,
+    Map<String, dynamic> body,
   ) async {
     try {
       final response = await _dio.patch<Map<String, dynamic>>(
         '/membership-plans/$planId',
-        data: input.toJson(),
+        data: body,
       );
       return MembershipPlan.fromJson(
         response.data!['data'] as Map<String, dynamic>,

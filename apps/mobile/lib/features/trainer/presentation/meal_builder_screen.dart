@@ -5,22 +5,35 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/diet_plan.dart';
 import '../../../models/food.dart';
 import '../../../models/gym_member.dart';
 import '../../../repositories/diet_plan_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../diet/presentation/diet_ui.dart';
+import '../../diet/presentation/meal_draft.dart';
+import '../../diet/presentation/widgets/assign_diet_panel.dart';
+import '../../diet/presentation/widgets/meal_builder_editor.dart';
+import '../../manager/presentation/widgets/member_detail_anim.dart';
+import '../../plans/presentation/plan_ui.dart' show PlanHeroShell;
+import '../../team/presentation/widgets/team_ui.dart';
 
-const _mealSections = [MealType.breakfast, MealType.lunch, MealType.dinner];
-
-/// Design frame "8. Meal builder" — Breakfast/Lunch/Dinner sections only
-/// (the backend's `MealType` has 7 values; the design shows exactly these
-/// 3). "Save plan" persists the meal list only (`PATCH .../meals`);
-/// "Assign to {member}" is a separate step so the trainer can save changes
-/// without re-assigning (or re-assign later without editing meals).
+/// Design frame "8. Meal builder", redesigned: the plan's hero, the meal
+/// builder (one card per meal slot - food, quantity, note) with "Save plan",
+/// and the "Assign to client" card. The client is already fixed by the flow
+/// that got us here (My Clients -> Assign), so the card shows them instead of
+/// a search and adds a start-date calendar (the old screen always started
+/// today). "Save plan" persists the meal list only (`PATCH .../meals`);
+/// assigning is a separate step so the trainer can save changes without
+/// re-assigning (or re-assign later without editing meals). Assigning pops
+/// back to the plan list, as before.
+///
+/// The old screen exposed only Breakfast / Lunch / Dinner and re-sent just
+/// those foods (no quantity, no note) - which, because `PATCH .../meals`
+/// replaces the whole list, silently wiped the other four slots, quantities
+/// and notes of any plan that had them. The builder now carries all seven
+/// slots and every row's quantity + note.
 class MealBuilderScreen extends StatefulWidget {
   const MealBuilderScreen({
     required this.planId,
@@ -37,11 +50,12 @@ class MealBuilderScreen extends StatefulWidget {
 
 class _MealBuilderScreenState extends State<MealBuilderScreen> {
   DietPlan? _plan;
-  final Map<MealType, List<Food>> _mealFoods = {};
+  MealPlanDraft? _draft;
+  MealPlanDraft? _saved;
   bool _loading = true;
   bool _saving = false;
-  bool _assigning = false;
   String? _error;
+  String? _saveError;
 
   @override
   void initState() {
@@ -51,7 +65,7 @@ class _MealBuilderScreenState extends State<MealBuilderScreen> {
 
   Future<void> _load() async {
     setState(() {
-      _loading = true;
+      _loading = _plan == null;
       _error = null;
     });
     try {
@@ -59,225 +73,241 @@ class _MealBuilderScreenState extends State<MealBuilderScreen> {
       if (!mounted) return;
       setState(() {
         _plan = plan;
-        _mealFoods.clear();
-        plan.mealsByType.forEach((type, meals) {
-          _mealFoods[type] = meals.map((m) => m.food).toList();
-        });
+        _draft = MealPlanDraft.fromPlan(plan);
+        _saved = MealPlanDraft.fromPlan(plan);
       });
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not load this plan ($e)');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _addToMeal(MealType type) async {
-    final added = await context.push<List<Food>>(
-      AppRoutes.trainerAddToMeal,
-      extra: type,
-    );
-    if (added == null || added.isEmpty || !mounted) return;
-    setState(
-      () => (_mealFoods[type] ??= []).addAll(added),
-    );
-  }
+  bool get _dirty =>
+      _draft != null && _saved != null && !_draft!.sameAs(_saved!);
+
+  /// Foods for a slot come from the `AddToMealScreen` route, as before.
+  Future<List<Food>?> _pick(MealType type) =>
+      context.push<List<Food>>(AppRoutes.trainerAddToMeal, extra: type);
 
   Future<void> _save() async {
     setState(() {
       _saving = true;
-      _error = null;
+      _saveError = null;
     });
     try {
-      final drafts = <PlanMealDraft>[];
-      for (final type in _mealSections) {
-        for (final food in _mealFoods[type] ?? const <Food>[]) {
-          drafts.add(PlanMealDraft(foodId: food.id, mealType: type));
-        }
-      }
-      await getIt<DietPlanRepository>().setMeals(widget.planId, drafts);
+      final updated = await getIt<DietPlanRepository>().setMeals(
+        widget.planId,
+        _draft!.toDrafts(),
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Plan saved.')));
+      teamSnack(context, 'Plan saved.');
+      setState(() {
+        _plan = updated;
+        _draft = MealPlanDraft.fromPlan(updated);
+        _saved = MealPlanDraft.fromPlan(updated);
+      });
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.message);
+      setState(() => _saveError = e.detailedMessage);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saveError = 'Something went wrong while saving ($e).');
     } finally {
       if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  Future<void> _assign() async {
-    setState(() {
-      _assigning = true;
-      _error = null;
-    });
-    try {
-      await getIt<DietPlanRepository>().assign(
-        planId: widget.planId,
-        memberId: widget.member.id,
-        startDate: DateTime.now(),
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Assigned to ${widget.member.name}')),
-      );
-      context.pop();
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _assigning = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final plan = _plan;
+    final hero = plan != null && _error == null;
     return Scaffold(
       backgroundColor: AppColors.bg,
+      extendBodyBehindAppBar: hero,
       appBar: AppBar(
-        backgroundColor: AppColors.bg,
+        backgroundColor: hero ? Colors.transparent : AppColors.bg,
+        foregroundColor: hero ? Colors.white : null,
         elevation: 0,
-        title: plan == null
-            ? null
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(plan.name, style: AppText.display(size: 18)),
-                  Text(
-                    plan.dailyCalories != null
-                        ? '${plan.dailyCalories} kcal target'
-                        : '${plan.durationDays} days',
-                    style: AppText.eyebrow(),
-                  ),
-                ],
-              ),
+        scrolledUnderElevation: 0,
+        title: Text(hero ? 'Diet plan' : 'Diet plans'),
       ),
       body: SafeArea(
         top: false,
-        child: _loading
+        child: _loading && plan == null
             ? const AppLoadingView()
-            : _error != null && plan == null
+            : _error != null
                 ? AppErrorView(message: _error!, onRetry: _load)
-                : plan == null
+                : plan == null || _draft == null
                     ? const SizedBox.shrink()
-                    : SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (_error != null) ...[
-                              FormAlert(message: _error!),
-                              const SizedBox(height: 10),
-                            ],
-                            for (final type in _mealSections) ...[
-                              _MealSection(
-                                type: type,
-                                foods: _mealFoods[type] ?? const [],
-                                onAdd: () => _addToMeal(type),
-                                onRemove: (food) => setState(
-                                  () => _mealFoods[type]?.remove(food),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                            ],
-                            const SizedBox(height: 6),
-                            AppButton(
-                              label: 'Save plan',
-                              loading: _saving,
-                              onPressed: _save,
-                            ),
-                            const SizedBox(height: 10),
-                            AppButton(
-                              label: 'Assign to ${widget.member.name}',
-                              variant: AppButtonVariant.ghost,
-                              loading: _assigning,
-                              onPressed: _assign,
-                            ),
-                          ],
-                        ),
-                      ),
+                    : _content(plan, _draft!),
       ),
     );
   }
-}
 
-class _MealSection extends StatelessWidget {
-  const _MealSection({
-    required this.type,
-    required this.foods,
-    required this.onAdd,
-    required this.onRemove,
-  });
-
-  final MealType type;
-  final List<Food> foods;
-  final VoidCallback onAdd;
-  final ValueChanged<Food> onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface2,
-        borderRadius: BorderRadius.circular(AppRadii.card),
-        border: Border.all(color: AppColors.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _content(DietPlan plan, MealPlanDraft draft) {
+    final top = MediaQuery.of(context).padding.top + kToolbarHeight;
+    final tone = dietTone(deleted: plan.isDeleted, active: plan.isActive);
+    final side = 16 + teamSideInset(context, maxWidth: 1000);
+    return RefreshIndicator(
+      color: AppColors.staffB,
+      backgroundColor: AppColors.surface2,
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 32),
         children: [
-          Text(type.label, style: AppText.eyebrow()),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final food in foods)
-                GestureDetector(
-                  onTap: () => onRemove(food),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.surface3,
-                      borderRadius: BorderRadius.circular(AppRadii.pill),
-                    ),
-                    child: Text(
-                      food.name,
-                      style: AppText.body(
-                        size: 11,
-                        weight: FontWeight.w700,
-                        color: AppColors.inkSoft,
+          PlanHeroShell(
+            topInset: top,
+            child: Column(
+              children: [
+                FadeUp(
+                  index: 0,
+                  child: SpinningRing(
+                    size: 92,
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF312E81), Color(0xFFC026D3)],
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.restaurant_rounded,
+                          size: 40,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              GestureDetector(
-                onTap: onAdd,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                  decoration: BoxDecoration(
-                    gradient: AppColors.staffGrad,
-                    borderRadius: BorderRadius.circular(AppRadii.pill),
-                  ),
+                const SizedBox(height: 12),
+                FadeUp(
+                  index: 1,
                   child: Text(
-                    '+ Add',
+                    plan.name,
+                    textAlign: TextAlign.center,
+                    style: AppText.display(size: 25, color: Colors.white),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                FadeUp(
+                  index: 2,
+                  child: Text(
+                    'For ${widget.member.name}',
                     style: AppText.body(
-                      size: 11,
-                      weight: FontWeight.w800,
-                      color: Colors.white,
+                      size: 12.5,
+                      weight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.88),
                     ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                FadeUp(
+                  index: 3,
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      TeamHeroPill(
+                        dietStatus(
+                          deleted: plan.isDeleted,
+                          active: plan.isActive,
+                        ),
+                        dot: tone,
+                      ),
+                      TeamHeroPill(
+                        plan.dailyCalories != null
+                            ? '${plan.dailyCalories} kcal target'
+                            : daysLabel(plan.durationDays),
+                        icon: Icons.local_fire_department_rounded,
+                      ),
+                      TeamHeroPill(
+                        daysLabel(plan.durationDays),
+                        icon: Icons.timelapse_rounded,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(side, 16, side, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                FadeUp(
+                  index: 0,
+                  child: TeamSectionCard(
+                    icon: Icons.restaurant_menu_rounded,
+                    color: TeamColors.violet,
+                    title: 'Meal builder',
+                    subtitle: 'Tap + on a meal to add foods from the library',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (_saveError != null) ...[
+                          FormAlert(message: _saveError!),
+                          const SizedBox(height: 12),
+                        ],
+                        MealBuilderEditor(
+                          draft: draft,
+                          pickFoods: _pick,
+                          onChanged: () => setState(() {}),
+                        ),
+                        const SizedBox(height: 14),
+                        if (_dirty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              'Unsaved changes - save the plan before '
+                              'assigning it.',
+                              textAlign: TextAlign.center,
+                              style: AppText.body(
+                                size: 12,
+                                weight: FontWeight.w700,
+                                color: TeamColors.amber,
+                              ),
+                            ),
+                          ),
+                        TeamGradientButton(
+                          label: 'Save plan',
+                          icon: Icons.check_rounded,
+                          loading: _saving,
+                          onTap: _save,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                FadeUp(
+                  index: 1,
+                  child: TeamSectionCard(
+                    icon: Icons.person_add_alt_1_rounded,
+                    color: TeamColors.sky,
+                    title: 'Assign to ${widget.member.name}',
+                    subtitle: plan.isActive
+                        ? 'Their current plan, if any, moves to history'
+                        : 'This plan is inactive and cannot be assigned',
+                    child: AssignDietPanel(
+                      planId: plan.id,
+                      member: widget.member,
+                      onAssigned: (_) {
+                        if (mounted) context.pop();
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

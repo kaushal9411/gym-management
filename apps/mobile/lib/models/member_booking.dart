@@ -9,6 +9,9 @@ class MemberBooking {
     required this.className,
     required this.branchName,
     required this.sessionDate,
+    this.startTime = '',
+    this.endTime = '',
+    this.bookedAt,
   });
 
   final String id;
@@ -18,6 +21,15 @@ class MemberBooking {
   final String branchName;
   final String sessionDate;
 
+  /// `HH:mm` session times (empty if the payload omits them).
+  final String startTime;
+  final String endTime;
+  final DateTime? bookedAt;
+
+  /// `YYYY-MM-DD`.
+  String get dayKey =>
+      sessionDate.length >= 10 ? sessionDate.substring(0, 10) : sessionDate;
+
   factory MemberBooking.fromJson(Map<String, dynamic> json) {
     final session = json['session'] as Map<String, dynamic>;
     return MemberBooking(
@@ -26,9 +38,13 @@ class MemberBooking {
       sessionId: session['id'] as String,
       className:
           (session['groupClass'] as Map<String, dynamic>)['name'] as String,
-      branchName:
-          (session['branch'] as Map<String, dynamic>)['name'] as String,
+      branchName: (session['branch'] as Map<String, dynamic>)['name'] as String,
       sessionDate: session['sessionDate'] as String,
+      startTime: session['startTime'] as String? ?? '',
+      endTime: session['endTime'] as String? ?? '',
+      bookedAt: json['bookedAt'] == null
+          ? null
+          : DateTime.tryParse(json['bookedAt'].toString()),
     );
   }
 }

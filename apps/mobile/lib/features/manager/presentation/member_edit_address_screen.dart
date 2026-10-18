@@ -3,13 +3,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../models/gym_member.dart';
 import '../../../repositories/member_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
-import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/member_edit_scaffold.dart';
 
 /// Design frame "7e. Edit address" — address + emergency contact, both
 /// plain `PATCH /members/:id` fields.
@@ -74,10 +71,16 @@ class _MemberEditAddressScreenState extends State<MemberEditAddressScreen> {
         'emergencyContactRelation': _orNull(_emergencyRelationController.text),
       });
       if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Address and emergency contact updated successfully'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
       context.pop();
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.message);
+      setState(() => _error = e.detailedMessage);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -87,113 +90,122 @@ class _MemberEditAddressScreenState extends State<MemberEditAddressScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Text('Address · ${widget.member.name}'),
-      ),
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_error != null) ...[
-                const SizedBox(height: 8),
-                FormAlert(message: _error!),
+    const amber = Color(0xFFF59E0B);
+    const rose = Color(0xFFFF5C7A);
+    return MemberEditScaffold(
+      member: widget.member,
+      title: 'Address & Emergency',
+      icon: Icons.location_on_rounded,
+      color: amber,
+      saving: _saving,
+      onSave: _save,
+      error: _error,
+      sections: [
+        FormSection(
+          icon: Icons.home_rounded,
+          color: amber,
+          title: 'Address',
+          subtitle: 'Where this member lives',
+          children: [
+            AppLabeledField(
+              label: 'Address line',
+              hintText: 'Street, building, area',
+              icon: Icons.home_rounded,
+              iconColor: amber,
+              controller: _addressController,
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: AppLabeledField(
+                    label: 'City',
+                    hintText: 'e.g. Mumbai',
+                    icon: Icons.location_city_rounded,
+                    iconColor: amber,
+                    controller: _cityController,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppLabeledField(
+                    label: 'State',
+                    hintText: 'e.g. Maharashtra',
+                    icon: Icons.map_rounded,
+                    iconColor: amber,
+                    controller: _stateController,
+                  ),
+                ),
               ],
-              const SizedBox(height: 16),
-              Text('Address', style: AppText.eyebrow()),
-              const SizedBox(height: 10),
-              AppLabeledField(
-                label: 'Address line',
-                hintText: 'Street, building, area',
-                controller: _addressController,
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'City',
-                      hintText: 'e.g. Mumbai',
-                      controller: _cityController,
-                    ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: AppLabeledField(
+                    label: 'Country',
+                    hintText: 'e.g. India',
+                    icon: Icons.public_rounded,
+                    iconColor: amber,
+                    controller: _countryController,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'State',
-                      hintText: 'e.g. Maharashtra',
-                      controller: _stateController,
-                    ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppLabeledField(
+                    label: 'Postal code',
+                    hintText: 'e.g. 400001',
+                    icon: Icons.markunread_mailbox_rounded,
+                    iconColor: amber,
+                    controller: _postalCodeController,
+                    keyboardType: TextInputType.number,
                   ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'Country',
-                      hintText: 'e.g. India',
-                      controller: _countryController,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'Postal code',
-                      hintText: 'e.g. 400001',
-                      controller: _postalCodeController,
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              Text('Emergency contact', style: AppText.eyebrow()),
-              const SizedBox(height: 10),
-              AppLabeledField(
-                label: 'Name',
-                hintText: 'e.g. Priya Sharma',
-                controller: _emergencyNameController,
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'Phone',
-                      hintText: 'e.g. 9876543210',
-                      controller: _emergencyPhoneController,
-                      keyboardType: TextInputType.phone,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: AppLabeledField(
-                      label: 'Relation',
-                      hintText: 'e.g. Spouse',
-                      controller: _emergencyRelationController,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              AppButton(
-                label: 'Save changes',
-                loading: _saving,
-                onPressed: _save,
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
-      ),
+        FormSection(
+          icon: Icons.phone_in_talk_rounded,
+          color: rose,
+          title: 'Emergency contact',
+          subtitle: 'Who to call if needed',
+          children: [
+            AppLabeledField(
+              label: 'Name',
+              hintText: 'e.g. Priya Sharma',
+              icon: Icons.person_rounded,
+              iconColor: rose,
+              controller: _emergencyNameController,
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: AppLabeledField(
+                    label: 'Phone',
+                    hintText: 'e.g. 9876543210',
+                    icon: Icons.call_rounded,
+                    iconColor: rose,
+                    controller: _emergencyPhoneController,
+                    keyboardType: TextInputType.phone,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: AppLabeledField(
+                    label: 'Relation',
+                    hintText: 'e.g. Spouse',
+                    icon: Icons.diversity_1_rounded,
+                    iconColor: rose,
+                    controller: _emergencyRelationController,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

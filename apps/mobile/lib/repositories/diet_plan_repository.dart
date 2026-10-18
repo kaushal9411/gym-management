@@ -15,6 +15,16 @@ class PlanMealDraft {
     this.notes,
   });
 
+  /// A draft that re-sends a saved row exactly as it is (food, slot, quantity
+  /// and notes) - `PATCH .../meals` replaces the whole list, so anything left
+  /// out of a draft is wiped from the plan.
+  factory PlanMealDraft.fromPlanMeal(PlanMeal m) => PlanMealDraft(
+        foodId: m.food.id,
+        mealType: m.mealType,
+        quantity: m.quantity,
+        notes: m.notes,
+      );
+
   final String foodId;
   final MealType mealType;
   final double? quantity;
@@ -70,6 +80,10 @@ class DietPlanRepository {
 
   final Dio _dio;
 
+  /// `isActive` and `includeDeleted` are validated with `z.coerce.boolean()`,
+  /// so the string `"false"` coerces to `true`: an "inactive only" query would
+  /// silently return the active plans. Only `true` is ever sent; filter the
+  /// rest on the device ([listAll]).
   Future<PaginatedResult<DietPlanSummary>> list({
     int page = 1,
     int limit = 20,
@@ -84,8 +98,8 @@ class DietPlanRepository {
           'page': page,
           'limit': limit,
           if (search != null && search.isNotEmpty) 'search': search,
-          if (isActive != null) 'isActive': isActive,
-          if (includeDeleted) 'includeDeleted': includeDeleted,
+          if (isActive == true) 'isActive': true,
+          if (includeDeleted) 'includeDeleted': true,
         },
       );
       return PaginatedResult.fromJson(
@@ -95,6 +109,29 @@ class DietPlanRepository {
     } on DioException catch (e) {
       throw _mapError(e);
     }
+  }
+
+  /// Every plan of the tenant in one list (pages of 100, at most [maxPages]).
+  /// A gym has a handful of plans, so the list screens load them all and
+  /// search / filter / sort / count on the device - the same trade web makes
+  /// for its KPI tiles, and the only safe way to filter "inactive".
+  Future<List<DietPlanSummary>> listAll({
+    bool includeDeleted = true,
+    int maxPages = 10,
+  }) async {
+    final all = <DietPlanSummary>[];
+    var page = 1;
+    while (page <= maxPages) {
+      final result = await list(
+        page: page,
+        limit: 100,
+        includeDeleted: includeDeleted,
+      );
+      all.addAll(result.items);
+      if (!result.hasNextPage) break;
+      page++;
+    }
+    return all;
   }
 
   /// Active-only, unfiltered — for assign-plan pickers.
@@ -126,6 +163,32 @@ class DietPlanRepository {
       final response = await _dio.post<Map<String, dynamic>>(
         '/diet-plans',
         data: input.toJson(),
+      );
+      return DietPlan.fromJson(response.data!['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `POST /diet-plans` with a hand-built body (the catalog form sends only
+  /// what was filled in).
+  Future<DietPlan> createWith(Map<String, dynamic> body) async {
+    try {
+      final response =
+          await _dio.post<Map<String, dynamic>>('/diet-plans', data: body);
+      return DietPlan.fromJson(response.data!['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `PATCH /diet-plans/:id` with only the changed keys (an empty body is
+  /// rejected by `updateDietPlanSchema`).
+  Future<DietPlan> updateWith(String planId, Map<String, dynamic> body) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/diet-plans/$planId',
+        data: body,
       );
       return DietPlan.fromJson(response.data!['data'] as Map<String, dynamic>);
     } on DioException catch (e) {

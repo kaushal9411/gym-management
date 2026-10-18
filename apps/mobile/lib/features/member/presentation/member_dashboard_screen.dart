@@ -18,6 +18,7 @@ import '../../../models/member_workout_progress.dart';
 import '../../../repositories/member_portal_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/menu_button.dart';
 import '../../../shared/widgets/notification_bell_icon.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import 'member_dashboard_detail_sheet.dart';
@@ -158,7 +159,8 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
     final w = _workout;
     if (w == null || w.exercises.isEmpty) return null;
     final completed = w.exercises
-        .where((e) => w.statusOf(e.exerciseId) == ExerciseProgressStatus.completed)
+        .where(
+            (e) => w.statusOf(e.exerciseId) == ExerciseProgressStatus.completed,)
         .length;
     return (completed / w.exercises.length * 100).round();
   }
@@ -213,6 +215,8 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
         children: [
           Row(
             children: [
+              const MenuButton(),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

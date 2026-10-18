@@ -6,6 +6,9 @@ import '../models/paginated_result.dart';
 import '../models/workout_plan.dart';
 import '../models/workout_plan_summary.dart';
 
+/// One row of a plan's weekly schedule as `PATCH /workout-plans/:id/exercises`
+/// takes it. The array **replaces the whole schedule** and its order is the
+/// per-day sort order, so callers always send every day's rows.
 class PlanExerciseDraft {
   const PlanExerciseDraft({
     required this.exerciseId,
@@ -15,6 +18,18 @@ class PlanExerciseDraft {
     this.restSeconds,
     this.notes,
   });
+
+  /// Carries an existing row over unchanged (sets, reps, rest AND notes —
+  /// dropping the last two silently wiped them in the old editors).
+  factory PlanExerciseDraft.fromPlanExercise(PlanExercise e) =>
+      PlanExerciseDraft(
+        exerciseId: e.exercise.id,
+        dayOfWeek: e.dayOfWeek,
+        sets: e.sets,
+        repetitions: e.repetitions,
+        restSeconds: e.restSeconds,
+        notes: e.notes,
+      );
 
   final String exerciseId;
   final WeekDay dayOfWeek;
@@ -29,15 +44,14 @@ class PlanExerciseDraft {
         if (sets != null) 'sets': sets,
         if (repetitions != null) 'repetitions': repetitions,
         if (restSeconds != null) 'restSeconds': restSeconds,
-        if (notes != null) 'notes': notes,
+        if (notes != null && notes!.trim().isNotEmpty) 'notes': notes!.trim(),
       };
 }
 
-/// Full create/update field set — mirrors web's plan form
-/// (`createWorkoutPlanSchema`/`updateWorkoutPlanSchema`). One input class
-/// for both create (`POST`) and update (`PATCH`), same convention as
-/// `MembershipPlanFormInput`: the form always submits the complete current
-/// state of every field.
+/// Create fields for the minimal (Trainer) flow — mirrors the required part
+/// of `createWorkoutPlanSchema`. The Owner / Manager forms build their own
+/// body maps (create + diff-only edit) and use [WorkoutPlanRepository.createWith]
+/// / [WorkoutPlanRepository.updateWith].
 class WorkoutPlanFormInput {
   const WorkoutPlanFormInput({
     required this.name,
@@ -76,6 +90,10 @@ class WorkoutPlanRepository {
 
   final Dio _dio;
 
+  /// `isActive` and `includeDeleted` are validated with `z.coerce.boolean()`,
+  /// so the string `"false"` coerces to `true`: an "inactive only" query would
+  /// silently return the active plans. Only `true` is ever sent; filter the
+  /// rest on the device ([listAll]).
   Future<PaginatedResult<WorkoutPlanSummary>> list({
     int page = 1,
     int limit = 20,
@@ -90,8 +108,8 @@ class WorkoutPlanRepository {
           'page': page,
           'limit': limit,
           if (search != null && search.isNotEmpty) 'search': search,
-          if (isActive != null) 'isActive': isActive,
-          if (includeDeleted) 'includeDeleted': includeDeleted,
+          if (isActive == true) 'isActive': true,
+          if (includeDeleted) 'includeDeleted': true,
         },
       );
       return PaginatedResult.fromJson(
@@ -101,6 +119,29 @@ class WorkoutPlanRepository {
     } on DioException catch (e) {
       throw _mapError(e);
     }
+  }
+
+  /// Every plan of the tenant in one list (pages of 100, at most [maxPages]).
+  /// A gym has a handful of plans, so the list screens load them all and
+  /// search / filter / sort / count on the device — the same trade web makes
+  /// for its KPI tiles, and the only safe way to filter "inactive".
+  Future<List<WorkoutPlanSummary>> listAll({
+    bool includeDeleted = true,
+    int maxPages = 10,
+  }) async {
+    final all = <WorkoutPlanSummary>[];
+    var page = 1;
+    while (page <= maxPages) {
+      final result = await list(
+        page: page,
+        limit: 100,
+        includeDeleted: includeDeleted,
+      );
+      all.addAll(result.items);
+      if (!result.hasNextPage) break;
+      page++;
+    }
+    return all;
   }
 
   /// Active-only, unfiltered — for assign-plan pickers.
@@ -117,6 +158,8 @@ class WorkoutPlanRepository {
     }
   }
 
+  /// A soft-deleted plan 404s here — open a restore sheet from the list
+  /// instead.
   Future<WorkoutPlan> getById(String planId) async {
     try {
       final response =
@@ -129,11 +172,15 @@ class WorkoutPlanRepository {
     }
   }
 
-  Future<WorkoutPlan> create(WorkoutPlanFormInput input) async {
+  Future<WorkoutPlan> create(WorkoutPlanFormInput input) =>
+      createWith(input.toJson());
+
+  /// `POST /workout-plans` with a raw body (`createWorkoutPlanSchema`).
+  Future<WorkoutPlan> createWith(Map<String, dynamic> body) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/workout-plans',
-        data: input.toJson(),
+        data: body,
       );
       return WorkoutPlan.fromJson(
         response.data!['data'] as Map<String, dynamic>,
@@ -143,11 +190,17 @@ class WorkoutPlanRepository {
     }
   }
 
-  Future<WorkoutPlan> update(String planId, WorkoutPlanFormInput input) async {
+  /// `PATCH /workout-plans/:id` with only the keys that changed
+  /// (`updateWorkoutPlanSchema`: an absent key is left alone, an empty body is
+  /// rejected, `trainerId: null` clears the trainer).
+  Future<WorkoutPlan> updateWith(
+    String planId,
+    Map<String, dynamic> body,
+  ) async {
     try {
       final response = await _dio.patch<Map<String, dynamic>>(
         '/workout-plans/$planId',
-        data: input.toJson(),
+        data: body,
       );
       return WorkoutPlan.fromJson(
         response.data!['data'] as Map<String, dynamic>,
@@ -222,6 +275,8 @@ class WorkoutPlanRepository {
     }
   }
 
+  /// Assigns the plan to a member; the API completes any plan the member is
+  /// currently on (history is kept).
   Future<void> assign({
     required String planId,
     required String memberId,
@@ -232,7 +287,7 @@ class WorkoutPlanRepository {
         '/workout-plans/$planId/assign',
         data: {
           'memberId': memberId,
-          'startDate': startDate.toIso8601String().substring(0, 10),
+          'startDate': _isoDay(startDate),
         },
       );
     } on DioException catch (e) {
@@ -240,21 +295,27 @@ class WorkoutPlanRepository {
     }
   }
 
-  /// `{ current, history }` — only `current` is modeled, matching what the
-  /// Client Progress screen shows.
-  Future<MemberWorkoutProgress?> currentForMember(String memberId) async {
+  static String _isoDay(DateTime d) => '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
+  /// `{ current, history }` for one member.
+  Future<MemberWorkoutPlans> memberPlans(String memberId) async {
     try {
       final response = await _dio
           .get<Map<String, dynamic>>('/workout-plans/members/$memberId');
-      final data = response.data!['data'] as Map<String, dynamic>;
-      final current = data['current'];
-      return current == null
-          ? null
-          : MemberWorkoutProgress.fromJson(current as Map<String, dynamic>);
+      return MemberWorkoutPlans.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
     } on DioException catch (e) {
       throw _mapError(e);
     }
   }
+
+  /// Only the `current` assignment of [memberPlans] — what the Client
+  /// Progress screen and Member Detail's Workout card show.
+  Future<MemberWorkoutProgress?> currentForMember(String memberId) async =>
+      (await memberPlans(memberId)).current;
 
   Future<void> updateTrainerRemarks({
     required String assignmentId,

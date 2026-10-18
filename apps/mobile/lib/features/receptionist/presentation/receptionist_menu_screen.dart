@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../bloc/session/session_cubit.dart';
 import '../../../bloc/session/session_state.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_text_styles.dart';
+import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/menu_entry.dart';
-import '../../../shared/widgets/notification_bell_icon.dart';
-import '../../../shared/widgets/user_avatar.dart';
+import '../../../shared/widgets/staff_logout_dialog.dart';
 
 /// Section order mirrors web's `NAV_ITEMS` macro order (People/Programs/
 /// Finance/"My work" before Communication before Administration) — same
@@ -34,6 +32,14 @@ const _sections = <String, List<MenuEntry>>{
       subtitle: 'Pipeline, follow-ups, conversions',
       route: AppRoutes.leads,
       permissions: ['leads:view'],
+    ),
+    MenuEntry(
+      icon: Icons.badge_outlined,
+      title: 'Staff',
+      subtitle: 'Directory, employment & branches',
+      route: AppRoutes.staffRoster,
+      permissions: ['staff:view'],
+      featureFlag: 'staff',
     ),
     MenuEntry(
       icon: Icons.storefront_outlined,
@@ -170,52 +176,16 @@ class ReceptionistMenuScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final session = context.watch<SessionCubit>().state;
     if (session is! SessionAuthenticatedStaff) return const SizedBox.shrink();
-    final tenantName = session.tenant.name;
-    final name = session.user.name;
-    final avatarUrl = session.user.avatarUrl;
     final sections =
         visibleMenuSections(_sections, session.user, session.tenant);
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 90),
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(tenantName, style: AppText.eyebrow()),
-                  Text('Menu', style: AppText.display(size: 22)),
-                ],
-              ),
-            ),
-            const NotificationBellIcon(isStaff: true),
-            const SizedBox(width: 10),
-            GestureDetector(
-              onTap: () => context.push(AppRoutes.myProfile),
-              child: UserAvatar(avatarUrl: avatarUrl, name: name),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          name,
-          style: AppText.body(
-            size: 12,
-            color: AppColors.inkFaint,
-            weight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 18),
-        for (final section in sections.entries) ...[
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8, top: 6),
-            child: Text(section.key, style: AppText.eyebrow()),
-          ),
-          ...section.value.map((entry) => MenuTile(entry: entry)),
-        ],
-      ],
+    return AppDrawer(
+      role: AppRole.staff,
+      avatarUrl: session.user.avatarUrl,
+      name: session.user.name,
+      subtitle: 'Receptionist · ${session.tenant.name}',
+      sections: sections,
+      onSignOut: () => showStaffLogoutDialog(context),
     );
   }
 }

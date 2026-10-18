@@ -15,6 +15,7 @@ import '../../../models/exercise.dart';
 import '../../../repositories/exercise_repository.dart';
 import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/menu_button.dart';
 
 /// Design frame "5. Exercise library" — the Trainer shell's "Workouts" tab
 /// root. Workout PLANS themselves (frame "6. Workout builder") aren't a
@@ -73,6 +74,8 @@ class _ExerciseLibraryScreenState extends State<ExerciseLibraryScreen> {
           children: [
             Row(
               children: [
+                const MenuButton(),
+                const SizedBox(width: 10),
                 Expanded(
                   child: BlocBuilder<PaginatedListCubit<Exercise>,
                       PaginatedListState<Exercise>>(

@@ -214,8 +214,7 @@ class _TrainerPickerSheetState extends State<_TrainerPickerSheet> {
             decoration: InputDecoration(
               hintText: 'Search trainers…',
               hintStyle: AppText.body(size: 14, color: AppColors.inkFaint),
-              prefixIcon:
-                  Icon(Icons.search_rounded, color: AppColors.inkFaint),
+              prefixIcon: Icon(Icons.search_rounded, color: AppColors.inkFaint),
               filled: true,
               fillColor: AppColors.surface3,
               contentPadding: const EdgeInsets.symmetric(vertical: 12),

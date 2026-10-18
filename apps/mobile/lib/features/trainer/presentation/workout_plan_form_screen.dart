@@ -10,15 +10,17 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../models/gym_member.dart';
 import '../../../models/workout_plan.dart';
 import '../../../repositories/workout_plan_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
 import '../../../shared/widgets/app_state_views.dart';
-import '../../../shared/widgets/category_chip_selector.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import '../../workouts/presentation/workout_ui.dart';
 import 'trainer_workout_plans_screen.dart';
 
-/// Create step ahead of design frame "6. Workout builder" — the builder
-/// frame opens an already-named plan, so this minimal name/level/duration
-/// form is what creates it first.
+/// The Trainer's reduced create step ahead of the plan page: name, goal
+/// (optional), level and duration, then straight into the plan to build its
+/// week and assign it to [member]. Same `POST /workout-plans` as the catalog
+/// form and the same fields it always sent (no trainer, no description) - the
+/// full form lives in the Owner / Manager catalog.
 class WorkoutPlanFormScreen extends StatefulWidget {
   const WorkoutPlanFormScreen({required this.member, super.key});
 
@@ -29,28 +31,30 @@ class WorkoutPlanFormScreen extends StatefulWidget {
 }
 
 class _WorkoutPlanFormScreenState extends State<WorkoutPlanFormScreen> {
-  final _nameController = TextEditingController();
-  final _durationController = TextEditingController(text: '8');
+  final _name = TextEditingController();
+  final _goal = TextEditingController();
+  final _duration = TextEditingController(text: '8');
   WorkoutLevel _level = WorkoutLevel.intermediate;
   bool _loading = false;
   String? _error;
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _durationController.dispose();
+    _name.dispose();
+    _goal.dispose();
+    _duration.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    final name = _nameController.text.trim();
-    final duration = int.tryParse(_durationController.text.trim());
+    final name = _name.text.trim();
+    final duration = int.tryParse(_duration.text.trim());
     if (name.isEmpty) {
       setState(() => _error = 'Enter a plan name');
       return;
     }
-    if (duration == null || duration <= 0) {
-      setState(() => _error = 'Enter a valid duration in weeks');
+    if (duration == null || duration <= 0 || duration > 104) {
+      setState(() => _error = 'Enter a duration from 1 to 104 weeks');
       return;
     }
     setState(() {
@@ -63,6 +67,7 @@ class _WorkoutPlanFormScreenState extends State<WorkoutPlanFormScreen> {
           name: name,
           level: _level,
           durationWeeks: duration,
+          goal: _goal.text.trim().isEmpty ? null : _goal.text.trim(),
         ),
       );
       if (!mounted) return;
@@ -72,7 +77,10 @@ class _WorkoutPlanFormScreenState extends State<WorkoutPlanFormScreen> {
       );
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.message);
+      setState(() => _error = e.detailedMessage);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Something went wrong ($e).');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -80,56 +88,117 @@ class _WorkoutPlanFormScreenState extends State<WorkoutPlanFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final top = MediaQuery.of(context).padding.top + kToolbarHeight;
+    final weeks = int.tryParse(_duration.text.trim());
     return Scaffold(
       backgroundColor: AppColors.bg,
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: AppColors.bg,
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
         elevation: 0,
+        scrolledUnderElevation: 0,
         title: const Text('New workout plan'),
       ),
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (_error != null) ...[
-                const SizedBox(height: 8),
-                FormAlert(message: _error!),
-              ],
-              const SizedBox(height: 16),
-              AppLabeledField(
-                label: 'Plan name',
-                hintText: 'e.g. Strength Foundations',
-                controller: _nameController,
-                textInputAction: TextInputAction.next,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            WorkoutBanner(
+              top: top,
+              name: _name.text.trim().isEmpty ? 'New plan' : _name.text.trim(),
+              subtitle: 'For ${widget.member.name}',
+              chip:
+                  '${_level.label} · ${weeks == null ? '—' : weeksLabel(weeks)}',
+              chipIcon: levelIcon(_level),
+            ),
+            TeamCenter(
+              maxWidth: 840,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_error != null) ...[
+                      FormAlert(message: _error!),
+                      const SizedBox(height: 14),
+                    ],
+                    TeamFormSection(
+                      icon: Icons.fitness_center_rounded,
+                      color: TeamColors.indigo,
+                      title: 'Plan information',
+                      subtitle: 'You build the week on the next screen',
+                      children: [
+                        AppLabeledField(
+                          label: 'Plan name',
+                          hintText: 'e.g. Strength Foundations',
+                          icon: Icons.fitness_center_rounded,
+                          iconColor: TeamColors.indigo,
+                          controller: _name,
+                          textCapitalization: TextCapitalization.words,
+                          textInputAction: TextInputAction.next,
+                          onChanged: (_) => setState(() {}),
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(150),
+                          ],
+                        ),
+                        AppLabeledField(
+                          label: 'Goal (optional)',
+                          hintText: 'e.g. Build muscle',
+                          icon: Icons.track_changes_rounded,
+                          iconColor: TeamColors.amber,
+                          controller: _goal,
+                          textCapitalization: TextCapitalization.sentences,
+                          inputFormatters: [
+                            LengthLimitingTextInputFormatter(150),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Text('Level', style: AppText.eyebrow()),
+                            ),
+                            for (final l in WorkoutLevel.values) ...[
+                              TeamChoiceCard(
+                                title: l.label,
+                                icon: levelIcon(l),
+                                color: levelColor(l),
+                                selected: _level == l,
+                                onTap: () => setState(() => _level = l),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                          ],
+                        ),
+                        AppLabeledField(
+                          label: 'Duration (weeks)',
+                          icon: Icons.timelapse_rounded,
+                          iconColor: TeamColors.teal,
+                          controller: _duration,
+                          keyboardType: TextInputType.number,
+                          onChanged: (_) => setState(() {}),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(3),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    TeamGradientButton(
+                      label: 'Create plan',
+                      icon: Icons.check_rounded,
+                      loading: _loading,
+                      onTap: _submit,
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 14),
-              Text('Level', style: AppText.eyebrow()),
-              const SizedBox(height: 8),
-              CategoryChipSelector<WorkoutLevel>(
-                options: WorkoutLevel.values,
-                labelOf: (l) => l.label,
-                value: _level,
-                onChanged: (l) => setState(() => _level = l),
-              ),
-              const SizedBox(height: 14),
-              AppLabeledField(
-                label: 'Duration (weeks)',
-                controller: _durationController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              ),
-              const SizedBox(height: 24),
-              AppButton(
-                label: 'Create plan',
-                loading: _loading,
-                onPressed: _submit,
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

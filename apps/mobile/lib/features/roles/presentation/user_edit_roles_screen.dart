@@ -4,17 +4,17 @@ import 'package:go_router/go_router.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
-import '../../../core/theme/app_text_styles.dart';
 import '../../../models/iam_user.dart';
 import '../../../models/tenant_role.dart';
 import '../../../repositories/iam_user_repository.dart';
 import '../../../repositories/tenant_role_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../team/presentation/widgets/team_ui.dart';
 
 /// `PUT /users/:id/roles` replaces the whole role set — this screen always
-/// sends the complete selection, never a delta.
+/// sends the complete selection, never a delta. `SUPER_ADMIN` is never
+/// offered (the endpoint rejects it) and inactive roles are hidden, as on web.
+/// People can't change their own roles.
 class UserEditRolesScreen extends StatefulWidget {
   const UserEditRolesScreen({required this.user, super.key});
 
@@ -29,6 +29,7 @@ class _UserEditRolesScreenState extends State<UserEditRolesScreen> {
   late final Set<String> _selected = widget.user.roles.map((r) => r.id).toSet();
   bool _saving = false;
   String? _error;
+  String? _loadError;
 
   @override
   void initState() {
@@ -37,20 +38,22 @@ class _UserEditRolesScreenState extends State<UserEditRolesScreen> {
   }
 
   Future<void> _load() async {
+    setState(() => _loadError = null);
     try {
       final roles = await getIt<TenantRoleRepository>().list();
       if (!mounted) return;
-      // `PUT /users/:id/roles` rejects SUPER_ADMIN ("cannot be assigned
-      // here") — verified live — so it's filtered out here too, matching
-      // UserFormScreen/InviteUserScreen.
       setState(
-        () => _roles = roles.where((r) => r.name != 'SUPER_ADMIN').toList(),
+        () => _roles =
+            roles.where((r) => r.name != 'SUPER_ADMIN' && r.isActive).toList(),
       );
     } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _loadError = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _loadError = '$e');
     }
   }
+
+  bool get _isSelf => teamSelfId(context) == widget.user.id;
 
   Future<void> _save() async {
     if (_selected.isEmpty) {
@@ -65,10 +68,14 @@ class _UserEditRolesScreenState extends State<UserEditRolesScreen> {
       await getIt<IamUserRepository>()
           .setRoles(widget.user.id, _selected.toList());
       if (!mounted) return;
+      teamSnack(context, 'Roles updated.');
       context.pop();
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.message);
+      setState(() => _error = e.detailedMessage);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Could not save ($e)');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -76,117 +83,57 @@ class _UserEditRolesScreenState extends State<UserEditRolesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
+    final roles = _roles;
+    if (roles == null) {
+      return Scaffold(
         backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        appBar: AppBar(
+          backgroundColor: AppColors.bg,
+          elevation: 0,
+          title: const Text('Roles'),
+        ),
+        body: _loadError != null
+            ? AppErrorView(message: _loadError!, onRetry: _load)
+            : const AppLoadingView(),
+      );
+    }
+    final self = _isSelf;
+    return TeamEditScaffold(
+      name: widget.user.name,
+      subtitle: widget.user.email,
+      avatarUrl: widget.user.avatarUrl,
+      title: 'Roles',
+      icon: Icons.shield_rounded,
+      color: TeamColors.violet,
+      saving: _saving,
+      onSave: self ? () {} : _save,
+      error: _error ?? (self ? "You can't change your own roles." : null),
+      sections: [
+        TeamFormSection(
+          icon: Icons.shield_rounded,
+          color: TeamColors.violet,
+          title: 'Assigned roles',
+          subtitle: '${_selected.length} selected · '
+              'their access is the union of these roles',
           children: [
-            Text('Edit roles', style: AppText.display(size: 18)),
-            Text(widget.user.name, style: AppText.eyebrow()),
+            for (final r in roles)
+              TeamChoiceCard(
+                title: displayRoleName(r.name),
+                description: roleBlurb(r),
+                icon: iamRoleIcon(r.name),
+                color: iamRoleColor(r.name),
+                multi: true,
+                badge: r.isSystem ? 'System' : 'Custom',
+                selected: _selected.contains(r.id),
+                onTap: self
+                    ? null
+                    : () => setState(() {
+                          if (!_selected.add(r.id)) _selected.remove(r.id);
+                        }),
+              ),
           ],
         ),
-      ),
-      body: SafeArea(
-        top: false,
-        child: _roles == null
-            ? _error != null
-                ? AppErrorView(message: _error!, onRetry: _load)
-                : const AppLoadingView()
-            : Padding(
-                padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_error != null) ...[
-                      FormAlert(message: _error!),
-                      const SizedBox(height: 12),
-                    ],
-                    Expanded(
-                      child: ListView.separated(
-                        itemCount: _roles!.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (context, i) {
-                          final role = _roles![i];
-                          final selected = _selected.contains(role.id);
-                          return Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius:
-                                  BorderRadius.circular(AppRadii.card),
-                              onTap: () => setState(() {
-                                selected
-                                    ? _selected.remove(role.id)
-                                    : _selected.add(role.id);
-                              }),
-                              child: Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surface2,
-                                  borderRadius:
-                                      BorderRadius.circular(AppRadii.card),
-                                  border: Border.all(
-                                    color: selected
-                                        ? AppColors.staffPillFg
-                                        : AppColors.line,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      selected
-                                          ? Icons.check_box_rounded
-                                          : Icons
-                                              .check_box_outline_blank_rounded,
-                                      size: 20,
-                                      color: selected
-                                          ? AppColors.staffPillFg
-                                          : AppColors.inkFaint,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            role.name,
-                                            style: AppText.body(
-                                              size: 14,
-                                              weight: FontWeight.w700,
-                                            ),
-                                          ),
-                                          Text(
-                                            '${role.permissions.length} permissions',
-                                            style: AppText.body(
-                                              size: 11,
-                                              color: AppColors.inkFaint,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    AppButton(
-                      label: 'Save roles',
-                      loading: _saving,
-                      onPressed: _save,
-                    ),
-                  ],
-                ),
-              ),
-      ),
+      ],
     );
   }
 }

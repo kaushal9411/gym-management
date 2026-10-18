@@ -16,6 +16,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../repositories/reports_repository.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/menu_button.dart';
 import '../../../shared/widgets/notification_bell_icon.dart';
 import '../../../shared/widgets/user_avatar.dart';
 import '../../owner/presentation/widgets/dashboard_detail_sheet.dart';
@@ -93,6 +94,8 @@ class _ManagerDashboardViewState extends State<_ManagerDashboardView> {
         children: [
           Row(
             children: [
+              const MenuButton(),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

@@ -13,6 +13,7 @@ import '../../../repositories/member_portal_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/menu_button.dart';
 
 /// One glass = 250 ml. The API stores `waterIntakeMl`, so the design's
 /// 8-glass row is rendered by converting; nothing about "glasses" is
@@ -144,8 +145,19 @@ class _MemberDietScreenState extends State<MemberDietScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 90),
         children: [
-          Text('Today', style: AppText.eyebrow()),
-          Text('Diet Log', style: AppText.display(size: 22)),
+          Row(
+            children: [
+              const MenuButton(),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Today', style: AppText.eyebrow()),
+                  Text('Diet Log', style: AppText.display(size: 22)),
+                ],
+              ),
+            ],
+          ),
           const SizedBox(height: 4),
           Text(
             assignment.dailyCalories != null

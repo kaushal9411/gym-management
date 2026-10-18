@@ -12,6 +12,7 @@ import '../../../repositories/member_portal_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/menu_button.dart';
 
 /// Design frame "5. Workout" — today's exercises from the member's own
 /// assigned plan, with Mark done / Skip writing straight to
@@ -121,11 +122,22 @@ class _MemberWorkoutScreenState extends State<MemberWorkoutScreen> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 90),
         children: [
-          Text(
-            '${assignment.planName} · Week ${assignment.currentWeek}',
-            style: AppText.eyebrow(),
+          Row(
+            children: [
+              const MenuButton(),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${assignment.planName} · Week ${assignment.currentWeek}',
+                    style: AppText.eyebrow(),
+                  ),
+                  Text(_today.label, style: AppText.display(size: 22)),
+                ],
+              ),
+            ],
           ),
-          Text(_today.label, style: AppText.display(size: 22)),
           const SizedBox(height: 14),
           if (_error != null) ...[
             FormAlert(message: _error!),

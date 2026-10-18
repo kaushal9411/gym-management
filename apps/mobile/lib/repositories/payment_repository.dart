@@ -77,13 +77,16 @@ class PaymentRepository {
     int page = 1,
     String? search,
     String? status,
+    String? memberId,
+    int limit = 20,
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/payments',
         queryParameters: {
           'page': page,
-          'limit': 20,
+          'limit': limit,
+          if (memberId != null) 'memberId': memberId,
           if (search != null && search.isNotEmpty) 'search': search,
           if (status != null) 'status': status,
         },

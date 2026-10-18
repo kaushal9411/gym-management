@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../shared/widgets/slide_drawer_scaffold.dart';
 import '../../../shared/widgets/glass_bottom_nav.dart';
-import 'attendance_screen.dart';
+import '../../attendance/presentation/attendance_today_screen.dart';
 import 'manager_dashboard_screen.dart';
 import 'manager_menu_screen.dart';
 import 'members_screen.dart';
 import 'team_screen.dart';
 
-/// Manager shell — the 5-tab bottom nav from design frame "4. Dashboard"
-/// (Home/Team/Members/Attendance/Menu), distinct from Owner's
-/// Home/Members/Finance/Reports/Menu.
+/// Manager shell — the 4-tab bottom nav from design frame "4. Dashboard"
+/// (Home/Team/Members/Attendance), distinct from Owner's
+/// Home/Members/Finance/Reports, plus a hamburger-triggered
+/// [ManagerMenuScreen] drawer (the former 5th "Menu" tab).
 class ManagerShell extends StatefulWidget {
   const ManagerShell({super.key});
 
@@ -25,8 +27,7 @@ class _ManagerShellState extends State<ManagerShell> {
     ManagerDashboardScreen(),
     TeamScreen(),
     MembersScreen(),
-    AttendanceScreen(),
-    ManagerMenuScreen(),
+    AttendanceTodayScreen(asTab: true),
   ];
 
   static const _navItems = [
@@ -34,13 +35,13 @@ class _ManagerShellState extends State<ManagerShell> {
     GlassNavItem(icon: Icons.groups_rounded, label: 'Team'),
     GlassNavItem(icon: Icons.people_alt_rounded, label: 'Members'),
     GlassNavItem(icon: Icons.fact_check_rounded, label: 'Attendance'),
-    GlassNavItem(icon: Icons.menu_rounded, label: 'Menu'),
   ];
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return SlideDrawerScaffold(
       backgroundColor: AppColors.bg,
+      drawer: const ManagerMenuScreen(),
       body: SafeArea(
         bottom: false,
         child: IndexedStack(index: _index, children: _tabs),

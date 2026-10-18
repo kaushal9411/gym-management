@@ -28,7 +28,8 @@ class ApiException implements Exception {
 
   /// True for connectivity failures (no response reached the server at all).
   factory ApiException.network() => const ApiException(
-        message: 'Can\'t reach the server. Check your connection and try again.',
+        message:
+            'Can\'t reach the server. Check your connection and try again.',
       );
 
   factory ApiException.fromResponseData(dynamic data, int? statusCode) {
@@ -51,6 +52,16 @@ class ApiException implements Exception {
       message: 'Something went wrong',
       statusCode: statusCode,
     );
+  }
+
+  /// [message] plus each field's reason — "Request Validation Failed" alone
+  /// doesn't tell the user which input to fix.
+  String get detailedMessage {
+    if (fieldErrors.isEmpty) return message;
+    final lines = fieldErrors
+        .map((e) => e.field == null ? e.message : '${e.field}: ${e.message}')
+        .toSet();
+    return lines.join(', ');
   }
 
   /// First field-specific error for [field], if the server flagged one.

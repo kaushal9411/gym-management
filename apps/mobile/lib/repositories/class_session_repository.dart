@@ -61,16 +61,20 @@ class ClassSessionRepository {
     }
   }
 
-  /// Manually rolls the session-generation window forward — the nightly
-  /// BullMQ job already covers this; no UI trigger wires to it this pass,
-  /// it exists so a class create/edit flow could call it later without a
-  /// repository change.
-  Future<void> generate({int? daysAhead}) async {
+  /// Manually rolls the session-generation window forward
+  /// (`POST /class-sessions/generate`, `classes:update`) — web's
+  /// "Regenerate sessions now" button on the class detail and calendar pages;
+  /// the nightly BullMQ job covers the same ground. Returns how many sessions
+  /// were created (0 when nothing was missing).
+  Future<int> generate({int? daysAhead}) async {
     try {
-      await _dio.post<void>(
+      final response = await _dio.post<Map<String, dynamic>>(
         '/class-sessions/generate',
         data: {if (daysAhead != null) 'daysAhead': daysAhead},
       );
+      final data = response.data?['data'];
+      final created = data is Map<String, dynamic> ? data['created'] : null;
+      return created is num ? created.toInt() : 0;
     } on DioException catch (e) {
       throw _mapError(e);
     }

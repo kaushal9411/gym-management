@@ -1,24 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/member_workout_progress.dart';
 import '../../../models/workout_plan.dart';
 import '../../../repositories/workout_plan_repository.dart';
-import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
-import '../../../shared/widgets/app_pill.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../team/presentation/widgets/team_ui.dart';
+import '../../workouts/presentation/workout_ui.dart';
 import 'client_progress_screen.dart';
 
-/// Design frame "9a. Workout log" — tap an exercise to cycle its status
-/// (`POST /workout-plans/assignments/:id/progress`), plus the trainer note
-/// (`PATCH /workout-plans/assignments/:id`). The design's "@ 62kg" load
-/// isn't shown: the API tracks status per exercise, never a weight.
+/// Design frame "9a. Workout log", redesigned: the day's exercises as cards
+/// (sets x reps, rest and notes from the plan) each with a Pending / Done /
+/// Skipped switch (`POST /workout-plans/assignments/:id/progress`, applied
+/// from the server's answer, one row at a time), the day's completion ring,
+/// plus the trainer note (`PATCH /workout-plans/assignments/:id`). The design's
+/// "@ 62kg" load isn't shown: the API tracks status per exercise, never a
+/// weight.
 class WorkoutLogScreen extends StatefulWidget {
   const WorkoutLogScreen({required this.args, super.key});
 
@@ -35,6 +38,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
   late final _noteController = TextEditingController(
     text: widget.args.progress.trainerRemarks ?? '',
   );
+  final Set<String> _busy = {};
   Map<String, PlanExercise>? _planExercises;
   bool _saving = false;
   bool _dirty = false;
@@ -55,8 +59,8 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
     super.dispose();
   }
 
-  /// The assignment's progress entries carry no sets/reps — those live on
-  /// the plan, so the "4 × 10" line needs the plan fetched alongside.
+  /// The assignment's progress entries carry no sets/reps - those live on
+  /// the plan, so the "4 x 10" line needs the plan fetched alongside.
   Future<void> _loadPlan() async {
     try {
       final plan = await getIt<WorkoutPlanRepository>()
@@ -68,36 +72,39 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
             if (e.dayOfWeek == widget.args.day) e.exercise.id: e,
         };
       });
-    } on ApiException {
+    } catch (_) {
       if (!mounted) return;
       setState(() => _planExercises = const {});
     }
   }
 
-  Future<void> _cycleStatus(ExerciseProgressEntry entry) async {
-    final current = _statuses[entry.exerciseId]!;
-    final next = switch (current) {
-      ExerciseProgressStatus.pending => ExerciseProgressStatus.completed,
-      ExerciseProgressStatus.completed => ExerciseProgressStatus.skipped,
-      ExerciseProgressStatus.skipped => ExerciseProgressStatus.pending,
-    };
+  Future<void> _setStatus(
+    ExerciseProgressEntry entry,
+    ExerciseProgressStatus next,
+  ) async {
+    final id = entry.exerciseId;
+    if (_busy.contains(id) || _statuses[id] == next) return;
     setState(() {
-      _statuses[entry.exerciseId] = next;
+      _busy.add(id);
       _error = null;
     });
     try {
       await getIt<WorkoutPlanRepository>().markProgress(
         assignmentId: widget.args.progress.id,
-        exerciseId: entry.exerciseId,
+        exerciseId: id,
         status: next,
       );
+      if (!mounted) return;
       _dirty = true;
+      setState(() => _statuses[id] = next);
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() {
-        _statuses[entry.exerciseId] = current;
-        _error = e.message;
-      });
+      setState(() => _error = e.detailedMessage);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Something went wrong ($e).');
+    } finally {
+      if (mounted) setState(() => _busy.remove(id));
     }
   }
 
@@ -115,7 +122,10 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
       context.pop(true);
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(() => _error = e.message);
+      setState(() => _error = e.detailedMessage);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = 'Something went wrong ($e).');
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -124,6 +134,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
   @override
   Widget build(BuildContext context) {
     final entries = _dayEntries;
+    final day = widget.args.day;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -138,10 +149,7 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                '${widget.args.day.label} — Log',
-                style: AppText.display(size: 18),
-              ),
+              Text('${day.label} — Log', style: AppText.display(size: 18)),
               Text(widget.args.member.name, style: AppText.eyebrow()),
             ],
           ),
@@ -149,9 +157,14 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
         body: SafeArea(
           top: false,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
+            padding: EdgeInsets.fromLTRB(
+              16 + teamSideInset(context, maxWidth: 840),
+              8,
+              16 + teamSideInset(context, maxWidth: 840),
+              24,
+            ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (_error != null) ...[
                   FormAlert(message: _error!),
@@ -162,21 +175,29 @@ class _WorkoutLogScreenState extends State<WorkoutLogScreen> {
                     entry: entry,
                     status: _statuses[entry.exerciseId]!,
                     planExercise: _planExercises?[entry.exerciseId],
-                    onTap: () => _cycleStatus(entry),
+                    busy: _busy.contains(entry.exerciseId),
+                    onChanged: (s) => _setStatus(entry, s),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
                 ],
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 AppLabeledField(
                   label: 'Trainer note',
                   hintText: 'Feedback for this session (optional)',
+                  icon: Icons.chat_bubble_outline_rounded,
+                  iconColor: TeamColors.teal,
                   controller: _noteController,
+                  minLines: 2,
+                  maxLines: 5,
+                  textCapitalization: TextCapitalization.sentences,
+                  inputFormatters: [LengthLimitingTextInputFormatter(2000)],
                 ),
-                const SizedBox(height: 20),
-                AppButton(
+                const SizedBox(height: 16),
+                TeamGradientButton(
                   label: 'Save note',
+                  icon: Icons.check_rounded,
                   loading: _saving,
-                  onPressed: _saveNote,
+                  onTap: _saveNote,
                 ),
               ],
             ),
@@ -192,63 +213,131 @@ class _ExerciseLogCard extends StatelessWidget {
     required this.entry,
     required this.status,
     required this.planExercise,
-    required this.onTap,
+    required this.busy,
+    required this.onChanged,
   });
 
   final ExerciseProgressEntry entry;
   final ExerciseProgressStatus status;
   final PlanExercise? planExercise;
-  final VoidCallback onTap;
+  final bool busy;
+  final ValueChanged<ExerciseProgressStatus> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final sets = planExercise?.sets;
-    final reps = planExercise?.repetitions;
+    final p = planExercise;
+    final line = ExerciseLine(
+      name: entry.exerciseName,
+      muscle: p?.exercise.muscleGroup,
+      sets: p?.sets,
+      reps: p?.repetitions,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ExerciseTile(
+          key: ValueKey('log-${entry.exerciseId}'),
+          line: line,
+          trailing: busy
+              ? const Padding(
+                  padding: EdgeInsets.all(10),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : null,
+        ),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            for (final s in ExerciseProgressStatus.values) ...[
+              if (s != ExerciseProgressStatus.pending) const SizedBox(width: 6),
+              Expanded(
+                child: _StatusButton(
+                  key: ValueKey('mark-${entry.exerciseId}-${s.name}'),
+                  status: s,
+                  selected: status == s,
+                  onTap: busy ? null : () => onChanged(s),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
 
+class _StatusButton extends StatelessWidget {
+  const _StatusButton({
+    super.key,
+    required this.status,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ExerciseProgressStatus status;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, icon, color) = switch (status) {
+      ExerciseProgressStatus.pending => (
+          'Pending',
+          Icons.hourglass_bottom_rounded,
+          TeamColors.amber,
+        ),
+      ExerciseProgressStatus.completed => (
+          'Done',
+          Icons.check_circle_rounded,
+          TeamColors.green,
+        ),
+      ExerciseProgressStatus.skipped => (
+          'Skipped',
+          Icons.skip_next_rounded,
+          TeamColors.rose,
+        ),
+    };
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(AppRadii.card),
+        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 9),
           decoration: BoxDecoration(
-            color: AppColors.surface2,
-            borderRadius: BorderRadius.circular(AppRadii.card),
-            border: Border.all(color: AppColors.line),
+            color: selected ? color.withValues(alpha: 0.18) : AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: selected ? color : AppColors.line,
+              width: selected ? 1.5 : 1,
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      entry.exerciseName,
-                      style: AppText.body(size: 13, weight: FontWeight.w700),
-                    ),
-                  ),
-                  AppPill(
-                    label: switch (status) {
-                      ExerciseProgressStatus.completed => 'Done',
-                      ExerciseProgressStatus.skipped => 'Skipped',
-                      ExerciseProgressStatus.pending => 'Pending',
-                    },
-                    tone: switch (status) {
-                      ExerciseProgressStatus.completed => AppPillTone.success,
-                      ExerciseProgressStatus.skipped => AppPillTone.danger,
-                      ExerciseProgressStatus.pending => AppPillTone.warning,
-                    },
-                  ),
-                ],
+              Icon(
+                icon,
+                size: 15,
+                color: selected ? color : AppColors.inkFaint,
               ),
-              if (sets != null && reps != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  '$sets × $reps',
-                  style: AppText.body(size: 12, color: AppColors.inkFaint),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.body(
+                    size: 12,
+                    weight: FontWeight.w800,
+                    color: selected ? color : AppColors.inkSoft,
+                  ),
                 ),
-              ],
+              ),
             ],
           ),
         ),

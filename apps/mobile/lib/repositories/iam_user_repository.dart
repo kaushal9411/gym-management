@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
 import '../models/iam_user.dart';
+import '../models/iam_user_stats.dart';
 import '../models/paginated_result.dart';
 
 class BranchAssignmentDraft {
@@ -18,7 +19,9 @@ class BranchAssignmentDraft {
   Map<String, dynamic> toJson() => {
         'branchId': branchId,
         if (isPrimary != null) 'isPrimary': isPrimary,
-        if (expiresAt != null) 'expiresAt': expiresAt!.toIso8601String(),
+        // zod `datetime()` needs an offset — always send UTC (`...Z`).
+        if (expiresAt != null)
+          'expiresAt': expiresAt!.toUtc().toIso8601String(),
       };
 }
 
@@ -30,11 +33,17 @@ class IamUserRepository {
 
   final Dio _dio;
 
+  /// `includeDeleted` is only ever sent as `true` (the API coerces with
+  /// `z.coerce.boolean()`, so the string `"false"` would be truthy).
   Future<PaginatedResult<IamUser>> list({
     int page = 1,
     String? search,
     String? status,
     String? roleId,
+    String? branchId,
+    bool includeDeleted = false,
+    String sortBy = 'createdAt',
+    String sortDir = 'desc',
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -45,12 +54,46 @@ class IamUserRepository {
           if (search != null && search.isNotEmpty) 'search': search,
           if (status != null) 'status': status,
           if (roleId != null) 'roleId': roleId,
+          if (branchId != null) 'branchId': branchId,
+          if (includeDeleted) 'includeDeleted': true,
+          'sortBy': sortBy,
+          'sortDir': sortDir,
         },
       );
       return PaginatedResult.fromJson(
         response.data!['data'] as Map<String, dynamic>,
         IamUser.fromJson,
       );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /users/stats` — KPI tiles + insight panels (needs `users:read`).
+  Future<IamUserStats> stats({String? branchId}) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/users/stats',
+        queryParameters: {if (branchId != null) 'branchId': branchId},
+      );
+      return IamUserStats.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `PATCH /users/:id` — only the keys present in [fields] change
+  /// (name, email, phone, emergencyContact*, avatarUrl). `phone` cannot be
+  /// cleared (the schema isn't nullable).
+  Future<IamUser> update(String userId, Map<String, dynamic> fields) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/users/$userId',
+        data: fields,
+      );
+      return IamUser.fromJson(response.data!['data'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throw _mapError(e);
     }

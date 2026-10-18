@@ -13,11 +13,22 @@ class AttendanceRepository {
   /// `branchId` isn't auto-scoped server-side for this endpoint (unlike
   /// `/reports/dashboard/kpis`), so callers must pass the caller's own
   /// branch explicitly to avoid leaking other branches' counts.
-  Future<AttendanceSummary> summary({String? branchId}) async {
+  ///
+  /// `dateFrom`/`dateTo` (YYYY-MM-DD) only widen the `trend` series (default
+  /// last 7 days); today's live figures are always today's.
+  Future<AttendanceSummary> summary({
+    String? branchId,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+  }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/attendance/summary',
-        queryParameters: {if (branchId != null) 'branchId': branchId},
+        queryParameters: {
+          if (branchId != null) 'branchId': branchId,
+          if (dateFrom != null) 'dateFrom': _ymd(dateFrom),
+          if (dateTo != null) 'dateTo': _ymd(dateTo),
+        },
       );
       return AttendanceSummary.fromJson(
         response.data!['data'] as Map<String, dynamic>,
@@ -112,6 +123,43 @@ class AttendanceRepository {
     }
   }
 
+  /// Checks a member out (QR flow) — `POST /attendance/check-out`, needs
+  /// `attendance:checkout`. Pass `memberId` (server finds the open visit) or
+  /// `attendanceId`.
+  Future<void> checkOut({String? memberId, String? attendanceId}) async {
+    try {
+      await _dio.post<void>(
+        '/attendance/check-out',
+        data: {
+          if (memberId != null) 'memberId': memberId,
+          if (attendanceId != null) 'attendanceId': attendanceId,
+        },
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Corrects a record (`PATCH /attendance/:id`, `attendance:update`). Only
+  /// the keys present in [body] are sent: `checkOutTime` (ISO-8601 UTC or an
+  /// explicit null to reopen the visit), `notes`, `status`.
+  Future<void> update(String id, Map<String, dynamic> body) async {
+    try {
+      await _dio.patch<void>('/attendance/$id', data: body);
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Soft-deletes a record (`DELETE /attendance/:id`, `attendance:delete`).
+  Future<void> delete(String id) async {
+    try {
+      await _dio.delete<void>('/attendance/$id');
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
   /// Staff-facing visit history for one member — the Member Detail
   /// screen's "Recent visits" list.
   Future<PaginatedResult<AttendanceRecord>> getMemberAttendance(
@@ -144,6 +192,8 @@ class AttendanceRepository {
     String? method,
     DateTime? dateFrom,
     DateTime? dateTo,
+    String sortBy = 'checkInTime',
+    String sortDir = 'desc',
   }) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
@@ -155,10 +205,10 @@ class AttendanceRepository {
           if (branchId != null) 'branchId': branchId,
           if (status != null) 'status': status,
           if (method != null) 'method': method,
-          if (dateFrom != null)
-            'dateFrom': dateFrom.toIso8601String().substring(0, 10),
-          if (dateTo != null)
-            'dateTo': dateTo.toIso8601String().substring(0, 10),
+          if (dateFrom != null) 'dateFrom': _ymd(dateFrom),
+          if (dateTo != null) 'dateTo': _ymd(dateTo),
+          'sortBy': sortBy,
+          'sortDir': sortDir,
         },
       );
       return PaginatedResult.fromJson(
@@ -169,6 +219,10 @@ class AttendanceRepository {
       throw _mapError(e);
     }
   }
+
+  static String _ymd(DateTime d) => '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
 
   ApiException _mapError(DioException e) {
     if (e.type == DioExceptionType.connectionError ||

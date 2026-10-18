@@ -20,6 +20,16 @@ extension WeekDayX on WeekDay {
         WeekDay.saturday => 'Sat',
         WeekDay.sunday => 'Sun',
       };
+
+  String get fullLabel => switch (this) {
+        WeekDay.monday => 'Monday',
+        WeekDay.tuesday => 'Tuesday',
+        WeekDay.wednesday => 'Wednesday',
+        WeekDay.thursday => 'Thursday',
+        WeekDay.friday => 'Friday',
+        WeekDay.saturday => 'Saturday',
+        WeekDay.sunday => 'Sunday',
+      };
 }
 
 /// One weekly recurring slot — `PATCH /classes/:id/schedule`'s `slots[]`.
@@ -96,6 +106,8 @@ class GroupClass {
 
   /// Non-null means soft-deleted.
   final DateTime? deletedAt;
+
+  bool get isDeleted => deletedAt != null;
 
   factory GroupClass.fromJson(Map<String, dynamic> json) => GroupClass(
         id: json['id'] as String,

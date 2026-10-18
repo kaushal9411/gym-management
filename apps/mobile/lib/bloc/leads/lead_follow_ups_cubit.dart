@@ -52,6 +52,10 @@ class LeadFollowUpsCubit extends Cubit<LeadFollowUpsState> {
       if (!isClosed) emit(LeadFollowUpsLoaded(b, m, data));
     } on ApiException catch (e) {
       if (!isClosed) emit(LeadFollowUpsError(b, m, e.message));
+    } on Object {
+      if (!isClosed) {
+        emit(LeadFollowUpsError(b, m, 'Could not load follow-ups.'));
+      }
     }
   }
 }

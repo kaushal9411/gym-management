@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../core/network/api_exception.dart';
 import '../models/permission_group.dart';
+import '../models/permission_matrix.dart';
 import '../models/tenant_role.dart';
 
 class TenantRoleRepository {
@@ -94,6 +95,44 @@ class TenantRoleRepository {
         },
       );
       return TenantRole.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `DELETE /roles/:id` — custom roles only (`roles:manage-custom`); the
+  /// server rejects system roles and roles still assigned to people.
+  Future<void> delete(String roleId) async {
+    try {
+      await _dio.delete<void>('/roles/$roleId');
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `POST /roles/:id/clone` — the way to customise a (read-only) system role.
+  Future<TenantRole> clone(String roleId, {String? name}) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/roles/$roleId/clone',
+        data: {if (name != null && name.isNotEmpty) 'name': name},
+      );
+      return TenantRole.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /permissions/matrix` — every permission against every role.
+  Future<PermissionMatrix> matrix() async {
+    try {
+      final response =
+          await _dio.get<Map<String, dynamic>>('/permissions/matrix');
+      return PermissionMatrix.fromJson(
         response.data!['data'] as Map<String, dynamic>,
       );
     } on DioException catch (e) {
