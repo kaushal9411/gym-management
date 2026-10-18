@@ -842,3 +842,7 @@ The member drawer (`member_menu_screen.dart`) has no "Profile" row any more. Ope
 ## Member My Profile v2 — blocks (Prompt 164)
 
 `member_profile_screen.dart` now lays out `ProfileBlock`s (`widgets/member_profile_blocks.dart`): gradient header + Edit pill; the body is the read-only `rows` or, in edit mode, the block's form built by the screen through `ProfileBlockForm` (`text` / `select` / `date`). Each block owns its keys, sends only changed ones through `updateProfile`, and calls `onSaved(updated)` (the screen sets the profile and syncs the session). `ProfileBlockState.startEditing()` is public — the screen keeps a `GlobalKey` per block so a completeness chip can open it. Shared pieces: `BounceIn` (elastic entrance, stagger via the controller timeline — never `Future.delayed`, tests would see a pending timer), `PressBounce`, `ProfileColorTile`. Tests must `ensureVisible` + `pump(1s)` before tapping inside an expanding block (the size animation moves it).
+
+## Member Gym info redesign (Prompt 165)
+
+`member_gym_info_screen.dart`: `MemberGymInfoScreen` (loads `gymInfo()`) → `GymInfoBody(info, now)` (hero + `_GymBlock`s built on `BounceIn` / `PressBounce` from `widgets/member_profile_blocks.dart`). Helpers: `gymTime("06:00") → "6:00 AM"`, `gymOpenState(hours, now)` (web's `openState`), `launchGymLink`. Social keys map to icon / label / colour in `_social()`. Hours rows use `FittedBox` for the trailing time so a wide font never overflows. Tests: `test/widgets/member_gym_info_test.dart`.
