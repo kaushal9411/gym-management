@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+import { measurementFields } from '../../measurements/validators/measurement.validators';
+import { hasMeasurementValue } from '../utils/member-measurement.util';
+
 export const memberPortalPaginationSchema = z.object({
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(100).default(20),
@@ -13,8 +16,8 @@ export const memberWorkoutProgressSchema = z.object({
 
 export const memberDietLogSchema = z.object({
   date: z.string().min(1, 'Date is required'),
-  waterIntakeMl: z.coerce.number().int().nonnegative().optional(),
-  weightKg: z.coerce.number().positive().optional(),
+  waterIntakeMl: z.coerce.number().int().nonnegative().max(20_000).optional(),
+  weightKg: z.coerce.number().positive().max(500).optional(),
   mealsStatus: z.record(z.enum(['PENDING', 'COMPLETED', 'SKIPPED'])).optional(),
   notes: z.string().max(500).optional(),
 });
@@ -169,3 +172,32 @@ export const memberProfilePhotoSchema = z
     image: z.string().min(1, 'Choose a photo to upload').max(1_000_000, 'This photo is too large. Choose one under 700 KB (or resize it).'),
   })
   .strict();
+
+// ── Self-service body measurements (POST/PATCH /portal/measurements) ──────
+// Same per-field bounds as the staff validators (`measurementFields`), but
+// `.strict()` so a client can never smuggle `source`/`recordedBy`/`memberId`,
+// and `recordedAt` must be a parseable date. The future / 365-day window is
+// checked in the service (it needs the member's branch-local "today").
+
+const memberMeasurementShape = {
+  ...measurementFields,
+  recordedAt: z
+    .string()
+    .trim()
+    .min(1, 'Enter a valid date')
+    .refine((v) => !Number.isNaN(Date.parse(v)), 'Enter a valid date')
+    .optional(),
+};
+
+/** Create (quick weight log or full check-in): at least one numeric value is required. */
+export const memberCreateMeasurementSchema = z
+  .object(memberMeasurementShape)
+  .strict()
+  .refine((v) => hasMeasurementValue(v), { message: 'Enter at least one measurement.', path: ['weightKg'] });
+
+/** Edit own entry: any subset; PATCH cannot clear a numeric value (same as staff). */
+export const memberUpdateMeasurementSchema = z
+  .object(memberMeasurementShape)
+  .partial()
+  .strict()
+  .refine((v) => Object.keys(v).length > 0, { message: 'Nothing to update.' });

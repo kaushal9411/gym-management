@@ -8,6 +8,7 @@ import { MemberDashboardDetailModal, type MemberDashboardStatKind } from '../mem
 import { AttendanceCard, BillingCard, ClassesCard, MeasurementCard, MyDataCard, WorkoutCard, YourGymCard } from './dashboard-cards';
 import { DashboardHero } from './dashboard-hero';
 import { DashboardTiles } from './dashboard-tiles';
+import { PlanBenefitsSection } from '../plan/plan-benefits-card';
 
 /** Dashboard body once data is ready (`data.overview`/`data.profile` are non-null here). */
 export function DashboardCards({ data, exporting, onExport }: { data: ReturnType<typeof useDashboardData>; exporting: boolean; onExport: () => void }) {
@@ -21,6 +22,7 @@ export function DashboardCards({ data, exporting, onExport }: { data: ReturnType
     <div className="space-y-4 md:space-y-5">
       <DashboardHero overview={overview} qrUrl={profile.qrCodeImageUrl} />
       <DashboardTiles overview={overview} onOpen={setOpenStat} />
+      {overview.membership ? <PlanBenefitsSection /> : null}
       <div className="grid gap-4 md:gap-5 lg:grid-cols-3">
         <AttendanceCard attendance={overview.attendance} />
         <ClassesCard classes={overview.classes} />

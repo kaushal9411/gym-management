@@ -17,6 +17,7 @@ class MemberPortalProfile {
     required this.currentMembership,
     required this.joiningDate,
     this.qrCodeImageUrl,
+    this.targetWeightKg,
   });
 
   final String id;
@@ -31,6 +32,11 @@ class MemberPortalProfile {
 
   /// Check-in QR (a `data:` URL or object-storage URL); null when none yet.
   final String? qrCodeImageUrl;
+
+  /// The member's target weight (kg) set by staff when a membership was
+  /// assigned — the newest `membershipHistory[]` row that has one; null when
+  /// none was ever set. Backs the goal-progress card on Body Measurements.
+  final double? targetWeightKg;
 
   String get initials {
     final words =
@@ -72,5 +78,17 @@ class MemberPortalProfile {
               ),
         joiningDate: DateTime.parse(json['joiningDate'] as String),
         qrCodeImageUrl: json['qrCodeImageUrl'] as String?,
+        targetWeightKg: _targetWeight(json['membershipHistory']),
       );
+
+  /// `membershipHistory` is newest first; DECIMAL arrives as a string.
+  static double? _targetWeight(Object? history) {
+    if (history is! List) return null;
+    for (final h in history) {
+      if (h is! Map) continue;
+      final v = double.tryParse(h['targetWeight']?.toString() ?? '');
+      if (v != null && v > 0) return v;
+    }
+    return null;
+  }
 }

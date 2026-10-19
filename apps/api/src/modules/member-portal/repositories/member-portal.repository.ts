@@ -232,6 +232,7 @@ export class MemberPortalRepository {
         country: true,
         postalCode: true,
         operatingHours: true,
+        holidays: true,
       },
     });
   }

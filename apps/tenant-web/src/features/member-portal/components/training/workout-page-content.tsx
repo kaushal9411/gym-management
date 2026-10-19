@@ -1,36 +1,55 @@
 'use client';
 
 import * as React from 'react';
-import { motion } from 'framer-motion';
-import { Check, Dumbbell, MessageSquareQuote, SkipForward, Target, Trophy, CalendarRange, Layers } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { CalendarCheck, CheckCheck, Dumbbell, Flame, MessageSquareQuote, RotateCcw } from 'lucide-react';
+import { toast } from 'sonner';
 
-import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useMotionSafe } from '@/features/reports/lib/motion';
-import { useMarkWorkoutProgress, useMemberOverview, useMemberWorkout } from '../../hooks/use-member-portal';
+import { useCompleteWorkoutDay, useDeleteWorkoutLog, useLogWorkout, useMemberWorkout, useResetWorkoutDay } from '../../hooks/use-member-portal';
 import { formatDate } from '../../lib/format';
-import { EmptyBlock, HeroChip, PortalHero, ProgressRing, SectionCard, SkeletonCard, SkeletonHero, StaggerGroup, StatTile, StatusChip, toneColor, toneTint } from '../kit';
+import { describeTarget, shortDay, type TrackingDay, type TrackingExercise, type WorkoutCompleteInput } from '../../lib/workout-tracking';
+import { EmptyBlock, HeroAction, HeroChip, PortalHero, ProgressRing, SectionCard, SkeletonCard, SkeletonHero, StatusChip } from '../kit';
+import { CompleteSheet } from '../workout/complete-sheet';
+import { ExerciseCard } from '../workout/exercise-card';
+import { HistorySection } from '../workout/history-section';
+import { InsightsCard } from '../workout/insights-card';
+import { LogSheet, type LogDetails } from '../workout/log-sheet';
+import { ProgressSection } from '../workout/progress-section';
+import { WeekStrip, addDays, weekStartOf } from '../workout/week-strip';
+import { PressButton } from '../workout/workout-motion';
 
-const DAYS: string[] = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'];
-type Ex = { exerciseId: string; name: string; dayOfWeek: string };
-const SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const cap = (s: string) => s.toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
-const dayName = (i: number) => DAYS[i] ?? 'MONDAY';
-const todayIdx = () => (new Date().getDay() + 6) % 7;
 
+/**
+ * Member workout page. Reads `GET /portal/workout` (legacy plan + the additive
+ * `tracking` block) and writes through the daily log endpoints
+ * (`POST/PATCH/DELETE /portal/workout/log*`), each of which returns the refreshed
+ * payload straight into the cache. Day picker -> big exercise cards (Done / Skip /
+ * Undo, optional sets/reps/weight sheet), Finish workout (+ duration, effort 1-5),
+ * progress visuals, rule-based advice, history. The member id only ever comes from
+ * the token; every figure shown is derived from the member's real logs.
+ */
 export function WorkoutPageContent() {
   const { data: workout, isLoading } = useMemberWorkout();
-  const { data: overview } = useMemberOverview();
-  const markProgress = useMarkWorkoutProgress();
+  const log = useLogWorkout();
+  const undo = useDeleteWorkoutLog();
+  const complete = useCompleteWorkoutDay();
+  const reset = useResetWorkoutDay();
   const m = useMotionSafe();
-  const [picked, setPicked] = React.useState<number | null>(null);
 
-  const exercises = workout?.workoutPlan.exercises;
-  const byDay = React.useMemo(() => {
-    const out: Record<string, Ex[]> = {};
-    DAYS.forEach((d) => (out[d] = []));
-    (exercises ?? []).forEach((e) => (out[e.dayOfWeek] ??= []).push(e));
-    return out;
-  }, [exercises]);
+  const [picked, setPicked] = React.useState<string | null>(null);
+  const [viewWeek, setViewWeek] = React.useState<string | null>(null);
+  const [detailsFor, setDetailsFor] = React.useState<TrackingExercise | null>(null);
+  const [completeOpen, setCompleteOpen] = React.useState(false);
+  const [resetOpen, setResetOpen] = React.useState(false);
+
+  const tracking = workout?.tracking;
+  const today = tracking?.today ?? '';
+  const selectedDate = picked && tracking?.days.some((d) => d.date === picked) ? picked : today;
+  const day: TrackingDay | undefined = tracking?.days.find((d) => d.date === selectedDate);
+  const todayDay = tracking?.days.find((d) => d.date === today);
 
   if (isLoading) {
     return (
@@ -45,61 +64,95 @@ export function WorkoutPageContent() {
       <div className="space-y-4">
         <PortalHero eyebrow="Workout" title="No workout plan yet" subtitle="Your trainer will set one up for you" />
         <SectionCard title="Your plan" icon={Dumbbell} tone="primary">
-          <EmptyBlock icon={Dumbbell} title="Your trainer hasn't assigned a plan yet" description="Once a plan is assigned, your weekly exercises and progress will appear here." />
+          <EmptyBlock icon={Dumbbell} title="Your trainer hasn't assigned a plan yet" description="Once a plan is assigned, you can log each day's workout and track your progress here." />
+        </SectionCard>
+      </div>
+    );
+  }
+  if (!tracking || !day || !todayDay) {
+    return (
+      <div className="space-y-4">
+        <PortalHero eyebrow="Workout plan" title={workout.workoutPlan.name} subtitle={`${cap(workout.workoutPlan.level)} · ${workout.workoutPlan.durationWeeks} weeks`} />
+        <SectionCard title="Workout tracking" icon={Dumbbell} tone="primary">
+          <EmptyBlock icon={Dumbbell} title="Tracking isn't available right now" description="Please refresh in a moment." />
         </SectionCard>
       </div>
     );
   }
 
-  const progressBy = new Map(workout.progress.map((p) => [p.exerciseId, p]));
-  // Optimistic feel: while the mutation is in flight, show the requested status right away.
-  const pendingVars = markProgress.isPending ? markProgress.variables : undefined;
-  const statusOf = (exerciseId: string) => (pendingVars && pendingVars.exerciseId === exerciseId ? pendingVars.status : (progressBy.get(exerciseId)?.status ?? 'PENDING'));
+  const week = tracking.week;
+  const weekStart = viewWeek ?? weekStartOf(selectedDate);
+  const currentWeekStart = weekStartOf(today);
+  const busy = log.isPending || undo.isPending || complete.isPending || reset.isPending;
 
-  const all = workout.workoutPlan.exercises;
-  const done = all.filter((e) => statusOf(e.exerciseId) === 'COMPLETED').length;
-  const skipped = all.filter((e) => statusOf(e.exerciseId) === 'SKIPPED').length;
-  const pct = all.length ? Math.round((done / all.length) * 100) : 0;
-  const today = todayIdx();
-  const listOf = (d: string): Ex[] => byDay[d] ?? [];
-  const firstWithEx = DAYS.findIndex((d) => listOf(d).length > 0);
-  const selected = picked ?? (listOf(dayName(today)).length > 0 ? today : Math.max(0, firstWithEx));
-  const dayExercises = listOf(dayName(selected));
-  const dayDone = dayExercises.filter((e) => statusOf(e.exerciseId) !== 'PENDING').length;
-  const activeDays = DAYS.filter((d) => listOf(d).length > 0).length;
-  const week = overview?.workout?.completedThisWeek;
+  // Optimistic feel: show the requested status straight away while the request is in flight.
+  const shownStatus = (ex: TrackingExercise): TrackingExercise['status'] => {
+    const v = log.isPending ? log.variables : undefined;
+    if (v && v.exerciseId === ex.exerciseId && (v.date ?? today) === day.date) return v.status;
+    if (undo.isPending && undo.variables === ex.logId) return 'PENDING';
+    return ex.status;
+  };
+
+  const remaining = day.exercises.filter((e) => e.status === 'PENDING').length;
+  const lockedReason = day.isFuture ? 'You can log this on the day.' : `Logging is open for the last ${tracking.backdateDays} days.`;
+  const dayTitle = day.isToday ? `Today · ${day.label}` : `${day.label} · ${shortDay(day.date)}`;
+  const planStarts = day.state === 'OUTSIDE' ? workout.startDate : null;
+
+  const mark = (ex: TrackingExercise, status: 'COMPLETED' | 'SKIPPED') =>
+    log.mutate({ exerciseId: ex.exerciseId, date: day.date, status }, { onError: (err) => toast.error(err.message || 'Could not save. Please try again.') });
+
+  const heroTitle = todayDay.plannedCount ? (todayDay.focus ? `${todayDay.focus} day` : 'Today’s workout') : 'Rest day';
+  const heroSubtitle = !todayDay.plannedCount
+    ? tracking.nextDay
+      ? `Recover well - next up ${tracking.nextDay.label}${tracking.nextDay.focus ? `: ${tracking.nextDay.focus}` : ''}`
+      : 'Nothing scheduled today'
+    : todayDay.state === 'DONE'
+      ? 'Workout complete - great job today'
+      : `${todayDay.completedCount + todayDay.skippedCount} of ${todayDay.plannedCount} exercises logged`;
 
   return (
     <div className="space-y-4">
       <PortalHero
-        eyebrow="Workout plan"
-        title={workout.workoutPlan.name}
-        subtitle={`${cap(workout.workoutPlan.level)} · ${workout.workoutPlan.durationWeeks} weeks · ${activeDays} training day${activeDays === 1 ? '' : 's'}/week`}
+        eyebrow={workout.workoutPlan.name}
+        title={heroTitle}
+        subtitle={heroSubtitle}
         chips={
           <>
+            <HeroChip>{cap(workout.workoutPlan.level)}</HeroChip>
             <HeroChip>Started {formatDate(workout.startDate)}</HeroChip>
             {workout.endDate ? <HeroChip>Ends {formatDate(workout.endDate)}</HeroChip> : null}
-            <HeroChip>{cap(workout.status)}</HeroChip>
+            {tracking.streak > 0 ? (
+              <HeroChip>
+                <Flame className="size-3.5" aria-hidden /> {tracking.streak} in a row
+              </HeroChip>
+            ) : null}
           </>
         }
         aside={
-          <ProgressRing value={pct} size={84} thickness={9} onDark>
-            <span className="text-lg font-semibold tabular-nums">{pct}%</span>
+          <ProgressRing value={week.completionPercent} size={84} thickness={9} onDark>
+            <span className="text-lg font-semibold tabular-nums">{week.completionPercent}%</span>
           </ProgressRing>
         }
         stats={[
-          { label: 'Completed', value: done, format: (n) => `${n}/${all.length}` },
-          { label: 'This week', value: week ?? 0, hidden: week === undefined },
-          { label: 'Skipped', value: skipped },
+          { label: 'Sessions', value: week.completedSessions, format: (n) => `${Math.round(n)}/${week.plannedSessions}`, hidden: week.plannedSessions === 0 },
+          { label: 'This week', value: week.completedExercises, format: (n) => `${Math.round(n)}/${week.plannedExercises}`, hidden: week.plannedExercises === 0 },
+          { label: 'Streak', value: tracking.streak },
         ]}
+        actions={
+          todayDay.plannedCount && todayDay.state !== 'DONE' ? (
+            <HeroAction
+              variant="solid"
+              onClick={() => {
+                setPicked(today);
+                setViewWeek(null);
+                setCompleteOpen(true);
+              }}
+            >
+              <CheckCheck className="size-4" /> Finish today&apos;s workout
+            </HeroAction>
+          ) : null
+        }
       />
-
-      <StaggerGroup className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatTile label="Plan progress" value={pct} format={(n) => `${n}%`} icon={Target} tone="success" progress={pct} hint={`${done} of ${all.length} exercises`} />
-        <StatTile label="Done this week" value={week ?? done} icon={Trophy} tone="orange" hint={week === undefined ? 'Overall' : 'Exercises completed'} />
-        <StatTile label="Exercises" value={all.length} icon={Layers} tone="info" hint={`Across ${activeDays} days`} />
-        <StatTile label="Duration" value={workout.workoutPlan.durationWeeks} format={(n) => `${n} wk`} icon={CalendarRange} tone="violet" hint={workout.endDate ? `Ends ${formatDate(workout.endDate)}` : 'Open-ended'} />
-      </StaggerGroup>
 
       {workout.trainerRemarks ? (
         <SectionCard title="Trainer remarks" icon={MessageSquareQuote} tone="warning">
@@ -107,96 +160,142 @@ export function WorkoutPageContent() {
         </SectionCard>
       ) : null}
 
-      <SectionCard title="Weekly schedule" subtitle="Pick a day to see its exercises" icon={Dumbbell} tone="primary">
-        <div role="tablist" aria-label="Day of week" className="grid grid-cols-7 gap-1 rounded-2xl bg-muted p-1">
-          {DAYS.map((d, i) => {
-            const list = listOf(d);
-            const dd = list.filter((e) => statusOf(e.exerciseId) !== 'PENDING').length;
-            const frac = list.length ? dd / list.length : 0;
-            const active = selected === i;
-            return (
-              <button
-                key={d}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                aria-label={`${cap(d)}, ${list.length} exercises`}
-                onClick={() => setPicked(i)}
-                className={cn('relative flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', active ? 'text-primary-foreground' : 'text-muted-foreground')}
-              >
-                {active ? <motion.span layoutId="workout-day-pill" className="absolute inset-0 rounded-xl bg-primary shadow-sm" transition={m.reduce ? { duration: 0 } : { type: 'spring', stiffness: 420, damping: 34 }} /> : null}
-                <span className="relative">{SHORT[i] ?? ''}</span>
-                <span className={cn('relative h-1 w-6 overflow-hidden rounded-full', active ? 'bg-white/30' : 'bg-foreground/10')}>
-                  <span className="block h-full rounded-full" style={{ width: `${frac * 100}%`, background: active ? 'white' : toneColor('success') }} />
-                </span>
-                {i === today ? <span className={cn('absolute right-1 top-1 size-1.5 rounded-full', active ? 'bg-white' : 'bg-primary')} aria-label="today" /> : null}
-              </button>
-            );
-          })}
+      <SectionCard title="Your week" subtitle="Pick a day to log it" icon={CalendarCheck} tone="primary">
+        <WeekStrip
+          days={tracking.days}
+          selected={selectedDate}
+          onSelect={setPicked}
+          weekStart={weekStart}
+          onWeekChange={(start) => {
+            setViewWeek(start);
+            // Keep a day of the viewed week selected.
+            const first = tracking.days.find((d) => d.date >= start && d.date <= addDays(start, 6));
+            if (first) setPicked(first.date <= today && start === currentWeekStart ? today : first.date);
+          }}
+          currentWeekStart={currentWeekStart}
+        />
+
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-base font-semibold">{dayTitle}</p>
+            <p className="text-xs text-muted-foreground">{day.plannedCount ? `${day.focus ? `${day.focus} · ` : ''}${day.plannedCount} ${day.plannedCount === 1 ? 'exercise' : 'exercises'}` : 'Rest day'}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {day.session?.durationMin ? <StatusChip tone="info">{day.session.durationMin} min</StatusChip> : null}
+            {day.session?.effort ? <StatusChip tone="violet">Effort {day.session.effort}/5</StatusChip> : null}
+            <StatusChip tone={day.state === 'DONE' ? 'success' : day.state === 'MISSED' ? 'danger' : day.state === 'PARTIAL' ? 'warning' : 'muted'}>
+              {day.plannedCount === 0 ? 'Rest' : day.state === 'DONE' ? 'Done' : day.state === 'MISSED' ? 'Missed' : `${day.completedCount + day.skippedCount}/${day.plannedCount} logged`}
+            </StatusChip>
+          </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-between gap-2">
-          <p className="text-sm font-semibold">
-            {cap(dayName(selected))}
-            {selected === today ? ' · Today' : ''}
-          </p>
-          <StatusChip tone={dayExercises.length && dayDone === dayExercises.length ? 'success' : 'muted'}>{dayExercises.length ? `${dayDone}/${dayExercises.length} done` : 'Rest day'}</StatusChip>
-        </div>
-
-        <motion.div key={selected} initial={m.reduce ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mt-3 space-y-3">
-          {dayExercises.length === 0 ? (
-            <EmptyBlock compact icon={Dumbbell} tone="success" title="Rest day" description="Nothing scheduled — recover well." />
-          ) : (
-            dayExercises.map((ex, index) => {
-              const status = statusOf(ex.exerciseId);
-              const tone = status === 'COMPLETED' ? 'success' : status === 'SKIPPED' ? 'muted' : 'primary';
-              return (
-                <div
-                  key={`${ex.exerciseId}-${ex.dayOfWeek}-${index}`}
-                  className="overflow-hidden rounded-2xl border p-3.5 transition-colors"
-                  style={{ background: status === 'PENDING' ? undefined : toneTint(tone, 10), borderColor: status === 'PENDING' ? undefined : toneTint(tone, 40) }}
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-xl text-sm font-semibold tabular-nums" style={{ background: toneTint(tone, 18), color: toneColor(tone) }}>
-                      {status === 'COMPLETED' ? <Check className="size-5" /> : status === 'SKIPPED' ? <SkipForward className="size-5" /> : index + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className={cn('truncate text-sm font-semibold', status === 'SKIPPED' && 'text-muted-foreground line-through')}>{ex.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {status === 'COMPLETED' ? 'Completed' : status === 'SKIPPED' ? 'Skipped' : 'Pending'}
-                        {progressBy.get(ex.exerciseId)?.markedAt && status !== 'PENDING' ? ` · ${formatDate(progressBy.get(ex.exerciseId)!.markedAt)}` : ''}
-                      </p>
-                    </div>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div key={day.date} initial={m.reduce ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={m.reduce ? undefined : { opacity: 0, y: -6 }} transition={{ duration: 0.25 }} className="mt-3 space-y-3">
+            {planStarts ? (
+              <EmptyBlock compact icon={CalendarCheck} title="Your plan hasn't started" description={`It starts on ${formatDate(planStarts)}.`} />
+            ) : day.plannedCount === 0 ? (
+              <EmptyBlock compact icon={Dumbbell} tone="success" title="Rest day" description="Nothing scheduled - recover well." />
+            ) : (
+              <>
+                {day.exercises.map((ex, i) => (
+                  <ExerciseCard
+                    key={ex.exerciseId}
+                    exercise={ex}
+                    index={i}
+                    shown={shownStatus(ex)}
+                    canLog={day.canLog}
+                    lockedReason={lockedReason}
+                    busy={busy}
+                    onDone={() => mark(ex, 'COMPLETED')}
+                    onSkip={() => mark(ex, 'SKIPPED')}
+                    onUndo={() => ex.logId && undo.mutate(ex.logId, { onError: (err) => toast.error(err.message || 'Could not undo. Please try again.') })}
+                    onDetails={() => setDetailsFor(ex)}
+                  />
+                ))}
+                {day.canLog ? (
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    {day.state !== 'DONE' ? (
+                      <PressButton
+                        disabled={busy}
+                        onClick={() => setCompleteOpen(true)}
+                        className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-primary-foreground shadow-md"
+                        style={{ background: 'linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 55%, var(--chart-7)))' }}
+                      >
+                        <CheckCheck className="size-4" /> Finish workout
+                      </PressButton>
+                    ) : (
+                      <PressButton disabled={busy} onClick={() => setCompleteOpen(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border bg-card px-4 text-sm font-semibold hover:bg-accent">
+                        <CheckCheck className="size-4" /> Edit duration &amp; effort
+                      </PressButton>
+                    )}
+                    {day.completedCount + day.skippedCount > 0 || day.session ? (
+                      <PressButton disabled={busy} onClick={() => setResetOpen(true)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-muted-foreground hover:bg-accent">
+                        <RotateCcw className="size-4" /> Reset day
+                      </PressButton>
+                    ) : null}
                   </div>
-                  {status === 'PENDING' ? (
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        aria-label={`Mark ${ex.name} completed`}
-                        disabled={markProgress.isPending}
-                        onClick={() => markProgress.mutate({ assignmentId: workout.id, exerciseId: ex.exerciseId, status: 'COMPLETED' })}
-                        className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl bg-success text-sm font-semibold text-white shadow-sm transition active:scale-[0.97] disabled:opacity-60"
-                      >
-                        <Check className="size-4" /> Complete
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Mark ${ex.name} skipped`}
-                        disabled={markProgress.isPending}
-                        onClick={() => markProgress.mutate({ assignmentId: workout.id, exerciseId: ex.exerciseId, status: 'SKIPPED' })}
-                        className="inline-flex min-h-12 items-center justify-center gap-1.5 rounded-xl border bg-card text-sm font-semibold text-muted-foreground transition active:scale-[0.97] hover:bg-accent disabled:opacity-60"
-                      >
-                        <SkipForward className="size-4" /> Skip
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })
-          )}
-        </motion.div>
-        {/* Dropped: sets/reps/rest per exercise — the member endpoint exposes only name + day, so none are shown. */}
+                ) : null}
+              </>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </SectionCard>
+
+      <ProgressSection tracking={tracking} />
+      <InsightsCard insights={tracking.insights} />
+      <HistorySection />
+
+      <LogSheet
+        open={!!detailsFor}
+        onOpenChange={(o) => !o && setDetailsFor(null)}
+        title={detailsFor?.name ?? 'Exercise details'}
+        description={detailsFor ? `${dayTitle} - saving marks it done.` : undefined}
+        initial={
+          detailsFor
+            ? detailsFor.status === 'COMPLETED'
+              ? { setsDone: detailsFor.setsDone, repsDone: detailsFor.repsDone, weightKg: detailsFor.weightKg, durationMin: detailsFor.durationMin, notes: detailsFor.logNotes }
+              : { setsDone: detailsFor.sets, repsDone: detailsFor.reps }
+            : null
+        }
+        hint={detailsFor && describeTarget(detailsFor) ? `Plan: ${describeTarget(detailsFor)}` : null}
+        submitLabel={detailsFor?.status === 'COMPLETED' ? 'Save changes' : 'Save as done'}
+        onSave={async (d: LogDetails) => {
+          if (!detailsFor) return;
+          await log.mutateAsync({ exerciseId: detailsFor.exerciseId, date: day.date, status: 'COMPLETED', ...d });
+          toast.success('Saved - nice work!');
+        }}
+      />
+
+      <CompleteSheet
+        open={completeOpen}
+        onOpenChange={setCompleteOpen}
+        dayLabel={day.isToday ? 'today' : day.label}
+        remaining={remaining}
+        onComplete={async (input: Pick<WorkoutCompleteInput, 'durationMin' | 'effort' | 'notes'>) => {
+          const r = await complete.mutateAsync({ date: day.date, ...input });
+          toast.success(r.completedNow > 0 ? `Workout complete - ${r.completedNow} ${r.completedNow === 1 ? 'exercise' : 'exercises'} marked done` : 'Workout saved');
+        }}
+      />
+
+      <ConfirmDialog
+        open={resetOpen}
+        onOpenChange={setResetOpen}
+        title="Reset this day?"
+        description={`Everything you logged for ${day.isToday ? 'today' : day.label} (exercises, duration and effort) will be cleared.`}
+        confirmLabel="Reset day"
+        destructive
+        loading={reset.isPending}
+        onConfirm={() =>
+          reset.mutate(day.date, {
+            onSuccess: () => {
+              toast.success('Day cleared');
+              setResetOpen(false);
+            },
+            onError: (err) => toast.error(err.message || 'Could not reset the day.'),
+          })
+        }
+      />
     </div>
   );
 }
+

@@ -242,6 +242,8 @@ model Tenant {
   workoutPlanExercises  WorkoutPlanExercise[]
   memberWorkoutPlans    MemberWorkoutPlan[]
   memberWorkoutProgress MemberWorkoutProgress[]
+  memberWorkoutDailyLogs   MemberWorkoutDailyLog[]
+  memberWorkoutSessionLogs MemberWorkoutSessionLog[]
   foods                 Food[]
   dietPlans             DietPlan[]
   dietPlanMeals         DietPlanMeal[]
@@ -953,6 +955,8 @@ model Member {
   leadConversion   Lead?             @relation("LeadConvertedMember")
   attendances      Attendance[]
   workoutPlans     MemberWorkoutPlan[]
+  workoutDailyLogs   MemberWorkoutDailyLog[]
+  workoutSessionLogs MemberWorkoutSessionLog[]
   dietPlans        MemberDietPlan[]
   invoices         MemberInvoice[]
   payments         MemberPayment[]
@@ -1251,6 +1255,15 @@ model BodyMeasurement {
   /// that user is later removed (same nullable + SetNull shape as
   /// `Attendance.checkedInBy`).
   recordedBy     String?  @map("recorded_by") @db.Uuid
+  /// Who authored the entry. STAFF (default — every pre-existing row) =
+  /// logged through the staff `/measurements` routes; MEMBER = the member
+  /// logged it themselves via `/portal/measurements` (then `recordedBy` is
+  /// null). Only MEMBER rows can be edited/deleted from the member plane, and
+  /// a partial unique index (`body_measurements_one_member_entry_per_day`,
+  /// hand-written in the migration — Prisma can't express it) allows at most
+  /// one MEMBER entry per member per calendar day (`recordedAt` is
+  /// normalised to UTC midnight for those rows).
+  source         MeasurementSource @default(STAFF)
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -1261,6 +1274,11 @@ model BodyMeasurement {
   @@index([tenantId, memberId])
   @@index([tenantId, recordedAt])
   @@map("body_measurements")
+}
+
+enum MeasurementSource {
+  STAFF
+  MEMBER
 }
 
 /// QR_CODE and MANUAL are the only methods wired up today; the device-based
@@ -1555,6 +1573,7 @@ model Exercise {
   tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   planExercises WorkoutPlanExercise[]
   progress      MemberWorkoutProgress[]
+  dailyLogs     MemberWorkoutDailyLog[]
 
   @@unique([tenantId, name])
   @@index([tenantId, isActive])
@@ -1673,6 +1692,8 @@ model MemberWorkoutPlan {
   workoutPlan    WorkoutPlan             @relation(fields: [workoutPlanId], references: [id], onDelete: Restrict)
   assignedByUser User?                   @relation("MemberWorkoutPlanAssignedBy", fields: [assignedBy], references: [id], onDelete: SetNull)
   progress       MemberWorkoutProgress[]
+  dailyLogs      MemberWorkoutDailyLog[]
+  sessionLogs    MemberWorkoutSessionLog[]
 
   @@index([tenantId, memberId])
   @@index([tenantId, workoutPlanId])
@@ -1710,6 +1731,73 @@ model MemberWorkoutProgress {
   @@unique([memberWorkoutPlanId, exerciseId])
   @@index([tenantId, memberWorkoutPlanId])
   @@map("member_workout_progress")
+}
+
+/// What a member did for one exercise on one calendar day.
+enum WorkoutLogStatus {
+  COMPLETED
+  SKIPPED
+
+  @@map("workout_log_status")
+}
+
+/// Per-day workout history (member self-tracking). `MemberWorkoutProgress`
+/// above keeps ONE overwritten row per assignment+exercise (no history); this
+/// table keeps one row per (assignment, exercise, calendar day) — logging
+/// again the same day updates the row. `logDate` is the member's branch-local
+/// calendar day. The actual* columns are optional and only meaningful for
+/// COMPLETED rows. Written only by the member plane (`/portal/workout/log`),
+/// which also mirrors the latest status into `MemberWorkoutProgress` so staff
+/// views keep working. Hand-written RLS migration.
+model MemberWorkoutDailyLog {
+  id                  String           @id @default(uuid()) @db.Uuid
+  tenantId            String           @map("tenant_id") @db.Uuid
+  memberId            String           @map("member_id") @db.Uuid
+  memberWorkoutPlanId String           @map("member_workout_plan_id") @db.Uuid
+  exerciseId          String           @map("exercise_id") @db.Uuid
+  logDate             DateTime         @map("log_date") @db.Date
+  status              WorkoutLogStatus
+  setsDone            Int?             @map("sets_done")
+  repsDone            Int?             @map("reps_done")
+  weightKg            Decimal?         @map("weight_kg") @db.Decimal(6, 2)
+  durationMin         Int?             @map("duration_min")
+  notes               String?
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member            Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberWorkoutPlan MemberWorkoutPlan @relation(fields: [memberWorkoutPlanId], references: [id], onDelete: Cascade)
+  exercise          Exercise          @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  @@unique([memberWorkoutPlanId, exerciseId, logDate], map: "member_workout_daily_logs_plan_exercise_date_key")
+  @@index([tenantId, memberId, logDate])
+  @@map("member_workout_daily_logs")
+}
+
+/// Optional per-day "I finished my workout" metadata (duration, effort 1-5,
+/// note) — at most one per member per calendar day. Whether a day COUNTS as a
+/// completed session is computed from the exercise logs, not from this row.
+model MemberWorkoutSessionLog {
+  id                  String   @id @default(uuid()) @db.Uuid
+  tenantId            String   @map("tenant_id") @db.Uuid
+  memberId            String   @map("member_id") @db.Uuid
+  memberWorkoutPlanId String   @map("member_workout_plan_id") @db.Uuid
+  logDate             DateTime @map("log_date") @db.Date
+  durationMin         Int?     @map("duration_min")
+  /// Simple perceived-effort rating, 1 (easy) to 5 (very hard).
+  effort              Int?
+  notes               String?
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member            Member            @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  memberWorkoutPlan MemberWorkoutPlan @relation(fields: [memberWorkoutPlanId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, logDate])
+  @@index([tenantId, memberId, logDate])
+  @@map("member_workout_session_logs")
 }
 
 /// The gym's own food catalog — reused across diet plans via

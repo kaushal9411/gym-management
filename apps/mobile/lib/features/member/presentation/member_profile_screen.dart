@@ -32,6 +32,7 @@ import 'member_profile_logic.dart';
 import 'widgets/member_dash_ui.dart';
 import 'widgets/member_profile_blocks.dart';
 import 'widgets/member_photo_sheet.dart';
+import 'widgets/member_plan_benefits.dart';
 
 /// Picks a photo and returns its bytes (null = cancelled). Injectable so
 /// widget tests never touch the platform channel.
@@ -61,7 +62,9 @@ Future<Uint8List?> pickMemberPhoto(ImageSource source) async {
 /// **Edit profile** and the **Check-in QR** dialog); the camera badge takes /
 /// chooses / removes the photo (`POST|DELETE /portal/profile/photo`). Then
 /// web's profile-completeness ring with its ten real checks as chips (tap a
-/// missing one to edit), Plan / Member since / Trainer tiles, **About you**,
+/// missing one to edit), Plan / Member since / Trainer tiles, the **What's
+/// included** plan card (`GET /portal/plan`: every benefit of the current plan
+/// with usage vs quota), **About you**,
 /// **Fitness**, **Contact details** (address + emergency contact) — only the
 /// fields that are set — **Managed by your gym** (read-only), **Security &
 /// data** (change password, download my data) and Log out. Everything staggers
@@ -91,6 +94,9 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
   bool _uploading = false;
   double? _progress;
 
+  /// Bumped on every (re)load so the plan-benefits block refetches with it.
+  int _planEpoch = 0;
+
   @override
   void initState() {
     super.initState();
@@ -101,6 +107,7 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _planEpoch++;
     });
     try {
       final profile = await getIt<MemberPortalRepository>().selfProfile();
@@ -606,6 +613,10 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                     );
                   },
                 ),
+                if (locked.planName != null) ...[
+                  const SizedBox(height: 14),
+                  MemberPlanBenefitsSection(reloadToken: _planEpoch),
+                ],
                 const SizedBox(height: 18),
                 block(
                   id: 'personal',

@@ -15,10 +15,12 @@ import 'package:gym_saas_mobile/features/member/presentation/member_edit_profile
 import 'package:gym_saas_mobile/features/member/presentation/member_profile_logic.dart';
 import 'package:gym_saas_mobile/features/member/presentation/member_profile_screen.dart';
 import 'package:gym_saas_mobile/features/member/presentation/widgets/member_photo_sheet.dart';
+import 'package:gym_saas_mobile/models/member_plan.dart';
 import 'package:gym_saas_mobile/models/member_self_profile.dart';
 import 'package:gym_saas_mobile/repositories/member_portal_repository.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../fixtures/member_plan_fixtures.dart';
 import '../models/member_self_profile_test.dart' show dtoFixture, realFixture;
 
 class _MockRepo extends Mock implements MemberPortalRepository {}
@@ -103,8 +105,11 @@ void main() {
     await t.pump();
     verifyNever(() => repo.updateProfile(any()));
 
-    await t.scrollUntilVisible(find.text('City'), 300,
-        scrollable: find.byType(Scrollable).first,);
+    await t.scrollUntilVisible(
+      find.text('City'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await t.enterText(inputFor('City'), 'Mumbai');
     await t.pump();
     await t.tap(find.text('Save changes'));
@@ -132,8 +137,11 @@ void main() {
     await pump(t, MemberEditProfileScreen(profile: profile));
     expect(find.text('Current password'), findsNothing);
 
-    await t.scrollUntilVisible(find.text('Email'), 300,
-        scrollable: find.byType(Scrollable).first,);
+    await t.scrollUntilVisible(
+      find.text('Email'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     await t.enterText(inputFor('Email'), 'new@example.com');
     await t.pump();
     await t.pump(const Duration(milliseconds: 400));
@@ -162,7 +170,8 @@ void main() {
     await pump(
       t,
       MemberEditProfileScreen(
-          profile: MemberSelfProfile.fromJson(realFixture()),),
+        profile: MemberSelfProfile.fromJson(realFixture()),
+      ),
     );
     await t.enterText(inputFor('First name'), '');
     await t.pump();
@@ -221,6 +230,8 @@ void main() {
     );
     when(() => repo.uploadPhoto(any(), onProgress: any(named: 'onProgress')))
         .thenAnswer((_) async => 'http://x/new.jpg');
+    when(() => repo.plan())
+        .thenAnswer((_) async => MemberPlan.fromJson(planJson()));
     await pump(
       t,
       MemberProfileScreen(
@@ -250,6 +261,13 @@ void main() {
         clearPhoto: any(named: 'clearPhoto'),
       ),
     ).called(greaterThanOrEqualTo(1));
+
+    await t.scrollUntilVisible(
+      find.text('What’s included'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Quarterly Pro'), findsWidgets);
 
     await t.scrollUntilVisible(
       find.text('Ask the front desk to change these.'),
@@ -292,7 +310,8 @@ void main() {
         memberProfileHint(checks),
         'Add your date of birth and address +4 more',
       );
-      final full = memberProfileChecks(MemberSelfProfile.fromJson(dtoFixture()));
+      final full =
+          memberProfileChecks(MemberSelfProfile.fromJson(dtoFixture()));
       expect(memberProfilePercent(full), greaterThan(40));
     });
 
@@ -341,7 +360,10 @@ void main() {
       await show(t, find.text('address'));
       await t.tap(find.text('address'));
       await t.pump(const Duration(seconds: 1));
-      expect(find.byKey(const ValueKey('block-save-addressLine')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('block-save-addressLine')),
+        findsOneWidget,
+      );
       expect(find.text('Address line'), findsOneWidget);
     });
 
@@ -381,8 +403,7 @@ void main() {
       expect(find.text('9111111111'), findsWidgets);
     });
 
-    testWidgets('changing the e-mail asks for the current password',
-        (t) async {
+    testWidgets('changing the e-mail asks for the current password', (t) async {
       when(() => repo.selfProfile()).thenAnswer(
         (_) async => MemberSelfProfile.fromJson(realFixture()),
       );

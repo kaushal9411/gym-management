@@ -17,6 +17,8 @@ class ChartSeries {
     required this.values,
     required this.unit,
     this.fill = false,
+    this.dots = true,
+    this.strokeWidth = 2.6,
   });
 
   final String label;
@@ -28,6 +30,13 @@ class ChartSeries {
 
   /// Area gradient under the line.
   final bool fill;
+
+  /// Ring marker on every point (off for smoothed overlay lines such as the
+  /// 7-day moving average).
+  final bool dots;
+
+  /// Line thickness.
+  final double strokeWidth;
 
   bool get hasData => values.any((v) => v != null);
 }
@@ -361,20 +370,22 @@ class _LinePainter extends CustomPainter {
         Paint()
           ..color = s.color
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.6
+          ..strokeWidth = s.strokeWidth
           ..strokeCap = StrokeCap.round
           ..strokeJoin = StrokeJoin.round,
       );
-      for (final p in pts) {
-        canvas.drawCircle(p, 3.6, Paint()..color = surface);
-        canvas.drawCircle(
-          p,
-          3.6,
-          Paint()
-            ..color = s.color
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2,
-        );
+      if (s.dots) {
+        for (final p in pts) {
+          canvas.drawCircle(p, 3.6, Paint()..color = surface);
+          canvas.drawCircle(
+            p,
+            3.6,
+            Paint()
+              ..color = s.color
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = 2,
+          );
+        }
       }
     }
     canvas.restore();

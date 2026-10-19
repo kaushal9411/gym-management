@@ -373,6 +373,12 @@ class _MemberMeasurementsDetailScreenState
                         color: TeamColors.green,
                         icon: Icons.bolt_rounded,
                       ),
+                    if (e.isMemberLogged)
+                      const TeamTag(
+                        label: 'Logged by member',
+                        color: TeamColors.teal,
+                        icon: Icons.person_rounded,
+                      ),
                   ],
                 ),
               ),

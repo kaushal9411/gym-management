@@ -11,6 +11,8 @@ export interface BodyMeasurement {
   bicepsCm: string | null;
   thighsCm: string | null;
   notes: string | null;
+  /** Who logged it: staff (default) or the member themselves from the portal. */
+  source?: 'STAFF' | 'MEMBER';
   recordedBy: { id: string; name: string } | null;
   createdAt: string;
   updatedAt: string;

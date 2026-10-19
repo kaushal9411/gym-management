@@ -5,6 +5,7 @@ import {
   fillDailySeries,
   fillWeekdayCounts,
   flattenBusinessHours,
+  flattenHolidays,
   membershipCountdown,
   monthComparisonWindows,
   pickSocialLinks,
@@ -156,5 +157,28 @@ describe('public gym helpers', () => {
       pickSocialLinks({ facebook: 'https://f.com/x', secretToken: 'abc', instagram: '' }),
     ).toEqual({ facebook: 'https://f.com/x' });
     expect(pickSocialLinks(null)).toBeNull();
+  });
+});
+
+describe('flattenHolidays', () => {
+  it('returns null for non-arrays and empty lists', () => {
+    expect(flattenHolidays(null)).toBeNull();
+    expect(flattenHolidays({})).toBeNull();
+    expect(flattenHolidays([])).toBeNull();
+  });
+  it('sorts by date, trims labels, drops bad rows and duplicates', () => {
+    expect(
+      flattenHolidays([
+        { date: '2026-10-24', label: ' Diwali ' },
+        { date: '2026-10-17' },
+        { date: '2026-10-24', label: 'dup' },
+        { date: 'not-a-date', label: 'x' },
+        { label: 'no date' },
+        null,
+      ]),
+    ).toEqual([
+      { date: '2026-10-17', label: null },
+      { date: '2026-10-24', label: 'Diwali' },
+    ]);
   });
 });

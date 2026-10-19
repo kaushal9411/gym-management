@@ -99,10 +99,17 @@ class MeasurementFormFields extends StatelessWidget {
     super.key,
     required this.controller,
     this.enabled = true,
+    this.firstDate,
+    this.lastDate,
   });
 
   final MeasurementFormController controller;
   final bool enabled;
+
+  /// Date-picker bounds (the member plane limits logging to today and 365
+  /// days back); unbounded when null, as on the staff screens.
+  final DateTime? firstDate;
+  final DateTime? lastDate;
 
   static final _decimal = [
     FilteringTextInputFormatter.allow(RegExp(r'^\d*[.,]?\d{0,2}')),
@@ -145,6 +152,8 @@ class MeasurementFormFields extends StatelessWidget {
                   icon: Icons.event_rounded,
                   iconColor: TeamColors.indigo,
                   value: controller.date,
+                  firstDate: firstDate,
+                  lastDate: lastDate,
                   clearable: false,
                   onChanged: (d) {
                     if (enabled && d != null) controller.setDate(d);

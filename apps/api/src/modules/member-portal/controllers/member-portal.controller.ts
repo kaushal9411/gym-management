@@ -5,8 +5,10 @@ import { sendSuccess } from '../../../core/http/response';
 import { buildMemberAuthService } from '../../member-auth/services/member-auth.service';
 import { MemberGdprService } from '../../members/services/member-gdpr.service';
 import { MemberOverviewService } from '../services/member-overview.service';
+import { MemberPlanService } from '../services/member-plan.service';
 import { MemberPortalService } from '../services/member-portal.service';
 import { MemberProfileService } from '../services/member-profile.service';
+import { MemberSelfMeasurementService } from '../services/member-self-measurement.service';
 
 function serviceFor(req: Request): MemberPortalService {
   return new MemberPortalService(req.tenant!.id);
@@ -49,6 +51,10 @@ export class MemberPortalController {
 
   async overview(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await overviewFor(req).getOverview(memberId(req)));
+  }
+
+  async plan(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await new MemberPlanService(req.tenant!.id).getPlan(memberId(req)));
   }
 
   async payments(req: Request, res: Response): Promise<void> {
@@ -124,6 +130,22 @@ export class MemberPortalController {
 
   async measurements(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await serviceFor(req).getMeasurements(memberId(req)));
+  }
+
+  /** Create (or merge into) the member's own entry for the day — 201 when new, 200 when an existing same-day entry was updated. */
+  async logMeasurement(req: Request, res: Response): Promise<void> {
+    const { measurement, created } = await new MemberSelfMeasurementService(req.tenant!.id).log(memberId(req), req.body, ctxOf(req));
+    sendSuccess(res, measurement, created ? 'Measurement logged.' : 'Today’s entry updated.', created ? 201 : 200);
+  }
+
+  async updateMeasurement(req: Request<{ id: string }>, res: Response): Promise<void> {
+    const result = await new MemberSelfMeasurementService(req.tenant!.id).update(memberId(req), req.params.id, req.body, ctxOf(req));
+    sendSuccess(res, result, 'Measurement updated.');
+  }
+
+  async deleteMeasurement(req: Request<{ id: string }>, res: Response): Promise<void> {
+    await new MemberSelfMeasurementService(req.tenant!.id).delete(memberId(req), req.params.id, ctxOf(req));
+    sendSuccess(res, null, 'Measurement deleted.');
   }
 
   async logDiet(req: Request<{ id: string }>, res: Response): Promise<void> {

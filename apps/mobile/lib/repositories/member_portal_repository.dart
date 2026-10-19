@@ -15,11 +15,13 @@ import '../models/member_diet_assignment.dart';
 import '../models/member_invoice.dart';
 import '../models/member_invoice_detail.dart';
 import '../models/member_overview.dart';
+import '../models/member_plan.dart';
 import '../models/member_portal_profile.dart';
 import '../models/member_self_profile.dart';
 import '../models/member_visit.dart';
 import '../models/member_workout_assignment.dart';
 import '../models/member_workout_progress.dart';
+import '../models/member_workout_tracking.dart';
 import '../models/paginated_result.dart';
 import '../models/portal_payment.dart';
 import '../models/report_export.dart';
@@ -73,17 +75,117 @@ class MemberPortalRepository {
     }
   }
 
-  Future<MemberWorkoutAssignment> markWorkoutProgress({
-    required String assignmentId,
+  // ── daily workout log (`/portal/workout/log*`) ──────────────────────────
+  // Every write returns the refreshed workout payload; the screen replaces
+  // its state with it (no optimistic UI). The legacy
+  // `POST /portal/workout/:id/progress` is no longer called by the app —
+  // the API mirrors each log into it for staff views.
+
+  /// Logs (or updates) one exercise for [date] (the plan's active week day).
+  /// Pass [details] only with [LogStatus.completed]; its null fields clear.
+  Future<WorkoutWriteResult> logWorkout({
     required String exerciseId,
-    required ExerciseProgressStatus status,
+    required String date,
+    required LogStatus status,
+    WorkoutDetails? details,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
-        '/portal/workout/$assignmentId/progress',
-        data: {'exerciseId': exerciseId, 'status': status.apiValue},
+        '/portal/workout/log',
+        data: {
+          'exerciseId': exerciseId,
+          'date': date,
+          'status': status.apiValue,
+          if (details != null) ...details.toJson(),
+        },
       );
-      return MemberWorkoutAssignment.fromJson(
+      return WorkoutWriteResult.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+        created: response.statusCode == 201,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Edits an entry's details (the day and exercise never change).
+  Future<WorkoutWriteResult> updateWorkoutLog(
+    String id,
+    WorkoutDetails details,
+  ) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/portal/workout/log/$id',
+        data: details.toJson(),
+      );
+      return WorkoutWriteResult.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Undo: removes the entry.
+  Future<WorkoutWriteResult> deleteWorkoutLog(String id) async {
+    try {
+      final response =
+          await _dio.delete<Map<String, dynamic>>('/portal/workout/log/$id');
+      return WorkoutWriteResult.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// "Finish workout": every unlogged exercise of [date] becomes done; the
+  /// optional [durationMin] / [effort] (1-5) / [notes] are stored for the day.
+  Future<WorkoutWriteResult> completeWorkoutDay({
+    required String date,
+    int? durationMin,
+    int? effort,
+    String? notes,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/portal/workout/log/complete',
+        data: {
+          'date': date,
+          if (durationMin != null) 'durationMin': durationMin,
+          if (effort != null) 'effort': effort,
+          if (notes != null) 'notes': notes,
+        },
+      );
+      return WorkoutWriteResult.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Clears everything logged for [date] (entries + duration / effort).
+  Future<WorkoutWriteResult> resetWorkoutDay(String date) async {
+    try {
+      final response = await _dio
+          .delete<Map<String, dynamic>>('/portal/workout/log/day/$date');
+      return WorkoutWriteResult.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// The member's own log entries (newest first), up to [days] days.
+  Future<WorkoutHistory> workoutHistory({int days = 60}) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/portal/workout/log',
+        queryParameters: {'days': days},
+      );
+      return WorkoutHistory.fromJson(
         response.data!['data'] as Map<String, dynamic>,
       );
     } on DioException catch (e) {
@@ -112,6 +214,7 @@ class MemberPortalRepository {
     int? waterIntakeMl,
     double? weightKg,
     Map<MealType, ExerciseProgressStatus>? mealsStatus,
+    String? notes,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -120,6 +223,7 @@ class MemberPortalRepository {
           'date': date.toIso8601String().substring(0, 10),
           if (waterIntakeMl != null) 'waterIntakeMl': waterIntakeMl,
           if (weightKg != null) 'weightKg': weightKg,
+          if (notes != null) 'notes': notes,
           if (mealsStatus != null)
             'mealsStatus': {
               for (final e in mealsStatus.entries)
@@ -138,11 +242,22 @@ class MemberPortalRepository {
   /// `GET /portal/overview` — the aggregated Insights payload (dashboard).
   Future<MemberOverview> overview() async {
     try {
-      final response =
-          await _dio.get<Map<String, dynamic>>('/portal/overview');
+      final response = await _dio.get<Map<String, dynamic>>('/portal/overview');
       return MemberOverview.fromJson(
         response.data!['data'] as Map<String, dynamic>,
       );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `GET /portal/plan` — the current plan and everything it includes with
+  /// usage vs quota; null when the member has no membership at all.
+  Future<MemberPlan?> plan() async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>('/portal/plan');
+      final data = response.data!['data'];
+      return data is Map<String, dynamic> ? MemberPlan.fromJson(data) : null;
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -322,8 +437,8 @@ class MemberPortalRepository {
 
   /// Own body measurement history, newest first — reuses the staff-side
   /// `BodyMeasurement` DTO shape (identical, nothing needs hiding for the
-  /// member it belongs to). Read-only: a member never edits their own
-  /// measurements, only a trainer/owner/manager logs them.
+  /// member it belongs to). Each row carries `id` and `source`: only
+  /// `MEMBER` rows can be edited / deleted by the member (below).
   Future<List<BodyMeasurement>> measurements() async {
     try {
       final response =
@@ -332,6 +447,59 @@ class MemberPortalRepository {
       return data
           .map((e) => BodyMeasurement.fromJson(e as Map<String, dynamic>))
           .toList();
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Logs the member's own measurement (`POST /portal/measurements`) — the
+  /// quick weight log and the full check-in share this one call. One member
+  /// entry per calendar day: logging again for the same day updates it
+  /// server-side (merging the supplied fields), which the API reports as 200
+  /// instead of 201 -> [MeasurementLogResult.created] false.
+  Future<MeasurementLogResult> logMeasurement(
+    BodyMeasurementFormInput input,
+  ) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/portal/measurements',
+        data: input.toJson(),
+      );
+      return MeasurementLogResult(
+        entry: BodyMeasurement.fromJson(
+          response.data!['data'] as Map<String, dynamic>,
+        ),
+        created: response.statusCode == 201,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Edits an entry the member logged themselves (`PATCH
+  /// /portal/measurements/:id`). Staff-recorded entries are 403, someone
+  /// else's 404. PATCH cannot clear a numeric value (same as staff).
+  Future<BodyMeasurement> updateMeasurement(
+    String id,
+    BodyMeasurementFormInput input,
+  ) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/portal/measurements/$id',
+        data: input.toJson(),
+      );
+      return BodyMeasurement.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// Deletes an entry the member logged themselves.
+  Future<void> deleteMeasurement(String id) async {
+    try {
+      await _dio.delete<void>('/portal/measurements/$id');
     } on DioException catch (e) {
       throw _mapError(e);
     }

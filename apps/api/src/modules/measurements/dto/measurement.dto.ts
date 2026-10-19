@@ -12,6 +12,8 @@ export interface BodyMeasurementDto {
   thighsCm: string | null;
   notes: string | null;
   recordedBy: { id: string; name: string } | null;
+  /** Who authored the entry — `MEMBER` rows were logged by the member themselves (and are the only ones the member plane may edit/delete). */
+  source: 'STAFF' | 'MEMBER';
   createdAt: string;
   updatedAt: string;
 }

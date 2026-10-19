@@ -430,6 +430,8 @@ class GymInfoBody extends StatelessWidget {
                       ],
                     ),
                   ),
+                if (b != null && b.holidays.isNotEmpty)
+                  bounce(_holidaysBlock(b.holidays, clock)),
                 if (i.social.isNotEmpty)
                   bounce(
                     _GymBlock(
@@ -468,6 +470,139 @@ class GymInfoBody extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Upcoming closed days of the member's branch: today onwards, soonest
+/// first, capped at 12. Past-only lists read "No upcoming holidays".
+Widget _holidaysBlock(List<GymHoliday> all, DateTime now) {
+  final today = DateTime(now.year, now.month, now.day);
+  final upcoming = all.where((h) => !h.date.isBefore(today)).take(12).toList();
+  final next = upcoming.isEmpty ? null : upcoming.first;
+  String when(GymHoliday h) {
+    final d = h.date.difference(today).inDays;
+    return d == 0
+        ? 'Today'
+        : d == 1
+            ? 'Tomorrow'
+            : 'In $d days';
+  }
+
+  return _GymBlock(
+    title: 'Holidays',
+    subtitle: next == null
+        ? 'No upcoming holidays'
+        : 'Next: ${_dayMonth(next.date)} · ${when(next).toLowerCase()}',
+    icon: Icons.event_busy_rounded,
+    colors: const [Color(0xFFF59E0B), Color(0xFFFF5C7A)],
+    children: [
+      if (upcoming.isEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+          child: Text(
+            'The gym has no closed days coming up.',
+            style: AppText.body(size: 13, color: AppColors.inkFaint),
+          ),
+        )
+      else
+        for (final h in upcoming) _HolidayRow(holiday: h, whenLabel: when(h)),
+      const SizedBox(height: 6),
+    ],
+  );
+}
+
+const _monthNames = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+const _weekdayNames = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+
+String _dayMonth(DateTime d) => '${d.day} ${_monthNames[d.month - 1]}';
+
+class _HolidayRow extends StatelessWidget {
+  const _HolidayRow({required this.holiday, required this.whenLabel});
+
+  final GymHoliday holiday;
+  final String whenLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = Color(0xFFF59E0B);
+    final d = holiday.date;
+    final soon = whenLabel == 'Today' || whenLabel == 'Tomorrow';
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: accent.withValues(alpha: 0.35)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '${d.day}',
+                  style: AppText.display(size: 17, color: accent),
+                ),
+                Text(
+                  _monthNames[d.month - 1].toUpperCase(),
+                  style: AppText.body(
+                    size: 9,
+                    weight: FontWeight.w800,
+                    color: accent,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  holiday.label ?? 'Closed',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.body(size: 13.5, weight: FontWeight.w700),
+                ),
+                Text(
+                  _weekdayNames[d.weekday - 1],
+                  style: AppText.body(size: 11.5, color: AppColors.inkFaint),
+                ),
+              ],
+            ),
+          ),
+          TeamTag(
+            label: whenLabel,
+            color: soon ? AppColors.danger : AppColors.inkFaint,
+          ),
+        ],
+      ),
     );
   }
 }

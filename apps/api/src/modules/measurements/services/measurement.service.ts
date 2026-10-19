@@ -5,7 +5,7 @@ import type { IamActor } from '../../authentication/utils/actor.util';
 import type { BodyMeasurementDto, CreateBodyMeasurementInput, MeasuredMemberDto, UpdateBodyMeasurementInput } from '../dto/measurement.dto';
 import { MeasurementRepository, type MeasurementRow } from '../repositories/measurement.repository';
 
-function toDto(row: MeasurementRow): BodyMeasurementDto {
+export function toMeasurementDto(row: MeasurementRow): BodyMeasurementDto {
   return {
     id: row.id,
     memberId: row.memberId,
@@ -20,6 +20,7 @@ function toDto(row: MeasurementRow): BodyMeasurementDto {
     thighsCm: row.thighsCm?.toString() ?? null,
     notes: row.notes,
     recordedBy: row.recordedByUser ? { id: row.recordedByUser.id, name: row.recordedByUser.name } : null,
+    source: row.source,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -39,7 +40,7 @@ export class MeasurementService {
   async listForMember(memberId: string): Promise<BodyMeasurementDto[]> {
     await this.mustFindMember(memberId);
     const rows = await this.measurements.list(this.tenantId, memberId);
-    return rows.map(toDto);
+    return rows.map(toMeasurementDto);
   }
 
   /** Backs the "Body Measurements" list page — only members with real history, not the full roster. */
@@ -54,7 +55,7 @@ export class MeasurementService {
         branch: { id: row.member.branch.id, name: row.member.branch.name },
         trainer: row.member.trainer ? { id: row.member.trainer.id, name: row.member.trainer.name } : null,
       },
-      latest: toDto(row),
+      latest: toMeasurementDto(row),
       count,
     }));
   }
@@ -80,7 +81,7 @@ export class MeasurementService {
       recordedBy: actor.userId,
     });
     await this.audit(actor, 'measurement.created', memberId);
-    return toDto(row);
+    return toMeasurementDto(row);
   }
 
   async update(id: string, input: UpdateBodyMeasurementInput, actor: IamActor): Promise<BodyMeasurementDto> {
@@ -101,7 +102,7 @@ export class MeasurementService {
       ...(input.notes !== undefined ? { notes: input.notes } : {}),
     });
     await this.audit(actor, 'measurement.updated', existing.memberId);
-    return toDto(row);
+    return toMeasurementDto(row);
   }
 
   async delete(id: string, actor: IamActor): Promise<void> {
@@ -113,7 +114,7 @@ export class MeasurementService {
   /** Self-service read for the member-portal plane — no RBAC, caller already proved `memberId` is their own via `req.memberAuth.sub`. */
   async listForSelf(memberId: string): Promise<BodyMeasurementDto[]> {
     const rows = await this.measurements.list(this.tenantId, memberId);
-    return rows.map(toDto);
+    return rows.map(toMeasurementDto);
   }
 
   private async mustFind(id: string): Promise<MeasurementRow> {

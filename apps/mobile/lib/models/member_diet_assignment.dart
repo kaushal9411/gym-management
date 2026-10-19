@@ -1,4 +1,5 @@
 import 'diet_plan.dart';
+import 'member_diet_nutrition.dart';
 import 'member_workout_progress.dart';
 
 /// One day's entry of `dailyLogs` — the design's water glasses, weight
@@ -23,9 +24,7 @@ class MemberDietDailyLog {
     return MemberDietDailyLog(
       date: DateTime.parse(json['date'] as String),
       waterIntakeMl: json['waterIntakeMl'] as int?,
-      weightKg: json['weightKg'] == null
-          ? null
-          : double.parse(json['weightKg'] as String),
+      weightKg: double.tryParse(json['weightKg']?.toString() ?? ''),
       mealsStatus: {
         for (final entry in raw.entries)
           MealTypeX.fromApi(entry.key):
@@ -39,6 +38,8 @@ class MemberDietDailyLog {
 /// Mirrors `GET /portal/diet` (null when nothing is assigned). The plan's
 /// `mealTypes` drive which meal rows the Diet Log shows — the backend
 /// rejects logging a meal type that isn't part of the assigned plan.
+/// [nutrition] is the additive derived block (eaten vs planned, history,
+/// weekly summary, rule-based advice); null only against an older API.
 class MemberDietAssignment {
   const MemberDietAssignment({
     required this.id,
@@ -48,8 +49,16 @@ class MemberDietAssignment {
     required this.dailyCalories,
     required this.mealTypes,
     required this.dailyLogs,
+    this.durationDays = 0,
+    this.endDate,
+    this.trainerRemarks,
+    this.nutrition,
   });
 
+  final int durationDays;
+  final DateTime? endDate;
+  final String? trainerRemarks;
+  final MemberDietNutrition? nutrition;
   final String id;
   final String status;
   final DateTime startDate;
@@ -84,6 +93,16 @@ class MemberDietAssignment {
       dailyLogs: (json['dailyLogs'] as List)
           .map((l) => MemberDietDailyLog.fromJson(l as Map<String, dynamic>))
           .toList(),
+      durationDays: (plan['durationDays'] as num?)?.toInt() ?? 0,
+      endDate: json['endDate'] == null
+          ? null
+          : DateTime.tryParse(json['endDate'] as String),
+      trainerRemarks: json['trainerRemarks'] as String?,
+      nutrition: json['nutrition'] == null
+          ? null
+          : MemberDietNutrition.fromJson(
+              json['nutrition'] as Map<String, dynamic>,
+            ),
     );
   }
 }

@@ -1,4 +1,6 @@
 import type { BodyMeasurement } from '@/features/measurements/types';
+import type { DietNutrition } from '../lib/diet-nutrition';
+import type { WorkoutCompleteInput, WorkoutHistory, WorkoutLogEntry, WorkoutLogInput, WorkoutLogPatch, WorkoutTracking } from '../lib/workout-tracking';
 import { memberApiClient, toMemberAuthServiceError } from './member-api-client';
 
 interface Envelope<T> {
@@ -6,6 +8,9 @@ interface Envelope<T> {
   data: T;
   message: string;
 }
+
+/** Body of POST/PATCH /portal/measurements — numbers in kg / cm / %; `recordedAt` is a YYYY-MM-DD day (default today). */
+export type MemberMeasurementInput = Partial<Record<'weightKg' | 'heightCm' | 'bodyFatPercent' | 'chestCm' | 'waistCm' | 'hipsCm' | 'bicepsCm' | 'thighsCm', number>> & { recordedAt?: string; notes?: string };
 
 export interface MemberPortalProfile {
   id: string;
@@ -40,6 +45,8 @@ export interface MemberPortalWorkout {
   trainerRemarks: string | null;
   workoutPlan: { id: string; name: string; level: string; durationWeeks: number; exercises: { exerciseId: string; name: string; dayOfWeek: string }[] };
   progress: { exerciseId: string; status: 'PENDING' | 'COMPLETED' | 'SKIPPED'; notes: string | null; markedAt: string | null }[];
+  /** Daily log + progress + rule-based advice (additive; see lib/workout-tracking.ts). */
+  tracking?: WorkoutTracking;
 }
 
 export interface MemberPortalDiet {
@@ -50,6 +57,8 @@ export interface MemberPortalDiet {
   trainerRemarks: string | null;
   dietPlan: { id: string; name: string; dailyCalories: number | null; durationDays: number; mealTypes: string[] };
   dailyLogs: { date: string; waterIntakeMl: number | null; weightKg: string | null; mealsStatus: Record<string, string> | null; notes: string | null }[];
+  /** Derived nutrition intake, history, weekly summary and rule-based advice (additive; see lib/diet-nutrition.ts). */
+  nutrition: DietNutrition;
 }
 
 export interface MemberPortalInvoice {
@@ -197,6 +206,64 @@ export const memberPortalService = {
     }
   },
 
+  // ── Daily workout log (POST/PATCH/DELETE /portal/workout/log*) - every write returns the refreshed workout payload ──
+
+  /** Log (or update) one exercise for a day. 201 = new entry, 200 = the day's entry was updated. */
+  async logWorkout(input: WorkoutLogInput): Promise<{ entry: WorkoutLogEntry; created: boolean; workout: MemberPortalWorkout }> {
+    try {
+      const res = await memberApiClient.post<Envelope<{ entry: WorkoutLogEntry; created: boolean; workout: MemberPortalWorkout }>>('/portal/workout/log', input);
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async updateWorkoutLog(id: string, patch: WorkoutLogPatch): Promise<{ entry: WorkoutLogEntry; workout: MemberPortalWorkout }> {
+    try {
+      const res = await memberApiClient.patch<Envelope<{ entry: WorkoutLogEntry; workout: MemberPortalWorkout }>>(`/portal/workout/log/${id}`, patch);
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async deleteWorkoutLog(id: string): Promise<{ workout: MemberPortalWorkout | null }> {
+    try {
+      const res = await memberApiClient.delete<Envelope<{ workout: MemberPortalWorkout | null }>>(`/portal/workout/log/${id}`);
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  /** "Complete workout": every unlogged exercise of the day becomes done; optional duration (min) / effort (1-5) / note. */
+  async completeWorkoutDay(input: WorkoutCompleteInput): Promise<{ completedNow: number; workout: MemberPortalWorkout }> {
+    try {
+      const res = await memberApiClient.post<Envelope<{ completedNow: number; workout: MemberPortalWorkout }>>('/portal/workout/log/complete', input);
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async resetWorkoutDay(date: string): Promise<{ workout: MemberPortalWorkout | null }> {
+    try {
+      const res = await memberApiClient.delete<Envelope<{ workout: MemberPortalWorkout | null }>>(`/portal/workout/log/day/${date}`);
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async getWorkoutHistory(days = 60): Promise<WorkoutHistory> {
+    try {
+      const res = await memberApiClient.get<Envelope<WorkoutHistory>>('/portal/workout/log', { params: { days } });
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
   async getDiet(): Promise<MemberPortalDiet | null> {
     try {
       const res = await memberApiClient.get<Envelope<MemberPortalDiet | null>>('/portal/diet');
@@ -220,6 +287,34 @@ export const memberPortalService = {
     try {
       const res = await memberApiClient.get<Envelope<BodyMeasurement[]>>('/portal/measurements');
       return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  /** Log own measurement (quick weight or full check-in). One MEMBER entry per day — same-day logs merge server-side. */
+  async logMeasurement(input: MemberMeasurementInput): Promise<BodyMeasurement> {
+    try {
+      const res = await memberApiClient.post<Envelope<BodyMeasurement>>('/portal/measurements', input);
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  /** Edit an entry the member logged (staff-recorded entries are rejected with 403). */
+  async updateMeasurement(id: string, input: MemberMeasurementInput): Promise<BodyMeasurement> {
+    try {
+      const res = await memberApiClient.patch<Envelope<BodyMeasurement>>(`/portal/measurements/${id}`, input);
+      return res.data.data;
+    } catch (error) {
+      throw toMemberAuthServiceError(error);
+    }
+  },
+
+  async deleteMeasurement(id: string): Promise<void> {
+    try {
+      await memberApiClient.delete(`/portal/measurements/${id}`);
     } catch (error) {
       throw toMemberAuthServiceError(error);
     }
@@ -465,6 +560,46 @@ export async function fetchMemberOverview(): Promise<MemberOverview> {
 export async function fetchGymInfo(): Promise<MemberGymInfo> {
   try {
     const res = await memberApiClient.get<Envelope<MemberGymInfo>>('/portal/gym');
+    return res.data.data;
+  } catch (error) {
+    throw toMemberAuthServiceError(error);
+  }
+}
+
+/** `GET /portal/plan` - the current plan and everything it includes. The server builds `benefits` (one pure util shared with mobile): a 0 quota arrives as `included: false`; an uncapped freeze as `quota: null` + note "No limit". `data` is null when the member has never had a membership. */
+export type MemberPlanBenefitKey = 'gym_access' | 'pt_sessions' | 'group_classes' | 'diet_consultation' | 'locker' | 'guest_passes' | 'freeze';
+export interface MemberPlanBenefit {
+  key: MemberPlanBenefitKey;
+  label: string;
+  included: boolean;
+  quota: number | null;
+  used: number | null;
+  remaining: number | null;
+  /** 'sessions' | 'classes' | 'passes' | 'days' for quota benefits. */
+  unit: string | null;
+  /** 'All branches', 'No limit', 'Not allowed', 'All used', '2 branches' ... */
+  note: string | null;
+  /** Gym access only: branch names when the plan is limited to selected branches. */
+  items: string[];
+}
+export interface MemberPlan {
+  name: string;
+  code: string;
+  category: string | null;
+  description: string | null;
+  durationLabel: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  daysLeft: number;
+  expired: boolean;
+  totalDays: number;
+  benefits: MemberPlanBenefit[];
+}
+
+export async function fetchMemberPlan(): Promise<MemberPlan | null> {
+  try {
+    const res = await memberApiClient.get<Envelope<MemberPlan | null>>('/portal/plan');
     return res.data.data;
   } catch (error) {
     throw toMemberAuthServiceError(error);

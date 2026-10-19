@@ -147,6 +147,28 @@ export function flattenBusinessHours(raw: unknown): PublicBusinessHour[] | null 
   return rows.length ? rows : null;
 }
 
+export interface PublicHoliday {
+  /** `YYYY-MM-DD` (calendar day, no timezone). */
+  date: string;
+  label: string | null;
+}
+
+/** Stored `[{date, label?}]` -> valid, de-duplicated, date-sorted list; null when none. Malformed rows are skipped. */
+export function flattenHolidays(raw: unknown): PublicHoliday[] | null {
+  if (!Array.isArray(raw)) return null;
+  const seen = new Set<string>();
+  const rows: PublicHoliday[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const { date, label } = item as { date?: unknown; label?: unknown };
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || seen.has(date)) continue;
+    seen.add(date);
+    rows.push({ date, label: typeof label === 'string' && label.trim() ? label.trim() : null });
+  }
+  rows.sort((a, b) => a.date.localeCompare(b.date));
+  return rows.length ? rows : null;
+}
+
 const SOCIAL_KEYS = ['facebook', 'instagram', 'twitter', 'youtube', 'linkedin'] as const;
 
 /** Whitelist: only known social keys with string values pass through. */

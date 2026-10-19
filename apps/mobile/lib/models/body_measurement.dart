@@ -20,6 +20,18 @@ class BodyMeasurementRecorder {
       );
 }
 
+/// Who authored an entry (`source` on the wire, UPPER_SNAKE): STAFF = a
+/// trainer/owner/manager logged it; MEMBER = the member logged it themselves
+/// from the app (the only entries the member plane may edit or delete).
+/// Unknown / missing values (older API) read as [staff].
+enum MeasurementSource {
+  staff,
+  member;
+
+  static MeasurementSource parse(Object? v) =>
+      v?.toString().toUpperCase() == 'MEMBER' ? member : staff;
+}
+
 class BodyMeasurement {
   const BodyMeasurement({
     required this.id,
@@ -35,6 +47,7 @@ class BodyMeasurement {
     required this.thighsCm,
     required this.notes,
     required this.recordedBy,
+    this.source = MeasurementSource.staff,
   });
 
   final String id;
@@ -50,6 +63,10 @@ class BodyMeasurement {
   final double? thighsCm;
   final String? notes;
   final BodyMeasurementRecorder? recordedBy;
+  final MeasurementSource source;
+
+  /// Logged by the member themselves (`recordedBy` is null for these).
+  bool get isMemberLogged => source == MeasurementSource.member;
 
   /// DECIMAL columns arrive as strings ("78.50"); tolerate real numbers too.
   static double? _num(dynamic v) =>
@@ -74,6 +91,7 @@ class BodyMeasurement {
             : BodyMeasurementRecorder.fromJson(
                 json['recordedBy'] as Map<String, dynamic>,
               ),
+        source: MeasurementSource.parse(json['source']),
       );
 
   /// Compact one-line summary of whichever fields were actually recorded —
@@ -94,6 +112,16 @@ class BodyMeasurement {
 
   static String _trim(double v) =>
       v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toString();
+}
+
+/// Result of `POST /portal/measurements`: the saved entry, and whether it was
+/// newly created (201) or merged into the member's existing entry for that
+/// day (200 — "one member entry per day").
+class MeasurementLogResult {
+  const MeasurementLogResult({required this.entry, required this.created});
+
+  final BodyMeasurement entry;
+  final bool created;
 }
 
 /// Full create/update field set — mirrors web's `CreateBodyMeasurementPayload`.

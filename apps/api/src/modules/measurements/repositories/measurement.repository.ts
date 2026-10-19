@@ -67,6 +67,18 @@ export class MeasurementRepository {
     return this.db.bodyMeasurement.findFirst({ where: { tenantId, id }, include: WITH_RECORDER });
   }
 
+  /**
+   * The member's own (source = MEMBER) entry for a calendar day. Member rows
+   * store `recordedAt` normalised to UTC midnight, so equality is the match;
+   * the partial unique index guarantees there is at most one.
+   */
+  async findMemberEntryOnDay(tenantId: string, memberId: string, day: Date) {
+    return this.db.bodyMeasurement.findFirst({
+      where: { tenantId, memberId, source: 'MEMBER', recordedAt: day },
+      include: WITH_RECORDER,
+    });
+  }
+
   async create(data: Prisma.BodyMeasurementUncheckedCreateInput) {
     return this.db.bodyMeasurement.create({ data, include: WITH_RECORDER });
   }

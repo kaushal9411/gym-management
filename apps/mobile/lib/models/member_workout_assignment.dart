@@ -1,11 +1,12 @@
 import 'member_workout_progress.dart';
+import 'member_workout_tracking.dart';
 import 'workout_plan.dart';
 
 /// One exercise of the member's assigned plan as `GET /portal/workout`
 /// returns it. Deliberately thinner than the trainer plane's
 /// [PlanExercise]: the portal DTO carries only `exerciseId`/`name`/
-/// `dayOfWeek` — no sets/reps — so the design's "4×10 · 60kg" detail line
-/// has nothing to render from here.
+/// `dayOfWeek`; the per-day targets, logs and progress come from
+/// [MemberWorkoutAssignment.tracking] instead.
 class MemberPlanExercise {
   const MemberPlanExercise({
     required this.exerciseId,
@@ -37,6 +38,7 @@ class MemberWorkoutAssignment {
     required this.durationWeeks,
     required this.exercises,
     required this.progress,
+    this.tracking,
   });
 
   final String id;
@@ -48,6 +50,9 @@ class MemberWorkoutAssignment {
   final int durationWeeks;
   final List<MemberPlanExercise> exercises;
   final Map<String, ExerciseProgressStatus> progress;
+
+  /// Daily log, progress and advice (additive on `GET /portal/workout`).
+  final WorkoutTracking? tracking;
 
   int get currentWeek => DateTime.now().difference(startDate).inDays ~/ 7 + 1;
 
@@ -75,6 +80,47 @@ class MemberWorkoutAssignment {
           (p as Map<String, dynamic>)['exerciseId'] as String:
               ExerciseProgressStatusX.fromApi(p['status'] as String),
       },
+      tracking: json['tracking'] == null
+          ? null
+          : WorkoutTracking.fromJson(json['tracking'] as Map<String, dynamic>),
+    );
+  }
+}
+
+/// What every `/portal/workout/log*` write returns: the refreshed workout
+/// (null when the member no longer has an active plan), plus the entry that
+/// was written and, for `complete`, how many exercises it newly marked done.
+class WorkoutWriteResult {
+  const WorkoutWriteResult({
+    this.workout,
+    this.entry,
+    this.created = false,
+    this.completedNow = 0,
+  });
+
+  final MemberWorkoutAssignment? workout;
+  final WorkoutLogEntry? entry;
+
+  /// True when the log call created a new entry (HTTP 201) instead of
+  /// updating the day's existing one.
+  final bool created;
+  final int completedNow;
+
+  factory WorkoutWriteResult.fromJson(
+    Map<String, dynamic> json, {
+    bool created = false,
+  }) {
+    final workout = json['workout'];
+    final entry = json['entry'];
+    return WorkoutWriteResult(
+      workout: workout == null
+          ? null
+          : MemberWorkoutAssignment.fromJson(workout as Map<String, dynamic>),
+      entry: entry == null
+          ? null
+          : WorkoutLogEntry.fromJson(entry as Map<String, dynamic>),
+      created: created,
+      completedNow: (json['completedNow'] as num?)?.toInt() ?? 0,
     );
   }
 }

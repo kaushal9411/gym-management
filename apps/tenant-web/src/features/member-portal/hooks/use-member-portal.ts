@@ -3,7 +3,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useAppDispatch } from '@/store/hooks';
 import { memberProfileUpdated } from '../store/member-auth-slice';
 import { memberProfileService, type MemberProfilePatch, type MemberSelfProfile } from '../services/member-profile.service';
-import { fetchGymInfo, fetchMemberOverview, memberPortalService, type MemberNotificationCategory } from '../services/member-portal.service';
+import { fetchGymInfo, fetchMemberOverview, fetchMemberPlan, memberPortalService, type MemberMeasurementInput, type MemberNotificationCategory, type MemberPortalWorkout } from '../services/member-portal.service';
+import type { WorkoutCompleteInput, WorkoutLogInput, WorkoutLogPatch } from '../lib/workout-tracking';
 
 export function useMemberProfile() {
   return useQuery({ queryKey: ['member-portal', 'me'], queryFn: memberPortalService.getProfile });
@@ -40,6 +41,23 @@ export function useMemberMeasurements() {
   return useQuery({ queryKey: ['member-portal', 'measurements'], queryFn: memberPortalService.getMeasurements });
 }
 
+function useMeasurementMutation<V>(mutationFn: (v: V) => Promise<unknown>) {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['member-portal', 'measurements'] }) });
+}
+
+export function useLogMeasurement() {
+  return useMeasurementMutation((input: MemberMeasurementInput) => memberPortalService.logMeasurement(input));
+}
+
+export function useUpdateMeasurement() {
+  return useMeasurementMutation(({ id, input }: { id: string; input: MemberMeasurementInput }) => memberPortalService.updateMeasurement(id, input));
+}
+
+export function useDeleteMeasurement() {
+  return useMeasurementMutation((id: string) => memberPortalService.deleteMeasurement(id));
+}
+
 export function useMarkWorkoutProgress() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -47,6 +65,47 @@ export function useMarkWorkoutProgress() {
       memberPortalService.markWorkoutProgress(assignmentId, exerciseId, status, notes),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['member-portal', 'workout'] }),
   });
+}
+
+// ── Daily workout log: every write returns the refreshed workout payload, which is written straight into the cache ──
+const WORKOUT_KEY = ['member-portal', 'workout'] as const;
+
+function useWorkoutLogSync() {
+  const queryClient = useQueryClient();
+  return (workout: MemberPortalWorkout | null | undefined) => {
+    if (workout !== undefined) queryClient.setQueryData(WORKOUT_KEY, workout);
+    void queryClient.invalidateQueries({ queryKey: ['member-portal', 'workout-history'] });
+    void queryClient.invalidateQueries({ queryKey: ['member-portal', 'overview'] });
+  };
+}
+
+export function useMemberWorkoutHistory(days = 60, enabled = true) {
+  return useQuery({ queryKey: ['member-portal', 'workout-history', days], queryFn: () => memberPortalService.getWorkoutHistory(days), enabled });
+}
+
+export function useLogWorkout() {
+  const sync = useWorkoutLogSync();
+  return useMutation({ mutationFn: (input: WorkoutLogInput) => memberPortalService.logWorkout(input), onSuccess: (r) => sync(r.workout) });
+}
+
+export function useUpdateWorkoutLog() {
+  const sync = useWorkoutLogSync();
+  return useMutation({ mutationFn: ({ id, patch }: { id: string; patch: WorkoutLogPatch }) => memberPortalService.updateWorkoutLog(id, patch), onSuccess: (r) => sync(r.workout) });
+}
+
+export function useDeleteWorkoutLog() {
+  const sync = useWorkoutLogSync();
+  return useMutation({ mutationFn: (id: string) => memberPortalService.deleteWorkoutLog(id), onSuccess: (r) => sync(r.workout) });
+}
+
+export function useCompleteWorkoutDay() {
+  const sync = useWorkoutLogSync();
+  return useMutation({ mutationFn: (input: WorkoutCompleteInput) => memberPortalService.completeWorkoutDay(input), onSuccess: (r) => sync(r.workout) });
+}
+
+export function useResetWorkoutDay() {
+  const sync = useWorkoutLogSync();
+  return useMutation({ mutationFn: (date: string) => memberPortalService.resetWorkoutDay(date), onSuccess: (r) => sync(r.workout) });
 }
 
 export function useMemberDiet() {
@@ -58,7 +117,11 @@ export function useLogDiet() {
   return useMutation({
     mutationFn: ({ assignmentId, input }: { assignmentId: string; input: { date: string; waterIntakeMl?: number; weightKg?: number; mealsStatus?: Record<string, string>; notes?: string } }) =>
       memberPortalService.logDiet(assignmentId, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['member-portal', 'diet'] }),
+    // The log response is the full diet payload (incl. recomputed nutrition) - write it straight into the cache.
+    onSuccess: (data) => {
+      queryClient.setQueryData(['member-portal', 'diet'], data);
+      void queryClient.invalidateQueries({ queryKey: ['member-portal', 'overview'] });
+    },
   });
 }
 
@@ -142,6 +205,11 @@ export function useCancelMemberBooking() {
 /** Aggregated dashboard payload (`/portal/overview`). No retry: a 404/error just means "use the per-resource fallback". */
 export function useMemberOverview() {
   return useQuery({ queryKey: ['member-portal', 'overview'], queryFn: fetchMemberOverview, retry: false, staleTime: 30_000 });
+}
+
+/** Current plan + everything it includes (`/portal/plan`); `null` data = no membership. */
+export function useMemberPlan() {
+  return useQuery({ queryKey: ['member-portal', 'plan'], queryFn: fetchMemberPlan, retry: false, staleTime: 30_000 });
 }
 
 /** Public gym info (`/portal/gym`); errors are silent (teaser hides). */

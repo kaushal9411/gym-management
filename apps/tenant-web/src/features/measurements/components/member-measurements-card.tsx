@@ -110,7 +110,7 @@ export function MemberMeasurementsCard({ memberId }: MemberMeasurementsCardProps
                 <p className="text-sm font-medium">{new Date(latest.recordedAt).toLocaleDateString()}</p>
                 <p className="text-sm text-muted-foreground">{summarizeMeasurement(latest)}</p>
                 {latest.notes ? <p className="mt-1 text-xs text-muted-foreground">{latest.notes}</p> : null}
-                {latest.recordedBy ? <p className="mt-1 text-xs text-muted-foreground">Recorded by {latest.recordedBy.name}</p> : null}
+                {latest.source === 'MEMBER' ? <p className="mt-1 text-xs text-muted-foreground">Logged by the member</p> : latest.recordedBy ? <p className="mt-1 text-xs text-muted-foreground">Recorded by {latest.recordedBy.name}</p> : null}
               </div>
               <div className="flex shrink-0 gap-1">
                 {canUpdate ? (

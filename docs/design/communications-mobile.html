@@ -1,0 +1,339 @@
+<title>Communications Mobile Design</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&family=Figtree:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: a row of phone frames, one per screen in the flow (hub, audience, message, channels, review, automations, history). Frames wrap on narrow viewports. */
+:root{
+  --bg:#eceef8; --stage:#dfe2f2; --surface:#ffffff; --surface2:#f6f7fc; --ink:#161a30; --muted:#5b6283; --line:#e2e5f1;
+  --brand:#5a3ff0; --brand-ink:#fff; --brand-soft:#ece8ff; --warm:#ff6b57;
+  --push:#6d4aff; --inapp:#0e9f9e; --email:#2f6fed; --sms:#e08a00; --wa:#1fa855;
+  --ok:#14804a; --ok-soft:#dff5e8; --warn:#9a5b00; --warn-soft:#fff0d3; --bad:#b4233a; --bad-soft:#fde3e7;
+  --bezel:#12142a;
+  --font-d:'Bricolage Grotesque','Segoe UI',system-ui,sans-serif; --font-b:'Figtree','Segoe UI',system-ui,sans-serif;
+  --shadow:0 18px 40px rgba(22,26,48,.16);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b0d1b; --stage:#12152a; --surface:#171a2f; --surface2:#1c2038; --ink:#eceefb; --muted:#9aa1c4; --line:#2a2f4d;
+  --brand:#8f7bff; --brand-ink:#0e1020; --brand-soft:#2a2552; --warm:#ff8472;
+  --push:#9a82ff; --inapp:#3ccfcd; --email:#6b9bff; --sms:#f2ae3d; --wa:#4cd07f;
+  --ok:#59d58f; --ok-soft:#14301f; --warn:#f2b45a; --warn-soft:#352610; --bad:#ff7d8f; --bad-soft:#3a1620;
+  --bezel:#05060d; --shadow:0 18px 40px rgba(0,0,0,.5); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b0d1b; --stage:#12152a; --surface:#171a2f; --surface2:#1c2038; --ink:#eceefb; --muted:#9aa1c4; --line:#2a2f4d;
+  --brand:#8f7bff; --brand-ink:#0e1020; --brand-soft:#2a2552; --warm:#ff8472;
+  --push:#9a82ff; --inapp:#3ccfcd; --email:#6b9bff; --sms:#f2ae3d; --wa:#4cd07f;
+  --ok:#59d58f; --ok-soft:#14301f; --warn:#f2b45a; --warn-soft:#352610; --bad:#ff7d8f; --bad-soft:#3a1620;
+  --bezel:#05060d; --shadow:0 18px 40px rgba(0,0,0,.5); color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-b);font-size:14px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px}
+h1,h2,h3{font-family:var(--font-d);margin:0;text-wrap:balance;letter-spacing:-.01em}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--brand);outline-offset:2px}
+.intro{max-width:1280px;margin:0 auto 18px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.intro h1{font-size:26px;font-weight:800}
+.intro p{margin:4px 0 0;color:var(--muted);max-width:640px}
+.tag{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--warn-soft);color:var(--warn);padding:3px 8px;border-radius:99px}
+.stage{max-width:1280px;margin:0 auto;background:var(--stage);border-radius:22px;padding:26px 18px;display:flex;flex-wrap:wrap;gap:28px;justify-content:center}
+.fig{display:flex;flex-direction:column;gap:10px;align-items:center;width:min(100%,340px)}
+.cap{font-weight:700;font-size:13px;color:var(--muted);text-align:center}
+.cap b{color:var(--ink);display:block;font-family:var(--font-d);font-size:15px}
+.phone{width:100%;max-width:340px;height:660px;border-radius:36px;background:var(--bezel);padding:8px;box-shadow:var(--shadow)}
+.scr{height:100%;border-radius:29px;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;position:relative}
+.status{display:flex;justify-content:space-between;padding:8px 18px 4px;font-size:11px;font-weight:700;color:var(--ink)}
+.status.on{color:#fff}
+.scroll{flex:1;overflow-y:auto;padding:0 14px 14px;scrollbar-width:none}
+.scroll::-webkit-scrollbar{display:none}
+/* hero (same full-width gradient header as the other list screens) */
+.hero{background:linear-gradient(130deg,#4a2fe0,#7a3fe8 50%,#ff6b57 125%);color:#fff;border-radius:0 0 28px 28px;padding:6px 18px 18px;margin:0 -14px 14px}
+.hero .bar{display:flex;align-items:center;gap:10px}
+.hero h2{font-size:22px;font-weight:800}
+.ib{width:34px;height:34px;border-radius:11px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.25);display:grid;place-items:center;color:#fff;flex:none}
+.ib svg{width:18px;height:18px}
+.hero p{margin:6px 0 0;opacity:.85;font-size:12.5px}
+.qrow{display:flex;gap:8px;margin-top:12px}
+.qm{flex:1;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);border-radius:12px;padding:7px 9px;min-width:0}
+.qm small{display:block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;opacity:.85}
+.qm b{font-size:14px;font-variant-numeric:tabular-nums}
+.qm i{display:block;height:3px;border-radius:9px;background:rgba(255,255,255,.28);margin-top:5px;overflow:hidden}
+.qm i s{display:block;height:100%;background:#fff;text-decoration:none}
+.tiles{display:grid;gap:10px}
+.tile{display:flex;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;text-align:left;width:100%;transition:transform .15s}
+.tile:active{transform:scale(.97)}
+.tile .ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;color:#fff;flex:none}
+.tile .ic svg{width:22px;height:22px}
+.tile b{display:block;font-size:15px}.tile small{color:var(--muted);font-size:12.5px}
+.tile .go{margin-left:auto;color:var(--muted)}
+.sec{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 2px 8px}
+.last{display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:8px}
+.last b{font-size:13.5px;display:block}.last small{color:var(--muted);font-size:12px}
+.pill{font-size:11.5px;font-weight:700;border-radius:99px;padding:3px 9px;white-space:nowrap}
+.p-ok{background:var(--ok-soft);color:var(--ok)}.p-warn{background:var(--warn-soft);color:var(--warn)}.p-run{background:var(--brand-soft);color:var(--brand)}.p-bad{background:var(--bad-soft);color:var(--bad)}
+/* stepper */
+.steps{display:flex;gap:5px;margin:2px 0 12px}
+.steps i{flex:1;height:5px;border-radius:9px;background:var(--line)}
+.steps i.d{background:var(--brand)}
+.steps i.c{background:linear-gradient(90deg,var(--brand),var(--warm))}
+h3.q{font-size:20px;font-weight:800}
+.hint{color:var(--muted);font-size:12.5px;margin:3px 0 10px}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:3px;margin-bottom:12px}
+.seg button{flex:1;border:0;background:transparent;border-radius:11px;padding:9px;font-weight:700;font-size:13px;color:var(--muted);min-height:40px}
+.seg button[aria-selected="true"]{background:var(--brand);color:var(--brand-ink)}
+.srch{position:relative;margin-bottom:8px}
+.srch .in{padding-left:36px}
+.srch svg{position:absolute;left:11px;top:13px;width:18px;height:18px;color:var(--muted)}
+.pmrow{display:flex;align-items:center;gap:11px;width:100%;text-align:left;background:var(--surface);border:1.5px solid var(--line);border-radius:14px;padding:9px 11px;margin-bottom:6px;min-height:52px;transition:transform .15s}
+.pmrow:active{transform:scale(.98)}
+.pmrow[aria-pressed="true"]{border-color:var(--brand);background:var(--brand-soft)}
+.av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--brand),var(--warm));color:#fff;font-weight:800;font-size:13px;display:grid;place-items:center;flex:none}
+.pmrow .t{flex:1;min-width:0}.pmrow b{display:block;font-size:13.5px}.pmrow small{color:var(--muted);font-size:12px}
+.tick{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;color:transparent;font-size:12px;font-weight:800;flex:none;transition:transform .2s cubic-bezier(.3,1.6,.5,1)}
+.pmrow[aria-pressed="true"] .tick{background:var(--brand);border-color:var(--brand);color:var(--brand-ink);transform:scale(1.1)}
+.sbar{display:flex;gap:8px;margin-bottom:8px}
+.sbar .chip{flex:1}
+.grp{margin-bottom:12px}
+.grp>label{display:block;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:7px 12px;font-weight:600;font-size:13px;min-height:36px;transition:transform .15s}
+.chip:active{transform:scale(.94)}
+.chip[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.dock{padding:10px 14px calc(12px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.dock .cnt{flex:none}
+.dock .cnt b{font-family:var(--font-d);font-size:26px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;display:block}
+.dock .cnt small{color:var(--muted);font-size:11px}
+.btn{flex:1;border:0;border-radius:14px;padding:13px;font-weight:700;font-size:15px;background:linear-gradient(120deg,var(--brand),#8a3fe8);color:#fff;box-shadow:0 8px 16px rgba(90,63,240,.3);transition:transform .15s}
+.btn:active{transform:scale(.97)}
+.btn.alt{background:var(--surface2);color:var(--ink);box-shadow:none;border:1px solid var(--line);flex:none;padding:13px 16px}
+.field{margin-bottom:12px}
+.field label{display:block;font-weight:600;font-size:12.5px;margin-bottom:4px}
+.in{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 12px;font-size:14px;min-height:44px;width:100%;color:var(--ink);font-family:inherit}
+textarea.in{min-height:96px;resize:none}
+.ph{font-family:ui-monospace,Consolas,monospace;font-size:11.5px;background:var(--brand-soft);color:var(--brand);border:0;border-radius:7px;padding:5px 8px}
+.bub{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:11px 13px}
+.bub small{display:flex;justify-content:space-between;color:var(--muted);font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.bub b{display:block;margin:3px 0 2px;font-size:14px}.bub p{margin:0;color:var(--muted);font-size:12.5px}
+.chrow{display:flex;align-items:center;gap:11px;background:var(--surface);border:1.5px solid var(--line);border-radius:16px;padding:11px 12px;margin-bottom:8px;width:100%;text-align:left;transition:transform .15s}
+.chrow:active{transform:scale(.98)}
+.chrow[aria-pressed="true"]{border-color:var(--c);background:color-mix(in srgb,var(--c) 9%,var(--surface))}
+.chrow.short{border-color:var(--bad);background:var(--bad-soft)}
+.chrow .dot{width:36px;height:36px;border-radius:12px;display:grid;place-items:center;color:#fff;font-weight:800;flex:none}
+.chrow .t{flex:1;min-width:0}.chrow .t b{display:block;font-size:14px}.chrow .t small{color:var(--muted);font-size:12px}
+.chrow.short .t small{color:var(--bad);font-weight:700}
+.meter{height:5px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:6px}
+.meter i{display:block;height:100%;border-radius:9px;background:var(--c);transition:width .45s cubic-bezier(.3,1.4,.5,1)}
+.sw{width:42px;height:25px;border-radius:99px;border:0;background:var(--line);position:relative;flex:none;transition:background .2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;border-radius:50%;background:#fff;transition:transform .25s cubic-bezier(.3,1.5,.5,1);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.sw[aria-checked="true"]{background:var(--ok)}
+.sw[aria-checked="true"]::after{transform:translateX(17px)}
+.sum{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:4px 14px;margin-bottom:12px}
+.sum div{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line);font-size:13.5px}
+.sum div:first-child{border-top:0}.sum span{color:var(--muted)}.sum b{text-align:right}
+.warnbox{background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:10px 12px;font-weight:600;font-size:12.5px;margin-bottom:12px}
+.rule{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:9px}
+.rule .h{display:flex;gap:10px;align-items:center}
+.rule .h div{flex:1;min-width:0}.rule b{font-size:14px;display:block}.rule small{color:var(--muted);font-size:12px}
+.dots{display:flex;gap:4px;margin-top:8px}
+.dots i{width:20px;height:20px;border-radius:7px;color:#fff;font-style:normal;font-size:10px;font-weight:800;display:grid;place-items:center;background:var(--c)}
+.dots i.off{opacity:.22}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--surface);border-radius:26px 26px 0 0;padding:10px 16px 18px;box-shadow:0 -12px 30px rgba(0,0,0,.25);border-top:1px solid var(--line)}
+.sheet .grab{width:38px;height:4px;border-radius:9px;background:var(--line);margin:0 auto 10px}
+.scrim{position:absolute;inset:0;background:rgba(10,12,28,.45)}
+.stack{display:flex;height:9px;border-radius:9px;overflow:hidden;background:var(--line);margin:10px 0 6px}
+.stack i{display:block;height:100%}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend b{color:var(--ink)}
+.rec{display:flex;justify-content:space-between;gap:8px;padding:9px 0;border-top:1px solid var(--line);font-size:13px}
+.legendnote{max-width:1280px;margin:16px auto 0;color:var(--muted);font-size:13px;display:flex;gap:18px;flex-wrap:wrap}
+.legendnote span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;background:var(--c)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="intro">
+  <div>
+    <h1>Communications on mobile</h1>
+    <p>A separate menu entry for owners and managers. Seven screens: hub, a four-step send flow, automations and history. Tap the chips, channels and switches; numbers use sample data for a 412-member gym.</p>
+  </div>
+  <span class="tag">Design preview</span>
+</header>
+
+<main class="stage">
+  <!-- 1 HUB -->
+  <figure class="fig" style="margin:0"><div class="phone"><div class="scr">
+    <div class="status on" style="background:#4a2fe0"><span>9:41</span><span>5G 88%</span></div>
+    <div class="scroll">
+      <div class="hero" style="margin-top:0;padding-top:4px">
+        <div class="bar"><span class="ib"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M4 7h16M4 12h16M4 17h10"/></svg></span><h2>Communications</h2></div>
+        <p>Reach members on the right channel.</p>
+        <div class="qrow"><div class="qm"><small>SMS left</small><b>240</b><i><s style="width:76%"></s></i></div><div class="qm"><small>WhatsApp</small><b>380</b><i><s style="width:24%"></s></i></div><div class="qm"><small>Email</small><b>3,790</b><i><s style="width:24%"></s></i></div></div>
+      </div>
+      <div class="tiles">
+        <button class="tile"><span class="ic" style="background:linear-gradient(135deg,#5a3ff0,#8a3fe8)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 4L3 11l7 3 3 7 8-17z"/></svg></span><span><b>Send message</b><small>Pick members, write, send</small></span><span class="go">›</span></button>
+        <button class="tile"><span class="ic" style="background:linear-gradient(135deg,#0e9f9e,#2f6fed)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="3"/></svg></span><span><b>Automations</b><small>9 reminders · 8 on</small></span><span class="go">›</span></button>
+        <button class="tile"><span class="ic" style="background:linear-gradient(135deg,#e08a00,#ff6b57)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span><span><b>History</b><small>Every send and its result</small></span><span class="go">›</span></button>
+      </div>
+      <div class="sec">Recent</div>
+      <div class="last"><div><b>Extended closing time</b><small>412 members · today</small></div><span class="pill p-run">Sending</span></div>
+      <div class="last"><div><b>Renew before 31 Oct</b><small>38 members · 15 Oct</small></div><span class="pill p-warn">2 failed</span></div>
+      <div class="last"><div><b>Diwali timings</b><small>297 members · 17 Oct</small></div><span class="pill p-ok">Sent</span></div>
+    </div>
+  </div></div><figcaption class="cap"><b>1 · Hub</b>Quota at a glance, three doors</figcaption></figure>
+
+  <!-- 2 AUDIENCE (interactive) -->
+  <figure class="fig" style="margin:0"><div class="phone"><div class="scr">
+    <div class="status"><span>9:41</span><span>5G 88%</span></div>
+    <div class="scroll">
+      <div class="steps"><i class="c"></i><i></i><i></i><i></i></div>
+      <h3 class="q">Who should get it?</h3>
+      <p class="hint">Filters combine. Each one narrows the list.</p>
+      <div class="seg" role="tablist" aria-label="How to choose members"><button role="tab" id="mm-f" aria-selected="true">By filters</button><button role="tab" id="mm-p" aria-selected="false">Pick members</button></div>
+      <div id="mf"></div>
+      <div id="mpick" hidden>
+        <div class="srch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input class="in" id="msearch" placeholder="Search name, member ID or phone" aria-label="Search members"></div>
+        <div class="sbar"><button class="chip" id="mall">Select shown</button><button class="chip" id="mclr">Clear</button></div>
+        <div id="mlist"></div>
+      </div>
+      <div class="sec" style="margin-top:4px" id="msecl">Includes</div>
+      <div class="bub"><p id="msample"></p></div>
+    </div>
+    <div class="dock"><div class="cnt"><b id="mcount">412</b><small id="mcntl">members</small></div><button class="btn">Next: Message</button></div>
+  </div></div><figcaption class="cap"><b>2 · Audience</b>Count updates as you tap</figcaption></figure>
+
+  <!-- 3 MESSAGE -->
+  <figure class="fig" style="margin:0"><div class="phone"><div class="scr">
+    <div class="status"><span>9:41</span><span>5G 88%</span></div>
+    <div class="scroll">
+      <div class="steps"><i class="d"></i><i class="c"></i><i></i><i></i></div>
+      <h3 class="q">What do you want to say?</h3>
+      <div class="chips" style="margin:10px 0 12px"><button class="chip" aria-pressed="false">Expiring</button><button class="chip" aria-pressed="false">Overdue</button><button class="chip" aria-pressed="false">New class</button><button class="chip" aria-pressed="true">Custom</button></div>
+      <div class="field"><label>Title</label><div class="in">Hi {{firstName}}, a note from Kaushal Fitness</div></div>
+      <div class="field"><label>Message</label><div class="in" style="min-height:96px">We have extended weekday closing time to 10 pm from Monday. See you at the gym!</div></div>
+      <div class="chips" style="margin-bottom:12px"><button class="ph">{{firstName}}</button><button class="ph">{{planName}}</button><button class="ph">{{endDate}}</button></div>
+      <div class="sec" style="margin-top:6px">Preview</div>
+      <div class="bub"><small><span>Kaushal Fitness</span><span>now</span></small><b>Hi Aarav, a note from Kaushal Fitness</b><p>We have extended weekday closing time to 10 pm from Monday. See you at the gym!</p></div>
+    </div>
+    <div class="dock"><button class="btn alt">Back</button><button class="btn">Next: Channels</button></div>
+  </div></div><figcaption class="cap"><b>3 · Message</b>Template or custom, live preview</figcaption></figure>
+
+  <!-- 4 CHANNELS (interactive) -->
+  <figure class="fig" style="margin:0"><div class="phone"><div class="scr">
+    <div class="status"><span>9:41</span><span>5G 88%</span></div>
+    <div class="scroll">
+      <div class="steps"><i class="d"></i><i class="d"></i><i class="c"></i><i></i></div>
+      <h3 class="q">Where should it go?</h3>
+      <p class="hint">Each member uses one message from that channel's monthly limit.</p>
+      <div id="mch"></div>
+      <div class="warnbox" id="mwarn" hidden></div>
+    </div>
+    <div class="dock"><button class="btn alt">Back</button><button class="btn">Next: Review</button></div>
+  </div></div><figcaption class="cap"><b>4 · Channels</b>Over-limit channels turn red and explain why</figcaption></figure>
+
+  <!-- 5 REVIEW -->
+  <figure class="fig" style="margin:0"><div class="phone"><div class="scr">
+    <div class="status"><span>9:41</span><span>5G 88%</span></div>
+    <div class="scroll">
+      <div class="steps"><i class="d"></i><i class="d"></i><i class="d"></i><i class="c"></i></div>
+      <h3 class="q">Ready to send?</h3>
+      <p class="hint">Check this once. You can cancel a scheduled send later.</p>
+      <div class="sum">
+        <div><span>To</span><b>All active members<br><small class="muted" style="font-weight:500">412 people</small></b></div>
+        <div><span>Channels</span><b>Push, In-app</b></div>
+        <div><span>Message</span><b>Hi {{firstName}}, a note from Kaushal Fitness</b></div>
+        <div><span>When</span><b>Now</b></div>
+        <div><span>Uses</span><b>412 push · 412 in-app</b></div>
+      </div>
+      <div class="warnbox">More than 100 people. Tick the box below to confirm.</div>
+      <button class="chip" aria-pressed="true" style="width:100%;text-align:left;border-radius:14px;padding:12px">✓ I checked the audience and message</button>
+      <div class="field" style="margin-top:12px"><label>Schedule instead</label><div class="in" style="color:var(--muted)">Choose date and time</div></div>
+    </div>
+    <div class="dock"><button class="btn alt">Back</button><button class="btn">Send to 412</button></div>
+  </div></div><figcaption class="cap"><b>5 · Review</b>Confirm step above 100 recipients</figcaption></figure>
+
+  <!-- 6 AUTOMATIONS (interactive) + sheet -->
+  <figure class="fig" style="margin:0"><div class="phone"><div class="scr">
+    <div class="status on" style="background:#4a2fe0"><span>9:41</span><span>5G 88%</span></div>
+    <div class="scroll">
+      <div class="hero" style="margin-top:0;padding-top:4px"><div class="bar"><span class="ib"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 6l-6 6 6 6"/></svg></span><h2>Automations</h2></div><p>Reminders that send themselves.</p></div>
+      <div id="mrules"></div>
+    </div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <h3 style="font-size:18px">Membership expiring</h3>
+      <p class="hint" style="margin-bottom:8px">Sends before the end date to members with an active plan.</p>
+      <div class="grp"><label>Send</label><div class="chips"><button class="chip" aria-pressed="true">7 days before</button><button class="chip" aria-pressed="true">3 days</button><button class="chip" aria-pressed="true">1 day</button><button class="chip" aria-pressed="false">+ Add</button></div></div>
+      <div class="grp"><label>Channels</label><div class="chips"><button class="chip" aria-pressed="true">Push</button><button class="chip" aria-pressed="false">In-app</button><button class="chip" aria-pressed="true">Email</button><button class="chip" aria-pressed="false">SMS</button></div></div>
+      <div style="display:flex;gap:8px"><button class="btn alt" style="flex:1">Send test to me</button><button class="btn" style="flex:1">Save</button></div>
+    </div>
+  </div></div><figcaption class="cap"><b>6 · Automations</b>Switch rules on, tap one to edit timing</figcaption></figure>
+
+  <!-- 7 HISTORY DETAIL -->
+  <figure class="fig" style="margin:0"><div class="phone"><div class="scr">
+    <div class="status on" style="background:#4a2fe0"><span>9:41</span><span>5G 88%</span></div>
+    <div class="scroll">
+      <div class="hero" style="margin-top:0;padding-top:4px"><div class="bar"><span class="ib"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 6l-6 6 6 6"/></svg></span><h2>Renew before 31 Oct</h2></div><p>38 members · Email, SMS · 15 Oct, 8:00 am</p></div>
+      <div class="bub"><div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-family:var(--font-d);font-size:28px;margin:0">34 <span style="font-size:14px;color:var(--muted);font-weight:600">of 38 delivered</span></b></div>
+        <div class="stack"><i style="width:89.5%;background:var(--ok)"></i><i style="width:5.3%;background:var(--bad)"></i><i style="width:5.2%;background:var(--sms)"></i></div>
+        <div class="legend"><span><b>34</b> sent</span><span><b>2</b> failed</span><span><b>2</b> opted out</span></div></div>
+      <div class="chips" style="margin:12px 0 4px"><button class="chip" aria-pressed="false">All</button><button class="chip" aria-pressed="true">Failed</button><button class="chip" aria-pressed="false">Skipped</button></div>
+      <div class="rec"><span>Rohan T.<br><small class="muted">SMS · invalid number</small></span><span class="pill p-bad">Failed</span></div>
+      <div class="rec"><span>Neha P.<br><small class="muted">Email · mailbox full</small></span><span class="pill p-bad">Failed</span></div>
+      <button class="btn alt" style="width:100%;margin-top:12px;flex:none">Send again to failed only</button>
+    </div>
+  </div></div><figcaption class="cap"><b>7 · History detail</b>Who got it, who did not, and why</figcaption></figure>
+</main>
+
+<div class="legendnote">
+  <span style="--c:var(--push)">Push</span><span style="--c:var(--inapp)">In-app</span><span style="--c:var(--email)">Email</span><span style="--c:var(--sms)">SMS</span><span style="--c:var(--wa)">WhatsApp</span>
+</div>
+
+<script>
+(function(){
+  var $=function(s){return document.querySelector(s)};
+  var $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+  var seed=7;function rnd(){seed=(seed*16807)%2147483647;return seed/2147483647}
+  var plans=['Monthly','Quarterly','Annual'],branches=['Main Branch','Ufuf'],people=[];
+  var first=['Aarav','Diya','Kabir','Meera','Rohan','Anaya','Vivaan','Ishita','Arjun','Saanvi','Neha','Dev'];
+  for(var i=0;i<412;i++){var r=rnd();
+    people.push({id:'MEM-'+String(i+1).padStart(4,'0'),n:first[i%first.length]+' '+String.fromCharCode(65+i%26)+'.',status:r<.09?'expiring':r<.13?'expired':r<.16?'frozen':'active',
+      plan:plans[Math.floor(rnd()*3)],branch:branches[rnd()<.72?0:1],overdue:rnd()<.05,inactive:rnd()<.16,bday:rnd()<.03})}
+  var F=[
+   {k:'status',l:'Membership',o:[['expiring','Expiring in 7 days'],['expired','Expired'],['frozen','Frozen']],t:function(p,v){return p.status===v}},
+   {k:'plan',l:'Plan',o:plans.map(function(x){return [x,x]}),t:function(p,v){return p.plan===v}},
+   {k:'branch',l:'Branch',o:branches.map(function(x){return [x,x]}),t:function(p,v){return p.branch===v}},
+   {k:'flag',l:'Payment and activity',o:[['overdue','Overdue invoice'],['inactive','Not visited 14 days'],['bday','Birthday this week']],t:function(p,v){return !!p[v]}}];
+  var sel={status:null,plan:null,branch:null,flag:null};var mode='f',picked={},q='';
+  var fmt=function(n){return n.toLocaleString('en-IN')};
+  function aud(){if(mode==='p')return people.filter(function(p){return picked[p.id]});return people.filter(function(p){if(p.status==='expired'&&sel.status!=='expired')return false;return F.every(function(f){return sel[f.k]===null||f.t(p,sel[f.k])})})}
+  var C=[{k:'push',n:'Push',c:'--push',a:'P',lim:null,used:0,note:'Free, instant'},{k:'inapp',n:'In-app',c:'--inapp',a:'In',lim:null,used:0,note:'Shows in their inbox'},
+         {k:'email',n:'Email',c:'--email',a:'@',lim:5000,used:1210},{k:'sms',n:'SMS',c:'--sms',a:'S',lim:1000,used:760},{k:'wa',n:'WhatsApp',c:'--wa',a:'W',lim:500,used:120}];
+  var on={push:true,inapp:true,email:false,sms:false,wa:false};
+  function chans(n){$('#mch').innerHTML=C.map(function(c){var left=c.lim===null?null:c.lim-c.used,short=on[c.k]&&left!==null&&n>left;
+    var pct=c.lim===null?6:Math.min(100,(c.used+(on[c.k]?n:0))/c.lim*100);
+    return '<button class="chrow'+(short?' short':'')+'" style="--c:var('+c.c+')" data-c="'+c.k+'" aria-pressed="'+on[c.k]+'"><span class="dot" style="background:var('+c.c+')">'+c.a+'</span><span class="t"><b>'+c.n+'</b><small>'+(short?'Only '+fmt(left)+' left, you need '+fmt(n):(left===null?c.note:fmt(left)+' left this month'))+'</small><div class="meter" style="--c:'+(short?'var(--bad)':'var('+c.c+')')+'"><i style="width:'+pct+'%"></i></div></span><span class="sw" aria-hidden="true" style="pointer-events:none" '+(on[c.k]?'':'')+'></span></button>'}).join('');
+    $$('#mch .chrow').forEach(function(b){b.querySelector('.sw').setAttribute('aria-checked',b.getAttribute('aria-pressed'))});
+    var bad=C.filter(function(c){return on[c.k]&&c.lim!==null&&n>c.lim-c.used}).map(function(c){return c.n});
+    var w=$('#mwarn');w.hidden=!bad.length;if(bad.length)w.textContent=bad.join(' and ')+' would go over the limit. Turn it off or narrow the audience.'}
+  function shown(){var t=q.trim().toLowerCase();return people.filter(function(p){return !t||p.n.toLowerCase().indexOf(t)>-1||p.id.toLowerCase().indexOf(t)>-1}).slice(0,40)}
+  function plist(){$('#mlist').innerHTML=shown().map(function(p){var i=p.n.split(' ').map(function(x){return x[0]}).join('');
+    return '<button class="pmrow" data-id="'+p.id+'" aria-pressed="'+!!picked[p.id]+'"><span class="av">'+i+'</span><span class="t"><b>'+p.n+'</b><small>'+p.id+' · '+p.plan+' · '+p.branch+'</small></span><span class="tick">✓</span></button>'}).join('')||'<p class="hint">No member found.</p>'}
+  function setMode(m){mode=m;$('#mm-f').setAttribute('aria-selected',String(m==='f'));$('#mm-p').setAttribute('aria-selected',String(m==='p'));$('#mf').hidden=m!=='f';$('#mpick').hidden=m!=='p';$('#msecl').textContent=m==='p'?'Picked':'Includes';if(m==='p')plist();upd()}
+  function upd(){var a=aud(),n=a.length;$('#mcount').textContent=fmt(n);$('#mcntl').textContent=n===1?'member':'members';
+    $('#msample').textContent=n?a.slice(0,4).map(function(p){return p.n}).join(', ')+(n>4?' and '+fmt(n-4)+' more':''):(mode==='p'?'Nobody picked yet. Tap members above.':'No members match. Remove a filter.');chans(n)}
+  $('#mm-f').addEventListener('click',function(){setMode('f')});$('#mm-p').addEventListener('click',function(){setMode('p')});
+  $('#msearch').addEventListener('input',function(e){q=e.target.value;plist()});
+  $('#mlist').addEventListener('click',function(e){var b=e.target.closest('.pmrow');if(!b)return;var id=b.dataset.id;if(picked[id])delete picked[id];else picked[id]=true;b.setAttribute('aria-pressed',String(!!picked[id]));upd()});
+  $('#mall').addEventListener('click',function(){shown().forEach(function(p){picked[p.id]=true});plist();upd()});
+  $('#mclr').addEventListener('click',function(){picked={};plist();upd()});
+  $('#mf').innerHTML=F.map(function(f){return '<div class="grp"><label>'+f.l+'</label><div class="chips">'+f.o.map(function(o){return '<button class="chip" data-f="'+f.k+'" data-v="'+o[0]+'" aria-pressed="false">'+o[1]+'</button>'}).join('')+'</div></div>'}).join('');
+  $('#mf').addEventListener('click',function(e){var b=e.target.closest('.chip');if(!b)return;var k=b.dataset.f,v=b.dataset.v;sel[k]=sel[k]===v?null:v;
+    $$('#mf .chip[data-f="'+k+'"]').forEach(function(x){x.setAttribute('aria-pressed',String(sel[k]===x.dataset.v))});upd()});
+  $('#mch').addEventListener('click',function(e){var b=e.target.closest('.chrow');if(!b)return;on[b.dataset.c]=!on[b.dataset.c];upd()});
+  var R=[['Membership expiring','7, 3, 1 days before',true,['push','email']],['Membership expired','Day after it ends',true,['push','email']],['Payment overdue','1, 7, 14 days after due',true,['push','sms']],
+         ['Invoice due soon','3 days before',true,['push','email']],['Class reminder','24 h and 2 h before',true,['push']],['We miss you','After 14 days away',false,['push']]];
+  var sh={push:'P',inapp:'In',email:'@',sms:'S',wa:'W'};
+  $('#mrules').innerHTML=R.map(function(r){return '<div class="rule"><div class="h"><div><b>'+r[0]+'</b><small>'+r[1]+'</small></div><button class="sw" role="switch" aria-label="'+r[0]+'" aria-checked="'+r[2]+'"></button></div><div class="dots">'+C.map(function(c){return '<i style="--c:var('+c.c+')" class="'+(r[3].indexOf(c.k)<0?'off':'')+'">'+sh[c.k]+'</i>'}).join('')+'</div></div>'}).join('');
+  document.addEventListener('click',function(e){var s=e.target.closest('.rule .sw');if(s)s.setAttribute('aria-checked',String(s.getAttribute('aria-checked')!=='true'));
+    var c=e.target.closest('.sheet .chip');if(c)c.setAttribute('aria-pressed',String(c.getAttribute('aria-pressed')!=='true'))});
+  upd();
+})();
+</script>

@@ -24,6 +24,41 @@ class GymHour {
       );
 }
 
+/// One closed day of the member's branch (`holidays[]` of `GET /portal/gym`).
+/// [date] is a plain calendar day (local midnight, never timezone-shifted).
+class GymHoliday {
+  const GymHoliday({required this.date, required this.label});
+
+  final DateTime date;
+  final String? label;
+
+  static GymHoliday? parse(Object? v) {
+    if (v is! Map<String, dynamic>) return null;
+    final raw = _s(v['date']);
+    final m = raw == null
+        ? null
+        : RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(raw);
+    if (m == null) return null;
+    return GymHoliday(
+      date: DateTime(
+        int.parse(m.group(1)!),
+        int.parse(m.group(2)!),
+        int.parse(m.group(3)!),
+      ),
+      label: _s(v['label']),
+    );
+  }
+}
+
+List<GymHoliday> _holidays(Object? v) {
+  final rows = jsonList(v)
+      .map(GymHoliday.parse)
+      .whereType<GymHoliday>()
+      .toList()
+    ..sort((a, b) => a.date.compareTo(b.date));
+  return rows;
+}
+
 List<GymHour>? _hours(Object? v) {
   final rows = jsonList(v).map(GymHour.fromJson).toList();
   return rows.isEmpty ? null : rows;
@@ -72,6 +107,7 @@ class GymBranchInfo {
     required this.email,
     required this.address,
     required this.businessHours,
+    this.holidays = const [],
   });
 
   final String name;
@@ -79,6 +115,9 @@ class GymBranchInfo {
   final String? email;
   final GymAddress? address;
   final List<GymHour>? businessHours;
+
+  /// Closed days, sorted by date (all of them — callers show the upcoming ones).
+  final List<GymHoliday> holidays;
 }
 
 /// Mirrors `MemberGymDto` (`GET /portal/gym`). Every contact field is
@@ -129,6 +168,7 @@ class GymInfo {
               email: _s(bm['email']),
               address: GymAddress.parse(bm['address']),
               businessHours: _hours(bm['businessHours']),
+              holidays: _holidays(bm['holidays']),
             )
           : null,
     );

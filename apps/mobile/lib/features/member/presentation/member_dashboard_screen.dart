@@ -27,6 +27,7 @@ import 'member_dashboard_detail_sheet.dart';
 import 'member_pay_invoice_sheet.dart';
 import 'member_renew_sheet.dart';
 import 'widgets/member_dash_ui.dart';
+import 'widgets/member_plan_benefits.dart';
 
 /// Member Dashboard — web's `/portal/dashboard`, redesigned for phone and
 /// tablet, in the member palette (lime → teal).
@@ -45,6 +46,10 @@ import 'widgets/member_dash_ui.dart';
 /// invoices card; measurements and gym info load on their own and only their
 /// card degrades. Tiles Membership, Visits, Workout and Outstanding open the
 /// same detail sheets as before; the diet tile jumps to the Diet tab.
+///
+/// **What's included** (`GET /portal/plan`, also added to the web dashboard): the
+/// member's current plan and every benefit it includes, between the tiles and
+/// the cards; it loads on its own and only that card degrades on failure.
 ///
 /// Dropped vs web: the "My data" card links to the existing export screen
 /// instead of downloading inline; the hero does not extend behind the status
@@ -71,6 +76,9 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
   bool _loading = true;
   String? _error;
 
+  /// Bumped on every (re)load so the plan-benefits block refetches with it.
+  int _planEpoch = 0;
+
   @override
   void initState() {
     super.initState();
@@ -89,6 +97,7 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
     setState(() {
       _loading = _overview == null;
       _error = null;
+      _planEpoch++;
     });
     final repo = getIt<MemberPortalRepository>();
     // Optional pieces start now and fill their cards when they land.
@@ -273,6 +282,10 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
                 children: [
                   _tiles(o),
                   const SizedBox(height: 14),
+                  if (o.membership != null) ...[
+                    MemberPlanBenefitsSection(reloadToken: _planEpoch),
+                    const SizedBox(height: 14),
+                  ],
                   AdaptiveColumns(
                     fullWidth: [
                       StaggeredReveal(

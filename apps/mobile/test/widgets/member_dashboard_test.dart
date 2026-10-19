@@ -14,6 +14,7 @@ import 'package:gym_saas_mobile/models/gym_info.dart';
 import 'package:gym_saas_mobile/models/gym_member.dart';
 import 'package:gym_saas_mobile/models/member_invoice.dart';
 import 'package:gym_saas_mobile/models/member_overview.dart';
+import 'package:gym_saas_mobile/models/member_plan.dart';
 import 'package:gym_saas_mobile/models/member_portal_profile.dart';
 import 'package:gym_saas_mobile/models/member_profile.dart';
 import 'package:gym_saas_mobile/models/paginated_result.dart';
@@ -22,6 +23,7 @@ import 'package:gym_saas_mobile/repositories/member_notification_repository.dart
 import 'package:gym_saas_mobile/repositories/member_portal_repository.dart';
 import 'package:mocktail/mocktail.dart';
 
+import '../fixtures/member_plan_fixtures.dart';
 import '../models/member_overview_test.dart' show fullFixture, realFixture;
 
 class _Repo extends Mock implements MemberPortalRepository {}
@@ -113,6 +115,8 @@ void main() {
       (_) async => _page([_invoice('1', 'PAID'), _invoice('2', 'PENDING')]),
     );
     when(() => repo.measurements()).thenAnswer((_) async => []);
+    when(() => repo.plan())
+        .thenAnswer((_) async => MemberPlan.fromJson(planJson()));
     when(() => repo.gymInfo()).thenAnswer(
       (_) async => GymInfo(
         name: 'Kaushal Fitness',
@@ -212,6 +216,23 @@ void main() {
       await show(t, find.text(label));
       expect(find.text(label), findsWidgets, reason: label);
     }
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('shows What’s included for the current plan', (t) async {
+    await pump(t);
+    await show(t, find.text('What’s included'));
+    expect(find.text('Quarterly Pro'), findsOneWidget);
+    expect(find.text('Personal training'), findsOneWidget);
+    expect(find.text('Bandra'), findsOneWidget);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('a plan failure only degrades its card', (t) async {
+    when(() => repo.plan())
+        .thenAnswer((_) async => throw ApiException.network());
+    await pump(t);
+    await show(t, find.textContaining('tap to retry'));
     expect(t.takeException(), isNull);
   });
 

@@ -2,16 +2,20 @@
 
 import * as React from 'react';
 import { motion } from 'framer-motion';
-import { Activity, ArrowDownRight, ArrowUpRight, ChevronDown, GitCompareArrows, Percent, Ruler, Scale, TrendingUp } from 'lucide-react';
+import { Activity, ArrowDownRight, ArrowUpRight, ChevronDown, ClipboardList, GitCompareArrows, Pencil, Percent, Ruler, Scale, Trash2, TrendingUp } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { BodyMeasurement } from '@/features/measurements/types';
 import { useMotionSafe } from '@/features/reports/lib/motion';
-import { useMemberMeasurements } from '../../hooks/use-member-portal';
+import { useDeleteMeasurement, useMemberMeasurements } from '../../hooks/use-member-portal';
 import { formatDate } from '../../lib/format';
 import { ChartLegend, TrendChart, type TrendSeries } from '../charts/trend-chart';
-import { EmptyBlock, HeroChip, PortalHero, SectionCard, SkeletonCard, SkeletonHero, StaggerGroup, StatTile, StatusChip, toneColor, toneTint, type PortalTone } from '../kit';
+import { EmptyBlock, HeroAction, HeroChip, PortalHero, SectionCard, SkeletonCard, SkeletonHero, StaggerGroup, StatTile, StatusChip, toneColor, toneTint, type PortalTone } from '../kit';
 import { FilterChips } from './chips';
+import { MeasurementLogSheet, type LogMode } from './measurement-log-sheet';
 
 type Field = 'weightKg' | 'heightCm' | 'bodyFatPercent' | 'chestCm' | 'waistCm' | 'hipsCm' | 'bicepsCm' | 'thighsCm';
 const FIELDS: { key: Field; label: string; unit: string; tone: PortalTone; lowerIsBetter?: boolean }[] = [
@@ -53,11 +57,28 @@ function Delta({ diff, unit, lowerIsBetter }: { diff: number | null; unit: strin
   );
 }
 
+function LogActions({ onLog }: { onLog: (mode: LogMode) => void }) {
+  return (
+    <>
+      <HeroAction variant="solid" onClick={() => onLog('quick')}>
+        <Scale className="size-4" /> Log weight
+      </HeroAction>
+      <HeroAction onClick={() => onLog('full')}>
+        <ClipboardList className="size-4" /> Full check-in
+      </HeroAction>
+    </>
+  );
+}
+
 export function MeasurementsPageContent() {
   const { data, isLoading } = useMemberMeasurements();
   const m = useMotionSafe();
   const [range, setRange] = React.useState('all');
   const [open, setOpen] = React.useState<string | null>(null);
+  // Member self-service: the log sheet (new quick/full, or editing one of their own entries) and delete confirmation.
+  const [sheet, setSheet] = React.useState<{ mode: LogMode; entry: BodyMeasurement | null } | null>(null);
+  const [toDelete, setToDelete] = React.useState<BodyMeasurement | null>(null);
+  const del = useDeleteMeasurement();
   // (analysis below uses `valued`, history uses every row)
 
   const asc = React.useMemo(() => [...(data ?? [])].sort((a, b) => a.recordedAt.localeCompare(b.recordedAt)), [data]);
@@ -78,10 +99,11 @@ export function MeasurementsPageContent() {
   if (!first || !latest) {
     return (
       <div className="space-y-4">
-        <PortalHero eyebrow="Body measurements" title="No check-ins yet" subtitle="Your trainer logs them for you" />
+        <PortalHero eyebrow="Body measurements" title="No check-ins yet" subtitle="Log your weight daily or weekly to track your progress" actions={<LogActions onLog={(mode) => setSheet({ mode, entry: null })} />} />
         <SectionCard title="Progress" icon={Ruler} tone="primary">
-          <EmptyBlock icon={Ruler} title="No measurements yet" description="Ask your trainer to log your first check-in — your trends and comparisons will appear here." />
+          <EmptyBlock icon={Ruler} title="No measurements yet" description="Log your first weight or full check-in — your trends and comparisons will appear here. Your trainer can add check-ins for you too." />
         </SectionCard>
+        <MeasurementLogSheet open={sheet !== null} onOpenChange={(o) => !o && setSheet(null)} mode={sheet?.mode ?? 'quick'} entry={sheet?.entry} />
       </div>
     );
   }
@@ -121,7 +143,8 @@ export function MeasurementsPageContent() {
       <PortalHero
         eyebrow="Body measurements"
         title={w !== null ? `${w} kg` : 'Latest check-in'}
-        subtitle={`Latest check-in ${formatDate(latest.recordedAt)}${latest.recordedBy ? ` · by ${latest.recordedBy.name}` : ''}`}
+        subtitle={`Latest check-in ${formatDate(latest.recordedAt)}${latest.source === 'MEMBER' ? ' · logged by you' : latest.recordedBy ? ` · by ${latest.recordedBy.name}` : ''}`}
+        actions={<LogActions onLog={(mode) => setSheet({ mode, entry: null })} />}
         chips={
           <>
             <HeroChip>{asc.length} check-in{asc.length === 1 ? '' : 's'}</HeroChip>
@@ -224,6 +247,7 @@ export function MeasurementsPageContent() {
                       {headline.length ? headline.map((f) => `${f.label} ${num(e[f.key])}${f.unit === '%' ? '%' : ` ${f.unit}`}`).join(' · ') : 'No values recorded'}
                     </p>
                   </div>
+                  {e.source === 'MEMBER' ? <StatusChip tone="info">You</StatusChip> : null}
                   {idx === 0 ? <StatusChip tone="success">Latest</StatusChip> : null}
                   <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform', isOpen && 'rotate-180')} aria-hidden />
                 </button>
@@ -240,15 +264,48 @@ export function MeasurementsPageContent() {
                       ))}
                     </div>
                     {e.notes ? <p className="mt-3 whitespace-pre-line text-xs text-muted-foreground">{e.notes}</p> : null}
-                    {e.recordedBy ? <p className="mt-2 text-[11px] text-muted-foreground">Logged by {e.recordedBy.name}</p> : null}
+                    {e.source === 'MEMBER' ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <p className="mr-auto text-[11px] text-muted-foreground">Logged by you</p>
+                        <Button type="button" size="sm" variant="outline" className="min-h-9 gap-1.5" onClick={() => setSheet({ mode: 'full', entry: e })}>
+                          <Pencil className="size-3.5" /> Edit
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" className="min-h-9 gap-1.5 text-destructive hover:text-destructive" onClick={() => setToDelete(e)}>
+                          <Trash2 className="size-3.5" /> Delete
+                        </Button>
+                      </div>
+                    ) : e.recordedBy ? (
+                      <p className="mt-2 text-[11px] text-muted-foreground">Logged by {e.recordedBy.name}</p>
+                    ) : null}
                   </motion.div>
                 ) : null}
               </motion.div>
             );
           })}
         </div>
-        {/* Read-only on purpose: members never edit measurements; only staff log them. */}
+        {/* Members can edit/delete only the entries they logged themselves (source MEMBER); the API enforces it — staff entries have no actions. */}
       </SectionCard>
+
+      <MeasurementLogSheet open={sheet !== null} onOpenChange={(o) => !o && setSheet(null)} mode={sheet?.mode ?? 'quick'} entry={sheet?.entry} heightHint={heightLatest} />
+      <ConfirmDialog
+        open={toDelete !== null}
+        onOpenChange={(o) => !o && setToDelete(null)}
+        title="Delete this check-in?"
+        description={toDelete ? `Your check-in from ${formatDate(toDelete.recordedAt)} will be removed. This can't be undone.` : undefined}
+        confirmLabel="Delete"
+        destructive
+        loading={del.isPending}
+        onConfirm={() => {
+          if (!toDelete) return;
+          del.mutate(toDelete.id, {
+            onSuccess: () => {
+              toast.success('Check-in deleted');
+              setToDelete(null);
+            },
+            onError: (err) => toast.error(err.message || 'Could not delete this check-in.'),
+          });
+        }}
+      />
     </div>
   );
 }

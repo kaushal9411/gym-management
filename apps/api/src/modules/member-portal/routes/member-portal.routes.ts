@@ -6,6 +6,8 @@ import { memberAuthenticateMiddleware } from '../../member-auth/middlewares/memb
 import { memberChangePasswordSchema } from '../../member-auth/validators/member-auth.validators';
 import { memberPortalController } from '../controllers/member-portal.controller';
 import {
+  memberCreateMeasurementSchema,
+  memberUpdateMeasurementSchema,
   memberDietLogSchema,
   memberInvoicePaymentParamSchema,
   memberNotificationsQuerySchema,
@@ -21,6 +23,8 @@ import {
   memberVerifyRenewalCheckoutSchema,
   memberWorkoutProgressSchema,
 } from '../validators/member-portal.validators';
+
+import { memberWorkoutLogRouter } from './member-workout-log.routes';
 
 export const memberPortalRouter: Router = Router();
 
@@ -39,6 +43,24 @@ const profileWriteLimiter = () =>
     keyGenerator: (req) => `${req.tenant?.id ?? 'platform'}:${req.memberAuth?.sub ?? req.ip}`,
   });
 
+// Per-member throttle for the diet log route (water quick-add taps are frequent, so the cap is generous).
+const dietWriteLimiter = () =>
+  createRateLimiter({
+    windowMs: 15 * 60_000,
+    max: 120,
+    prefix: 'member-diet-write',
+    keyGenerator: (req) => `${req.tenant?.id ?? 'platform'}:${req.memberAuth?.sub ?? req.ip}`,
+  });
+
+// Per-member throttle for the body-measurement write routes (keyed on the token's member id, never the body).
+const measurementWriteLimiter = () =>
+  createRateLimiter({
+    windowMs: 15 * 60_000,
+    max: 60,
+    prefix: 'member-measurement-write',
+    keyGenerator: (req) => `${req.tenant?.id ?? 'platform'}:${req.memberAuth?.sub ?? req.ip}`,
+  });
+
 // Router-level gate — every route below requires a valid member-audience
 // token, same "one line covers the whole module" pattern as the AI
 // assistant module's `requirePermission('ai:use')` at router level. No
@@ -54,6 +76,13 @@ memberPortalRouter.use(memberAuthenticateMiddleware);
  *     security: [{ bearerAuth: [] }]
  *     responses:
  *       200: { description: Member overview }
+ * /portal/plan:
+ *   get:
+ *     tags: [Member Portal]
+ *     summary: "The authenticated member current plan and everything it includes (gym access, PT, classes, diet, locker, guest passes, freeze) with usage vs quota; data is null without a membership"
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Plan benefits }
  * /portal/payments:
  *   get:
  *     tags: [Member Portal]
@@ -80,6 +109,7 @@ memberPortalRouter.use(memberAuthenticateMiddleware);
  *       200: { description: Gym info }
  */
 memberPortalRouter.get('/overview', asyncHandler(memberPortalController.overview.bind(memberPortalController)));
+memberPortalRouter.get('/plan', asyncHandler(memberPortalController.plan.bind(memberPortalController)));
 memberPortalRouter.get('/gym', asyncHandler(memberPortalController.gym.bind(memberPortalController)));
 memberPortalRouter.get(
   '/payments',
@@ -111,6 +141,8 @@ memberPortalRouter.get(
 );
 
 memberPortalRouter.get('/workout', asyncHandler(memberPortalController.workout.bind(memberPortalController)));
+// Daily workout log (member self-tracking) - own file, see member-workout-log.routes.ts
+memberPortalRouter.use('/workout/log', memberWorkoutLogRouter);
 memberPortalRouter.post(
   '/workout/:id/progress',
   validate({ params: memberPortalIdParamSchema, body: memberWorkoutProgressSchema }),
@@ -120,11 +152,75 @@ memberPortalRouter.post(
 memberPortalRouter.get('/diet', asyncHandler(memberPortalController.diet.bind(memberPortalController)));
 memberPortalRouter.post(
   '/diet/:id/log',
+  dietWriteLimiter(),
   validate({ params: memberPortalIdParamSchema, body: memberDietLogSchema }),
   asyncHandler(memberPortalController.logDiet.bind(memberPortalController)),
 );
 
+/**
+ * @openapi
+ * /portal/measurements:
+ *   get:
+ *     tags: [Member Portal]
+ *     summary: Own body-measurement history, newest first (staff- and member-logged; each row carries `id` and `source` STAFF|MEMBER)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Array of measurements }
+ *   post:
+ *     tags: [Member Portal]
+ *     summary: Log own measurement for a day (default today). One MEMBER entry per day - logging again on the same day merges into it (200) instead of duplicating (201 when new). At least one numeric value is required.
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { type: object, additionalProperties: false, properties: { recordedAt: { type: string }, weightKg: { type: number }, heightCm: { type: number }, bodyFatPercent: { type: number }, chestCm: { type: number }, waistCm: { type: number }, hipsCm: { type: number }, bicepsCm: { type: number }, thighsCm: { type: number }, notes: { type: string } } }
+ *     responses:
+ *       200: { description: Existing same-day entry updated }
+ *       201: { description: Entry created }
+ *       422: { description: "Out-of-range value, no value, future date, or older than 365 days" }
+ * /portal/measurements/{id}:
+ *   patch:
+ *     tags: [Member Portal]
+ *     summary: Edit an entry the member logged themselves. Staff-recorded entries are 403; another member's entry is 404.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200: { description: Updated entry }
+ *       403: { description: Entry was recorded by staff }
+ *       404: { description: Not found or not owned }
+ *       409: { description: Another entry already exists on the target day }
+ *   delete:
+ *     tags: [Member Portal]
+ *     summary: Delete an entry the member logged themselves (staff-recorded 403, others' 404)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - { in: path, name: id, required: true, schema: { type: string, format: uuid } }
+ *     responses:
+ *       200: { description: Deleted }
+ *       403: { description: Entry was recorded by staff }
+ *       404: { description: Not found or not owned }
+ */
 memberPortalRouter.get('/measurements', asyncHandler(memberPortalController.measurements.bind(memberPortalController)));
+memberPortalRouter.post(
+  '/measurements',
+  measurementWriteLimiter(),
+  validate({ body: memberCreateMeasurementSchema }),
+  asyncHandler(memberPortalController.logMeasurement.bind(memberPortalController)),
+);
+memberPortalRouter.patch(
+  '/measurements/:id',
+  measurementWriteLimiter(),
+  validate({ params: memberPortalIdParamSchema, body: memberUpdateMeasurementSchema }),
+  asyncHandler(memberPortalController.updateMeasurement.bind(memberPortalController)),
+);
+memberPortalRouter.delete(
+  '/measurements/:id',
+  measurementWriteLimiter(),
+  validate({ params: memberPortalIdParamSchema }),
+  asyncHandler(memberPortalController.deleteMeasurement.bind(memberPortalController)),
+);
 
 memberPortalRouter.get(
   '/invoices',

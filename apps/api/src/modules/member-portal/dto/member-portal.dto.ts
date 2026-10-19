@@ -1,6 +1,7 @@
 import type { MemberInvoiceStatus, MemberPaymentMethod, MemberPaymentStatus } from '@prisma/client';
 
-import type { PublicBusinessHour } from '../utils/member-overview.util';
+import type { PublicBusinessHour, PublicHoliday } from '../utils/member-overview.util';
+import type { PlanBenefit } from '../utils/member-plan-benefits.util';
 
 /** Money = decimal strings, counts = numbers, dates = 'YYYY-MM-DD' (UTC). */
 export interface MemberOverviewDto {
@@ -69,6 +70,23 @@ export interface MemberOverviewDto {
   notifications: { unread: number };
 }
 
+/** `GET /portal/plan` — the member's current plan and what it includes (null data when no membership exists). */
+export interface MemberPlanDto {
+  name: string;
+  code: string;
+  category: string | null;
+  description: string | null;
+  /** "1 Month", "3 Months", "1 Year" ... */
+  durationLabel: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  daysLeft: number;
+  expired: boolean;
+  totalDays: number;
+  benefits: PlanBenefit[];
+}
+
 export interface MemberPaymentItemDto {
   id: string;
   paymentNumber: string;
@@ -131,5 +149,7 @@ export interface MemberGymDto {
       postalCode: string | null;
     } | null;
     businessHours: PublicBusinessHour[] | null;
+    /** The member's own branch's closed days (all dates, sorted); clients show the upcoming ones. */
+    holidays: PublicHoliday[] | null;
   } | null;
 }

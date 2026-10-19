@@ -512,6 +512,26 @@ void main() {
       expect(t.takeException(), isNull);
     });
 
+    testWidgets('member-logged entries carry a "Logged by member" tag; staff '
+        'controls are unchanged', (t) async {
+      _repo.entries['m1'] = [
+        BodyMeasurement.fromJson({
+          ..._bmJson('mm', 1, weight: '69.00'),
+          'recordedBy': null,
+          'source': 'MEMBER',
+        }),
+        ...?_repo.entries['m1'],
+      ];
+      await pumpApp(t, const MemberMeasurementsDetailScreen(memberId: 'm1'));
+      await settle(t);
+      await scrollTo(t, find.text('Logged by member'));
+      expect(find.text('Logged by member'), findsOneWidget);
+      // Staff keep their normal Edit / Delete on every entry, including this one.
+      expect(find.byTooltip('Edit'), findsWidgets);
+      expect(find.byTooltip('Delete'), findsWidgets);
+      expect(t.takeException(), isNull);
+    });
+
     testWidgets('gating: owner/manager see Edit, Delete and Record', (t) async {
       await pumpApp(t, const MemberMeasurementsDetailScreen(memberId: 'm1'));
       await settle(t);
@@ -709,7 +729,7 @@ void main() {
     });
   });
 
-  group('member plane (read-only)', () {
+  group('member plane (history, trends, tags)', () {
     setUp(() {
       final g = GetIt.instance;
       if (g.isRegistered<MemberPortalRepository>()) {
@@ -771,7 +791,7 @@ void main() {
       await t.tap(latest);
       await step(t);
       expect(find.text('Great'), findsOneWidget);
-      expect(find.text('Logged by Coach Ravi'), findsOneWidget);
+      expect(find.text('Recorded by Coach Ravi'), findsWidgets);
     });
 
     testWidgets('no measurements -> friendly empty state', (t) async {

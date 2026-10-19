@@ -23,6 +23,10 @@ import { notifyMembershipRenewed } from '../../tenant-notifications/services/not
 import { tenantNotificationService } from '../../tenant-notifications/services/tenant-notification.service';
 import { tenantService } from '../../tenants/service/tenant.service';
 import { MemberWorkoutPlanRepository } from '../../workouts/repositories/member-workout-plan.repository';
+import { resolveDietLogDay } from '../utils/member-nutrition.util';
+
+import { MemberDietNutritionService } from './member-diet-nutrition.service';
+import { MemberWorkoutLogService } from './member-workout-log.service';
 
 /** Same shape `SubscriptionService#startCheckout`/`OnboardingService#startCheckout` already return — both tenant-web's and mobile's existing Checkout-modal code consume this exact union with zero translation. */
 export type RenewalCheckoutResult =
@@ -316,8 +320,8 @@ export class MemberPortalService {
   }
 
   async getWorkout(memberId: string) {
-    const assignment = await this.workoutAssignments.findActiveByMember(this.tenantId, memberId);
-    return assignment ? toWorkoutAssignmentDto(assignment) : null;
+    // Legacy assignment body (unchanged fields) + additive `tracking` block - see MemberWorkoutLogService.
+    return new MemberWorkoutLogService(this.tenantId).getWorkoutPayload(memberId);
   }
 
   async markWorkoutProgress(memberId: string, assignmentId: string, input: { exerciseId: string; status: 'PENDING' | 'COMPLETED' | 'SKIPPED'; notes?: string }) {
@@ -328,12 +332,17 @@ export class MemberPortalService {
 
     await this.workoutAssignments.upsertProgress(this.tenantId, assignmentId, input.exerciseId, { status: input.status, notes: input.notes });
     await this.auditLog.record({ tenantId: this.tenantId, actorUserId: null, actorRole: 'MEMBER', action: 'member_portal.workout_progress_marked', entityType: 'member_workout_plan', entityId: assignmentId });
-    return toWorkoutAssignmentDto((await this.workoutAssignments.findById(this.tenantId, assignmentId))!);
+    return new MemberWorkoutLogService(this.tenantId).payloadFor(memberId, (await this.workoutAssignments.findById(this.tenantId, assignmentId))!);
   }
 
   async getDiet(memberId: string) {
     const assignment = await this.dietAssignments.findActiveByMember(this.tenantId, memberId);
-    return assignment ? toDietAssignmentDto(assignment) : null;
+    return assignment ? this.withNutrition(memberId, assignment) : null;
+  }
+
+  /** Existing diet DTO + the additive `nutrition` block (eaten vs planned, history, insights). */
+  private async withNutrition(memberId: string, assignment: NonNullable<Awaited<ReturnType<MemberDietPlanRepository['findActiveByMember']>>>) {
+    return { ...toDietAssignmentDto(assignment), nutrition: await new MemberDietNutritionService(this.tenantId).build(memberId, assignment) };
   }
 
   /** Reuses the staff-side service's DTO shape — it's the member's own history, newest first, nothing needs hiding. */
@@ -346,8 +355,8 @@ export class MemberPortalService {
     const assignment = await this.dietAssignments.findById(this.tenantId, assignmentId);
     if (!assignment || assignment.memberId !== memberId) throw new NotFoundError('Diet plan assignment not found.');
 
-    const date = new Date(input.date);
-    if (Number.isNaN(date.getTime())) throw new ValidationError('Invalid date.');
+    // Day must be within the last 7 days (member's branch-local "today"); stored at UTC midnight like before.
+    const { day: dateStr, date } = resolveDietLogDay(input.date, await new MemberDietNutritionService(this.tenantId).today(memberId));
 
     const planMealTypes = new Set(assignment.dietPlan.meals.map((m) => m.mealType));
     if (input.mealsStatus) {
@@ -356,7 +365,6 @@ export class MemberPortalService {
       }
     }
 
-    const dateStr = date.toISOString().slice(0, 10);
     const existingLog = assignment.dailyLogs.find((log) => log.date.toISOString().slice(0, 10) === dateStr);
     const existingMealsStatus = (existingLog?.mealsStatus as Record<string, string> | null) ?? {};
 
@@ -366,8 +374,8 @@ export class MemberPortalService {
       mealsStatus: { ...existingMealsStatus, ...input.mealsStatus } as Prisma.InputJsonValue,
       notes: input.notes ?? existingLog?.notes ?? undefined,
     });
-    await this.auditLog.record({ tenantId: this.tenantId, actorUserId: null, actorRole: 'MEMBER', action: 'member_portal.diet_progress_logged', entityType: 'member_diet_plan', entityId: assignmentId });
-    return toDietAssignmentDto((await this.dietAssignments.findById(this.tenantId, assignmentId))!);
+    await this.auditLog.record({ tenantId: this.tenantId, actorUserId: null, actorRole: 'MEMBER', action: 'member_portal.diet_progress_logged', entityType: 'member_diet_plan', entityId: assignmentId, after: { day: dateStr, fields: [...(input.mealsStatus ? ['mealsStatus'] : []), ...(input.waterIntakeMl !== undefined ? ['waterIntakeMl'] : []), ...(input.weightKg !== undefined ? ['weightKg'] : []), ...(input.notes !== undefined ? ['notes'] : [])] } });
+    return this.withNutrition(memberId, (await this.dietAssignments.findById(this.tenantId, assignmentId))!);
   }
 
   async getInvoices(memberId: string, pagination: { page: number; limit: number }) {
@@ -424,25 +432,6 @@ export class MemberPortalService {
   async markAllNotificationsRead(memberId: string): Promise<void> {
     await tenantNotificationService.markAllReadForMember(this.tenantId, memberId);
   }
-}
-
-function toWorkoutAssignmentDto(assignment: Awaited<ReturnType<MemberWorkoutPlanRepository['findActiveByMember']>>) {
-  const a = assignment!;
-  return {
-    id: a.id,
-    status: a.status,
-    startDate: a.startDate.toISOString().slice(0, 10),
-    endDate: a.endDate?.toISOString().slice(0, 10) ?? null,
-    trainerRemarks: a.trainerRemarks,
-    workoutPlan: {
-      id: a.workoutPlan.id,
-      name: a.workoutPlan.name,
-      level: a.workoutPlan.level,
-      durationWeeks: a.workoutPlan.durationWeeks,
-      exercises: a.workoutPlan.exercises.map((e) => ({ exerciseId: e.exerciseId, name: e.exercise.name, dayOfWeek: e.dayOfWeek })),
-    },
-    progress: a.progress.map((p) => ({ exerciseId: p.exerciseId, status: p.status, notes: p.notes, markedAt: p.markedAt?.toISOString() ?? null })),
-  };
 }
 
 function toDietAssignmentDto(assignment: Awaited<ReturnType<MemberDietPlanRepository['findActiveByMember']>>) {

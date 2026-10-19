@@ -6,12 +6,15 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/body_measurement.dart';
 import '../../../repositories/member_portal_repository.dart';
+import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../manager/presentation/widgets/member_detail_anim.dart';
 import '../../measurements/presentation/measurement_charts.dart';
 import '../../measurements/presentation/measurement_ui.dart';
 import '../../measurements/presentation/member_progress.dart';
 import '../../team/presentation/widgets/team_ui.dart';
+import 'member_measurement_logic.dart';
+import 'member_measurement_sheets.dart';
 
 const _ranges = [
   (label: '1M', days: 30),
@@ -20,18 +23,30 @@ const _ranges = [
   (label: 'All', days: null),
 ];
 
-/// The member's own Body Measurements page — mirrors web's member-portal
-/// `/portal/measurements`: hero (latest weight, check-in count, change vs the
-/// previous / first check-in, BMI · body fat · waist), four stat tiles,
-/// Trends (1M / 3M / 6M / All range; weight, body fat and girth charts),
-/// First vs latest, and a tap-to-expand History.
+const _weekdayLetters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+/// The member's own Body Measurements page: hero (latest weight, check-in
+/// count, change vs the previous / first check-in, BMI · body fat · waist)
+/// with the **Log weight** and **Full check-in** actions, a daily-tracking
+/// card (last 7 days, streak, this-week vs last-week average, progress toward
+/// the target weight), four stat tiles, Trends (1M / 3M / 6M / All; the
+/// weight chart plots each day plus a 7-day moving average), First vs latest,
+/// and a tap-to-expand History.
 ///
-/// Read-only on purpose — a member never edits measurements; only staff log
-/// them (`GET /portal/measurements`, no member id: the member plane scopes to
-/// the signed-in member). Entered from the member Menu tile ("Body
-/// Measurements" -> `AppRoutes.memberMeasurements`), unchanged. BMI is not a
-/// stored value: it is computed here from the real weight and the most recent
-/// recorded height, exactly as web does.
+/// **Self-tracking (member-initiated, beyond web's read-only portal)**: a
+/// member logs / edits / deletes their OWN entries (`POST` / `PATCH` /
+/// `DELETE /portal/measurements`). One member entry per day — logging again
+/// the same day updates it. Only entries with `source == MEMBER` show Edit /
+/// Delete (and a "Logged by you" tag); staff-recorded entries are read-only
+/// and tagged "Recorded by (staff name)". The API enforces the same rules
+/// (ownership, no future dates, 365-day back-dating), so the client checks
+/// are convenience only.
+///
+/// The target weight comes from `GET /portal/me` (`membershipHistory[]
+/// .targetWeight`, set by staff at membership assignment); without one the
+/// goal card is simply absent. BMI is computed here from the real weight and
+/// the most recent recorded height. Entered from the member Menu tile ("Body
+/// Measurements" -> `AppRoutes.memberMeasurements`), unchanged.
 ///
 /// Member palette (lime -> teal), per the "member screens pass
 /// `AppRole.member`" rule; the per-value tones are the same content colours
@@ -46,10 +61,13 @@ class MemberMeasurementsScreen extends StatefulWidget {
 
 class _MemberMeasurementsScreenState extends State<MemberMeasurementsScreen> {
   List<BodyMeasurement>? _entries;
+  double? _targetKg;
+  bool _targetLoaded = false;
   bool _loading = true;
   String? _error;
   int? _rangeDays;
   String? _openId;
+  String? _deletingId;
 
   @override
   void initState() {
@@ -72,10 +90,27 @@ class _MemberMeasurementsScreenState extends State<MemberMeasurementsScreen> {
         _loading = false;
         _error = null;
       });
+      _loadTarget();
     } on ApiException catch (e) {
       _fail(e.message);
     } catch (e) {
       _fail('Could not load your measurements.');
+    }
+  }
+
+  /// Best-effort: the goal card is optional, so a failure here is silent and
+  /// retried on the next refresh.
+  Future<void> _loadTarget() async {
+    if (_targetLoaded) return;
+    try {
+      final profile = await getIt<MemberPortalRepository>().me();
+      if (!mounted) return;
+      setState(() {
+        _targetKg = profile.targetWeightKg;
+        _targetLoaded = true;
+      });
+    } catch (e) {
+      // No goal card without a target.
     }
   }
 
@@ -96,6 +131,97 @@ class _MemberMeasurementsScreenState extends State<MemberMeasurementsScreen> {
       });
     }
   }
+
+  // ── actions ───────────────────────────────────────────────────────────────
+
+  Map<int, BodyMeasurement> _ownByDay(List<BodyMeasurement> entries) => {
+        for (final e in entries)
+          if (e.isMemberLogged) dayOrdinal(entryDay(e.recordedAt)): e,
+      };
+
+  Future<void> _afterSave(String? message) async {
+    if (message == null || !mounted) return;
+    teamSnack(context, message);
+    await _load(silent: true);
+  }
+
+  Future<void> _logWeight() async {
+    final entries = _entries ?? const <BodyMeasurement>[];
+    final stats = MemberWeightStats(entries, targetKg: _targetKg);
+    final message = await showMemberWeightSheet(
+      context,
+      lastWeight: stats.currentKg,
+      ownByDay: _ownByDay(entries),
+      onSave: (input) async {
+        final r = await getIt<MemberPortalRepository>().logMeasurement(input);
+        return r.created ? 'Weight saved.' : 'Weight updated for that day.';
+      },
+    );
+    await _afterSave(message);
+  }
+
+  Future<void> _checkIn() async {
+    final entries = _entries ?? const <BodyMeasurement>[];
+    // Today's own entry (if any) is prefilled: saving updates it.
+    final todayOwn = _ownByDay(entries)[dayOrdinal(entryDay(DateTime.now()))];
+    final message = await showMemberCheckInSheet(
+      context,
+      initial: todayOwn,
+      onSave: (input) async {
+        final r = await getIt<MemberPortalRepository>().logMeasurement(input);
+        return r.created ? 'Check-in saved.' : 'Check-in updated for that day.';
+      },
+    );
+    await _afterSave(message);
+  }
+
+  Future<void> _edit(BodyMeasurement entry) async {
+    final message = await showMemberCheckInSheet(
+      context,
+      initial: entry,
+      editing: true,
+      onSave: (input) async {
+        await getIt<MemberPortalRepository>()
+            .updateMeasurement(entry.id, input);
+        return 'Entry updated.';
+      },
+    );
+    await _afterSave(message);
+  }
+
+  Future<void> _delete(BodyMeasurement entry) async {
+    final ok = await confirmTeam(
+      context,
+      title: 'Delete this entry?',
+      message: 'Your ${longDay(entry.recordedAt)} check-in will be removed '
+          'from your history and charts.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    );
+    if (!ok || !mounted) return;
+    setState(() => _deletingId = entry.id);
+    try {
+      await getIt<MemberPortalRepository>().deleteMeasurement(entry.id);
+      if (!mounted) return;
+      setState(() => _openId = null);
+      teamSnack(context, 'Entry deleted.');
+      await _load(silent: true);
+    } on ApiException catch (e) {
+      if (mounted) teamSnack(context, e.detailedMessage, error: true);
+    } catch (e) {
+      if (mounted) {
+        teamSnack(
+          context,
+          'Could not delete the entry. Try again.',
+          error: true,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _deletingId = null);
+    }
+  }
+
+  // ── build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -123,12 +249,39 @@ class _MemberMeasurementsScreenState extends State<MemberMeasurementsScreen> {
               color: AppColors.memberB,
               backgroundColor: AppColors.surface2,
               onRefresh: () => _load(silent: true),
-              child: _content(MemberProgress(entries)),
+              child: _content(
+                MemberProgress(entries),
+                MemberWeightStats(entries, targetKg: _targetKg),
+              ),
             ),
     );
   }
 
-  Widget _content(MemberProgress p) {
+  Widget _actions() => Row(
+        children: [
+          Expanded(
+            child: _HeroButton(
+              key: const ValueKey('log-weight'),
+              label: 'Log weight',
+              icon: Icons.add_rounded,
+              filled: true,
+              onTap: _logWeight,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _HeroButton(
+              key: const ValueKey('full-checkin'),
+              label: 'Full check-in',
+              icon: Icons.straighten_rounded,
+              filled: false,
+              onTap: _checkIn,
+            ),
+          ),
+        ],
+      );
+
+  Widget _content(MemberProgress p, MemberWeightStats stats) {
     final top = MediaQuery.of(context).padding.top + kToolbarHeight;
     if (p.isEmpty) {
       return ListView(
@@ -138,15 +291,17 @@ class _MemberMeasurementsScreenState extends State<MemberMeasurementsScreen> {
           _Hero(
             topInset: top,
             title: 'No check-ins yet',
-            subtitle: 'Your trainer logs them for you',
+            subtitle: 'Log your first weight in a few seconds',
             chips: const [],
+            actions: _actions(),
           ),
           const SizedBox(height: 60),
           const AppEmptyState(
             icon: Icons.straighten_outlined,
             title: 'No measurements yet',
-            message: 'Ask your trainer to log your first check-in — your '
-                'trends and comparisons will appear here.',
+            message: 'Log your weight (a quick daily entry works great) or '
+                'do a full check-in — your trends and comparisons will '
+                'appear here.',
           ),
         ],
       );
@@ -164,6 +319,11 @@ class _MemberMeasurementsScreenState extends State<MemberMeasurementsScreen> {
         : null;
     String signed(double v, String unit) =>
         '${v > 0 ? '+' : ''}${fmtNum(v)} $unit';
+    final by = latest.isMemberLogged
+        ? ' · by you'
+        : latest.recordedBy != null
+            ? ' · by ${latest.recordedBy!.name}'
+            : '';
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -172,8 +332,7 @@ class _MemberMeasurementsScreenState extends State<MemberMeasurementsScreen> {
         _Hero(
           topInset: top,
           title: w != null ? '${fmtNum(w)} kg' : 'Latest check-in',
-          subtitle: 'Latest check-in ${longDay(latest.recordedAt)}'
-              '${latest.recordedBy != null ? ' · by ${latest.recordedBy!.name}' : ''}',
+          subtitle: 'Latest check-in ${longDay(latest.recordedAt)}$by',
           chips: [
             '${p.asc.length} check-in${p.asc.length == 1 ? '' : 's'}',
             if (vsPrev != null && vsPrev != 0)
@@ -186,6 +345,7 @@ class _MemberMeasurementsScreenState extends State<MemberMeasurementsScreen> {
             if (bf != null) ('Body fat', '${fmtNum(bf)}%'),
             if (waist != null) ('Waist', '${fmtNum(waist)} cm'),
           ],
+          actions: _actions(),
         ),
         TeamCenter(
           maxWidth: 1000,
@@ -194,9 +354,11 @@ class _MemberMeasurementsScreenState extends State<MemberMeasurementsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                _progress(stats),
+                const SizedBox(height: 14),
                 _tiles(p, latest, prev, first, w, bf, bmi, sinceFirst),
                 const SizedBox(height: 14),
-                _trends(p),
+                _trends(p, stats),
                 const SizedBox(height: 14),
                 _comparison(p, first, latest, bmi),
                 const SizedBox(height: 14),
@@ -206,6 +368,148 @@ class _MemberMeasurementsScreenState extends State<MemberMeasurementsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  // ── daily tracking ────────────────────────────────────────────────────────
+
+  Widget _progress(MemberWeightStats s) {
+    final goal = s.goal;
+    final delta = s.weekDelta;
+    final avg = s.thisWeekAvg;
+    final lastSeven = s.lastSevenDays;
+
+    Color deltaTone(double d) {
+      if (goal == null || d == 0) return TeamColors.sky;
+      return (goal.isLoss ? d < 0 : d > 0)
+          ? TeamColors.green
+          : TeamColors.amber;
+    }
+
+    final week = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            for (var i = 0; i < 7; i++)
+              _DayDot(
+                index: i,
+                letter: _weekdayLetters[
+                    DateTime(s.today.year, s.today.month, s.today.day - (6 - i))
+                            .weekday -
+                        1],
+                logged: lastSeven[i],
+                isToday: i == 6,
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            Expanded(
+              child: _MiniStat(
+                label: 'Streak',
+                icon: Icons.local_fire_department_rounded,
+                color: TeamColors.amber,
+                child: CountUp(
+                  key: const ValueKey('stat-streak'),
+                  value: s.streak,
+                  suffix: s.streak == 1 ? ' day' : ' days',
+                  style: AppText.display(size: 17, color: TeamColors.amber),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _MiniStat(
+                label: 'This week',
+                icon: Icons.event_available_rounded,
+                color: TeamColors.sky,
+                child: Text(
+                  '${s.daysLoggedThisWeek}/7 days',
+                  key: const ValueKey('stat-days'),
+                  style: AppText.display(size: 17, color: TeamColors.sky),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _MiniStat(
+                label: 'Weekly avg',
+                icon: Icons.show_chart_rounded,
+                color: TeamColors.indigo,
+                child: Text(
+                  avg == null ? '—' : '${fmtNum(r1(avg))} kg',
+                  key: const ValueKey('stat-avg'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.display(size: 17, color: TeamColors.indigo),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (delta != null)
+          TeamTag(
+            key: const ValueKey('week-delta'),
+            label: delta == 0
+                ? 'Same average as last week'
+                : '${delta > 0 ? '▲' : '▼'} ${fmtNum(delta.abs())} kg vs last week',
+            color: deltaTone(delta),
+          )
+        else
+          Text(
+            avg == null
+                ? 'Log your weight this week to see how it compares.'
+                : 'Weigh in again next week to compare your averages.',
+            key: const ValueKey('week-delta-empty'),
+            style: AppText.body(
+              size: 12,
+              weight: FontWeight.w600,
+              color: AppColors.inkFaint,
+            ),
+          ),
+      ],
+    );
+
+    return FadeUp(
+      index: 0,
+      child: TeamSectionCard(
+        icon: Icons.local_fire_department_rounded,
+        color: AppColors.memberB,
+        title: 'Daily tracking',
+        subtitle: s.loggedToday
+            ? 'Logged today — nice work'
+            : 'A quick weigh-in each day keeps the trend honest',
+        child: LayoutBuilder(
+          builder: (context, c) {
+            if (goal == null) return week;
+            final goalCard = _GoalCard(goal: goal);
+            if (c.maxWidth >= 560) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: week),
+                  const SizedBox(width: 24),
+                  SizedBox(width: 250, child: goalCard),
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                week,
+                const SizedBox(height: 16),
+                Divider(height: 1, color: AppColors.line),
+                const SizedBox(height: 16),
+                goalCard,
+              ],
+            );
+          },
+        ),
+      ),
     );
   }
 
@@ -297,7 +601,7 @@ class _MemberMeasurementsScreenState extends State<MemberMeasurementsScreen> {
 
   // ── trends ────────────────────────────────────────────────────────────────
 
-  Widget _trends(MemberProgress p) {
+  Widget _trends(MemberProgress p, MemberWeightStats stats) {
     final rows = p.inRange(_rangeDays);
     List<double?> col(MeasurementField f) => [for (final e in rows) f.of(e)];
     final labels = [for (final e in rows) shortDay(e.recordedAt)];
@@ -360,12 +664,7 @@ class _MemberMeasurementsScreenState extends State<MemberMeasurementsScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          chart(
-            title: 'Weight (kg)',
-            f: MeasurementField.weight,
-            empty: 'Not enough weight check-ins in this range',
-            icon: Icons.monitor_weight_rounded,
-          ),
+          _weightChart(stats),
           const SizedBox(height: 18),
           chart(
             title: 'Body fat (%)',
@@ -401,6 +700,57 @@ class _MemberMeasurementsScreenState extends State<MemberMeasurementsScreen> {
             ),
         ],
       ),
+    );
+  }
+
+  /// Daily weight points plus the 7-day moving average (computed over the
+  /// whole history so the start of a range is not artificially noisy, then
+  /// cut to the selected range).
+  Widget _weightChart(MemberWeightStats stats) {
+    final today = dayOrdinal(stats.today);
+    final keep = [
+      for (var i = 0; i < stats.days.length; i++)
+        if (_rangeDays == null ||
+            today - dayOrdinal(stats.days[i].day) <= _rangeDays!)
+          i,
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Weight (kg)',
+          style: AppText.body(size: 13, weight: FontWeight.w800),
+        ),
+        const SizedBox(height: 6),
+        if (keep.length >= 2)
+          MeasurementLineChart(
+            key: ValueKey('chart-weight-$_rangeDays'),
+            labels: [for (final i in keep) shortDay(stats.days[i].day)],
+            series: [
+              ChartSeries(
+                label: 'Daily weight',
+                color: TeamColors.indigo,
+                values: [for (final i in keep) stats.days[i].kg],
+                unit: 'kg',
+                strokeWidth: 1.8,
+              ),
+              ChartSeries(
+                label: '7-day average',
+                color: AppColors.memberB,
+                values: [for (final i in keep) stats.movingAverage[i]],
+                unit: 'kg',
+                dots: false,
+                strokeWidth: 3.4,
+              ),
+            ],
+            height: 170,
+          )
+        else
+          const _EmptyChart(
+            icon: Icons.monitor_weight_rounded,
+            text: 'Not enough weight check-ins in this range',
+          ),
+      ],
     );
   }
 
@@ -478,9 +828,13 @@ class _MemberMeasurementsScreenState extends State<MemberMeasurementsScreen> {
               entry: rows[i],
               latest: i == 0,
               open: _openId == rows[i].id,
+              deleting: _deletingId == rows[i].id,
+              busy: _deletingId != null,
               onTap: () => setState(
                 () => _openId = _openId == rows[i].id ? null : rows[i].id,
               ),
+              onEdit: () => _edit(rows[i]),
+              onDelete: () => _delete(rows[i]),
             ),
           ],
         ],
@@ -498,6 +852,7 @@ class _Hero extends StatelessWidget {
     required this.subtitle,
     required this.chips,
     this.stats = const [],
+    this.actions,
   });
 
   final double topInset;
@@ -505,6 +860,9 @@ class _Hero extends StatelessWidget {
   final String subtitle;
   final List<String> chips;
   final List<(String, String)> stats;
+
+  /// The Log weight / Full check-in buttons.
+  final Widget? actions;
 
   @override
   Widget build(BuildContext context) {
@@ -611,10 +969,253 @@ class _Hero extends StatelessWidget {
                   ],
                 ),
               ],
+              if (actions != null) ...[
+                const SizedBox(height: 16),
+                actions!,
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+/// One of the two hero actions: [filled] = the primary "Log weight".
+class _HeroButton extends StatelessWidget {
+  const _HeroButton({
+    super.key,
+    required this.label,
+    required this.icon,
+    required this.filled,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool filled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final on = AppRole.member.onGradient;
+    final fg = filled ? AppColors.memberA : on;
+    return Material(
+      color: filled ? on : on.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Container(
+          height: 46,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border:
+                filled ? null : Border.all(color: on.withValues(alpha: 0.28)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: fg),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.body(
+                    size: 13.5,
+                    weight: FontWeight.w800,
+                    color: fg,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One of the last-seven-days dots: filled with a tick when that day has a
+/// check-in, a ring around today.
+class _DayDot extends StatelessWidget {
+  const _DayDot({
+    required this.index,
+    required this.letter,
+    required this.logged,
+    required this.isToday,
+  });
+
+  final int index;
+  final String letter;
+  final bool logged;
+  final bool isToday;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopIn(
+      index: index,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            letter,
+            style: AppText.body(
+              size: 10.5,
+              weight: FontWeight.w800,
+              color: isToday ? AppColors.memberB : AppColors.inkFaint,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Container(
+            key: ValueKey('day-dot-$index-${logged ? 'on' : 'off'}'),
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: logged ? AppColors.memberGrad : null,
+              color: logged ? null : AppColors.surface2,
+              border: Border.all(
+                color: isToday
+                    ? AppColors.memberB
+                    : logged
+                        ? Colors.transparent
+                        : AppColors.line,
+                width: isToday ? 2 : 1,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: logged
+                ? Icon(
+                    Icons.check_rounded,
+                    size: 16,
+                    color: AppRole.member.onGradient,
+                  )
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  const _MiniStat({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.child,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 9, 8, 9),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.09),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 12, color: color),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.body(
+                    size: 10.5,
+                    weight: FontWeight.w700,
+                    color: AppColors.inkFaint,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Progress toward the target weight: a ring that fills in, the target, what
+/// is left, and where the member started.
+class _GoalCard extends StatelessWidget {
+  const _GoalCard({required this.goal});
+
+  final GoalProgress goal;
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = (goal.ratio * 100).round();
+    return Row(
+      key: const ValueKey('goal-card'),
+      children: [
+        AnimatedRing(
+          value: goal.ratio,
+          size: 78,
+          stroke: 9,
+          colors: const [AppColors.memberA, AppColors.memberB],
+          track: AppColors.line,
+          child: CountUp(
+            value: pct,
+            suffix: '%',
+            style: AppText.display(size: 17),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Goal ${fmtNum(goal.target)} kg',
+                style: AppText.body(size: 14, weight: FontWeight.w800),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                goal.reached
+                    ? 'Goal reached — great work!'
+                    : '${fmtNum(goal.remaining)} kg to go',
+                key: const ValueKey('goal-remaining'),
+                style: AppText.body(
+                  size: 12.5,
+                  weight: FontWeight.w700,
+                  color: goal.reached ? TeamColors.green : AppColors.inkSoft,
+                ),
+              ),
+              Text(
+                'Started at ${fmtNum(goal.start)} kg',
+                style: AppText.body(
+                  size: 11.5,
+                  weight: FontWeight.w600,
+                  color: AppColors.inkFaint,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -834,19 +1435,50 @@ class _HistoryRow extends StatelessWidget {
     required this.entry,
     required this.latest,
     required this.open,
+    required this.deleting,
+    required this.busy,
     required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   final BodyMeasurement entry;
   final bool latest;
   final bool open;
+
+  /// This row's delete request is in flight.
+  final bool deleting;
+
+  /// Any delete is in flight (disables the other rows' buttons).
+  final bool busy;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  /// "Logged by you" for the member's own entries, "Recorded by (staff name)"
+  /// otherwise.
+  Widget _sourceTag() {
+    if (entry.isMemberLogged) {
+      return const TeamTag(
+        label: 'Logged by you',
+        color: TeamColors.teal,
+        icon: Icons.person_rounded,
+      );
+    }
+    final name = entry.recordedBy?.name;
+    return TeamTag(
+      label: name == null ? 'Recorded by staff' : 'Recorded by $name',
+      color: TeamColors.slate,
+      icon: Icons.badge_outlined,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final fields = recordedFields(entry);
     final headline = fields.take(3).toList();
     return Container(
+      key: ValueKey('history-${entry.id}'),
       decoration: BoxDecoration(
         color: AppColors.surface2,
         borderRadius: BorderRadius.circular(18),
@@ -875,7 +1507,28 @@ class _HistoryRow extends StatelessWidget {
                               weight: FontWeight.w800,
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              // A long staff name shrinks the tag instead
+                              // of overflowing the row.
+                              Flexible(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  alignment: Alignment.centerLeft,
+                                  child: _sourceTag(),
+                                ),
+                              ),
+                              if (latest) ...[
+                                const SizedBox(width: 6),
+                                const TeamTag(
+                                  label: 'Latest',
+                                  color: TeamColors.green,
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 4),
                           Text(
                             headline.isEmpty
                                 ? 'No values recorded'
@@ -896,8 +1549,6 @@ class _HistoryRow extends StatelessWidget {
                         ],
                       ),
                     ),
-                    if (latest)
-                      const TeamTag(label: 'Latest', color: TeamColors.green),
                     Icon(
                       open
                           ? Icons.expand_less_rounded
@@ -936,17 +1587,44 @@ class _HistoryRow extends StatelessWidget {
                         ),
                       ),
                     ],
-                    if (entry.recordedBy != null) ...[
-                      const SizedBox(height: 8),
+                    const SizedBox(height: 12),
+                    if (entry.isMemberLogged)
+                      Row(
+                        children: [
+                          AppButton(
+                            key: ValueKey('edit-${entry.id}'),
+                            label: 'Edit',
+                            icon: Icons.edit_outlined,
+                            role: AppRole.member,
+                            variant: AppButtonVariant.ghost,
+                            size: AppButtonSize.small,
+                            fullWidth: false,
+                            onPressed: busy ? null : onEdit,
+                          ),
+                          const SizedBox(width: 8),
+                          AppButton(
+                            key: ValueKey('delete-${entry.id}'),
+                            label: 'Delete',
+                            icon: Icons.delete_outline_rounded,
+                            role: AppRole.member,
+                            variant: AppButtonVariant.ghost,
+                            size: AppButtonSize.small,
+                            fullWidth: false,
+                            loading: deleting,
+                            foregroundColor: AppColors.danger,
+                            onPressed: busy ? null : onDelete,
+                          ),
+                        ],
+                      )
+                    else
                       Text(
-                        'Logged by ${entry.recordedBy!.name}',
+                        'Recorded by your gym — only they can change it.',
                         style: AppText.body(
                           size: 11,
                           weight: FontWeight.w600,
                           color: AppColors.inkFaint,
                         ),
                       ),
-                    ],
                   ],
                 ),
               ),

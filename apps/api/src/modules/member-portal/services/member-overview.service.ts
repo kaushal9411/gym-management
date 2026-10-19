@@ -20,6 +20,7 @@ import {
   fillDailySeries,
   fillWeekdayCounts,
   flattenBusinessHours,
+  flattenHolidays,
   membershipCountdown,
   monthComparisonWindows,
   pickSocialLinks,
@@ -310,6 +311,7 @@ export class MemberOverviewService {
             email: nonEmpty(branch.email),
             address: branchAddress && !allNull(branchAddress) ? branchAddress : null,
             businessHours: flattenBusinessHours(branch.operatingHours),
+            holidays: flattenHolidays(branch.holidays),
           }
         : null,
     };
