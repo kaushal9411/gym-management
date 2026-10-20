@@ -43,6 +43,22 @@ class _MessageStepState extends State<MessageStep> {
     final s = context.read<SendFlowCubit>().state;
     _title = TextEditingController(text: s.title);
     _body = TextEditingController(text: s.body);
+    if (s.title.trim().isEmpty && s.body.trim().isEmpty) _prefill();
+  }
+
+  /// A fresh flow opens on the first template (Expiring) so Title and Message
+  /// are never blank; typing over it flips the chip to Custom.
+  void _prefill() {
+    final t = CommTemplate.values.firstWhere(
+      (x) => kCommTemplateTexts.containsKey(x),
+    );
+    final preset = kCommTemplateTexts[t]!;
+    _title.text = preset.title;
+    _body.text = preset.body;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _cubit.setTexts(title: preset.title, body: preset.body, template: t);
+    });
   }
 
   @override
