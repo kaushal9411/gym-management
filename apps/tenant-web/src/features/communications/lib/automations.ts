@@ -39,7 +39,7 @@ export interface RuleDraft {
   enabled: boolean;
   offsets: number[];
   channels: AutomationRule['channels'];
-  /** Empty string = use the default text. */
+  /** Prefilled with the effective default (the gym's Notification template when customised); saved as an override only when edited. */
   title: string;
   body: string;
 }
@@ -52,7 +52,7 @@ export interface RuleErrors {
 }
 
 export function draftFromRule(r: AutomationRule): RuleDraft {
-  return { enabled: r.enabled, offsets: r.offsets, channels: r.channels, title: r.title ?? '', body: r.body ?? '' };
+  return { enabled: r.enabled, offsets: r.offsets, channels: r.channels, title: r.title ?? r.defaultTitle, body: r.body ?? r.defaultBody };
 }
 
 /** Same checks as the API's `automationIssues` for one rule. */
@@ -74,6 +74,12 @@ export function validateRuleDraft(rule: AutomationRule, d: RuleDraft): RuleError
   if (!e.title) delete e.title;
   if (!e.body) delete e.body;
   return e;
+}
+
+/** What to send as the rule's own text: null while it still equals the default, so the rule keeps following the Notification template. */
+export function overrideText(value: string, fallback: string): string | null {
+  const t = value.trim();
+  return !t || t === fallback.trim() ? null : t;
 }
 
 export function draftChanged(rule: AutomationRule, d: RuleDraft): boolean {

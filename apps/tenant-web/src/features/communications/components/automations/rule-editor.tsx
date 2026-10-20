@@ -10,7 +10,7 @@ import { LoadingButton } from '@/components/ui/loading-button';
 import { cn } from '@/lib/utils';
 import { BODY_MAX, CHANNEL_META, DISABLED_REASON_COPY, PLACEHOLDER_HINT, TEST_CHANNELS, TITLE_MAX } from '../../constants';
 import { useTestAutomation, useUpdateAutomation } from '../../hooks/use-communications';
-import { describeTiming, draftChanged, draftFromRule, timingUnitWord, validateRuleDraft, type RuleDraft } from '../../lib/automations';
+import { describeTiming, draftChanged, draftFromRule, overrideText, timingUnitWord, validateRuleDraft, type RuleDraft } from '../../lib/automations';
 import { classifyError } from '../../lib/errors';
 import type { AutomationRule, Channel, TestSendResult } from '../../types';
 import { Banner, ChannelDot, CommsSwitch, FieldError } from '../common';
@@ -91,8 +91,8 @@ function EditorBody({ rule, canManage, onClose }: { rule: AutomationRule; canMan
           enabled: draft.enabled,
           channels: draft.channels,
           ...(rule.timing.editable ? { offsets: draft.offsets } : {}),
-          title: draft.title.trim() || null,
-          body: draft.body.trim() || null,
+          title: overrideText(draft.title, rule.defaultTitle),
+          body: overrideText(draft.body, rule.defaultBody),
         },
       },
       {
@@ -129,7 +129,8 @@ function EditorBody({ rule, canManage, onClose }: { rule: AutomationRule; canMan
     );
   };
 
-  const resetText = () => patch({ title: '', body: '' });
+  const resetText = () => patch({ title: rule.defaultTitle, body: rule.defaultBody });
+  const usingDefault = draft.title.trim() === rule.defaultTitle.trim() && draft.body.trim() === rule.defaultBody.trim();
 
   return (
     <>
@@ -240,7 +241,7 @@ function EditorBody({ rule, canManage, onClose }: { rule: AutomationRule; canMan
       <section aria-labelledby="re-text">
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <h4 id="re-text" className="text-sm font-bold">Message text</h4>
-          {draft.title || draft.body ? (
+          {!usingDefault ? (
             <Button type="button" variant="ghost" size="sm" disabled={readOnly} onClick={resetText}>
               <RotateCcw className="size-3.5" aria-hidden /> Use default text
             </Button>
