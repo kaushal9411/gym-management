@@ -4,7 +4,7 @@ import { notificationTemplateService } from '../../tenant-notifications/services
 import { CAMPAIGN_PLACEHOLDERS, findPlaceholderIssues } from '../utils/placeholder.util';
 
 /** Member-facing Notification templates that can start a campaign (staff-only ones such as attendance / assignments are not offered). */
-const CAMPAIGN_TEMPLATE_TYPES: NotificationTemplateType[] = ['MEMBERSHIP_EXPIRY', 'MEMBERSHIP_RENEWAL', 'PAYMENT_SUCCESS', 'PAYMENT_FAILED', 'WELCOME_MESSAGE', 'BIRTHDAY_WISHES'];
+const CAMPAIGN_TEMPLATE_TYPES: NotificationTemplateType[] = ['MEMBERSHIP_EXPIRY', 'MEMBERSHIP_RENEWAL', 'PAYMENT_SUCCESS', 'PAYMENT_FAILED', 'WELCOME_MESSAGE', 'BIRTHDAY_WISHES', 'PAYMENT_OVERDUE', 'INVOICE_DUE_SOON', 'CLASS_REMINDER', 'CLASS_SCHEDULED_OR_CHANGED', 'WE_MISS_YOU'];
 
 /** Old-style tokens the Notification templates use -> the campaign placeholder set. */
 const TOKEN_MAP: Record<string, string> = {

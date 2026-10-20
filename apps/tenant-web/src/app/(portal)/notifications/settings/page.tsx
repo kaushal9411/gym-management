@@ -16,10 +16,10 @@ import { accentChipStyle } from '@/features/reports/lib/reports-theme';
 
 const GROUPS: TemplateGroup[] = [
   { key: 'membership', label: 'Membership', description: 'Expiry reminders and renewals', accent: 'members', icon: UserCheck, types: ['MEMBERSHIP_EXPIRY', 'MEMBERSHIP_RENEWAL'] },
-  { key: 'payments', label: 'Payments', description: 'Payment outcomes', accent: 'finance', icon: CreditCard, types: ['PAYMENT_SUCCESS', 'PAYMENT_FAILED'] },
-  { key: 'attendance', label: 'Attendance', description: 'Check-in confirmations', accent: 'attendance', icon: CalendarCheck, types: ['ATTENDANCE_CONFIRMATION'] },
+  { key: 'payments', label: 'Payments', description: 'Payment outcomes and reminders', accent: 'finance', icon: CreditCard, types: ['PAYMENT_SUCCESS', 'PAYMENT_FAILED', 'PAYMENT_OVERDUE', 'INVOICE_DUE_SOON'] },
+  { key: 'attendance', label: 'Attendance', description: 'Check-ins and class reminders', accent: 'attendance', icon: CalendarCheck, types: ['ATTENDANCE_CONFIRMATION', 'CLASS_REMINDER', 'CLASS_SCHEDULED_OR_CHANGED'] },
   { key: 'plans', label: 'Plans', description: 'Workout and diet assignments', accent: 'operations', icon: Dumbbell, types: ['WORKOUT_ASSIGNMENT', 'DIET_ASSIGNMENT'] },
-  { key: 'engagement', label: 'Engagement', description: 'Welcome and goodwill messages', accent: 'staff', icon: HeartHandshake, types: ['NEW_MEMBER_REGISTRATION', 'WELCOME_MESSAGE', 'BIRTHDAY_WISHES'] },
+  { key: 'engagement', label: 'Engagement', description: 'Welcome and goodwill messages', accent: 'staff', icon: HeartHandshake, types: ['NEW_MEMBER_REGISTRATION', 'WELCOME_MESSAGE', 'BIRTHDAY_WISHES', 'WE_MISS_YOU'] },
 ];
 
 export default function NotificationSettingsPage() {

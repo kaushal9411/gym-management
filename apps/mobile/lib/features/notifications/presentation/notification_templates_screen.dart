@@ -45,17 +45,26 @@ const _groups = <_Group>[
   ),
   _Group(
     'Payments',
-    'Payment outcomes',
+    'Payment outcomes and reminders',
     TeamColors.green,
     Icons.credit_card_rounded,
-    ['PAYMENT_SUCCESS', 'PAYMENT_FAILED'],
+    [
+      'PAYMENT_SUCCESS',
+      'PAYMENT_FAILED',
+      'PAYMENT_OVERDUE',
+      'INVOICE_DUE_SOON',
+    ],
   ),
   _Group(
     'Attendance',
-    'Check-in confirmations',
+    'Check-ins and class reminders',
     TeamColors.teal,
     Icons.event_available_rounded,
-    ['ATTENDANCE_CONFIRMATION'],
+    [
+      'ATTENDANCE_CONFIRMATION',
+      'CLASS_REMINDER',
+      'CLASS_SCHEDULED_OR_CHANGED',
+    ],
   ),
   _Group(
     'Plans',
@@ -69,7 +78,12 @@ const _groups = <_Group>[
     'Welcome and goodwill messages',
     TeamColors.fuchsia,
     Icons.volunteer_activism_rounded,
-    ['NEW_MEMBER_REGISTRATION', 'WELCOME_MESSAGE', 'BIRTHDAY_WISHES'],
+    [
+      'NEW_MEMBER_REGISTRATION',
+      'WELCOME_MESSAGE',
+      'BIRTHDAY_WISHES',
+      'WE_MISS_YOU',
+    ],
   ),
 ];
 

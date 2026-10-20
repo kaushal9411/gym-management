@@ -48,6 +48,9 @@ interface LegacyText {
  * (a rule never double-sends the same member + subject + timing) and the per-channel send through the shared gate.
  * Own-account reminders (kind TRANSACTIONAL) ignore promotional opt-out; promotional rules respect it.
  */
+/** Templates whose reminders also produced a staff Notification Center entry before Communications existed; the newer ones are member-only. */
+const STAFF_FEED_TEMPLATES: string[] = ['MEMBERSHIP_EXPIRY', 'PAYMENT_FAILED', 'BIRTHDAY_WISHES'];
+
 export class AutomationEngine {
   private rules: Map<AutomationRuleKey, EffectiveRule> | null = null;
   private readonly legacy = new Map<string, LegacyText>();
@@ -152,7 +155,7 @@ export class AutomationEngine {
         }
       }
 
-      if (params.staffFeed && rule.def.legacyTemplate) await this.staffFeed(rule, vars);
+      if (params.staffFeed && rule.def.legacyTemplate && STAFF_FEED_TEMPLATES.includes(rule.def.legacyTemplate)) await this.staffFeed(rule, vars);
       return sentAny ? 'SENT' : 'SKIPPED';
     } catch (error) {
       // Nothing was handed to a channel before the failure: give the claim back so the next run retries.

@@ -45,6 +45,11 @@ const TEMPLATE_TYPES = [
   'DIET_ASSIGNMENT',
   'WELCOME_MESSAGE',
   'BIRTHDAY_WISHES',
+  'PAYMENT_OVERDUE',
+  'INVOICE_DUE_SOON',
+  'CLASS_REMINDER',
+  'CLASS_SCHEDULED_OR_CHANGED',
+  'WE_MISS_YOU',
 ] as const;
 
 export const templateTypeParamSchema = z.object({

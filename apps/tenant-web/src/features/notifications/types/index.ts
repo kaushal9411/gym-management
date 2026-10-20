@@ -58,7 +58,12 @@ export type NotificationTemplateType =
   | 'WORKOUT_ASSIGNMENT'
   | 'DIET_ASSIGNMENT'
   | 'WELCOME_MESSAGE'
-  | 'BIRTHDAY_WISHES';
+  | 'BIRTHDAY_WISHES'
+  | 'PAYMENT_OVERDUE'
+  | 'INVOICE_DUE_SOON'
+  | 'CLASS_REMINDER'
+  | 'CLASS_SCHEDULED_OR_CHANGED'
+  | 'WE_MISS_YOU';
 
 export interface NotificationTemplate {
   type: NotificationTemplateType;

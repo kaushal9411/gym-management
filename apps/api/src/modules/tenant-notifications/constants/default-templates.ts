@@ -13,7 +13,7 @@ export interface DefaultTemplate {
  * Hardcoded defaults for the 10 named templates the spec requires. A tenant
  * only gets a `NotificationTemplate` row once it customizes one — until then,
  * `NotificationTemplateService#getEffective` falls back to this map, so every
- * tenant "has" all 10 templates without needing a seed step at onboarding.
+ * tenant "has" every template without needing a seed step at onboarding.
  * `{{variable}}` placeholders are substituted by `renderTemplate` below.
  */
 export const DEFAULT_TEMPLATES: Record<NotificationTemplateType, DefaultTemplate> = {
@@ -96,6 +96,46 @@ export const DEFAULT_TEMPLATES: Record<NotificationTemplateType, DefaultTemplate
     channels: ['IN_APP', 'EMAIL', 'PUSH'],
     titleTemplate: 'Happy Birthday, {{memberName}}!',
     bodyTemplate: 'Wishing you a fantastic birthday from all of us. See you at the gym!',
+  },
+  PAYMENT_OVERDUE: {
+    type: 'PAYMENT_OVERDUE',
+    label: 'Payment Overdue',
+    description: 'Sent to members whose invoice is past its due date (Communications automation).',
+    channels: ['IN_APP', 'EMAIL', 'PUSH'],
+    titleTemplate: 'Payment overdue: {{amountDue}}',
+    bodyTemplate: 'Hi {{firstName}}, invoice {{invoiceNumber}} of {{amountDue}} was due on {{dueDate}}. Please pay in the app or at the front desk.',
+  },
+  INVOICE_DUE_SOON: {
+    type: 'INVOICE_DUE_SOON',
+    label: 'Invoice Due Soon',
+    description: 'Sent to members shortly before an invoice is due (Communications automation).',
+    channels: ['IN_APP', 'EMAIL', 'PUSH'],
+    titleTemplate: 'Payment due {{dueDate}}',
+    bodyTemplate: 'Hi {{firstName}}, invoice {{invoiceNumber}} of {{amountDue}} is due on {{dueDate}}. You can pay in the app or at the front desk.',
+  },
+  CLASS_REMINDER: {
+    type: 'CLASS_REMINDER',
+    label: 'Class Reminder',
+    description: 'Sent to booked members before a class starts (Communications automation).',
+    channels: ['IN_APP', 'EMAIL', 'PUSH'],
+    titleTemplate: 'Class reminder: {{className}}',
+    bodyTemplate: 'Hi {{firstName}}, {{className}} starts on {{classDate}} at {{classTime}}. See you there!',
+  },
+  CLASS_SCHEDULED_OR_CHANGED: {
+    type: 'CLASS_SCHEDULED_OR_CHANGED',
+    label: 'Class Scheduled or Changed',
+    description: 'Sent to members when a class is scheduled or its time changes (Communications automation).',
+    channels: ['IN_APP', 'EMAIL', 'PUSH'],
+    titleTemplate: 'Class update: {{className}}',
+    bodyTemplate: 'Hi {{firstName}}, there is an update to {{className}}. Open the app to see the latest timetable.',
+  },
+  WE_MISS_YOU: {
+    type: 'WE_MISS_YOU',
+    label: 'We Miss You',
+    description: 'Sent to members who have not visited for a while (Communications automation).',
+    channels: ['IN_APP', 'EMAIL', 'PUSH'],
+    titleTemplate: 'We miss you, {{firstName}}',
+    bodyTemplate: 'It has been a while since your last visit to {{gymName}}. Come back this week and keep your streak going!',
   },
 };
 

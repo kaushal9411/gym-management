@@ -18,7 +18,7 @@ const asyncHandler =
 notificationTemplateRouter.use(authenticateMiddleware);
 notificationTemplateRouter.use(requireModuleEnabled('notifications'));
 
-/** @openapi { "/notifications/templates": { get: { tags: [Notification Templates], summary: "List all 10 templates (tenant override merged with the default)", security: [{bearerAuth: []}], responses: { 200: { description: OK } } } } } */
+/** @openapi { "/notifications/templates": { get: { tags: [Notification Templates], summary: "List all templates (tenant override merged with the default)", security: [{bearerAuth: []}], responses: { 200: { description: OK } } } } } */
 notificationTemplateRouter.get('/', requirePermission('notifications:manage'), asyncHandler(notificationTemplateController.list.bind(notificationTemplateController)));
 
 /** @openapi { "/notifications/templates/{type}": { patch: { tags: [Notification Templates], summary: "Customize a template for this tenant", security: [{bearerAuth: []}], responses: { 200: { description: Updated } } } } } */
