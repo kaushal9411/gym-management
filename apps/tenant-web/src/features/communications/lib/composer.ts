@@ -1,5 +1,5 @@
 import { fromIso, toLocalInputValue } from './message';
-import { CHANNELS } from '../constants';
+import { CHANNELS, TEMPLATES } from '../constants';
 import type { AudienceFilter, AudienceMode, Campaign, CampaignDetail, CampaignInput, Channel, PreviewRequest, SendMode, TemplateKey } from '../types';
 
 export interface PickedMember {
@@ -24,13 +24,16 @@ export interface ComposerState {
   scheduledAt: string;
 }
 
+/** A new message opens on the first template so Title and Message are never blank. */
+const STARTER = TEMPLATES.find((t) => t.title !== undefined)!;
+
 export const INITIAL_COMPOSER: ComposerState = {
   mode: 'FILTERS',
   filter: {},
   picked: {},
-  templateKey: 'CUSTOM',
-  title: '',
-  body: '',
+  templateKey: STARTER.key,
+  title: STARTER.title ?? '',
+  body: STARTER.body ?? '',
   channels: ['PUSH', 'IN_APP'],
   holdQuietHours: true,
   scheduleOn: false,
