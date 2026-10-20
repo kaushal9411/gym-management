@@ -1,83 +1,23 @@
 import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
-import { formatMoney } from '../../../infrastructure/mail/templates/base-layout';
-import { paymentDueReminderEmail, paymentOverdueReminderEmail } from '../../../infrastructure/mail/templates/member-templates';
+import { sweepInvoiceDueSoon, sweepPaymentFailed, sweepPaymentOverdue } from '../../communications/services/automation-sweeps.service';
 import { MemberInvoiceRepository } from '../../finance/repositories/member-invoice.repository';
-import { decryptMemberContact } from '../../members/utils/member-pii.util';
-import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
-import { notifyPaymentFailed } from '../../tenant-notifications/services/notification-trigger.service';
 import type { JobHandler } from '../types';
 
 const DAY_MS = 86_400_000;
-const DEDUPE_TTL_SECONDS = 3 * 86_400;
 
-/** Members with an UNPAID/OVERDUE invoice due within 3 days — a friendly heads-up before it's actually late. */
-export const paymentReminder: JobHandler = async () => {
-  const windowEnd = new Date(Date.now() + 3 * DAY_MS);
-  const invoices = (
-    await prisma.memberInvoice.findMany({
-      where: { status: { in: ['UNPAID', 'PARTIALLY_PAID'] }, dueDate: { gte: new Date(), lte: windowEnd } },
-      include: {
-        member: true,
-        tenant: { select: { name: true, settings: { select: { currencySymbol: true } } } },
-        items: { orderBy: { sortOrder: 'asc' }, take: 1 },
-      },
-    })
-  ).map((invoice) => ({ ...invoice, member: decryptMemberContact(invoice.member) }));
+/**
+ * Friendly heads-up before an invoice is late. Driven by the gym's `INVOICE_DUE_SOON` automation rule (default: 3 days
+ * before the due date, push + email — the email keeps its detailed invoice layout); one reminder per invoice per timing.
+ */
+export const paymentReminder: JobHandler = async () => sweepInvoiceDueSoon();
 
-  let reminded = 0;
-  for (const invoice of invoices) {
-    const dedupeKey = `notif:payment-reminder:${invoice.id}`;
-    // eslint-disable-next-line no-await-in-loop -- sequential across a small, infrequent (daily) batch; no throughput requirement justifies parallelizing
-    if (await cache.get(dedupeKey)) continue;
-    if (invoice.member.email) {
-      // eslint-disable-next-line no-await-in-loop
-      const mail = paymentDueReminderEmail(
-        { tenantName: invoice.tenant.name },
-        invoice.member.firstName,
-        invoice.invoiceNumber,
-        formatMoney(Number(invoice.totalAmount), invoice.tenant.settings?.currencySymbol ?? '₹'),
-        invoice.dueDate.toISOString().slice(0, 10),
-        invoice.items[0]?.description ?? null,
-      );
-      await sendGatedEmail(invoice.tenantId, { to: invoice.member.email, subject: mail.subject, html: mail.html });
-    }
-    // eslint-disable-next-line no-await-in-loop
-    await cache.set(dedupeKey, true, DEDUPE_TTL_SECONDS);
-    reminded += 1;
-  }
-  return { scanned: invoices.length, reminded };
-};
-
-/** Member payments recorded as FAILED — nudges the member to retry, deduped so the same failed payment isn't re-nudged daily. */
-export const failedPaymentRetry: JobHandler = async () => {
-  const windowStart = new Date(Date.now() - 14 * DAY_MS);
-  const payments = (
-    await prisma.memberPayment.findMany({
-      where: { status: 'FAILED', createdAt: { gte: windowStart } },
-      include: { member: true },
-    })
-  ).map((payment) => ({ ...payment, member: decryptMemberContact(payment.member) }));
-
-  let notified = 0;
-  for (const payment of payments) {
-    const dedupeKey = `notif:failed-payment-retry:${payment.id}`;
-    // eslint-disable-next-line no-await-in-loop -- see paymentReminder
-    if (await cache.get(dedupeKey)) continue;
-    // eslint-disable-next-line no-await-in-loop
-    await notifyPaymentFailed(payment.tenantId, {
-      memberId: payment.member.id,
-      memberName: `${payment.member.firstName} ${payment.member.lastName}`.trim(),
-      amount: payment.finalAmount.toString(),
-      memberEmail: payment.member.email,
-    });
-    // eslint-disable-next-line no-await-in-loop
-    await cache.set(dedupeKey, true, DEDUPE_TTL_SECONDS);
-    notified += 1;
-  }
-  return { scanned: payments.length, notified };
-};
+/**
+ * Nudges members whose payment attempt failed, the morning after. Driven by the gym's `PAYMENT_FAILED` automation rule
+ * (default: 1 day after, push); one nudge per failed payment.
+ */
+export const failedPaymentRetry: JobHandler = async () => sweepPaymentFailed();
 
 const INVOICE_RENEWAL_WINDOW_DAYS = 7;
 
@@ -132,40 +72,9 @@ export const invoiceGeneration: JobHandler = async () => {
   return { scanned: memberships.length, generated };
 };
 
-/** Escalation reminder for invoices that are genuinely overdue (past due date by 7+ days), separate window from `payment-reminder`'s "due soon" heads-up. */
-export const outstandingPaymentReminder: JobHandler = async () => {
-  const cutoff = new Date(Date.now() - 7 * DAY_MS);
-  const invoices = (
-    await prisma.memberInvoice.findMany({
-      where: { status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] }, dueDate: { lte: cutoff } },
-      include: {
-        member: true,
-        tenant: { select: { name: true, settings: { select: { currencySymbol: true } } } },
-        items: { orderBy: { sortOrder: 'asc' }, take: 1 },
-      },
-    })
-  ).map((invoice) => ({ ...invoice, member: decryptMemberContact(invoice.member) }));
-
-  let reminded = 0;
-  for (const invoice of invoices) {
-    const dedupeKey = `notif:outstanding-payment:${invoice.id}:${new Date().toISOString().slice(0, 10)}`;
-    // eslint-disable-next-line no-await-in-loop -- sequential across a small, infrequent (weekly) batch; no throughput requirement justifies parallelizing
-    if (await cache.get(dedupeKey)) continue;
-    if (invoice.member.email) {
-      // eslint-disable-next-line no-await-in-loop
-      const mail = paymentOverdueReminderEmail(
-        { tenantName: invoice.tenant.name },
-        invoice.member.firstName,
-        invoice.invoiceNumber,
-        formatMoney(Number(invoice.totalAmount), invoice.tenant.settings?.currencySymbol ?? '₹'),
-        invoice.dueDate.toISOString().slice(0, 10),
-        invoice.items[0]?.description ?? null,
-      );
-      await sendGatedEmail(invoice.tenantId, { to: invoice.member.email, subject: mail.subject, html: mail.html });
-    }
-    // eslint-disable-next-line no-await-in-loop
-    await cache.set(dedupeKey, true, 7 * 86_400);
-    reminded += 1;
-  }
-  return { scanned: invoices.length, reminded };
-};
+/**
+ * Reminders for invoices that are genuinely overdue. Driven by the gym's `PAYMENT_OVERDUE` automation rule (default:
+ * 1, 7 and 14 days after the due date, push + SMS; SMS only goes out where the gym has SMS enabled and within quota —
+ * otherwise a skipped row is written to the Message Log). Runs daily so every timing is caught; each timing is sent once per invoice.
+ */
+export const outstandingPaymentReminder: JobHandler = async () => sweepPaymentOverdue();

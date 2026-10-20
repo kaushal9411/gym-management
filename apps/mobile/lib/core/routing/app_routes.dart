@@ -69,6 +69,13 @@ class AppRoutes {
   static const notifications = '/notifications';
   static const notificationTemplates = '/notifications/templates';
   static const messageLog = '/notifications/log';
+
+  // Communications (staff): hub, 4-step send flow, automations, history.
+  static const communications = '/communications';
+  static const communicationsSend = '/communications/send';
+  static const communicationsAutomations = '/communications/automations';
+  static const communicationsHistory = '/communications/history';
+  static const communicationsHistoryDetail = '/communications/history/detail';
   static const editNotificationTemplate = '/notifications/templates/edit';
   static const announcements = '/announcements';
   static const announcementForm = '/announcements/form';
@@ -174,4 +181,5 @@ class AppRoutes {
   static const memberNotifications = '/member/notifications';
   static const memberPayments = '/member/payments';
   static const memberGymInfo = '/member/gym';
+  static const memberNotificationSettings = '/member/notification-settings';
 }

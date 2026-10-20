@@ -20,11 +20,21 @@ class ApiException implements Exception {
     required this.message,
     this.statusCode,
     this.fieldErrors = const [],
+    this.code,
+    this.data,
   });
 
   final String message;
   final int? statusCode;
   final List<FieldError> fieldErrors;
+
+  /// The API's machine code (`errors[0].code`, e.g. `QUOTA_EXCEEDED`), when
+  /// the envelope carried one.
+  final String? code;
+
+  /// The envelope's structured `data` payload on an error (e.g. the
+  /// `shortChannels` of a 409 QUOTA_EXCEEDED), when the server sent one.
+  final Map<String, dynamic>? data;
 
   /// True for connectivity failures (no response reached the server at all).
   factory ApiException.network() => const ApiException(
@@ -42,10 +52,13 @@ class ApiException implements Exception {
               .map(FieldError.fromJson)
               .toList()
           : <FieldError>[];
+      final payload = data['data'];
       return ApiException(
         message: message,
         statusCode: statusCode,
         fieldErrors: fieldErrors,
+        code: fieldErrors.isEmpty ? null : fieldErrors.first.code,
+        data: payload is Map<String, dynamic> ? payload : null,
       );
     }
     return ApiException(

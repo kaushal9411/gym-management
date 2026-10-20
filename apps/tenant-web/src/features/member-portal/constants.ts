@@ -17,4 +17,5 @@ export const MEMBER_PORTAL_ROUTES = {
   classes: '/portal/classes',
   notifications: '/portal/notifications',
   profile: '/portal/profile',
+  notificationPreferences: '/portal/notification-preferences',
 } as const;

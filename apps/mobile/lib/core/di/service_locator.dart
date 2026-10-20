@@ -46,6 +46,7 @@ import '../../repositories/search_repository.dart';
 import '../../repositories/staff_repository.dart';
 import '../../repositories/lead_repository.dart';
 import '../../repositories/support_ticket_repository.dart';
+import '../../repositories/communications_repository.dart';
 import '../../repositories/tenant_notification_repository.dart';
 import '../../repositories/tenant_role_repository.dart';
 import '../../repositories/workout_plan_repository.dart';
@@ -119,6 +120,9 @@ void setupServiceLocator() {
   );
   getIt.registerLazySingleton<TenantNotificationRepository>(
     () => TenantNotificationRepository(getIt()),
+  );
+  getIt.registerLazySingleton<CommunicationsRepository>(
+    () => CommunicationsRepository(getIt()),
   );
   getIt.registerLazySingleton<MemberNotificationRepository>(
     () => MemberNotificationRepository(getIt()),

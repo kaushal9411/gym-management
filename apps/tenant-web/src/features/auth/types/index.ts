@@ -48,8 +48,29 @@ export type AuthErrorCode =
   | 'MAINTENANCE'
   | 'UNKNOWN';
 
+/**
+ * Raw HTTP detail carried alongside the normalised error so features that need
+ * more than a message (field-level 422s, the structured `data` some errors
+ * carry such as Communications' QUOTA_EXCEEDED payload, Retry-After) can read
+ * it. Optional: absent for network failures and for errors built outside the
+ * axios interceptor.
+ */
+export interface ApiErrorDetails {
+  status: number;
+  /** Backend code of the first `errors[]` entry (e.g. `QUOTA_EXCEEDED`), whether or not it is an `AuthErrorCode`. */
+  apiCode?: string;
+  errors: Array<{ field?: string; code?: string; message: string }>;
+  /** Structured payload some errors carry in `data`. */
+  data?: unknown;
+  /** Seconds from the `Retry-After` header, when present. */
+  retryAfterSeconds?: number;
+}
+
 /** Typed service error — thrown by services, mapped to UX by hooks/pages. */
 export class AuthServiceError extends Error {
+  /** Set by `toAuthServiceError` for HTTP failures. */
+  details?: ApiErrorDetails;
+
   constructor(
     public readonly code: AuthErrorCode,
     message: string,

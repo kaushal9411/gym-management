@@ -1,11 +1,11 @@
 import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { dispatchNotification } from '../../admin-notifications/services/admin-notification.service';
+import { sweepBirthdays } from '../../communications/services/automation-sweeps.service';
 import { decryptMemberContactMany } from '../../members/utils/member-pii.util';
 import { TenantAnnouncementRepository } from '../../tenant-announcements/repositories/tenant-announcement.repository';
 import {
   notifyAnnouncementPublished,
-  notifyBirthdayWishes,
   notifyNewMemberRegistration,
   welcomeSentCacheKey,
 } from '../../tenant-notifications/services/notification-trigger.service';
@@ -63,33 +63,11 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-/** Members whose birthday (month + day) is today — no prior sweep existed for this; the `BIRTHDAY_WISHES` template existed but had no firing point. */
-export const birthdayWishes: JobHandler = async () => {
-  const now = new Date();
-  const members = decryptMemberContactMany(
-    await prisma.member.findMany({
-      where: { dateOfBirth: { not: null } },
-      select: { id: true, tenantId: true, firstName: true, lastName: true, email: true, phone: true, dateOfBirth: true },
-    }),
-  );
-
-  const todaysBirthdays = members.filter(
-    (m) => m.dateOfBirth!.getUTCMonth() === now.getUTCMonth() && m.dateOfBirth!.getUTCDate() === now.getUTCDate(),
-  );
-
-  let wished = 0;
-  for (const member of todaysBirthdays) {
-    const dedupeKey = `notif:birthday:${member.id}:${now.getUTCFullYear()}`;
-    // eslint-disable-next-line no-await-in-loop -- sequential across a small, infrequent (daily) batch; no throughput requirement justifies parallelizing
-    if (await cache.get(dedupeKey)) continue;
-    // eslint-disable-next-line no-await-in-loop
-    await notifyBirthdayWishes(member.tenantId, { memberId: member.id, memberName: `${member.firstName} ${member.lastName}`.trim(), memberEmail: member.email });
-    // eslint-disable-next-line no-await-in-loop
-    await cache.set(dedupeKey, true, 400 * 86_400); // outlives a year so it never double-fires within the same birthday
-    wished += 1;
-  }
-  return { scanned: todaysBirthdays.length, wished };
-};
+/**
+ * Birthday messages, driven by the gym's `BIRTHDAY` automation rule (on the day, push + email; promotional, so a member's
+ * opt-out is respected). One message per member per year via the dispatch ledger.
+ */
+export const birthdayWishes: JobHandler = async () => sweepBirthdays();
 
 const WELCOME_CATCHUP_WINDOW_HOURS = 48;
 

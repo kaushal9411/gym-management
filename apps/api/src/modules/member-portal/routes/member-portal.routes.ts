@@ -2,6 +2,7 @@ import { Router } from 'express';
 
 import { createRateLimiter } from '../../../core/middleware/rate-limiter';
 import { validate } from '../../../core/middleware/validate.middleware';
+import { memberPreferenceRouter } from '../../communications/routes/member-preference.routes';
 import { memberAuthenticateMiddleware } from '../../member-auth/middlewares/member-authenticate.middleware';
 import { memberChangePasswordSchema } from '../../member-auth/validators/member-auth.validators';
 import { memberPortalController } from '../controllers/member-portal.controller';
@@ -143,6 +144,8 @@ memberPortalRouter.get(
 memberPortalRouter.get('/workout', asyncHandler(memberPortalController.workout.bind(memberPortalController)));
 // Daily workout log (member self-tracking) - own file, see member-workout-log.routes.ts
 memberPortalRouter.use('/workout/log', memberWorkoutLogRouter);
+// Promotional opt-out per channel (Communications) - own file, see communications/routes/member-preference.routes.ts
+memberPortalRouter.use('/notification-preferences', memberPreferenceRouter);
 memberPortalRouter.post(
   '/workout/:id/progress',
   validate({ params: memberPortalIdParamSchema, body: memberWorkoutProgressSchema }),

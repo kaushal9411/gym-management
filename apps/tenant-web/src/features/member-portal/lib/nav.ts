@@ -37,7 +37,7 @@ export const PORTAL_NAV: PortalNavItem[] = [
   { href: MEMBER_PORTAL_ROUTES.invoices, label: 'Invoices', icon: Receipt, group: 'Account' },
   { href: MEMBER_PORTAL_ROUTES.payments, label: 'Payments', icon: Wallet, group: 'Account' },
   { href: MEMBER_PORTAL_ROUTES.gym, label: 'My gym', icon: Landmark, group: 'Account' },
-  { href: MEMBER_PORTAL_ROUTES.profile, label: 'Profile', icon: UserRound, group: 'Account' },
+  { href: MEMBER_PORTAL_ROUTES.profile, label: 'Profile', icon: UserRound, group: 'Account', also: [MEMBER_PORTAL_ROUTES.notificationPreferences] },
 ];
 
 export const PORTAL_NAV_GROUPS: PortalNavGroup[] = ['Overview', 'Training', 'Account'];

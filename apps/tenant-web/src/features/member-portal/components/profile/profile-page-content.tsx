@@ -8,6 +8,7 @@ import { PlanBenefitsSection } from '../plan/plan-benefits-card';
 import { LockedCard } from './locked-card';
 import { ProfileForm } from './profile-form';
 import { ProfileHero } from './profile-hero';
+import { NotificationPrefsLink } from './notification-prefs-link';
 import { SecurityCard } from './security-card';
 
 /** `/portal/profile`: hero (photo + completeness) -> What's included plan card -> editable cards (sticky save bar) -> gym-managed -> security. */
@@ -31,7 +32,7 @@ export function ProfilePageContent() {
     <div className="space-y-4 md:space-y-5">
       <ProfileHero profile={profile} />
       {profile.locked.membership ? <PlanBenefitsSection /> : null}
-      <ProfileForm profile={profile} footer={<><LockedCard profile={profile} /><SecurityCard /></>} />
+      <ProfileForm profile={profile} footer={<><LockedCard profile={profile} /><NotificationPrefsLink /><SecurityCard /></>} />
     </div>
   );
 }

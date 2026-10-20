@@ -798,9 +798,27 @@ class _MemberProfileScreenState extends State<MemberProfileScreen> {
                     onData: () => context.push(AppRoutes.memberDataExport),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 BounceIn(
                   index: 10,
+                  child: MemberSection(
+                    title: 'Notifications',
+                    subtitle: 'Choose which offers reach you',
+                    icon: Icons.notifications_active_outlined,
+                    color: TeamColors.violet,
+                    child: AppButton(
+                      label: 'Notification settings',
+                      role: AppRole.member,
+                      variant: AppButtonVariant.ghost,
+                      size: AppButtonSize.small,
+                      onPressed: () =>
+                          context.push(AppRoutes.memberNotificationSettings),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                BounceIn(
+                  index: 11,
                   child: AppButton(
                     label: 'Log out',
                     role: AppRole.member,

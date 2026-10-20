@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 
 import { useAppDispatch } from '@/store/hooks';
 import { memberProfileUpdated } from '../store/member-auth-slice';
+import { memberNotificationPrefsService } from '../services/member-notification-prefs.service';
 import { memberProfileService, type MemberProfilePatch, type MemberSelfProfile } from '../services/member-profile.service';
 import { fetchGymInfo, fetchMemberOverview, fetchMemberPlan, memberPortalService, type MemberMeasurementInput, type MemberNotificationCategory, type MemberPortalWorkout } from '../services/member-portal.service';
 import type { WorkoutCompleteInput, WorkoutLogInput, WorkoutLogPatch } from '../lib/workout-tracking';
@@ -266,5 +267,21 @@ export function useRemoveMemberPhoto() {
       queryClient.setQueryData<MemberSelfProfile>(SELF_PROFILE_KEY, (old) => (old ? { ...old, profilePhotoUrl: null } : old));
       void queryClient.invalidateQueries({ queryKey: ['member-portal'] });
     },
+  });
+}
+
+// ── Notification preferences (GET/PUT /portal/notification-preferences) ──
+const PREFS_KEY = ['member-portal', 'notification-preferences'] as const;
+
+export function useNotificationPreferences() {
+  return useQuery({ queryKey: PREFS_KEY, queryFn: memberNotificationPrefsService.get, retry: false });
+}
+
+/** The PUT returns the full preferences body, so it replaces the cached copy. */
+export function useUpdateNotificationPreferences() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: memberNotificationPrefsService.update,
+    onSuccess: (data) => queryClient.setQueryData(PREFS_KEY, data),
   });
 }

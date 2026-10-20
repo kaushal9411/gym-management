@@ -106,7 +106,7 @@ export async function sendGatedEmail(tenantId: string, data: Omit<EmailJobData, 
   return gate;
 }
 
-function readTenantToggle(
+export function readTenantToggle(
   settings: { emailNotificationsEnabled: boolean; smsNotificationsEnabled: boolean; whatsappNotificationsEnabled: boolean } | null,
   channel: GatedChannel,
 ): boolean {

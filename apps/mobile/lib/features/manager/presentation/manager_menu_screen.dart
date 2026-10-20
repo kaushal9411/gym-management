@@ -148,6 +148,14 @@ Map<String, List<MenuEntry>> _sections(String appName) =>
           route: AppRoutes.notifications,
         ),
         MenuEntry(
+          icon: Icons.forum_outlined,
+          title: 'Communications',
+          subtitle: 'Send messages & reminders',
+          route: AppRoutes.communications,
+          permissions: ['notifications:view'],
+          featureFlag: 'notifications',
+        ),
+        MenuEntry(
           icon: Icons.campaign_outlined,
           title: 'Announcements',
           subtitle: 'Published & drafts',

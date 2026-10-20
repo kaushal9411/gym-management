@@ -7,6 +7,8 @@ import { logger } from './core/logging/logger';
 import { captureError, initSentry } from './core/observability/sentry';
 import { disconnectRedis } from './infrastructure/cache/redis';
 import { disconnectPrisma } from './infrastructure/database/prisma';
+import { communicationsQueue } from './infrastructure/queue/communications.queue';
+import { startCommunicationsWorker, stopCommunicationsWorker } from './infrastructure/queue/communications.worker';
 import { emailQueue } from './infrastructure/queue/email.queue';
 import { startEmailWorker, stopEmailWorker } from './infrastructure/queue/email.worker';
 import { pushQueue } from './infrastructure/queue/push.queue';
@@ -51,6 +53,7 @@ async function bootstrap(): Promise<void> {
   startPushWorker();
   startSmsWorker();
   startWhatsAppWorker();
+  startCommunicationsWorker();
   await initScheduler();
 
   const app = createApp();
@@ -71,11 +74,13 @@ async function bootstrap(): Promise<void> {
       await stopPushWorker();
       await stopSmsWorker();
       await stopWhatsAppWorker();
+      await stopCommunicationsWorker();
       await stopScheduler();
       await emailQueue.close();
       await pushQueue.close();
       await smsQueue.close();
       await whatsappQueue.close();
+      await communicationsQueue.close();
       await disconnectPrisma();
       await disconnectRedis();
       logger.info('Shutdown complete');

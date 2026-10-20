@@ -1,5 +1,6 @@
 import { dailyAttendanceSummary, monthlyAttendanceSummary, weeklyAttendanceSummary } from '../handlers/attendance.handlers';
 import { classSessionGeneration } from '../handlers/class-session.handlers';
+import { classReminders, communicationsDispatch, weMissYou } from '../handlers/communications.handlers';
 import {
   cacheRefresh,
   cleanupAuditLogs,
@@ -51,7 +52,7 @@ export const JOB_REGISTRY: JobDefinition[] = [
   job({
     name: 'membership-renewal-reminder',
     category: 'MEMBERSHIP',
-    description: 'Emails members whose active membership expires within 7 days.',
+    description: "Expiring-membership reminders per each gym's MEMBERSHIP_EXPIRING automation rule (default 7, 3 and 1 days before, push + email).",
     cronPattern: '0 8 * * *',
     priority: 2,
     handler: membershipRenewalReminder,
@@ -83,7 +84,7 @@ export const JOB_REGISTRY: JobDefinition[] = [
   job({
     name: 'membership-expired-notification',
     category: 'MEMBERSHIP',
-    description: 'Notifies members whose membership was recently flipped to EXPIRED.',
+    description: "Expired-membership message per each gym's MEMBERSHIP_EXPIRED automation rule (default 1 day after, push + email).",
     cronPattern: '30 1 * * *',
     priority: 2,
     handler: membershipExpiredNotification,
@@ -119,7 +120,7 @@ export const JOB_REGISTRY: JobDefinition[] = [
   job({
     name: 'payment-reminder',
     category: 'PAYMENT',
-    description: 'Reminds members with an invoice due within 3 days.',
+    description: "Invoice-due reminders per each gym's INVOICE_DUE_SOON automation rule (default 3 days before, push + email).",
     cronPattern: '0 9 * * *',
     priority: 1,
     handler: paymentReminder,
@@ -127,7 +128,7 @@ export const JOB_REGISTRY: JobDefinition[] = [
   job({
     name: 'failed-payment-retry',
     category: 'PAYMENT',
-    description: 'Nudges members whose most recent payment attempt failed.',
+    description: "Failed-payment nudge per each gym's PAYMENT_FAILED automation rule (default the next morning, push).",
     cronPattern: '0 10 * * *',
     priority: 1,
     handler: failedPaymentRetry,
@@ -143,8 +144,8 @@ export const JOB_REGISTRY: JobDefinition[] = [
   job({
     name: 'outstanding-payment-reminder',
     category: 'PAYMENT',
-    description: 'Weekly escalation reminder for invoices overdue by 7+ days.',
-    cronPattern: '0 9 * * 1',
+    description: "Overdue-invoice reminders per each gym's PAYMENT_OVERDUE automation rule (default 1, 7 and 14 days after the due date, push + SMS).",
+    cronPattern: '15 9 * * *',
     priority: 2,
     handler: outstandingPaymentReminder,
   }),
@@ -178,10 +179,28 @@ export const JOB_REGISTRY: JobDefinition[] = [
   job({
     name: 'birthday-wishes',
     category: 'NOTIFICATION',
-    description: "Sends a birthday email to members whose date of birth is today.",
+    description: "Birthday message per each gym's BIRTHDAY automation rule (on the day, push + email).",
     cronPattern: '0 7 * * *',
     priority: 3,
     handler: birthdayWishes,
+  }),
+  job({
+    name: 'communications-dispatch',
+    category: 'NOTIFICATION',
+    description: 'Every minute: starts due scheduled campaigns, releases messages held for quiet hours (21:00-08:00 member-local, SMS/WhatsApp), and recovers stalled sends.',
+    cronPattern: '* * * * *',
+    priority: 1,
+    maxRetries: 1,
+    timeoutMs: 2 * MIN,
+    handler: communicationsDispatch,
+  }),
+  job({
+    name: 'we-miss-you',
+    category: 'NOTIFICATION',
+    description: "'We miss you' nudge for members without a visit for N days (WE_MISS_YOU automation rule - OFF by default, only gyms that enable it are scanned).",
+    cronPattern: '30 10 * * *',
+    priority: 3,
+    handler: weMissYou,
   }),
   job({
     name: 'welcome-messages',
@@ -236,6 +255,15 @@ export const JOB_REGISTRY: JobDefinition[] = [
     priority: 2,
     timeoutMs: 10 * MIN,
     handler: classSessionGeneration,
+  }),
+
+  job({
+    name: 'class-reminders',
+    category: 'CLASS',
+    description: "Class reminders (default 24 h and 2 h before) to members with a booked seat, per each gym's CLASS_REMINDER automation rule.",
+    cronPattern: '*/15 * * * *',
+    priority: 2,
+    handler: classReminders,
   }),
 
   // ── Maintenance ──────────────────────────────────────────────────────────

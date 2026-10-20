@@ -2,10 +2,12 @@
 
 import * as React from 'react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import { CalendarDays, IdCard, MapPin, MessageCircle, Phone, Send } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import type { MemberDetail } from '@/features/members/types';
 import { useCurrencySymbol } from '@/lib/currency';
 import { CountUp, ProgressBar, formatMoney } from './detail-ui';
@@ -36,6 +38,9 @@ interface MemberHeroProps {
 
 export function MemberHero({ data, actions, canSendLink, onSendLink }: MemberHeroProps) {
   const symbol = useCurrencySymbol();
+  const { hasPermission } = usePermissions();
+  // Communications messages only reach ACTIVE / FROZEN members (the audience API never lists the others).
+  const canMessage = hasPermission('notifications:send') && !data.deletedAt && (data.status === 'ACTIVE' || data.status === 'FROZEN');
   const { totalPaid, due, totalBilled } = useMemberMoney(data.id, data.outstandingAmount);
   const initials = data.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
   const membership = data.currentMembership;
@@ -113,6 +118,13 @@ export function MemberHero({ data, actions, canSendLink, onSendLink }: MemberHer
                 </a>
               </Button>
             </>
+          ) : null}
+          {canMessage ? (
+            <Button asChild size="sm" variant="secondary" className="border border-white/30 bg-white/15 text-white hover:bg-white/25">
+              <Link href={`/communications/send?${new URLSearchParams({ memberId: data.id, name: data.name, code: data.memberId ?? '' }).toString()}`}>
+                <Send className="size-4" /> Send message
+              </Link>
+            </Button>
           ) : null}
           <div className={ACTION_SKIN}>{actions}</div>
         </div>

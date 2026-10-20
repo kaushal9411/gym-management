@@ -263,6 +263,11 @@ model Tenant {
   notificationChannelLimit TenantNotificationChannelLimit?
   notificationUsage        TenantNotificationUsage[]
   notificationDeliveryLogs NotificationDeliveryLog[]
+  notificationCampaigns    NotificationCampaign[]
+  campaignRecipients       NotificationCampaignRecipient[]
+  automationRules          NotificationAutomationRule[]
+  automationDispatches     AutomationDispatch[]
+  memberChannelPreferences MemberChannelPreference[]
   aiConversations       AiConversation[]
   aiMessages            AiMessage[]
   aiRequestLogs         AiRequestLog[]
@@ -412,6 +417,7 @@ model User {
   incomeEntriesRecorded        Income[]              @relation("IncomeRecordedBy")
   leadsAssigned                Lead[]                @relation("LeadAssignedTo")
   leadsCreated                 Lead[]                @relation("LeadCreatedBy")
+  campaignsCreated             NotificationCampaign[] @relation("CampaignCreatedBy")
   leadActivitiesCreated        LeadActivity[]        @relation("LeadActivityCreatedBy")
   expensesRecorded             Expense[]             @relation("ExpenseRecordedBy")
   scheduledReportsCreated      ScheduledReport[]     @relation("ScheduledReportCreatedBy")
@@ -969,6 +975,9 @@ model Member {
   ptSessionLogs    PtSessionLog[]
   deviceTokens     MemberDeviceToken[]
   notifications    MemberNotification[]
+  campaignRecipients       NotificationCampaignRecipient[]
+  automationDispatches     AutomationDispatch[]
+  channelPreferences       MemberChannelPreference[]
 
   @@unique([tenantId, memberId])
   @@unique([tenantId, biometricId])
@@ -4185,4 +4194,191 @@ model LeadActivity {
 
   @@index([tenantId, leadId, createdAt])
   @@map("lead_activities")
+}
+
+// ── Communications: campaigns, automations, channel preferences ──────────────
+// Hand-written migration `communications` (DDL + forced RLS). See
+// docs/COMMUNICATIONS-API.md and BACKEND-GUIDE §Communications.
+
+enum CampaignAudienceMode {
+  FILTERS
+  PICKED
+
+  @@map("campaign_audience_mode")
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  SENDING
+  SENT
+  PARTIAL
+  FAILED
+  CANCELLED
+
+  @@map("campaign_status")
+}
+
+enum CampaignRecipientStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED_OPTED_OUT
+  SKIPPED_NO_CONTACT
+  SKIPPED_QUOTA
+  SKIPPED_DISABLED
+  CANCELLED
+
+  @@map("campaign_recipient_status")
+}
+
+enum AutomationRuleKey {
+  MEMBERSHIP_EXPIRING
+  MEMBERSHIP_EXPIRED
+  PAYMENT_OVERDUE
+  INVOICE_DUE_SOON
+  PAYMENT_FAILED
+  CLASS_REMINDER
+  CLASS_SCHEDULED_OR_CHANGED
+  BIRTHDAY
+  WE_MISS_YOU
+
+  @@map("automation_rule_key")
+}
+
+/// A staff-authored bulk message to members (custom notification). Counters
+/// are message-level (recipient x channel) except `recipientCount`.
+model NotificationCampaign {
+  id              String                      @id @default(uuid()) @db.Uuid
+  tenantId        String                      @map("tenant_id") @db.Uuid
+  name            String                      @db.VarChar(120)
+  title           String                      @db.VarChar(200)
+  body            String
+  channels        TenantNotificationChannel[]
+  audienceMode    CampaignAudienceMode        @map("audience_mode")
+  audienceFilter  Json                        @default("{}") @map("audience_filter")
+  pickedMemberIds Json?                       @map("picked_member_ids")
+  /// Branch ids the creating staff user may reach (null = all branches) —
+  /// re-applied when the audience is resolved at send time.
+  scopeBranchIds  Json?                       @map("scope_branch_ids")
+  templateKey     String?                     @map("template_key") @db.VarChar(40)
+  status          CampaignStatus              @default(DRAFT)
+  scheduledAt     DateTime?                   @map("scheduled_at")
+  startedAt       DateTime?                   @map("started_at")
+  finishedAt      DateTime?                   @map("finished_at")
+  holdQuietHours  Boolean                     @default(true) @map("hold_quiet_hours")
+  recipientCount  Int                         @default(0) @map("recipient_count")
+  messageCount    Int                         @default(0) @map("message_count")
+  sentCount       Int                         @default(0) @map("sent_count")
+  failedCount     Int                         @default(0) @map("failed_count")
+  skippedCount    Int                         @default(0) @map("skipped_count")
+  cancelledCount  Int                         @default(0) @map("cancelled_count")
+  failureReason   String?                     @map("failure_reason")
+  idempotencyKey  String?                     @map("idempotency_key") @db.VarChar(100)
+  createdBy       String?                     @map("created_by") @db.Uuid
+  createdAt       DateTime                    @default(now()) @map("created_at")
+  updatedAt       DateTime                    @updatedAt @map("updated_at")
+
+  tenant     Tenant                          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  creator    User?                           @relation("CampaignCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  recipients NotificationCampaignRecipient[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, createdAt])
+  @@index([status, scheduledAt])
+  @@map("notification_campaigns")
+}
+
+/// One message to one member on one channel. UNIQUE(campaign, member,
+/// channel) is what makes materialising the audience idempotent; `dispatchedAt`
+/// is the at-most-once claim marker the batch worker sets before handing a
+/// message to a channel queue.
+model NotificationCampaignRecipient {
+  id            String                      @id @default(uuid()) @db.Uuid
+  tenantId      String                      @map("tenant_id") @db.Uuid
+  campaignId    String                      @map("campaign_id") @db.Uuid
+  memberId      String                      @map("member_id") @db.Uuid
+  channel       TenantNotificationChannel
+  status        CampaignRecipientStatus     @default(QUEUED)
+  error         String?
+  deliveryLogId String?                     @map("delivery_log_id") @db.Uuid
+  sentAt        DateTime?                   @map("sent_at")
+  dispatchedAt  DateTime?                   @map("dispatched_at")
+  /// Quiet-hours hold: the earliest moment this message may go out.
+  deliverAfter  DateTime?                   @map("deliver_after")
+  createdAt     DateTime                    @default(now()) @map("created_at")
+  updatedAt     DateTime                    @updatedAt @map("updated_at")
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  campaign NotificationCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  member   Member               @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, memberId, channel])
+  @@index([campaignId, status])
+  @@index([tenantId, memberId])
+  @@index([status, dispatchedAt])
+  @@map("notification_campaign_recipients")
+}
+
+/// Per-tenant override of one automation rule. A missing row = the
+/// documented default (see `communications/constants/automation-rules.ts`).
+model NotificationAutomationRule {
+  id            String                      @id @default(uuid()) @db.Uuid
+  tenantId      String                      @map("tenant_id") @db.Uuid
+  key           AutomationRuleKey
+  enabled       Boolean                     @default(true)
+  /// number[] — days or hours depending on the rule's timing unit.
+  offsets       Json                        @default("[]")
+  channels      TenantNotificationChannel[]
+  titleTemplate String?                     @map("title_template") @db.VarChar(200)
+  bodyTemplate  String?                     @map("body_template")
+  updatedBy     String?                     @map("updated_by") @db.Uuid
+  createdAt     DateTime                    @default(now()) @map("created_at")
+  updatedAt     DateTime                    @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@map("notification_automation_rules")
+}
+
+/// Dedupe ledger — an automation never double-sends the same
+/// (rule, member, subject, offset). Inserted BEFORE sending.
+model AutomationDispatch {
+  id        String            @id @default(uuid()) @db.Uuid
+  tenantId  String            @map("tenant_id") @db.Uuid
+  ruleKey   AutomationRuleKey @map("rule_key")
+  memberId  String            @map("member_id") @db.Uuid
+  /// Membership / invoice / payment / class-session / group-class id, or the member id for member-level rules.
+  subjectId String            @map("subject_id") @db.VarChar(64)
+  /// Which offset fired ("7", "3", "24h", "y2026", ...).
+  offsetKey String            @map("offset_key") @db.VarChar(40)
+  sentAt    DateTime          @default(now()) @map("sent_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, ruleKey, memberId, subjectId, offsetKey])
+  @@index([tenantId, ruleKey, sentAt])
+  @@map("automation_dispatches")
+}
+
+/// Member's promotional opt-out per channel. Absent row = not opted out.
+/// Transactional reminders about the member's own membership / payments /
+/// bookings are never blocked by this.
+model MemberChannelPreference {
+  id                String                    @id @default(uuid()) @db.Uuid
+  tenantId          String                    @map("tenant_id") @db.Uuid
+  memberId          String                    @map("member_id") @db.Uuid
+  channel           TenantNotificationChannel
+  promotionalOptOut Boolean                   @default(false) @map("promotional_opt_out")
+  updatedAt         DateTime                  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, channel])
+  @@index([tenantId, channel, promotionalOptOut])
+  @@map("member_channel_preferences")
 }

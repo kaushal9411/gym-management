@@ -1,6 +1,8 @@
 import { Worker, type Job } from 'bullmq';
 
 import { logger } from '../../core/logging/logger';
+import { finalizeCampaignRecipient } from '../../modules/communications/services/recipient-finalizer.service';
+import { humanizeDeliveryError } from '../../modules/communications/utils/delivery-error.util';
 import { recordNotificationDelivery } from '../../modules/tenant-notifications/repositories/notification-delivery-log.repository';
 import { mailer } from '../mail/mailer';
 
@@ -14,12 +16,11 @@ export function startEmailWorker(): Worker<EmailJobData> {
     'notifications-email',
     async (job: Job<EmailJobData>) => {
       await mailer.send(job.data);
-      // Only `fireTemplated`'s EMAIL branch sets this — every other of this
-      // queue's ~27 call sites (password resets, invitations, platform
-      // billing, …) is a plain transactional send, never logged here or
+      // Only tenant-scoped call sites set this (see `EmailJobData.notificationTenantId`) — password
+      // resets, OTPs and the pre-tenant forms are plain transactional sends, never logged here or
       // counted against a tenant's quota.
       if (job.data.notificationTenantId) {
-        await recordNotificationDelivery({
+        const logId = await recordNotificationDelivery({
           tenantId: job.data.notificationTenantId,
           channel: 'EMAIL',
           recipient: job.data.to,
@@ -27,6 +28,9 @@ export function startEmailWorker(): Worker<EmailJobData> {
           content: job.data.html,
           status: 'SENT',
         });
+        if (job.data.campaignRecipientId) {
+          await finalizeCampaignRecipient(job.data.notificationTenantId, job.data.campaignRecipientId, { status: 'SENT', deliveryLogId: logId });
+        }
       }
     },
     { connection: createQueueConnection(), concurrency: 5 },
@@ -37,7 +41,7 @@ export function startEmailWorker(): Worker<EmailJobData> {
     logger.error('Email job failed', { jobId: job?.id, to: job?.data.to, error: err.message, attempts: job?.attemptsMade });
     // Only log a FAILED row once retries are exhausted (the job's final attempt), not on every transient retry.
     if (job?.data.notificationTenantId && job.attemptsMade >= (job.opts.attempts ?? 1)) {
-      await recordNotificationDelivery({
+      const logId = await recordNotificationDelivery({
         tenantId: job.data.notificationTenantId,
         channel: 'EMAIL',
         recipient: job.data.to,
@@ -46,6 +50,13 @@ export function startEmailWorker(): Worker<EmailJobData> {
         status: 'FAILED',
         errorMessage: err.message,
       });
+      if (job.data.campaignRecipientId) {
+        await finalizeCampaignRecipient(job.data.notificationTenantId, job.data.campaignRecipientId, {
+          status: 'FAILED',
+          error: humanizeDeliveryError('EMAIL', err.message),
+          deliveryLogId: logId,
+        });
+      }
     }
   });
 

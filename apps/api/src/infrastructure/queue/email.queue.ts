@@ -24,6 +24,12 @@ export interface EmailJobData {
    * just gets recorded as `SENT`/`FAILED`, never `SKIPPED_*`.
    */
   notificationTenantId?: string;
+  /**
+   * Set ONLY by the communications campaign sender - the worker reports the final outcome
+   * (SENT / FAILED + the delivery-log id) back onto that campaign recipient row. Requires
+   * `notificationTenantId`.
+   */
+  campaignRecipientId?: string;
 }
 
 /**

@@ -1,6 +1,8 @@
 import { Worker, type Job } from 'bullmq';
 
 import { logger } from '../../core/logging/logger';
+import { finalizeCampaignRecipient } from '../../modules/communications/services/recipient-finalizer.service';
+import { humanizeDeliveryError } from '../../modules/communications/utils/delivery-error.util';
 import { recordNotificationDelivery } from '../../modules/tenant-notifications/repositories/notification-delivery-log.repository';
 import { kaleyraClient } from '../sms/kaleyra.client';
 
@@ -15,7 +17,7 @@ export function startSmsWorker(): Worker<SmsJobData> {
     async (job: Job<SmsJobData>) => {
       const result = await kaleyraClient.sendSms({ to: job.data.to, body: job.data.body });
       if (job.data.skipDeliveryLog) return;
-      await recordNotificationDelivery({
+      const logId = await recordNotificationDelivery({
         tenantId: job.data.tenantId,
         channel: 'SMS',
         recipient: job.data.to,
@@ -28,6 +30,13 @@ export function startSmsWorker(): Worker<SmsJobData> {
         providerRef: 'messageId' in result ? result.messageId : undefined,
         errorMessage: 'messageId' in result ? undefined : result.error,
       });
+      if (job.data.campaignRecipientId) {
+        await finalizeCampaignRecipient(job.data.tenantId, job.data.campaignRecipientId, {
+          status: 'messageId' in result ? 'SENT' : 'FAILED',
+          error: 'messageId' in result ? undefined : humanizeDeliveryError('SMS', result.error),
+          deliveryLogId: logId,
+        });
+      }
     },
     { connection: createQueueConnection(), concurrency: 5 },
   );
@@ -36,7 +45,7 @@ export function startSmsWorker(): Worker<SmsJobData> {
   worker.on('failed', async (job, err) => {
     logger.error('SMS job failed', { jobId: job?.id, to: job?.data.to, error: err.message, attempts: job?.attemptsMade });
     if (job && !job.data.skipDeliveryLog && job.attemptsMade >= (job.opts.attempts ?? 1)) {
-      await recordNotificationDelivery({
+      const logId = await recordNotificationDelivery({
         tenantId: job.data.tenantId,
         channel: 'SMS',
         recipient: job.data.to,
@@ -44,6 +53,13 @@ export function startSmsWorker(): Worker<SmsJobData> {
         status: 'FAILED',
         errorMessage: err.message,
       });
+      if (job.data.campaignRecipientId) {
+        await finalizeCampaignRecipient(job.data.tenantId, job.data.campaignRecipientId, {
+          status: 'FAILED',
+          error: humanizeDeliveryError('SMS', err.message),
+          deliveryLogId: logId,
+        });
+      }
     }
   });
 

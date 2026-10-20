@@ -169,6 +169,8 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   // `notifications:manage` already existed in the catalog above (previously
   // unused — this prompt is what finally enforces it on real routes).
   { key: 'notifications:view', description: 'View the Notification Center feed, unread count, and notification details' },
+  // Communications (Prompt 172) — bulk campaigns to members + test sends. Same default grants as `notifications:manage` (OWNER via '*', MANAGER).
+  { key: 'notifications:send', description: 'Send bulk messages (campaigns) to members and run test sends' },
   { key: 'announcements:view', description: "View this tenant's in-gym announcements" },
   { key: 'announcements:create', description: 'Create a draft announcement' },
   { key: 'announcements:update', description: 'Edit a draft or scheduled announcement' },
@@ -244,7 +246,7 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'finance:view', 'finance:payment-create', 'finance:payment-refund', 'finance:invoice-view', 'finance:invoice-download',
     'finance:income-manage', 'finance:expense-manage',
     'reports:view', 'reports:export', 'analytics:view',
-    'notifications:view', 'announcements:view', 'announcements:create', 'announcements:update', 'announcements:delete', 'announcements:publish',
+    'notifications:view', 'notifications:send', 'announcements:view', 'announcements:create', 'announcements:update', 'announcements:delete', 'announcements:publish',
     'branches:view', 'branches:create', 'branches:update', 'branches:delete', 'branches:restore', 'branches:activate',
     'support:view', 'support:create', 'ai:use',
     'classes:view', 'classes:create', 'classes:update', 'classes:delete', 'classes:restore', 'bookings:manage',

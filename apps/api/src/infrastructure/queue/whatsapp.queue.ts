@@ -6,6 +6,8 @@ export interface WhatsAppJobData {
   tenantId: string;
   to: string;
   body: string;
+  /** Set only by the communications campaign sender - see `EmailJobData.campaignRecipientId`. */
+  campaignRecipientId?: string;
 }
 
 /** Producer side of async WhatsApp delivery — same shape as `sms.queue.ts`, through the same Kaleyra account as SMS (`kaleyra.client.ts`'s `sendWhatsApp`). */

@@ -38,6 +38,7 @@ import { branchRouter } from '../../modules/branches/routes/branch.routes';
 import { classBookingRouter } from '../../modules/classes/routes/class-booking.routes';
 import { classSessionRouter } from '../../modules/classes/routes/class-session.routes';
 import { groupClassRouter } from '../../modules/classes/routes/group-class.routes';
+import { communicationsRouter } from '../../modules/communications/routes/communications.routes';
 import { contactRouter } from '../../modules/contact/routes/contact.routes';
 import { couponRouter } from '../../modules/coupon/routes/coupon.routes';
 import { dietPlanRouter } from '../../modules/diet/routes/diet-plan.routes';
@@ -156,6 +157,7 @@ v1Router.use('/members', memberRouter);
 v1Router.use('/membership-plans', membershipPlanRouter);
 v1Router.use('/measurements', measurementRouter);
 v1Router.use('/leads', leadRouter);
+v1Router.use('/communications', communicationsRouter);
 // Mounted before the authenticated `/attendance-devices` CRUD router below —
 // this one has no `authenticateMiddleware` at all (a physical device/bridge
 // agent can't do an interactive login), same "no user JWT" reasoning as the

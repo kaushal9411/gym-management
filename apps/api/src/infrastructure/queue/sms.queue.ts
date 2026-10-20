@@ -15,6 +15,8 @@ export interface SmsJobData {
    * otherwise always does.
    */
   skipDeliveryLog?: boolean;
+  /** Set only by the communications campaign sender - see `EmailJobData.campaignRecipientId`. */
+  campaignRecipientId?: string;
 }
 
 /**

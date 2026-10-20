@@ -39,6 +39,7 @@ interface ApiErrorBody {
   success: false;
   message: string;
   errors: Array<{ field?: string; code?: string; message: string }> | null;
+  data?: unknown;
 }
 
 /** `validityStart` -> "Validity Start"; `staffProfile.dateOfBirth` -> "Date Of Birth" (last path segment — the leaf is what the user actually typed into). */
@@ -92,7 +93,17 @@ export function toAuthServiceError(error: unknown): AuthServiceError {
     }
     const code = extractErrorCode(axiosError);
     const message = buildErrorMessage(axiosError.response.data);
-    return new AuthServiceError(code, message);
+    const result = new AuthServiceError(code, message);
+    const body = axiosError.response.data;
+    const retryAfter = Number(axiosError.response.headers?.['retry-after']);
+    result.details = {
+      status: axiosError.response.status,
+      apiCode: body?.errors?.[0]?.code,
+      errors: body?.errors ?? [],
+      data: body?.data ?? undefined,
+      retryAfterSeconds: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : undefined,
+    };
+    return result;
   }
   return new AuthServiceError('UNKNOWN', 'Something went wrong. Please try again.');
 }

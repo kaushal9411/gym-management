@@ -132,6 +132,12 @@ function jobOptions(def: JobDefinition) {
 async function registerRepeatable(def: JobDefinition, queueName: string): Promise<void> {
   const entry = queues.get(queueName);
   if (!entry) return;
+  // A job whose cron pattern changed (e.g. weekly -> daily) would otherwise keep BOTH repeatables in Redis: drop the stale ones.
+  const existing = await entry.queue.getRepeatableJobs();
+  for (const stale of existing.filter((r) => r.name === def.name && r.pattern !== def.cronPattern)) {
+    // eslint-disable-next-line no-await-in-loop -- at most one or two leftovers, boot-time only
+    await entry.queue.removeRepeatableByKey(stale.key);
+  }
   await entry.queue.add(def.name, { trigger: 'SCHEDULED' satisfies JobTriggerType }, {
     ...jobOptions(def),
     repeat: { pattern: def.cronPattern, tz: def.timezone },

@@ -1,49 +1,14 @@
-import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
-import { decryptMemberContact } from '../../members/utils/member-pii.util';
-import { notifyMembershipExpired, notifyMembershipExpiring } from '../../tenant-notifications/services/notification-trigger.service';
+import { sweepMembershipExpired, sweepMembershipExpiring } from '../../communications/services/automation-sweeps.service';
 import type { JobHandler } from '../types';
 
-const REMINDER_WINDOW_DAYS = 7;
-const DAY_MS = 86_400_000;
-const DEDUPE_TTL_SECONDS = 8 * 86_400;
-
 /**
- * Ported verbatim from the old `membership-expiry.jobs.ts`'s `remindExpiringSoon` —
- * only the trigger mechanism (this module's cron registry instead of a
- * module-local BullMQ `repeat`) changed, not the query or dedupe logic.
+ * Expiring-membership reminders. Since Communications (Prompt 172) the timing (default 7, 3 and 1 days before the end
+ * date), channels (default push + email) and message come from the gym's `MEMBERSHIP_EXPIRING` automation rule; the
+ * dedupe ledger (`automation_dispatches`) replaces the old per-membership Redis key (which is still honoured once, so
+ * the upgrade does not re-send the first reminder).
  */
-export const membershipRenewalReminder: JobHandler = async () => {
-  const windowEnd = new Date(Date.now() + REMINDER_WINDOW_DAYS * DAY_MS);
-  const memberships = (
-    await prisma.membership.findMany({
-      where: { status: 'ACTIVE', endDate: { gte: new Date(), lte: windowEnd } },
-      include: { member: true, plan: { select: { name: true } } },
-    })
-  ).map((membership) => ({ ...membership, member: decryptMemberContact(membership.member) }));
-
-  let reminded = 0;
-  for (const membership of memberships) {
-    const dedupeKey = `notif:membership-expiring:${membership.id}`;
-    // eslint-disable-next-line no-await-in-loop -- sequential across a small, infrequent (daily) batch; no throughput requirement justifies parallelizing
-    if (await cache.get(dedupeKey)) continue;
-
-    const daysRemaining = Math.max(1, Math.ceil((membership.endDate.getTime() - Date.now()) / DAY_MS));
-    // eslint-disable-next-line no-await-in-loop
-    await notifyMembershipExpiring(membership.tenantId, {
-      memberId: membership.member.id,
-      memberName: `${membership.member.firstName} ${membership.member.lastName}`.trim(),
-      planName: membership.plan.name,
-      endDate: membership.endDate.toISOString().slice(0, 10),
-      daysRemaining,
-      memberEmail: membership.member.email,
-    });
-    // eslint-disable-next-line no-await-in-loop
-    await cache.set(dedupeKey, true, DEDUPE_TTL_SECONDS);
-    reminded += 1;
-  }
-  return { scanned: memberships.length, reminded };
-};
+export const membershipRenewalReminder: JobHandler = async () => sweepMembershipExpiring();
 
 /** Read-only audit: counts ACTIVE memberships whose `endDate` has already passed without mutating anything — distinct from `auto-membership-status-update`, which does the actual flip. */
 export const membershipExpiryCheck: JobHandler = async () => {
@@ -80,42 +45,9 @@ export const pendingMembershipActivation: JobHandler = async () => {
   return { activated: result.count };
 };
 
-const RECENTLY_EXPIRED_WINDOW_DAYS = 14;
-const RECENTLY_EXPIRED_DEDUPE_TTL_SECONDS = 20 * 86_400; // must outlive the window above, or a membership could re-notify before aging out of the query
-
 /**
- * Notifies members whose membership was flipped to EXPIRED, deduped so a
- * member is only ever notified once per membership. Bounded to a recent
- * window (not "all EXPIRED memberships ever") — otherwise every run would
- * re-scan the entire historical EXPIRED population and rely solely on the
- * dedupe TTL never lapsing, which it eventually would.
+ * "Your membership has expired" message, driven by the gym's `MEMBERSHIP_EXPIRED` rule (default: 1 day after the end
+ * date, push + email, once per membership per timing). Kept a separate job from the status flip so a notification
+ * failure never blocks the mutation.
  */
-export const membershipExpiredNotification: JobHandler = async () => {
-  const windowStart = new Date(Date.now() - RECENTLY_EXPIRED_WINDOW_DAYS * DAY_MS);
-  const memberships = (
-    await prisma.membership.findMany({
-      where: { status: 'EXPIRED', endDate: { gte: windowStart, lt: new Date() } },
-      include: { member: true, plan: { select: { name: true } } },
-    })
-  ).map((membership) => ({ ...membership, member: decryptMemberContact(membership.member) }));
-
-  let notified = 0;
-  for (const membership of memberships) {
-    const dedupeKey = `notif:membership-expired:${membership.id}`;
-    // eslint-disable-next-line no-await-in-loop -- see membershipRenewalReminder
-    if (await cache.get(dedupeKey)) continue;
-
-    // eslint-disable-next-line no-await-in-loop
-    await notifyMembershipExpired(membership.tenantId, {
-      memberId: membership.member.id,
-      memberName: `${membership.member.firstName} ${membership.member.lastName}`.trim(),
-      planName: membership.plan.name,
-      endDate: membership.endDate.toISOString().slice(0, 10),
-      memberEmail: membership.member.email,
-    });
-    // eslint-disable-next-line no-await-in-loop
-    await cache.set(dedupeKey, true, RECENTLY_EXPIRED_DEDUPE_TTL_SECONDS);
-    notified += 1;
-  }
-  return { scanned: memberships.length, notified };
-};
+export const membershipExpiredNotification: JobHandler = async () => sweepMembershipExpired();

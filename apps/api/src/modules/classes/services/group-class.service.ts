@@ -4,6 +4,7 @@ import { ErrorCode } from '../../../core/errors/error-codes';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
+import { notifyClassChange } from '../../communications/services/class-notifications.service';
 import type { CreateGroupClassInput, GroupClassDto, ListGroupClassesQuery, ScheduleSlotInput, UpdateGroupClassInput } from '../dto/classes.dto';
 import { GroupClassRepository, type GroupClassRow } from '../repositories/group-class.repository';
 
@@ -89,9 +90,15 @@ export class GroupClassService {
   }
 
   async setSchedule(id: string, slots: ScheduleSlotInput[], actor: IamActor): Promise<GroupClassDto> {
-    await this.mustFind(id);
+    const before = await this.mustFind(id);
     await this.classes.replaceSchedule(this.tenantId, id, slots);
     await this.audit(actor, 'group_class.schedule_updated', id);
+    // Communications: tell members affected by a timetable change (additive, fire-and-forget - never blocks the edit).
+    const slotKey = (x: { dayOfWeek: string; startTime: string }): string => `${x.dayOfWeek}@${x.startTime}`;
+    const oldSlots = new Set(before.schedule.map(slotKey));
+    const newSlots = new Set(slots.map(slotKey));
+    const changed = oldSlots.size !== newSlots.size || [...newSlots].some((k) => !oldSlots.has(k));
+    if (changed) void notifyClassChange(this.tenantId, id, oldSlots.size === 0 && newSlots.size > 0 ? 'NEW_CLASS' : 'SCHEDULE_UPDATED');
     return this.getById(id);
   }
 
@@ -99,6 +106,8 @@ export class GroupClassService {
     await this.mustFind(id);
     await this.classes.softDelete(id);
     await this.audit(actor, 'group_class.deleted', id);
+    // Communications: members with an upcoming booking are told the class is cancelled (fire-and-forget).
+    void notifyClassChange(this.tenantId, id, 'CANCELLED');
   }
 
   async restore(id: string, actor: IamActor): Promise<void> {

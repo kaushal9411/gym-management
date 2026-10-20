@@ -118,6 +118,14 @@ const _sections = <String, List<MenuEntry>>{
       route: AppRoutes.notifications,
     ),
     MenuEntry(
+      icon: Icons.forum_outlined,
+      title: 'Communications',
+      subtitle: 'Send messages & reminders',
+      route: AppRoutes.communications,
+      permissions: ['notifications:view'],
+      featureFlag: 'notifications',
+    ),
+    MenuEntry(
       icon: Icons.campaign_outlined,
       title: 'Announcements',
       subtitle: 'Published & drafts',

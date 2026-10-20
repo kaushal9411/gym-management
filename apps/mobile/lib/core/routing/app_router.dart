@@ -54,7 +54,13 @@ import '../../features/manager/presentation/member_detail_screen.dart';
 import '../../features/member/presentation/member_attendance_screen.dart';
 import '../../features/member/presentation/member_class_booked_screen.dart';
 import '../../features/member/presentation/member_data_export_screen.dart';
+import '../../features/communications/presentation/automations_screen.dart';
+import '../../features/communications/presentation/communications_hub_screen.dart';
+import '../../features/communications/presentation/history_detail_screen.dart';
+import '../../features/communications/presentation/history_screen.dart';
+import '../../features/communications/presentation/send/send_flow_screen.dart';
 import '../../features/member/presentation/member_gym_info_screen.dart';
+import '../../features/member/presentation/member_notification_settings_screen.dart';
 import '../../features/member/presentation/member_invoice_detail_screen.dart';
 import '../../features/member/presentation/member_invoices_screen.dart';
 import '../../features/member/presentation/member_measurements_screen.dart';
@@ -498,6 +504,28 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       GoRoute(
         path: AppRoutes.messageLog,
         builder: (context, state) => const NotificationLogScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.communications,
+        builder: (context, state) => const CommunicationsHubScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.communicationsSend,
+        builder: (context, state) =>
+            SendFlowScreen(args: state.extra as SendFlowArgs?),
+      ),
+      GoRoute(
+        path: AppRoutes.communicationsAutomations,
+        builder: (context, state) => const AutomationsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.communicationsHistory,
+        builder: (context, state) => const HistoryScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.communicationsHistoryDetail,
+        builder: (context, state) =>
+            HistoryDetailScreen(campaignId: state.extra! as String),
       ),
       GoRoute(
         path: AppRoutes.notificationTemplates,
@@ -962,6 +990,10 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       GoRoute(
         path: AppRoutes.memberGymInfo,
         builder: (context, state) => const MemberGymInfoScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.memberNotificationSettings,
+        builder: (context, state) => const MemberNotificationSettingsScreen(),
       ),
       GoRoute(
         path: AppRoutes.memberClassBooked,

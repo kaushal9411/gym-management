@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -14,6 +15,10 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/app_currency.dart';
+import '../../../bloc/session/session_cubit.dart';
+import '../../../bloc/session/session_state.dart';
+import '../../communications/presentation/send/send_flow_screen.dart';
+import '../../../models/comm_audience.dart';
 import '../../../models/attendance_summary.dart';
 import '../../../models/body_measurement.dart';
 import '../../../models/branch_option.dart';
@@ -1597,6 +1602,27 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
                             ],
                           ),
                         ),
+                        if (_canSendMessage(member)) ...[
+                          const SizedBox(height: 8),
+                          FadeUp(
+                            index: 4,
+                            child: _heroAction(
+                              'Send message',
+                              Icons.send_rounded,
+                              () => context.push(
+                                AppRoutes.communicationsSend,
+                                extra: SendFlowArgs(
+                                  member: PickerMember(
+                                    id: member.id,
+                                    memberId: member.memberId,
+                                    name: member.name,
+                                    membershipStatus: member.status,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     if (streak >= 2)
@@ -1643,6 +1669,16 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         ),
       ],
     );
+  }
+
+  /// "Send message" needs `notifications:send` (the key the Communications
+  /// API checks) and a member who can be messaged (not deleted / inactive).
+  bool _canSendMessage(GymMember member) {
+    final s = context.read<SessionCubit>().state;
+    return s is SessionAuthenticatedStaff &&
+        s.user.hasPermission('notifications:send') &&
+        member.deletedAt == null &&
+        (member.status == 'ACTIVE' || member.status == 'FROZEN');
   }
 
   Widget _heroAction(String label, IconData icon, VoidCallback? onTap) {

@@ -14,6 +14,8 @@ import '../models/member_booking.dart';
 import '../models/member_diet_assignment.dart';
 import '../models/member_invoice.dart';
 import '../models/member_invoice_detail.dart';
+import '../models/member_notification_preferences.dart';
+import '../models/comm_channel.dart';
 import '../models/member_overview.dart';
 import '../models/member_plan.dart';
 import '../models/member_portal_profile.dart';
@@ -668,6 +670,45 @@ class MemberPortalRepository {
   Future<void> removePhoto() async {
     try {
       await _dio.delete<Map<String, dynamic>>('/portal/profile/photo');
+    } on DioException catch (e) {
+      throw _profileError(e);
+    }
+  }
+
+  /// `GET /portal/notification-preferences` — promotional opt-out per channel
+  /// plus the categories that can never be blocked. Member id comes from the
+  /// token only.
+  Future<MemberNotificationPreferences> notificationPreferences() async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/portal/notification-preferences',
+      );
+      return MemberNotificationPreferences.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      throw _profileError(e);
+    }
+  }
+
+  /// `PUT /portal/notification-preferences` (30 per 15 minutes) — upserts
+  /// only the listed channels and returns the full, updated preferences.
+  Future<MemberNotificationPreferences> updateNotificationPreferences(
+    Map<CommChannel, bool> optOutByChannel,
+  ) async {
+    try {
+      final response = await _dio.put<Map<String, dynamic>>(
+        '/portal/notification-preferences',
+        data: {
+          'channels': [
+            for (final e in optOutByChannel.entries)
+              {'channel': e.key.api, 'promotionalOptOut': e.value},
+          ],
+        },
+      );
+      return MemberNotificationPreferences.fromJson(
+        response.data!['data'] as Map<String, dynamic>,
+      );
     } on DioException catch (e) {
       throw _profileError(e);
     }

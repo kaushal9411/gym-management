@@ -20,9 +20,9 @@ export interface RecordDeliveryInput {
  * a class — every caller already has a `tenantId` in hand and this has no
  * other state to carry.
  */
-export async function recordNotificationDelivery(input: RecordDeliveryInput): Promise<void> {
+export async function recordNotificationDelivery(input: RecordDeliveryInput): Promise<string> {
   const db = getTenantScopedClient(input.tenantId);
-  await db.notificationDeliveryLog.create({
+  const row = await db.notificationDeliveryLog.create({
     data: {
       tenantId: input.tenantId,
       channel: input.channel,
@@ -33,5 +33,7 @@ export async function recordNotificationDelivery(input: RecordDeliveryInput): Pr
       providerRef: input.providerRef ?? undefined,
       errorMessage: input.errorMessage ?? undefined,
     },
+    select: { id: true },
   });
+  return row.id;
 }
