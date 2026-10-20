@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { BODY_MAX, CAMPAIGN_PLACEHOLDERS, PLACEHOLDER_HINT, TEMPLATES, TEMPLATE_GROUPS, TITLE_MAX } from '../../constants';
 import { estimateSms } from '../../lib/message';
 import type { ComposerState } from '../../lib/composer';
+import { useCommunicationTemplates } from '../../hooks/use-communications';
 import type { TemplateKey } from '../../types';
 import { FieldError } from '../common';
 import { StepCard } from './step-card';
@@ -58,6 +59,9 @@ export function MessageStep({
     });
   };
 
+  const templates = useCommunicationTemplates(!disabled);
+  const synced = templates.data?.find((t) => t.title === state.title && t.body === state.body);
+
   const sms = smsSelected ? estimateSms(`${state.title.trim()}\n${state.body.trim()}`) : null;
 
   return (
@@ -69,13 +73,27 @@ export function MessageStep({
         <Select
           id="cm-template"
           disabled={disabled}
-          value={state.templateKey}
+          value={synced ? `SYNC:${synced.type}` : state.templateKey}
           onChange={(e) => {
+            const picked = e.target.value.startsWith('SYNC:') ? templates.data?.find((x) => `SYNC:${x.type}` === e.target.value) : undefined;
+            if (picked) {
+              onPatch({ templateKey: 'CUSTOM', title: picked.title, body: picked.body });
+              return;
+            }
             const t = TEMPLATES.find((x) => x.key === (e.target.value as TemplateKey));
             onPatch(t?.title !== undefined ? { templateKey: t.key, title: t.title, body: t.body ?? '' } : { templateKey: 'CUSTOM' });
           }}
         >
           <option value="CUSTOM">Custom message</option>
+          {templates.data?.length ? (
+            <optgroup label="Your notification templates">
+              {templates.data.map((t) => (
+                <option key={t.type} value={`SYNC:${t.type}`}>
+                  {t.label}
+                </option>
+              ))}
+            </optgroup>
+          ) : null}
           {TEMPLATE_GROUPS.map((g) => (
             <optgroup key={g} label={g}>
               {TEMPLATES.filter((t) => t.group === g).map((t) => (

@@ -176,10 +176,12 @@ describe('rule resolution', () => {
     expect(rule).toMatchObject({ enabled: false, isDefault: false, offsets: [2, 10], channels: ['SMS'], titleOverride: 'Custom' });
   });
 
-  it('a legacy template switched off keeps a rule off until staff saves the rule explicitly', async () => {
+  it('a legacy template switched off keeps the rule off, even when staff saved it enabled', async () => {
     state.template = { ...state.template, isActive: false, isCustomized: true };
     expect((await new AutomationEngine(TENANT).rule('BIRTHDAY')).enabled).toBe(false);
     state.savedRules = [{ key: 'BIRTHDAY', enabled: true, offsets: [], channels: ['PUSH'], titleTemplate: null, bodyTemplate: null, updatedAt: new Date() }];
+    expect((await new AutomationEngine(TENANT).rule('BIRTHDAY')).enabled).toBe(false);
+    state.template = { ...state.template, isActive: true };
     expect((await new AutomationEngine(TENANT).rule('BIRTHDAY')).enabled).toBe(true);
   });
 

@@ -4,9 +4,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../bloc/communications/send_flow_cubit.dart';
 import '../../../../bloc/communications/send_flow_state.dart';
+import '../../../../core/di/service_locator.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../models/comm_request.dart';
+import '../../../../models/comm_template.dart';
+import '../../../../repositories/communications_repository.dart';
 import '../../../team/presentation/widgets/team_ui.dart' show confirmTeam;
 import '../../comm_constants.dart';
 import '../../comm_logic.dart';
@@ -44,6 +47,50 @@ class _MessageStepState extends State<MessageStep> {
     _title = TextEditingController(text: s.title);
     _body = TextEditingController(text: s.body);
     if (s.title.trim().isEmpty && s.body.trim().isEmpty) _prefill();
+    _loadSynced();
+  }
+
+  /// The gym's Notification-settings templates (edited text; switched-off ones
+  /// are not returned). Best effort: the preset chips still work without it.
+  List<CommSyncedTemplate> _synced = const [];
+
+  Future<void> _loadSynced() async {
+    try {
+      final list = await getIt<CommunicationsRepository>().syncedTemplates();
+      if (mounted) setState(() => _synced = list);
+    } catch (_) {
+      // Leave the group out; nothing else depends on it.
+    }
+  }
+
+  Future<void> _applySynced(CommSyncedTemplate t) async {
+    final s = _cubit.state;
+    final current = kCommTemplateTexts[s.template];
+    final untouched = _synced.any(
+          (x) => x.title == _title.text && x.body == _body.text,
+        ) ||
+        (current != null &&
+            _title.text == current.title &&
+            _body.text == current.body);
+    final hasText =
+        _title.text.trim().isNotEmpty || _body.text.trim().isNotEmpty;
+    if (hasText && !untouched) {
+      final ok = await confirmTeam(
+        context,
+        title: 'Replace your text?',
+        message: 'The "${t.label}" template will replace the title and '
+            'message you have typed.',
+        confirmLabel: 'Replace',
+      );
+      if (!ok || !mounted) return;
+    }
+    _title.text = t.title;
+    _body.text = t.body;
+    _cubit.setTexts(
+      title: t.title,
+      body: t.body,
+      template: CommTemplate.custom,
+    );
   }
 
   /// A fresh flow opens on the first template (Expiring) so Title and Message
@@ -166,6 +213,28 @@ class _MessageStepState extends State<MessageStep> {
                 ),
               ],
             ),
+            if (_synced.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.only(top: 10, bottom: 6),
+                child: Text(
+                  'YOUR NOTIFICATION TEMPLATES',
+                  style: AppText.eyebrow(color: AppColors.inkFaint),
+                ),
+              ),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final t in _synced)
+                    CommChip(
+                      label: t.label,
+                      selected:
+                          _title.text == t.title && _body.text == t.body,
+                      onTap: () => _applySynced(t),
+                    ),
+                ],
+              ),
+            ],
             for (final g in CommTemplateGroup.values) ...[
               Padding(
                 padding: const EdgeInsets.only(top: 10, bottom: 6),

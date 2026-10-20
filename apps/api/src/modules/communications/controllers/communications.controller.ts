@@ -8,6 +8,7 @@ import { AudienceService } from '../services/audience.service';
 import { AutomationService } from '../services/automation.service';
 import { CampaignService } from '../services/campaign.service';
 import { buildOverview } from '../services/overview.service';
+import { listSyncedTemplates } from '../services/template-sync.service';
 import { TestSendService } from '../services/test-send.service';
 import type {
   CreateCampaignInput,
@@ -86,6 +87,10 @@ export class CommunicationsController {
 
   async testSend(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await new TestSendService(req.tenant!.id).send(req.body as TestSendInput, actorFrom(req)), 'Test message processed.');
+  }
+
+  async listTemplates(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, { items: await listSyncedTemplates(req.tenant!.id) });
   }
 
   async listAutomations(req: Request, res: Response): Promise<void> {

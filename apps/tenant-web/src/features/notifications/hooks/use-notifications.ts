@@ -99,6 +99,8 @@ export function useUpdateNotificationTemplate() {
       notificationService.updateTemplate(type, input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['notifications', 'templates'] });
+      // Automations + the Send-message template picker read these templates, so refresh them too.
+      void queryClient.invalidateQueries({ queryKey: ['communications'] });
     },
   });
 }

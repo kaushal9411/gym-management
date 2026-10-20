@@ -19,6 +19,7 @@ import type {
   Paginated,
   PreviewRequest,
   RecipientListParams,
+  SyncedTemplate,
   TestSendInput,
   TestSendResult,
 } from '../types';
@@ -36,6 +37,11 @@ class CommunicationsService {
   async overview(): Promise<CommunicationsOverview> {
     const res = await apiClient.get<Envelope<CommunicationsOverview>>(`${BASE}/overview`);
     return res.data.data;
+  }
+
+  async listTemplates(): Promise<SyncedTemplate[]> {
+    const res = await apiClient.get<Envelope<{ items: SyncedTemplate[] }>>(`${BASE}/templates`, { silent: true });
+    return res.data.data.items;
   }
 
   async previewAudience(input: PreviewRequest): Promise<AudiencePreview> {

@@ -70,7 +70,7 @@ export class AutomationEngine {
       );
     }
     const rule = this.rules.get(key)!;
-    if (rule.isDefault && rule.enabled && rule.def.legacyTemplate) {
+    if (rule.enabled && rule.def.legacyTemplate) {
       const legacy = await this.legacyTemplate(rule.def.legacyTemplate);
       if (!legacy.template.isActive) return { ...rule, enabled: false };
     }

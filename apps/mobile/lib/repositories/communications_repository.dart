@@ -8,6 +8,7 @@ import '../models/comm_campaign.dart';
 import '../models/comm_channel.dart';
 import '../models/comm_overview.dart';
 import '../models/comm_request.dart';
+import '../models/comm_template.dart';
 import '../models/paginated_result.dart';
 import '../models/payments_analytics.dart' show jsonInt, jsonList, jsonMap;
 
@@ -194,6 +195,16 @@ class CommunicationsRepository {
         },
         permission: 'notifications:send',
       );
+
+  /// `GET /communications/templates` (perm `notifications:send`): the gym's
+  /// active Notification templates as campaign starter text. Read live, so
+  /// edits / switch-offs in Notification settings show up on the next call.
+  Future<List<CommSyncedTemplate>> syncedTemplates() => _run(() async {
+        final r = await _dio.get<Map<String, dynamic>>(
+          '/communications/templates',
+        );
+        return CommSyncedTemplate.listFromJson(_data(r));
+      });
 
   /// `GET /communications/automations`.
   Future<AutomationList> automations() => _run(() async {

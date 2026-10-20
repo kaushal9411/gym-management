@@ -46,6 +46,9 @@ communicationsRouter.use(requireModuleEnabled('notifications'));
 /** @openapi { "/communications/overview": { get: { tags: [Communications], summary: "Hub - per-channel monthly quota, recent campaigns, automation count, quiet hours", security: [{bearerAuth: []}], responses: { 200: { description: "{ periodKey, channels[5], recent[], automations, quietHours }" } } } } } */
 communicationsRouter.get('/overview', requirePermission('notifications:view'), asyncHandler(c.overview.bind(c)));
 
+/** @openapi { "/communications/templates": { get: { tags: [Communications], summary: "The gym's active Notification templates as campaign starter text (notifications:send)", security: [{bearerAuth: []}], responses: { 200: { description: "{ items: [{ type, label, description, title, body, customized }] }" } } } } } */
+communicationsRouter.get('/templates', requirePermission('notifications:send'), readHeavyLimiter(), asyncHandler(c.listTemplates.bind(c)));
+
 /** @openapi { "/communications/audience/preview": { post: { tags: [Communications], summary: "Live audience count, sample names, per-channel contactable / opted-out / quota (notifications:send)", security: [{bearerAuth: []}], responses: { 200: { description: "{ total, sample, channels[], overLimit, largeSend, ... }" }, 404: { description: Unknown plan / branch / member }, 422: { description: Validation error } } } } } */
 communicationsRouter.post('/audience/preview', requirePermission('notifications:send'), readHeavyLimiter(), validate({ body: previewSchema }), asyncHandler(c.preview.bind(c)));
 

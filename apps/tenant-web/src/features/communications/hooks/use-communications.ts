@@ -13,6 +13,7 @@ import type {
   Channel,
   PreviewRequest,
   RecipientListParams,
+  SyncedTemplate,
   TestSendInput,
 } from '../types';
 
@@ -25,6 +26,16 @@ export function useCommunicationsOverview(enabled = true) {
     queryFn: () => communicationsService.overview(),
     enabled,
     staleTime: 15_000,
+  });
+}
+
+/** Notification-settings templates as starter text; always refetched on mount so edits / switch-offs there show up. */
+export function useCommunicationTemplates(enabled = true) {
+  return useQuery<SyncedTemplate[]>({
+    queryKey: [...ROOT, 'templates'],
+    queryFn: () => communicationsService.listTemplates(),
+    enabled,
+    staleTime: 0,
   });
 }
 

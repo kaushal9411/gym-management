@@ -343,3 +343,14 @@ Body `{}` (strict) or `{ "channels": [...] }` (subset of the rule's channels). S
 - Permission changes: tokens issued before this feature shipped carry the old permission version; a user gets `notifications:send` on next login/refresh (the migration bumps their permission version; the effective-permission cache otherwise expires within 30 minutes or at the 6-hourly `cache-refresh` job).
 - Use `GET /communications/audience/members` for the picker and `POST /communications/audience/preview` for the live count (debounce ~300 ms). Disable a channel button when `quota.enabled` is false; show the red "over limit" state when `quota.over` and the shortfall as `quota.shortBy`.
 - For the confirm step: preview returns `largeSend` (> 100); send `confirmLargeSend: true` only after the user ticks the box. Keep one `Idempotency-Key` per "Send" press so a double-tap cannot send twice.
+
+
+### GET /communications/templates  (notifications:send)
+
+The gym's **Notification-settings templates as campaign starter text**, read live on every call (no cache), so an edit in Settings -> Notifications -> Templates shows up on the next request.
+Response `data`: `{ items: [{ type, label, description, title, body, customized }] }`.
+
+- Only member-facing types are offered: `MEMBERSHIP_EXPIRY`, `MEMBERSHIP_RENEWAL`, `PAYMENT_SUCCESS`, `PAYMENT_FAILED`, `WELCOME_MESSAGE`, `BIRTHDAY_WISHES`.
+- **Switched-off templates are omitted**, as are ones whose text needs a value a campaign cannot supply (e.g. `{{paymentNumber}}`).
+- Old-style tokens are converted to the campaign placeholders: `{{memberName}}` -> `{{firstName}}`, `{{tenantName}}` -> `{{gymName}}`, `{{amount}}` -> `{{amountDue}}`, `{{expiryStatus}}` -> `ends`.
+- Automations: a rule linked to a Notification template (MEMBERSHIP_EXPIRING / MEMBERSHIP_EXPIRED -> Membership Expiry, PAYMENT_FAILED, BIRTHDAY -> Birthday Wishes) is **left out of `GET /automations`** and never sends while that template is switched off, saved row or not. Its text keeps following the template until the rule is given its own text.

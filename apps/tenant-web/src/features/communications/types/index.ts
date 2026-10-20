@@ -293,3 +293,13 @@ export interface MemberNotificationPreferences {
   nonBlockable: Array<{ key: string; label: string }>;
   note: string;
 }
+
+/** An active Notification-settings template offered as campaign starter text (`GET /communications/templates`). */
+export interface SyncedTemplate {
+  type: string;
+  label: string;
+  description: string;
+  title: string;
+  body: string;
+  customized: boolean;
+}

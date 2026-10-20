@@ -53,7 +53,9 @@ export class AutomationService {
     for (const key of AUTOMATION_KEYS) {
       const rule = mergeRule(AUTOMATION_RULES[key], rows.find((r) => r.key === key) ?? null);
       // eslint-disable-next-line no-await-in-loop -- nine rules, template lookups are single-row reads
-      items.push(await this.toItem({ ...rule, enabled: await this.effectiveEnabled(rule) }, sent.find((s) => s.key === key), lastSent.get(key) ?? null, states));
+      if (await this.templateOff(rule)) continue;
+      // eslint-disable-next-line no-await-in-loop -- nine rules, template lookups are single-row reads
+      items.push(await this.toItem(rule, sent.find((s) => s.key === key), lastSent.get(key) ?? null, states));
     }
     return { quietHours: QUIET_HOURS_VIEW, items };
   }
@@ -61,12 +63,15 @@ export class AutomationService {
   async enabledSummary(): Promise<{ total: number; enabled: number }> {
     const rows = await this.repo.listRules(this.tenantId);
     let enabled = 0;
+    let total = 0;
     for (const key of AUTOMATION_KEYS) {
       const rule = mergeRule(AUTOMATION_RULES[key], rows.find((r) => r.key === key) ?? null);
       // eslint-disable-next-line no-await-in-loop -- nine rules
-      if (await this.effectiveEnabled(rule)) enabled += 1;
+      if (await this.templateOff(rule)) continue;
+      total += 1;
+      if (rule.enabled) enabled += 1;
     }
-    return { total: AUTOMATION_KEYS.length, enabled };
+    return { total, enabled };
   }
 
   async put(key: AutomationRuleKey, input: PutAutomationInput, actor: IamActor) {
@@ -111,10 +116,10 @@ export class AutomationService {
     return new TestSendService(this.tenantId).send({ title: text.title, body: text.body, channels: wanted }, actor);
   }
 
-  /** A rule with no saved row stays off while the gym has the matching legacy notification template switched off (same rule the runtime applies). */
-  private async effectiveEnabled(rule: EffectiveRule): Promise<boolean> {
-    if (!rule.enabled || !rule.isDefault || !rule.def.legacyTemplate) return rule.enabled;
-    return (await notificationTemplateService.getEffective(this.tenantId, rule.def.legacyTemplate)).isActive;
+  /** True while the gym has the rule's linked Notification template switched off: the rule is hidden here and never sends (same rule the runtime applies), saved row or not. */
+  private async templateOff(rule: EffectiveRule): Promise<boolean> {
+    if (!rule.def.legacyTemplate) return false;
+    return !(await notificationTemplateService.getEffective(this.tenantId, rule.def.legacyTemplate)).isActive;
   }
 
   private async effectiveText(rule: EffectiveRule): Promise<{ title: string; body: string }> {
