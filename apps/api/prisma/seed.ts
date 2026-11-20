@@ -497,6 +497,7 @@ const ADMIN_PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'payments:manage', description: "Create Razorpay payment links, verify payment status, and email invoices/receipts for a tenant's platform billing" },
   { key: 'revenue:read', description: 'View revenue analytics (MRR/ARR/growth)' },
   { key: 'support:manage', description: 'View, assign, and close support tickets' },
+  { key: 'leads:manage', description: 'View and work the sales leads submitted through the public website contact form' },
   { key: 'feature-flags:manage', description: 'Enable or disable modules globally' },
   { key: 'cms:manage', description: 'Manage landing page content, blogs, FAQs, legal pages' },
   { key: 'notifications:send', description: 'Send global notifications and announcements' },
@@ -516,7 +517,7 @@ const ADMIN_PERMISSIONS: Array<{ key: string; description: string }> = [
 
 const ADMIN_ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
   SUPER_ADMIN: '*',
-  SUPPORT_ADMIN: ['dashboard:read', 'tenants:read', 'support:manage', 'audit:read'],
+  SUPPORT_ADMIN: ['dashboard:read', 'tenants:read', 'support:manage', 'leads:manage', 'audit:read'],
   FINANCE_ADMIN: ['dashboard:read', 'payments:read', 'payments:manage', 'revenue:read', 'coupons:manage', 'plans:manage', 'audit:read'],
   CONTENT_ADMIN: ['dashboard:read', 'cms:manage', 'templates:manage', 'notifications:send', 'audit:read'],
   TECHNICAL_ADMIN: [

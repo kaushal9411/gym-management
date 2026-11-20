@@ -45,7 +45,7 @@ function BackButton() {
     <button
       type="button"
       onClick={() => dispatch({ type: 'GO_TO', step: previousStep })}
-      className="inline-flex items-center gap-1 text-xs font-medium text-white/50 transition-colors hover:text-white"
+      className="inline-flex items-center gap-1 text-xs font-medium text-foreground/50 transition-colors hover:text-foreground"
     >
       <ArrowLeft className="size-3.5" aria-hidden />
       Back
@@ -64,9 +64,10 @@ function WizardBody() {
         /* Re-scopes every shared component's theme tokens (Input/Label/Card/
            Checkbox/Alert/etc. all read these) to fixed dark-neon values —
            this one block is what makes every step's fields render correctly
-           dark without touching each step file's markup. Kept local to this
-           wrapper, not global, so no other page is affected. */
-        .onboarding-dark-scope {
+           dark without touching each step file's markup. It only applies in the
+           dark theme (a .dark ancestor): in the light theme the app's own light
+           tokens apply. Kept local to this wrapper, not global. */
+        .dark .onboarding-dark-scope {
           /* Belt-and-suspenders: Input/select/textarea never set an explicit
              text color, they just inherit — and they inherit from <body>'s
              REAL (unscoped) theme, not this override, since nothing between
@@ -96,7 +97,8 @@ function WizardBody() {
           --warning: oklch(0.78 0.14 75);
           --warning-foreground: oklch(0.2 0.05 75);
         }
-        .onboarding-glass-card { background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%); }
+        .onboarding-glass-card { background: linear-gradient(180deg, rgba(255,255,255,0.88) 0%, rgba(255,255,255,0.72) 100%); }
+        .dark .onboarding-glass-card { background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%); }
         .onboarding-gradient-bar { background-image: linear-gradient(90deg, #ff8a3d 0%, #ff5a1f 45%, #22d3ee 100%); }
         .onboarding-cta {
           background-image: linear-gradient(135deg, #ff8a3d 0%, #ff5a1f 45%, #e0271b 100%);
@@ -114,8 +116,8 @@ function WizardBody() {
       <ProgressIndicator current={state.step} />
 
       <div className="space-y-1 text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-white">{copy.title}</h1>
-        {copy.subtitle ? <p className="text-sm text-white/50">{copy.subtitle}</p> : null}
+        <h1 className="text-2xl font-bold tracking-tight text-foreground">{copy.title}</h1>
+        {copy.subtitle ? <p className="text-sm text-foreground/50">{copy.subtitle}</p> : null}
       </div>
 
       <div className="onboarding-dark-scope">
@@ -135,7 +137,7 @@ function WizardBody() {
             </motion.div>
           </AnimatePresence>
         ) : (
-          <div className="onboarding-glass-card overflow-hidden rounded-4xl border border-white/10 shadow-[0_0_60px_-15px_rgba(255,90,31,0.25),0_0_80px_-20px_rgba(34,211,238,0.15)] backdrop-blur-2xl">
+          <div className="onboarding-glass-card overflow-hidden rounded-4xl border border-foreground/10 shadow-[0_0_60px_-15px_rgba(255,90,31,0.25),0_0_80px_-20px_rgba(34,211,238,0.15)] backdrop-blur-2xl">
             <div className="onboarding-gradient-bar h-1.5 w-full" aria-hidden />
             <div className="p-6 sm:p-8">
               <AnimatePresence mode="wait">
@@ -159,9 +161,9 @@ function WizardBody() {
       </div>
 
       {state.step === 'account' ? (
-        <p className="text-center text-sm text-white/40">
+        <p className="text-center text-sm text-foreground/40">
           Already using {tenant.platformName}?{' '}
-          <Link href={AUTH_ROUTES.login} className="font-medium text-cyan-300 underline-offset-4 hover:underline">
+          <Link href={AUTH_ROUTES.login} className="font-medium text-cyan-700 dark:text-cyan-300 underline-offset-4 hover:underline">
             Sign in
           </Link>
         </p>

@@ -12,6 +12,7 @@ import { publicCmsRouter } from '../../modules/admin-cms/routes/public-cms.route
 import { adminCouponRouter } from '../../modules/admin-coupons/routes/admin-coupon.routes';
 import { adminDashboardRouter } from '../../modules/admin-dashboard/routes/admin-dashboard.routes';
 import { adminFeatureFlagRouter } from '../../modules/admin-feature-flags/routes/admin-feature-flag.routes';
+import { adminLeadRouter } from '../../modules/admin-leads/routes/admin-lead.routes';
 import { adminNotificationSettingsRouter } from '../../modules/admin-notification-settings/routes/admin-notification-settings.routes';
 import { adminNotificationRouter } from '../../modules/admin-notifications/routes/admin-notification.routes';
 import { adminPaymentRouter } from '../../modules/admin-payments/routes/admin-payment.routes';
@@ -101,6 +102,7 @@ v1Router.use('/admin/coupons', adminCouponRouter);
 v1Router.use('/admin/payments', adminPaymentRouter);
 v1Router.use('/admin/revenue', adminRevenueRouter);
 v1Router.use('/admin/support/tickets', adminTicketRouter);
+v1Router.use('/admin/leads', adminLeadRouter);
 v1Router.use('/admin/feature-flags', adminFeatureFlagRouter);
 v1Router.use('/admin/notification-settings', adminNotificationSettingsRouter);
 v1Router.use('/admin/cms', adminCmsRouter);

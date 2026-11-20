@@ -42,6 +42,8 @@ const envSchema = z.object({
     .transform((v) => v === 'true'),
   MAIL_FROM_NAME: z.string().default('FitCloud'),
   MAIL_FROM_ADDRESS: z.string().email().default('no-reply@fitcloud.local'),
+  /** Where website contact-form messages are emailed. Unset = the built-in sales / billing inboxes. An empty value counts as unset. */
+  CONTACT_NOTIFY_EMAIL: z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? undefined : v), z.string().email().optional()),
 
   /** Platform-wide Kaleyra credentials — env vars are only the bootstrap fallback; a super-admin normally sets these via the Notification Providers settings page instead (`PlatformNotificationCredential`, encrypted at rest). Unlike SMTP, there's no built-in default here — Kaleyra has never been configured any other way. */
   KALEYRA_SID: z.string().optional(),
@@ -168,6 +170,7 @@ export const env = {
     secure: raw.SMTP_SECURE,
     fromName: raw.MAIL_FROM_NAME,
     fromAddress: raw.MAIL_FROM_ADDRESS,
+    contactNotifyEmail: raw.CONTACT_NOTIFY_EMAIL,
   },
 
   pusher: {

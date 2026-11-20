@@ -7,6 +7,7 @@ export const ADMIN_ROUTES = {
   payments: '/payments',
   revenue: '/revenue',
   support: '/support',
+  leads: '/leads',
   featureFlags: '/feature-flags',
   cms: '/cms',
   notifications: '/notifications',

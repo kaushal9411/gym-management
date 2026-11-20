@@ -1,5 +1,5 @@
 import {
-  Bell, Building2, Clock, CreditCard, FileText, Gauge, LifeBuoy, Receipt, ScrollText, Settings, Smartphone, Ticket, ToggleLeft, TrendingUp, Users,
+  Bell, Building2, Clock, CreditCard, FileText, Gauge, Inbox, LifeBuoy, Receipt, ScrollText, Settings, Smartphone, Ticket, ToggleLeft, TrendingUp, Users,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -9,7 +9,7 @@ export type NavBadgeKey = 'tenants' | 'payments' | 'support';
 export interface NavItem { href: string; label: string; icon: LucideIcon; permission: string; badge?: NavBadgeKey }
 export interface NavGroup { label: string; items: NavItem[] }
 
-/** All 15 portal pages, grouped as in the approved design. `permission` is the backend key that gates the page; Dashboard is never hidden. */
+/** All portal pages, grouped as in the approved design. `permission` is the backend key that gates the page; Dashboard is never hidden. */
 export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Overview',
@@ -30,6 +30,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Operations',
     items: [
+      { href: ADMIN_ROUTES.leads, label: 'Leads', icon: Inbox, permission: 'leads:manage' },
       { href: ADMIN_ROUTES.support, label: 'Support', icon: LifeBuoy, permission: 'support:manage', badge: 'support' },
       { href: ADMIN_ROUTES.notifications, label: 'Notifications', icon: Bell, permission: 'notifications:send' },
       { href: ADMIN_ROUTES.scheduler, label: 'Scheduler', icon: Clock, permission: 'scheduler:view' },

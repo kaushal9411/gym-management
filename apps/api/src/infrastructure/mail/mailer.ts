@@ -12,6 +12,8 @@ export interface SendMailInput {
   text?: string;
   fromName?: string;
   fromAddress?: string;
+  /** Where a plain "Reply" goes (for example the person who filled in the contact form). */
+  replyTo?: string;
 }
 
 /**
@@ -68,6 +70,7 @@ class Mailer {
     await transporter.sendMail({
       from: `"${fromName}" <${fromAddress}>`,
       to: input.to,
+      ...(input.replyTo ? { replyTo: input.replyTo } : {}),
       subject: input.subject,
       html: input.html,
       text: input.text ?? htmlToText(input.html),

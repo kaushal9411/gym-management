@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { env } from '../../../config/env';
 import { createRateLimiter } from '../../../core/middleware/rate-limiter';
 import { validate } from '../../../core/middleware/validate.middleware';
 import { contactController } from '../controllers/contact.controller';
@@ -13,7 +14,8 @@ const asyncHandler =
     Promise.resolve(fn(req, res)).catch(next);
   };
 
-const contactRateLimiter = () => createRateLimiter({ windowMs: 60 * 60_000, max: 5, prefix: 'contact' });
+// 5 messages an hour per visitor in production; far looser elsewhere so testing the form never locks anyone out.
+const contactRateLimiter = () => createRateLimiter({ windowMs: 60 * 60_000, max: env.isProduction ? 5 : 100, prefix: 'contact' });
 
 /**
  * @openapi

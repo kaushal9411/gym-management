@@ -96,13 +96,13 @@ export function FindGymForm({ bare = false, dark = false }: FindGymFormProps) {
   const noGymsFound = !isLoading && (tenants?.length ?? 0) === 0;
 
   if (remembered) {
-    return <p className={cn('text-center text-sm', dark ? 'text-white/40' : 'text-muted-foreground')}>Redirecting to your gym…</p>;
+    return <p className={cn('text-center text-sm', dark ? 'text-foreground/40' : 'text-muted-foreground')}>Redirecting to your gym…</p>;
   }
 
   const fields = (
     <form onSubmit={onSubmit} noValidate className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="slug" className={dark ? 'text-xs font-medium uppercase tracking-wide text-white/60' : undefined}>
+        <Label htmlFor="slug" className={dark ? 'text-xs font-medium uppercase tracking-wide text-foreground/60' : undefined}>
           Your gym
         </Label>
         <Select
@@ -115,15 +115,15 @@ export function FindGymForm({ bare = false, dark = false }: FindGymFormProps) {
           defaultValue=""
           className={cn(
             bare && 'h-12 text-[15px]',
-            dark && 'border-white/10 bg-white/4 text-white focus-visible:border-orange-400/50 focus-visible:ring-orange-400/20',
+            dark && 'border-foreground/10 bg-foreground/4 text-foreground focus-visible:border-orange-400/50 focus-visible:ring-orange-400/20',
           )}
           {...form.register('slug')}
         >
-          <option value="" disabled className={dark ? 'bg-neutral-900 text-white/50' : undefined}>
+          <option value="" disabled className={dark ? 'bg-background text-foreground/50' : undefined}>
             {isLoading ? 'Loading gyms…' : noGymsFound ? 'No gyms found' : 'Select your gym'}
           </option>
           {tenants?.map((tenant) => (
-            <option key={tenant.slug} value={tenant.slug} className={dark ? 'bg-neutral-900 text-white' : undefined}>
+            <option key={tenant.slug} value={tenant.slug} className={dark ? 'bg-background text-foreground' : undefined}>
               {tenant.name}
             </option>
           ))}
@@ -156,10 +156,10 @@ export function FindGymForm({ bare = false, dark = false }: FindGymFormProps) {
     return (
       <>
         {fields}
-        <p className={cn('mt-6 text-center text-sm', dark ? 'text-white/40' : 'text-muted-foreground')}>
+        <p className={cn('mt-6 text-center text-sm', dark ? 'text-foreground/40' : 'text-muted-foreground')}>
           New to {tenant.platformName}?{' '}
           {dark ? (
-            <Link href={AUTH_ROUTES.register} className="font-medium text-cyan-300 underline-offset-4 hover:underline">
+            <Link href={AUTH_ROUTES.register} className="font-medium text-cyan-700 dark:text-cyan-300 underline-offset-4 hover:underline">
               Register your gym
             </Link>
           ) : (

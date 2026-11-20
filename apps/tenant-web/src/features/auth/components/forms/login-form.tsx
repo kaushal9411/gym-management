@@ -10,6 +10,7 @@ import { motion } from 'framer-motion';
 import { Dumbbell, Lock, Phone, User } from 'lucide-react';
 
 import { Checkbox } from '@/components/ui/checkbox';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Label } from '@/components/ui/label';
 import { LoadingButton } from '@/components/ui/loading-button';
 import { cn } from '@/lib/utils';
@@ -49,9 +50,9 @@ const itemVariants = {
   show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: 'easeOut' as const } },
 };
 
-/** Dark-glass field chrome shared by every input on this page — overrides the theme-reactive base tokens with fixed dark values, since this page commits to one dramatic neon-dark look regardless of the app's light/dark toggle. */
+/** Glass field chrome shared by every input on this page. Built on theme tokens, so it reads in both the light and dark theme. */
 const DARK_FIELD_CLASS =
-  'h-12 border-white/10 bg-white/4 text-white placeholder:text-white/35 focus-visible:border-orange-400/50 focus-visible:ring-orange-400/20';
+  'h-12 border-foreground/15 bg-foreground/5 text-foreground placeholder:text-foreground/40 focus-visible:border-orange-400/50 focus-visible:ring-orange-400/20';
 
 export function LoginForm() {
   const router = useRouter();
@@ -193,7 +194,8 @@ export function LoginForm() {
   const isPlatform = tenant.id === 'platform';
 
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-hidden">
+    // A gym that uploaded a login photo keeps the dark neon look on top of it; otherwise the page follows the light/dark theme.
+    <div className={cn('relative flex min-h-dvh flex-col overflow-hidden', tenant.branding.loginBackgroundUrl && 'dark')}>
       <style>{`
         @keyframes login-ripple {
           from { transform: scale(0); opacity: 0.45; }
@@ -212,11 +214,18 @@ export function LoginForm() {
           transform: translateY(0) scale(0.98);
         }
         .login-glass-card {
+          background: linear-gradient(180deg, rgba(255,255,255,0.88) 0%, rgba(255,255,255,0.72) 100%);
+        }
+        .dark .login-glass-card {
           background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%);
         }
       `}</style>
 
       <LoginHero backgroundImageUrl={tenant.branding.loginBackgroundUrl} />
+
+      <div className="absolute right-3 top-3 z-20 sm:right-5 sm:top-4">
+        <ThemeToggle />
+      </div>
 
       <main className="flex flex-1 items-center justify-center px-4 py-10">
         <motion.div
@@ -228,11 +237,11 @@ export function LoginForm() {
           <motion.div variants={containerVariants} initial="hidden" animate="show">
             <motion.div
               variants={itemVariants}
-              className="login-glass-card relative rounded-4xl border border-white/10 p-6 shadow-[0_0_60px_-15px_rgba(255,90,31,0.25),0_0_80px_-20px_rgba(34,211,238,0.15)] backdrop-blur-2xl sm:p-8"
+              className="login-glass-card relative rounded-4xl border border-foreground/10 p-6 shadow-[0_0_60px_-15px_rgba(255,90,31,0.25),0_0_80px_-20px_rgba(34,211,238,0.15)] backdrop-blur-2xl sm:p-8"
             >
               {/* Brand mark */}
               <div className="mb-7 flex flex-col items-center gap-3 text-center">
-                <div className="flex size-16 items-center justify-center rounded-2xl border border-white/10 bg-white/5 p-2 shadow-[0_0_24px_rgba(255,138,61,0.25)]">
+                <div className="flex size-16 items-center justify-center rounded-2xl border border-foreground/10 bg-foreground/5 p-2 shadow-[0_0_24px_rgba(255,138,61,0.25)]">
                   {isPlatform ? (
                     <Dumbbell className="size-8 text-orange-400" strokeWidth={1.75} />
                   ) : (
@@ -240,16 +249,16 @@ export function LoginForm() {
                   )}
                 </div>
                 <div>
-                  <p className="text-lg font-bold uppercase tracking-wide text-white">
+                  <p className="text-lg font-bold uppercase tracking-wide text-foreground">
                     {isPlatform ? tenant.platformName : tenant.name}
                   </p>
-                  {!isPlatform ? <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">Gym Portal</p> : null}
+                  {!isPlatform ? <p className="text-[11px] uppercase tracking-[0.2em] text-foreground/40">Gym Portal</p> : null}
                 </div>
                 {!isPlatform ? (
                   <button
                     type="button"
                     onClick={handleChangeGym}
-                    className="text-xs font-medium text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 rounded-sm"
+                    className="text-xs font-medium text-cyan-700 dark:text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 rounded-sm"
                   >
                     Change gym
                   </button>
@@ -257,10 +266,10 @@ export function LoginForm() {
               </div>
 
               <div className="mb-6 space-y-1 text-center">
-                <h1 className="text-2xl font-bold tracking-tight text-white">
+                <h1 className="text-2xl font-bold tracking-tight text-foreground">
                   {isPlatform ? 'Looking for your gym?' : 'Welcome Back'}
                 </h1>
-                <p className="text-sm text-white/50">
+                <p className="text-sm text-foreground/50">
                   {isPlatform
                     ? 'Select your gym to continue.'
                     : 'Sign in to keep your gym running at full pace.'}
@@ -279,7 +288,7 @@ export function LoginForm() {
 
                   {mode === 'phone' ? (
                     <form onSubmit={onSubmitPhone} noValidate className="space-y-5" style={{ marginTop: inlineError?.message ? '1.25rem' : 0 }}>
-                      <div className="flex gap-1.5 rounded-lg border border-white/10 bg-white/4 p-1">
+                      <div className="flex gap-1.5 rounded-lg border border-foreground/10 bg-foreground/4 p-1">
                         {(['staff', 'member'] as const).map((r) => (
                           <button
                             key={r}
@@ -296,7 +305,7 @@ export function LoginForm() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="phone" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                        <Label htmlFor="phone" className="text-xs font-medium uppercase tracking-wide text-foreground/60">
                           Mobile number
                         </Label>
                         <IconField
@@ -309,7 +318,7 @@ export function LoginForm() {
                           showSuccess={phoneForm.formState.touchedFields.phone && !!phoneValue}
                           aria-describedby={phoneForm.formState.errors.phone ? 'phone-error' : undefined}
                           disabled={isSendingPhoneOtp}
-                          iconClassName="text-white/40 group-focus-within:text-orange-400"
+                          iconClassName="text-foreground/40 group-focus-within:text-orange-400"
                           glowClassName="shadow-[0_0_0_4px_rgba(255,138,61,0.18)]"
                           className={DARK_FIELD_CLASS}
                           {...phoneForm.register('phone')}
@@ -335,7 +344,7 @@ export function LoginForm() {
                   ) : (
                   <form onSubmit={onSubmit} noValidate className="space-y-5" style={{ marginTop: inlineError?.message ? '1.25rem' : 0 }}>
                     <div className="space-y-2">
-                      <Label htmlFor="identifier" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                      <Label htmlFor="identifier" className="text-xs font-medium uppercase tracking-wide text-foreground/60">
                         Email or Member ID
                       </Label>
                       <IconField
@@ -348,7 +357,7 @@ export function LoginForm() {
                         showSuccess={form.formState.touchedFields.identifier && !!identifierValue}
                         aria-describedby={form.formState.errors.identifier ? 'identifier-error' : undefined}
                         disabled={isSubmitting}
-                        iconClassName="text-white/40 group-focus-within:text-orange-400"
+                        iconClassName="text-foreground/40 group-focus-within:text-orange-400"
                         glowClassName="shadow-[0_0_0_4px_rgba(255,138,61,0.18)]"
                         className={DARK_FIELD_CLASS}
                         {...form.register('identifier')}
@@ -362,12 +371,12 @@ export function LoginForm() {
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="password" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                        <Label htmlFor="password" className="text-xs font-medium uppercase tracking-wide text-foreground/60">
                           Password
                         </Label>
                         <Link
                           href={AUTH_ROUTES.forgotPassword}
-                          className="text-xs font-medium text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 rounded-sm"
+                          className="text-xs font-medium text-cyan-700 dark:text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 rounded-sm"
                         >
                           Forgot password?
                         </Link>
@@ -380,7 +389,7 @@ export function LoginForm() {
                       >
                         <Lock
                           className={cn(
-                            'pointer-events-none absolute left-3.5 top-1/2 z-10 size-4 -translate-y-1/2 text-white/40 transition-colors duration-200',
+                            'pointer-events-none absolute left-3.5 top-1/2 z-10 size-4 -translate-y-1/2 text-foreground/40 transition-colors duration-200',
                             passwordFocused && !form.formState.errors.password && 'text-orange-400',
                           )}
                           aria-hidden
@@ -418,9 +427,9 @@ export function LoginForm() {
                             checked={field.value}
                             onCheckedChange={(checked) => field.onChange(checked === true)}
                             disabled={isSubmitting}
-                            className="border-white/25 data-[state=checked]:border-orange-400 data-[state=checked]:bg-orange-400"
+                            className="border-foreground/25 data-[state=checked]:border-orange-400 data-[state=checked]:bg-orange-400"
                           />
-                          <Label htmlFor="remember-me" className="cursor-pointer font-normal text-white/60">
+                          <Label htmlFor="remember-me" className="cursor-pointer font-normal text-foreground/60">
                             Remember me
                           </Label>
                         </div>
@@ -459,7 +468,7 @@ export function LoginForm() {
                     <button
                       type="button"
                       onClick={toggleMode}
-                      className="font-medium text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 rounded-sm"
+                      className="font-medium text-cyan-700 dark:text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 rounded-sm"
                     >
                       {mode === 'phone' ? 'Use email / member ID instead' : 'Use phone number instead'}
                     </button>
@@ -469,16 +478,16 @@ export function LoginForm() {
             </motion.div>
 
             {isPlatform ? null : (
-              <motion.p variants={itemVariants} className="mt-6 text-center text-sm text-white/40">
+              <motion.p variants={itemVariants} className="mt-6 text-center text-sm text-foreground/40">
                 Want {tenant.platformName} for your gym?{' '}
-                <Link href={AUTH_ROUTES.register} className="font-medium text-cyan-300 underline-offset-4 hover:underline">
+                <Link href={AUTH_ROUTES.register} className="font-medium text-cyan-700 dark:text-cyan-300 underline-offset-4 hover:underline">
                   Start a free trial
                 </Link>
               </motion.p>
             )}
 
-            <motion.p variants={itemVariants} className="mt-8 text-center text-[11px] text-white/25">
-              Powered by <span className="font-semibold text-white/40">{tenant.platformName}</span> · © {new Date().getFullYear()}
+            <motion.p variants={itemVariants} className="mt-8 text-center text-[11px] text-foreground/25">
+              Powered by <span className="font-semibold text-foreground/40">{tenant.platformName}</span> · © {new Date().getFullYear()}
             </motion.p>
           </motion.div>
         </motion.div>

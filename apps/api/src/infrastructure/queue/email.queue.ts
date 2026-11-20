@@ -8,6 +8,8 @@ export interface EmailJobData {
   html: string;
   fromName?: string;
   fromAddress?: string;
+  /** Reply-To header, passed through to the mailer. */
+  replyTo?: string;
   /**
    * The tenant this send belongs to — its presence is what tells
    * `email.worker.ts` to write a `NotificationDeliveryLog` row (tenant-facing

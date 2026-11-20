@@ -25,7 +25,7 @@ interface LoginHeroProps {
 }
 
 /**
- * Full-bleed dark "energetic gym" backdrop for the login experience — a
+ * Full-bleed "energetic gym" backdrop (neon in dark, soft pastel glow in light) for the login experience — a
  * fixed neon dual-tone (orange + cyan) aesthetic, deliberately independent
  * of the app's light/dark theme toggle, matching the reference concept art.
  * Login-only: not imported anywhere else, zero effect on other auth pages.
@@ -33,7 +33,7 @@ interface LoginHeroProps {
 export function LoginHero({ backgroundImageUrl }: LoginHeroProps) {
   return (
     <div
-      className={cn('absolute inset-0 -z-10 overflow-hidden bg-cover bg-center', !backgroundImageUrl && 'bg-[#07070b]')}
+      className={cn('absolute inset-0 -z-10 overflow-hidden bg-cover bg-center', !backgroundImageUrl && 'bg-background')}
       style={backgroundImageUrl ? { backgroundImage: `url(${backgroundImageUrl})` } : undefined}
     >
       <style>{`
@@ -43,10 +43,15 @@ export function LoginHero({ backgroundImageUrl }: LoginHeroProps) {
         }
         .login-bg-glow {
           background-image:
-            radial-gradient(38% 32% at 12% 18%, rgba(255,106,53,0.28) 0%, transparent 70%),
-            radial-gradient(42% 36% at 88% 82%, rgba(34,211,238,0.22) 0%, transparent 70%);
+            radial-gradient(38% 32% at 12% 18%, rgba(255,106,53,0.16) 0%, transparent 70%),
+            radial-gradient(42% 36% at 88% 82%, rgba(34,211,238,0.13) 0%, transparent 70%);
           background-size: 160% 160%, 160% 160%;
           animation: login-bg-drift 20s ease-in-out infinite;
+        }
+        .dark .login-bg-glow {
+          background-image:
+            radial-gradient(38% 32% at 12% 18%, rgba(255,106,53,0.28) 0%, transparent 70%),
+            radial-gradient(42% 36% at 88% 82%, rgba(34,211,238,0.22) 0%, transparent 70%);
         }
         @keyframes login-float {
           0%, 100% { translate: 0 0; }
@@ -72,7 +77,7 @@ export function LoginHero({ backgroundImageUrl }: LoginHeroProps) {
       <div aria-hidden className="login-bg-glow pointer-events-none absolute inset-0" />
 
       {/* Diagonal neon light streaks */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 opacity-70">
+      <div aria-hidden className="pointer-events-none absolute inset-0 opacity-40 dark:opacity-70">
         <div className="absolute left-[-10%] top-[8%] h-px w-[70%] -rotate-[18deg] bg-gradient-to-r from-transparent via-orange-400/70 to-transparent blur-[1px]" />
         <div className="absolute left-[-5%] top-[16%] h-px w-[55%] -rotate-[18deg] bg-gradient-to-r from-transparent via-orange-300/40 to-transparent blur-[2px]" />
         <div className="absolute right-[-10%] bottom-[10%] h-px w-[65%] -rotate-[18deg] bg-gradient-to-r from-transparent via-cyan-400/60 to-transparent blur-[1px]" />
@@ -80,9 +85,9 @@ export function LoginHero({ backgroundImageUrl }: LoginHeroProps) {
       </div>
 
       {/* Dot-grid texture */}
-      <svg className="absolute inset-0 size-full opacity-[0.07]" aria-hidden>
+      <svg className="absolute inset-0 size-full text-foreground opacity-[0.07]" aria-hidden>
         <pattern id="login-grid" width="30" height="30" patternUnits="userSpaceOnUse">
-          <circle cx="1.4" cy="1.4" r="1.4" fill="white" />
+          <circle cx="1.4" cy="1.4" r="1.4" fill="currentColor" />
         </pattern>
         <rect width="100%" height="100%" fill="url(#login-grid)" />
       </svg>
@@ -93,7 +98,7 @@ export function LoginHero({ backgroundImageUrl }: LoginHeroProps) {
           <div
             key={i}
             className={`login-diamond absolute rotate-45 rounded-[3px] border ${d.className} ${
-              d.tint === 'cyan' ? 'border-cyan-400/50 shadow-[0_0_16px_rgba(34,211,238,0.35)]' : 'border-orange-400/50 shadow-[0_0_16px_rgba(251,146,60,0.35)]'
+              d.tint === 'cyan' ? 'border-cyan-500/50 shadow-[0_0_16px_rgba(34,211,238,0.35)]' : 'border-orange-400/50 shadow-[0_0_16px_rgba(251,146,60,0.35)]'
             }`}
             style={{ animationDelay: d.delay }}
           />
@@ -113,7 +118,7 @@ export function LoginHero({ backgroundImageUrl }: LoginHeroProps) {
             style={{ animationDelay: `${i * -1.5}s` }}
           >
             <Icon
-              className={tint === 'cyan' ? 'size-6 text-cyan-300/80' : 'size-6 text-orange-300/80'}
+              className={tint === 'cyan' ? 'size-6 text-cyan-600/80 dark:text-cyan-300/80' : 'size-6 text-orange-500/80 dark:text-orange-300/80'}
               strokeWidth={1.5}
               aria-hidden
             />
@@ -138,7 +143,7 @@ export function LoginHero({ backgroundImageUrl }: LoginHeroProps) {
       ) : null}
 
       {/* Vignette to keep the center readable */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_45%,transparent_0%,rgba(7,7,11,0.55)_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_45%,transparent_0%,rgba(244,245,250,0.7)_100%)] dark:bg-[radial-gradient(60%_50%_at_50%_45%,transparent_0%,rgba(7,7,11,0.55)_100%)]" />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 'use client';
 
+import { ThemeToggle } from '@/components/theme-toggle';
 import { LoginHero } from '@/features/auth/components/login-hero';
 import { useTenant } from '@/features/tenant/tenant-provider';
 
@@ -20,12 +21,16 @@ export default function RegisterLayout({ children }: { children: React.ReactNode
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
       <LoginHero />
 
+      <div className="absolute right-3 top-3 z-20 sm:right-5 sm:top-4">
+        <ThemeToggle />
+      </div>
+
       <main className="flex flex-1 items-start justify-center px-4 pb-10 pt-8 sm:pt-12">
         <div className="w-full max-w-2xl">{children}</div>
       </main>
 
-      <footer className="pb-6 text-center text-xs text-white/25">
-        Powered by <span className="font-semibold text-white/40">{tenant.platformName}</span> · ©{' '}
+      <footer className="pb-6 text-center text-xs text-foreground/40">
+        Powered by <span className="font-semibold text-foreground/60">{tenant.platformName}</span> · ©{' '}
         {new Date().getFullYear()} {tenant.platformName}, Inc.
       </footer>
     </div>

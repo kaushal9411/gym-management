@@ -43,18 +43,20 @@ export function platformAnnouncementEmail(branding: EmailBranding, title: string
 /** Inbound sales/billing inquiry from the public contact form, mailed to the FitCloud team. */
 export function contactInquiryEmail(
   branding: EmailBranding,
-  input: { topic: 'sales' | 'billing'; name: string; email: string; phone?: string; gymSlug?: string; message: string },
+  input: { topic: 'sales' | 'billing' | 'demo' | 'general'; name: string; email: string; phone?: string; gymName?: string; gymSlug?: string; gymSize?: string; message: string },
 ) {
-  const sales = input.topic === 'sales';
+  const billing = input.topic === 'billing';
+  const sales = !billing;
+  const topicLabel = { sales: 'Sales', billing: 'Billing', demo: 'Demo request', general: 'General' }[input.topic];
   return {
-    subject: `[${input.topic}] Inquiry from ${input.name}${input.gymSlug ? ` (${input.gymSlug})` : ''}`.replace(/[\r\n]+/g, ' '),
+    subject: `[${input.topic}] Inquiry from ${input.name}${input.gymName ? ` (${input.gymName})` : input.gymSlug ? ` (${input.gymSlug})` : ''}`.replace(/[\r\n]+/g, ' '),
     html: renderEmailLayout(
       branding,
       {
         icon: sales ? '💬' : '💳',
-        title: `New ${sales ? 'sales' : 'billing'} inquiry`,
+        title: `New ${sales ? topicLabel.toLowerCase() : 'billing'} inquiry`,
         subtitle: `From ${input.name}`,
-        categoryLabel: sales ? 'Sales inquiry' : 'Billing inquiry',
+        categoryLabel: `${topicLabel} inquiry`,
         preheader: `New ${input.topic} inquiry from ${input.name}`,
         footerHint: 'none',
       },
@@ -63,8 +65,10 @@ export function contactInquiryEmail(
          detailRow('👤', 'Name', escapeHtml(input.name)) +
            detailRow('📧', 'Email', `<a href="mailto:${escapeHtml(input.email)}" style="color:#4f46e5;">${escapeHtml(input.email)}</a>`) +
            (input.phone ? detailRow('📱', 'Phone', escapeHtml(input.phone)) : '') +
-           (input.gymSlug ? detailRow('🏢', 'Gym', escapeHtml(input.gymSlug)) : '') +
-           detailRow('🏷️', 'Topic', escapeHtml(sales ? 'Sales' : 'Billing')),
+           (input.gymName ? detailRow('🏢', 'Gym', escapeHtml(input.gymName)) : '') +
+           (input.gymSlug ? detailRow('🌐', 'Gym address', escapeHtml(input.gymSlug)) : '') +
+           (input.gymSize ? detailRow('👥', 'Members', escapeHtml(input.gymSize)) : '') +
+           detailRow('🏷️', 'Topic', escapeHtml(topicLabel)),
        )}
        ${sectionTitle('Message')}
        <div class="fc-soft" style="padding:16px 18px;border-radius:14px;background:#f7f8fc;border:1px solid #e6e8f0;border-left:4px solid #4f46e5;font-size:15px;line-height:1.7;color:#2b2f3b;">${textBlock(input.message)}</div>

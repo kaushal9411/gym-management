@@ -36,14 +36,14 @@ function extractSlugFromHost(host: string): string | null {
 
 export function middleware(request: NextRequest): NextResponse {
   const devOverride = request.nextUrl.searchParams.get('tenant');
-  const slug =
-    extractSlugFromHost(request.headers.get('host') ?? '') ??
-    devOverride ??
-    request.cookies.get(TENANT_COOKIE)?.value ??
-    null;
+  const hostSlug = extractSlugFromHost(request.headers.get('host') ?? '');
+  const slug = hostSlug ?? devOverride ?? request.cookies.get(TENANT_COOKIE)?.value ?? null;
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-tenant-slug', slug ?? '');
+  // Only a real gym subdomain makes the root a gym's own entry point (it goes straight to that gym's login).
+  // A slug pinned by the dev cookie or ?tenant= must not hide the public home page on plain localhost.
+  requestHeaders.set('x-tenant-host', hostSlug ? '1' : '');
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   if (devOverride) {

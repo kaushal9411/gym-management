@@ -38,7 +38,7 @@ export function ProgressIndicator({ current }: { current: WizardStep }) {
                   'flex size-7 items-center justify-center rounded-full text-xs font-semibold shadow-xs transition-colors duration-300',
                   isComplete || isCurrent
                     ? 'text-white'
-                    : 'bg-white/10 text-white/40',
+                    : 'bg-foreground/10 text-foreground/40',
                   isCurrent && 'ring-4 ring-orange-400/20',
                 )}
                 style={isComplete || isCurrent ? { backgroundImage: 'linear-gradient(135deg, #ff8a3d 0%, #ff5a1f 45%, #e0271b 100%)' } : undefined}
@@ -49,14 +49,14 @@ export function ProgressIndicator({ current }: { current: WizardStep }) {
               <span
                 className={cn(
                   'hidden text-[11px] font-medium sm:block',
-                  isCurrent ? 'text-white' : 'text-white/40',
+                  isCurrent ? 'text-foreground' : 'text-foreground/40',
                 )}
               >
                 {STEP_LABELS[step]}
               </span>
             </div>
             {!isLast ? (
-              <div className="mx-1.5 h-0.5 flex-1 rounded-full bg-white/10 sm:mb-4">
+              <div className="mx-1.5 h-0.5 flex-1 rounded-full bg-foreground/10 sm:mb-4">
                 <motion.div
                   initial={false}
                   animate={{ width: isComplete ? '100%' : '0%' }}

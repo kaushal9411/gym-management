@@ -3537,6 +3537,54 @@ model SupportTicket {
   @@map("support_tickets")
 }
 
+enum PlatformLeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  WON
+  LOST
+
+  @@map("platform_lead_status")
+}
+
+enum PlatformLeadTopic {
+  SALES
+  BILLING
+  DEMO
+  GENERAL
+
+  @@map("platform_lead_topic")
+}
+
+/// A prospect (or existing gym) who used the public website's contact form.
+/// Platform-plane on purpose — NOT tenant-scoped and without RLS, like
+/// `CmsPage`: the SaaS operator's own sales pipeline, read only through the
+/// super-admin API. (Distinct from `Lead`, which is a gym's own prospect list.)
+model PlatformLead {
+  id           String             @id @default(uuid()) @db.Uuid
+  name         String             @db.VarChar(120)
+  email        String             @db.VarChar(255)
+  phone        String?            @db.VarChar(20)
+  gymName      String?            @map("gym_name") @db.VarChar(120)
+  gymSlug      String?            @map("gym_slug") @db.VarChar(60)
+  /// Free-text size band picked on the form, e.g. "under-100".
+  gymSize      String?            @map("gym_size") @db.VarChar(30)
+  topic        PlatformLeadTopic  @default(SALES)
+  message      String
+  /// Where the form lives: HOME_PAGE or STATUS_SCREEN.
+  source       String             @default("HOME_PAGE") @db.VarChar(30)
+  status       PlatformLeadStatus @default(NEW)
+  /// Internal notes written by the platform team.
+  notes        String?
+  contactedAt  DateTime?          @map("contacted_at")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  updatedAt    DateTime           @updatedAt @map("updated_at")
+
+  @@index([status, createdAt])
+  @@index([email])
+  @@map("platform_leads")
+}
+
 /// `isInternal = true` notes are staff-only (never shown to the tenant) —
 /// the ticket detail view's equivalent of a private comment thread.
 model SupportTicketNote {
