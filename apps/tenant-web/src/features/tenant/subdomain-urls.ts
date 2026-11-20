@@ -7,11 +7,15 @@ const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'fitcloud.loc
  * `{slug}.localhost:<port>` (browser-native dev subdomains); anywhere else
  * it targets `{slug}.<platform domain>`.
  */
-export function buildTenantLoginUrl(slug: string): string {
+export function buildTenantUrl(slug: string, path: string): string {
   const { protocol, hostname, port } = window.location;
   const isLocalDev = hostname === 'localhost' || hostname.endsWith('.localhost');
   const host = isLocalDev ? `${slug}.localhost${port ? `:${port}` : ''}` : `${slug}.${PLATFORM_DOMAIN}`;
-  return `${protocol}//${host}/login`;
+  return `${protocol}//${host}${path}`;
+}
+
+export function buildTenantLoginUrl(slug: string): string {
+  return buildTenantUrl(slug, '/login');
 }
 
 /** The reverse of `buildTenantLoginUrl` — strips the current tenant subdomain back down to the bare platform host, for the tenant login screen's "Change gym" link. */

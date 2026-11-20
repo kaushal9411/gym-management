@@ -215,11 +215,9 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
           return null;
         }
         // No page-specific destination (fresh launch, or a stale `/home`
-        // hit while signed out) — a remembered gym+role sends the user
-        // straight to Login; otherwise Find Gym, same as before.
-        final hasRememberedGym =
-            session.rememberedRole != null && session.rememberedTenant != null;
-        return hasRememberedGym ? AppRoutes.login : AppRoutes.findGym;
+        // hit while signed out) — Login is always the front door; the gym is
+        // discovered from the credentials, never asked for first.
+        return AppRoutes.login;
       }
       // Authenticated (staff or member) — keep out of the signed-out flow.
       return _signedOutPaths.contains(path) ? AppRoutes.home : null;
@@ -231,27 +229,25 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       ),
       GoRoute(
         path: AppRoutes.findGym,
-        builder: (context, state) => const FindGymScreen(),
+        builder: (context, state) => FindGymScreen(
+          args: state.extra as FindGymScreenArgs? ?? const FindGymScreenArgs(),
+        ),
       ),
       GoRoute(
         path: AppRoutes.login,
         builder: (context, state) {
           final extra = state.extra as LoginScreenArgs?;
           if (extra != null) return LoginScreen(args: extra);
-          // Reached via the redirect's remembered-gym path (no `extra`
-          // passed) — rebuild the same args from session state instead.
+          // Reached via the redirect (no `extra` passed) — preselect the
+          // tab for the role this device last signed in as.
           final session = sessionCubit.state;
-          if (session is SessionUnauthenticated &&
-              session.rememberedRole != null &&
-              session.rememberedTenant != null) {
-            return LoginScreen(
-              args: LoginScreenArgs(
-                role: session.rememberedRole!,
-                tenant: session.rememberedTenant!,
-              ),
-            );
-          }
-          return const FindGymScreen();
+          return LoginScreen(
+            args: LoginScreenArgs(
+              role: session is SessionUnauthenticated
+                  ? session.rememberedRole
+                  : null,
+            ),
+          );
         },
       ),
       GoRoute(

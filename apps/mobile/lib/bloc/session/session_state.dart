@@ -17,19 +17,18 @@ class SessionUnknown extends SessionState {
   const SessionUnknown();
 }
 
-/// Signed out. [rememberedRole]/[rememberedTenant] are set when this
-/// device has a remembered gym+role from a previous session (cold-start
-/// restore, sign-out, or a forced logout) — the router sends the user
-/// straight to Login for that gym instead of Find Gym. Both null means a
-/// genuinely fresh device, or the user explicitly asked to change gyms.
+/// Signed out. [rememberedRole] is set when this device remembers which
+/// plane (staff vs. member) was last signed in — it only preselects the
+/// Staff/Member tab on the login screen. The gym is never remembered or
+/// asked for up front: login discovers it from the credentials
+/// (`PublicTenantRepository.discoverGyms`).
 class SessionUnauthenticated extends SessionState {
-  const SessionUnauthenticated({this.rememberedRole, this.rememberedTenant});
+  const SessionUnauthenticated({this.rememberedRole});
 
   final AppRole? rememberedRole;
-  final TenantBranding? rememberedTenant;
 
   @override
-  List<Object?> get props => [rememberedRole, rememberedTenant?.slug];
+  List<Object?> get props => [rememberedRole];
 }
 
 class SessionAuthenticatedStaff extends SessionState {

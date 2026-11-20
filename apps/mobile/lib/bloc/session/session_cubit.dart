@@ -82,44 +82,28 @@ class SessionCubit extends Cubit<SessionState> {
     emit(await _unauthenticatedWithMemory());
   }
 
-  /// No valid session, but this device may still remember which gym+role
-  /// it was last used for — resolved here so the router can send a
-  /// returning user straight to Login instead of Find Gym. Any failure
-  /// (nothing remembered, the remembered gym no longer resolves) falls
-  /// back to a bare unauthenticated state, which sends them to Find Gym.
+  /// No valid session, but this device may still remember which role
+  /// (staff vs. member) it was last used for — only used to preselect the
+  /// matching tab on the login screen, so it needs no network call. Any
+  /// failure (nothing remembered) falls back to a bare unauthenticated state.
   Future<SessionUnauthenticated> _unauthenticatedWithMemory() async {
     final slug = await _storage.readTenantSlug();
     if (slug == null) return const SessionUnauthenticated();
     try {
       final recents = await _publicTenantRepository.recentGyms();
-      RecentGym? match;
       for (final gym in recents) {
         if (gym.slug == slug) {
-          match = gym;
-          break;
+          return SessionUnauthenticated(
+            rememberedRole: gym.actorType == ActorType.staff
+                ? AppRole.staff
+                : AppRole.member,
+          );
         }
       }
-      if (match == null) return const SessionUnauthenticated();
-      final tenant = await _publicTenantRepository.resolve(slug);
-      final role =
-          match.actorType == ActorType.staff ? AppRole.staff : AppRole.member;
-      return SessionUnauthenticated(
-        rememberedRole: role,
-        rememberedTenant: tenant,
-      );
+      return const SessionUnauthenticated();
     } catch (_) {
       return const SessionUnauthenticated();
     }
-  }
-
-  /// Explicit "Change gym" — clears only the in-memory remembered
-  /// gym/role so the router allows Find Gym again this session. Storage
-  /// is left untouched until the user actually resolves a new gym
-  /// (`PublicTenantRepository.resolve` overwrites it then); backing out
-  /// without picking one keeps the old gym remembered for next launch.
-  void startGymChange() {
-    AppCurrency.reset();
-    emit(const SessionUnauthenticated());
   }
 
   void staffSignedIn(UserProfile user, TenantBranding tenant) {

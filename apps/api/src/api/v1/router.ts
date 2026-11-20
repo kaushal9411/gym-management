@@ -50,6 +50,7 @@ import { incomeRouter } from '../../modules/finance/routes/income.routes';
 import { memberInvoiceRouter } from '../../modules/finance/routes/member-invoice.routes';
 import { memberPaymentRouter } from '../../modules/finance/routes/member-payment.routes';
 import { razorpayWebhookRouter } from '../../modules/finance/routes/razorpay-webhook.routes';
+import { gymDiscoveryRouter } from '../../modules/gym-discovery/routes/gym-discovery.routes';
 import { invitationRouter } from '../../modules/invitations/routes/invitation.routes';
 import { invoiceRouter } from '../../modules/invoice/routes/invoice.routes';
 import { leadRouter } from '../../modules/leads/routes/lead.routes';
@@ -190,6 +191,7 @@ v1Router.use('/search', searchRouter);
 // Platform-plane (no tenant check — mounted under /public, see PLATFORM_ROUTE_PREFIXES).
 v1Router.use('/public/contact', contactRouter);
 v1Router.use('/public/rum', rumRouter);
+v1Router.use('/public/auth', gymDiscoveryRouter);
 
 /**
  * @openapi

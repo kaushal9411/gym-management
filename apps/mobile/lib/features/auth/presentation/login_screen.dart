@@ -20,32 +20,30 @@ import '../../../shared/widgets/app_labeled_field.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/brand_mark.dart';
 import '../../../shared/widgets/role_toggle.dart';
+import 'find_gym_screen.dart';
 import 'forgot_password_screen.dart';
 import 'phone_login_screen.dart';
 import 'staff_mfa_setup_screen.dart';
 import 'staff_otp_screen.dart';
 
 class LoginScreenArgs {
-  const LoginScreenArgs({this.role, required this.tenant});
+  const LoginScreenArgs({this.role});
 
   /// Initial tab selection only — the [RoleToggle] on this screen lets the
-  /// user change it freely either way. `null` (a fresh Find Gym pick, which
-  /// no longer has its own toggle — see that screen's doc comment) defaults
-  /// to Staff. Non-null for the "send a returning user straight to Login"
-  /// remembered-gym path (`SessionCubit`/`AppRouter`), so a returning user
-  /// lands on the tab they actually used last time.
+  /// user change it freely either way. `null` defaults to Staff. Set from
+  /// the role this device last signed in as (`SessionCubit`), so a returning
+  /// member lands on the Member tab.
   final AppRole? role;
-  final TenantBranding tenant;
 }
 
-/// Design frame "3. Login" — staff (work email + password) and member
-/// (Member ID + password) variants, both against `kaushalgym`'s resolved
-/// branding from the previous screen. The [RoleToggle] picking between them
-/// lives here (moved from Find Gym, which now just resolves a gym — see
-/// that screen's doc comment) so switching roles doesn't need a round trip
-/// back through Find Gym.
+/// The first screen of the signed-out flow — staff (work email + password)
+/// and member (Member ID + password) variants. There is no gym picker before
+/// it: on submit, [PublicTenantRepository.discoverGyms] finds which gym(s)
+/// those credentials belong to. Exactly one gym → it is resolved (branding +
+/// plan) and the real login proceeds straight away; more than one → the
+/// gym picker ([FindGymScreen]) is shown with just those gyms.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.args});
+  const LoginScreen({super.key, this.args = const LoginScreenArgs()});
 
   final LoginScreenArgs args;
 
@@ -97,10 +95,12 @@ class _LoginScreenState extends State<LoginScreen> {
     });
     final isStaff = _isStaff;
     try {
+      final tenant = await _resolveGym(identifier, password);
+      if (tenant == null || !mounted) return;
       if (isStaff) {
-        await _submitStaff(identifier, password);
+        await _submitStaff(tenant, identifier, password);
       } else {
-        await _submitMember(identifier, password);
+        await _submitMember(tenant, identifier, password);
       }
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -129,24 +129,59 @@ class _LoginScreenState extends State<LoginScreen> {
   /// the same gym+role — and simpler than tracking whether this was fresh.
   /// Best-effort; a storage failure here shouldn't block a login that
   /// already succeeded.
-  Future<void> _rememberRole(ActorType actorType) async {
+  Future<void> _rememberRole(
+    TenantBranding tenant,
+    ActorType actorType,
+  ) async {
     try {
       await getIt<PublicTenantRepository>()
-          .rememberGymForRole(widget.args.tenant, actorType);
+          .rememberGymForRole(tenant, actorType);
     } catch (_) {
       // Best-effort only — see doc comment above.
     }
   }
 
-  Future<void> _submitStaff(String email, String password) async {
+  /// Works out which gym this login is for. One match → resolved silently
+  /// (this is also what loads the gym's branding/plan the session needs);
+  /// several → the user chooses on [FindGymScreen]. Returns null if they
+  /// back out of that choice.
+  Future<TenantBranding?> _resolveGym(
+    String identifier,
+    String password,
+  ) async {
+    final repo = getIt<PublicTenantRepository>();
+    final gyms = await repo.discoverGyms(
+      actorType: _isStaff ? ActorType.staff : ActorType.member,
+      identifier: identifier,
+      password: password,
+    );
+    if (gyms.length == 1) return repo.resolve(gyms.first.slug);
+    if (!mounted) return null;
+    return context.push<TenantBranding>(
+      AppRoutes.findGym,
+      extra: FindGymScreenArgs(gyms: gyms),
+    );
+  }
+
+  /// "Forgot password" and "Log in with phone number" need a gym before any
+  /// credentials exist to discover one from, so they still ask — every active
+  /// gym, via [FindGymScreen]. Null if the user backs out.
+  Future<TenantBranding?> _pickAnyGym() =>
+      context.push<TenantBranding>(AppRoutes.findGym);
+
+  Future<void> _submitStaff(
+    TenantBranding tenant,
+    String email,
+    String password,
+  ) async {
     final result =
         await getIt<AuthRepository>().login(email: email, password: password);
     if (!mounted) return;
     switch (result) {
       case StaffLoginSuccess(:final user):
-        await _rememberRole(ActorType.staff);
+        await _rememberRole(tenant, ActorType.staff);
         if (!mounted) return;
-        context.read<SessionCubit>().staffSignedIn(user, widget.args.tenant);
+        context.read<SessionCubit>().staffSignedIn(user, tenant);
       case StaffOtpRequired(:final email, :final purpose):
         context.push(
           AppRoutes.otp,
@@ -154,7 +189,7 @@ class _LoginScreenState extends State<LoginScreen> {
             email: email,
             purpose: purpose,
             role: AppRole.staff,
-            tenant: widget.args.tenant,
+            tenant: tenant,
           ),
         );
       case StaffMfaSetupRequired(:final email, :final setupToken):
@@ -164,50 +199,50 @@ class _LoginScreenState extends State<LoginScreen> {
             setupToken: setupToken,
             email: email,
             role: AppRole.staff,
-            tenant: widget.args.tenant,
+            tenant: tenant,
           ),
         );
     }
   }
 
-  Future<void> _submitMember(String memberId, String password) async {
+  Future<void> _submitMember(
+    TenantBranding tenant,
+    String memberId,
+    String password,
+  ) async {
     final result = await getIt<MemberAuthRepository>()
         .login(memberId: memberId, password: password);
     if (!mounted) return;
-    await _rememberRole(ActorType.member);
+    await _rememberRole(tenant, ActorType.member);
     if (!mounted) return;
-    context
-        .read<SessionCubit>()
-        .memberSignedIn(result.member, widget.args.tenant);
+    context.read<SessionCubit>().memberSignedIn(result.member, tenant);
   }
 
-  /// Explicit gym switch — clears the in-memory remembered gym/role (not
-  /// storage; see `SessionCubit.startGymChange`) and navigates rather than
-  /// popping, since this screen may have been reached directly via the
-  /// remembered-gym redirect with nothing underneath it on the stack.
-  void _changeGym() {
-    context.read<SessionCubit>().startGymChange();
-    context.go(AppRoutes.findGym);
+  Future<void> _forgotPassword() async {
+    final tenant = await _pickAnyGym();
+    if (tenant == null || !mounted) return;
+    context.push(
+      AppRoutes.forgotPassword,
+      extra: ForgotPasswordScreenArgs(
+        role: _role,
+        tenant: tenant,
+        prefill: _identifierController.text.trim(),
+      ),
+    );
   }
 
-  void _forgotPassword() => context.push(
-        AppRoutes.forgotPassword,
-        extra: ForgotPasswordScreenArgs(
-          role: _role,
-          tenant: widget.args.tenant,
-          prefill: _identifierController.text.trim(),
-        ),
-      );
-
-  void _loginWithPhone() => context.push(
-        AppRoutes.phoneLogin,
-        extra: PhoneLoginScreenArgs(role: _role, tenant: widget.args.tenant),
-      );
+  Future<void> _loginWithPhone() async {
+    final tenant = await _pickAnyGym();
+    if (tenant == null || !mounted) return;
+    context.push(
+      AppRoutes.phoneLogin,
+      extra: PhoneLoginScreenArgs(role: _role, tenant: tenant),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final role = _role;
-    final tenant = widget.args.tenant;
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: SafeArea(
@@ -217,34 +252,20 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               RoleToggle(value: _role, onChanged: _changeRole),
               const SizedBox(height: 20),
-              BrandMark.initials(
-                initials: tenant.initials,
-                role: role,
-                size: 68,
-              ),
+              BrandMark.glyph(role: role, size: 68),
               const SizedBox(height: 12),
               Text(
-                tenant.name,
+                'Welcome back',
                 style: AppText.display(size: 22),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 6),
-              GestureDetector(
-                onTap: _changeGym,
-                child: RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: '${tenant.slug}.fitcloud.app  ·  ',
-                        style: AppText.eyebrow(),
-                      ),
-                      TextSpan(
-                        text: 'Change',
-                        style: AppText.eyebrow(color: role.pillFg),
-                      ),
-                    ],
-                  ),
-                ),
+              Text(
+                _isStaff
+                    ? 'Sign in with your work email'
+                    : 'Sign in with your Member ID',
+                style: AppText.body(color: AppColors.inkSoft),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
               AppCard(

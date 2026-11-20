@@ -65,9 +65,38 @@ class PublicTenantRepository {
   /// branding payload Login needs.
   Future<List<TenantSummary>> listActive() async {
     try {
-      final response =
-          await _dio.get<Map<String, dynamic>>('/public/tenants');
+      final response = await _dio.get<Map<String, dynamic>>('/public/tenants');
       final items = response.data!['data'] as List;
+      return items
+          .map((e) => TenantSummary.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `POST /public/auth/discover-gyms` — which gym(s) these credentials
+  /// belong to, so [LoginScreen] never has to ask for a gym up front. Only
+  /// gyms where the password verifies come back (never empty — no match is a
+  /// 401 `INVALID_CREDENTIALS`, surfaced as an [ApiException] like any login
+  /// failure). The real tenant-scoped login still follows against the gym
+  /// that's picked.
+  Future<List<TenantSummary>> discoverGyms({
+    required ActorType actorType,
+    required String identifier,
+    required String password,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/public/auth/discover-gyms',
+        data: {
+          'actorType': actorType.name,
+          'identifier': identifier,
+          'password': password,
+        },
+      );
+      final items =
+          (response.data!['data'] as Map<String, dynamic>)['gyms'] as List;
       return items
           .map((e) => TenantSummary.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -85,8 +114,8 @@ class PublicTenantRepository {
     try {
       final response =
           await _dio.get<Map<String, dynamic>>('/public/platform-config');
-      final appName = (response.data?['data'] as Map<String, dynamic>?)?[
-          'appName'] as String?;
+      final appName = (response.data?['data']
+          as Map<String, dynamic>?)?['appName'] as String?;
       return (appName != null && appName.trim().isNotEmpty)
           ? appName
           : 'FitCloud';

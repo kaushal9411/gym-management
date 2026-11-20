@@ -1,6 +1,5 @@
 'use client';
 
-import * as React from 'react';
 import Link from 'next/link';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQuery } from '@tanstack/react-query';
@@ -16,7 +15,6 @@ import { AuthHeader } from '@/features/auth/components/auth-header';
 import { AUTH_ROUTES } from '@/features/auth/constants';
 import { slugSchema } from '@/features/auth/schemas';
 import { listActiveTenants } from '@/features/tenant/list-active';
-import { getRememberedGymSlug, setRememberedGymSlug } from '@/features/tenant/remember-gym';
 import { buildTenantLoginUrl } from '@/features/tenant/subdomain-urls';
 import { useTenant } from '@/features/tenant/tenant-provider';
 import { cn } from '@/lib/utils';
@@ -38,10 +36,11 @@ interface FindGymFormProps {
 }
 
 /**
- * Shown instead of the login form whenever no real gym subdomain resolved
- * (bare host / apex domain) — a login form that can never succeed is worse
- * than no form at all, so this replaces it with a way to actually get
- * somewhere useful.
+ * A plain "pick your gym from the list" form. The bare-host login page now
+ * asks for credentials first (the gym is discovered from them — see
+ * `platform-login.ts`); this stays as the escape hatch for the things that
+ * need a gym before any credentials exist (forgot password, phone-number
+ * login), reached via "Choose your gym instead" on that page.
  */
 export function FindGymForm({ bare = false, dark = false }: FindGymFormProps) {
   const tenant = useTenant();
@@ -50,54 +49,21 @@ export function FindGymForm({ bare = false, dark = false }: FindGymFormProps) {
     defaultValues: { slug: '' },
   });
 
-  // A previous visit already picked a gym — skip straight to its login
-  // instead of asking again. Starts `null` (matches the server-rendered
-  // markup — localStorage doesn't exist there) and is only ever read after
-  // mount, same "client-only prefill" pattern as `remember-me.ts`'s
-  // `getRememberedEmail`; reading it during the initial render instead
-  // would desync from the server output and trip a hydration mismatch.
-  //
-  // `?changeGym=1` is the tenant login screen's "Change gym" link signaling
-  // back here (it can't clear this storage directly — different origin,
-  // see remember-gym.ts) — forget the old pick and show the picker instead
-  // of bouncing straight back to it.
-  const [remembered, setRemembered] = React.useState<string | null>(null);
-  React.useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('changeGym')) {
-      setRememberedGymSlug(null);
-      window.history.replaceState(null, '', window.location.pathname);
-      return;
-    }
-    const slug = getRememberedGymSlug();
-    if (slug) {
-      setRemembered(slug);
-      window.location.href = buildTenantLoginUrl(slug);
-    }
-  }, []);
-
   // Public, unauthenticated — GET /public/tenants was built specifically for
   // this "pre-login pick your gym" picker (name/slug/logo only, excludes
   // suspended/cancelled/maintenance-mode tenants a login couldn't succeed
-  // against anyway). `enabled: !remembered` is best-effort, not a guarantee
-  // — on a remembered-slug mount both effects fire around the same time, so
-  // this may still request once before navigation away; harmless either way.
+  // against anyway).
   const { data: tenants, isLoading } = useQuery({
     queryKey: ['public-tenants'],
     queryFn: listActiveTenants,
     staleTime: 60_000,
-    enabled: !remembered,
   });
 
   const onSubmit = form.handleSubmit(({ slug }) => {
-    setRememberedGymSlug(slug);
     window.location.href = buildTenantLoginUrl(slug);
   });
 
   const noGymsFound = !isLoading && (tenants?.length ?? 0) === 0;
-
-  if (remembered) {
-    return <p className={cn('text-center text-sm', dark ? 'text-foreground/40' : 'text-muted-foreground')}>Redirecting to your gym…</p>;
-  }
 
   const fields = (
     <form onSubmit={onSubmit} noValidate className="space-y-4">

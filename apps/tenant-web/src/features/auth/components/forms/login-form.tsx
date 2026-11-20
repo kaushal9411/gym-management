@@ -19,6 +19,7 @@ import { useMemberAuth, useMemberLogin, useMemberRequestPhoneOtp } from '@/featu
 import { toMemberAuthServiceError } from '@/features/member-portal/services/member-api-client';
 import { FindGymForm } from '@/features/tenant/components/find-gym-form';
 import { TenantLogo } from '@/features/tenant/components/tenant-logo';
+import { continueToGym, discoverGyms, PlatformLoginError, type DiscoveredGym } from '@/features/tenant/platform-login';
 import { buildPlatformLoginUrl } from '@/features/tenant/subdomain-urls';
 import { useTenant } from '@/features/tenant/tenant-provider';
 import { useAppSelector } from '@/store/hooks';
@@ -54,6 +55,10 @@ const itemVariants = {
 const DARK_FIELD_CLASS =
   'h-12 border-foreground/15 bg-foreground/5 text-foreground placeholder:text-foreground/40 focus-visible:border-orange-400/50 focus-visible:ring-orange-400/20';
 
+/** Inline text-link look shared by every secondary action on this page. */
+const LINK_BUTTON_CLASS =
+  'font-medium text-cyan-700 dark:text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 rounded-sm';
+
 export function LoginForm() {
   const router = useRouter();
   const login = useLogin();
@@ -72,6 +77,15 @@ export function LoginForm() {
   const [mode, setMode] = React.useState<'password' | 'phone'>('password');
   const [phoneRole, setPhoneRole] = React.useState<'staff' | 'member'>('staff');
 
+  // Bare/platform host only (no gym in the address): the gym is discovered from the credentials, not asked for first.
+  const isPlatform = tenant.id === 'platform';
+  const [platformPending, setPlatformPending] = React.useState(false);
+  // Set only when the credentials belong to more than one gym — the visitor then picks which.
+  const [platformGyms, setPlatformGyms] = React.useState<DiscoveredGym[] | null>(null);
+  // Escape hatch for flows that need a gym before any credentials exist (forgot password, phone login).
+  const [pickGymManually, setPickGymManually] = React.useState(false);
+  const pendingLogin = React.useRef<{ actorType: 'staff' | 'member'; identifier: string; password: string; rememberMe: boolean } | null>(null);
+
   const form = useForm<UnifiedLoginFormValues>({
     resolver: zodResolver(unifiedLoginSchema),
     defaultValues: { identifier: '', password: '', rememberMe: false },
@@ -83,7 +97,14 @@ export function LoginForm() {
   });
 
   // Prefill remembered email after mount (localStorage is client-only). Member logins are never remembered.
+  // `?identifier=` comes from the bare-host login handing a member / 2FA account over to this gym's own login page.
   React.useEffect(() => {
+    const handedOver = new URLSearchParams(window.location.search).get('identifier');
+    if (handedOver) {
+      form.setValue('identifier', handedOver);
+      window.history.replaceState(null, '', window.location.pathname);
+      return;
+    }
     const remembered = getRememberedEmail();
     if (remembered) {
       form.setValue('identifier', remembered);
@@ -91,8 +112,51 @@ export function LoginForm() {
     }
   }, [form]);
 
+  async function goToGym(slug: string) {
+    const creds = pendingLogin.current;
+    if (!creds) return;
+    setPlatformPending(true);
+    try {
+      window.location.assign(await continueToGym({ slug, ...creds }));
+    } catch (error) {
+      const err = error instanceof PlatformLoginError ? error : null;
+      setPlatformGyms(null);
+      setPlatformPending(false);
+      setInlineError({ locked: err?.code === 'ACCOUNT_LOCKED', message: err?.message ?? 'Something went wrong. Please try again.' });
+    }
+  }
+
+  async function onSubmitPlatform(values: UnifiedLoginFormValues) {
+    const creds = {
+      actorType: looksLikeEmail(values.identifier) ? ('staff' as const) : ('member' as const),
+      identifier: values.identifier,
+      password: values.password,
+      rememberMe: values.rememberMe,
+    };
+    pendingLogin.current = creds;
+    setPlatformPending(true);
+    try {
+      const gyms = await discoverGyms(creds);
+      const [only] = gyms;
+      if (gyms.length === 1 && only) {
+        await goToGym(only.slug);
+        return;
+      }
+      setPlatformGyms(gyms);
+      setPlatformPending(false);
+    } catch (error) {
+      setPlatformPending(false);
+      setInlineError({ locked: false, message: error instanceof PlatformLoginError ? error.message : 'Something went wrong. Please try again.' });
+    }
+  }
+
   const onSubmit = form.handleSubmit((values) => {
     setInlineError(null);
+
+    if (isPlatform) {
+      void onSubmitPlatform(values);
+      return;
+    }
 
     if (!looksLikeEmail(values.identifier)) {
       memberLogin.mutate(
@@ -161,7 +225,7 @@ export function LoginForm() {
     else if (!isMemberBootstrapping && isMemberAuthenticated) router.replace(MEMBER_PORTAL_ROUTES.dashboard);
   }, [authenticatedUser, isMemberAuthenticated, isMemberBootstrapping, router]);
 
-  const isSubmitting = login.isPending || memberLogin.isPending;
+  const isSubmitting = login.isPending || memberLogin.isPending || platformPending;
   const isSendingPhoneOtp = requestPhoneOtp.isPending || memberRequestPhoneOtp.isPending;
   const identifierValue = form.watch('identifier');
   const passwordValue = form.watch('password');
@@ -172,13 +236,8 @@ export function LoginForm() {
     setMode((m) => (m === 'password' ? 'phone' : 'password'));
   }
 
-  // Can't clear the remembered pick directly — it lives in the bare host's
-  // localStorage, a different origin from this tenant subdomain page, and
-  // localStorage has no cross-origin equivalent of a cookie's `Domain`
-  // attribute. `?changeGym=1` signals the bare host's FindGymForm to forget
-  // it and show the picker instead of auto-redirecting straight back here.
   function handleChangeGym() {
-    window.location.href = `${buildPlatformLoginUrl()}?changeGym=1`;
+    window.location.href = buildPlatformLoginUrl();
   }
 
   function spawnRipple(e: React.MouseEvent<HTMLButtonElement>) {
@@ -187,11 +246,6 @@ export function LoginForm() {
     setRipples((r) => [...r, { id, x: e.clientX - rect.left, y: e.clientY - rect.top }]);
     window.setTimeout(() => setRipples((r) => r.filter((rp) => rp.id !== id)), 650);
   }
-
-  // No real gym subdomain resolved (bare host/apex domain) — a login form
-  // that can never succeed is worse than no form at all, so the same
-  // premium shell hosts the "find your gym" fields instead.
-  const isPlatform = tenant.id === 'platform';
 
   return (
     // A gym that uploaded a login photo keeps the dark neon look on top of it; otherwise the page follows the light/dark theme.
@@ -267,17 +321,50 @@ export function LoginForm() {
 
               <div className="mb-6 space-y-1 text-center">
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                  {isPlatform ? 'Looking for your gym?' : 'Welcome Back'}
+                  {isPlatform && pickGymManually ? 'Looking for your gym?' : isPlatform && platformGyms ? 'Choose your gym' : 'Welcome Back'}
                 </h1>
                 <p className="text-sm text-foreground/50">
-                  {isPlatform
+                  {isPlatform && pickGymManually
                     ? 'Select your gym to continue.'
-                    : 'Sign in to keep your gym running at full pace.'}
+                    : isPlatform && platformGyms
+                      ? 'Your account is linked to more than one gym. Which one do you want to sign in to?'
+                      : 'Sign in to keep your gym running at full pace.'}
                 </p>
               </div>
 
-              {isPlatform ? (
-                <FindGymForm bare dark />
+              {isPlatform && pickGymManually ? (
+                <>
+                  <FindGymForm bare dark />
+                  <p className="mt-5 text-center text-sm">
+                    <button type="button" onClick={() => setPickGymManually(false)} className={LINK_BUTTON_CLASS}>
+                      Sign in with email / member ID instead
+                    </button>
+                  </p>
+                </>
+              ) : isPlatform && platformGyms ? (
+                <>
+                  <FormAlert variant="error" message={inlineError?.message ?? null} />
+                  <ul className="space-y-2">
+                    {platformGyms.map((gym) => (
+                      <li key={gym.slug}>
+                        <button
+                          type="button"
+                          disabled={platformPending}
+                          onClick={() => void goToGym(gym.slug)}
+                          className="flex w-full items-center justify-between rounded-lg border border-foreground/10 bg-foreground/5 px-4 py-3 text-left text-sm font-semibold text-foreground transition-colors hover:border-orange-400/50 disabled:opacity-50"
+                        >
+                          <span>{gym.name}</span>
+                          <span className="text-xs font-normal text-foreground/40">{gym.slug}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-5 text-center text-sm">
+                    <button type="button" onClick={() => setPlatformGyms(null)} className={LINK_BUTTON_CLASS}>
+                      Back
+                    </button>
+                  </p>
+                </>
               ) : (
                 <>
                   <FormAlert
@@ -374,12 +461,16 @@ export function LoginForm() {
                         <Label htmlFor="password" className="text-xs font-medium uppercase tracking-wide text-foreground/60">
                           Password
                         </Label>
-                        <Link
-                          href={AUTH_ROUTES.forgotPassword}
-                          className="text-xs font-medium text-cyan-700 dark:text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 rounded-sm"
-                        >
-                          Forgot password?
-                        </Link>
+                        {isPlatform ? (
+                          // Needs a gym before any credentials exist to discover one from.
+                          <button type="button" onClick={() => setPickGymManually(true)} className={cn('text-xs', LINK_BUTTON_CLASS)}>
+                            Forgot password?
+                          </button>
+                        ) : (
+                          <Link href={AUTH_ROUTES.forgotPassword} className={cn('text-xs', LINK_BUTTON_CLASS)}>
+                            Forgot password?
+                          </Link>
+                        )}
                       </div>
                       <div
                         className={cn(
@@ -465,26 +556,26 @@ export function LoginForm() {
                   )}
 
                   <p className="mt-5 text-center text-sm">
-                    <button
-                      type="button"
-                      onClick={toggleMode}
-                      className="font-medium text-cyan-700 dark:text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 rounded-sm"
-                    >
-                      {mode === 'phone' ? 'Use email / member ID instead' : 'Use phone number instead'}
-                    </button>
+                    {isPlatform ? (
+                      <button type="button" onClick={() => setPickGymManually(true)} className={LINK_BUTTON_CLASS}>
+                        Choose your gym instead
+                      </button>
+                    ) : (
+                      <button type="button" onClick={toggleMode} className={LINK_BUTTON_CLASS}>
+                        {mode === 'phone' ? 'Use email / member ID instead' : 'Use phone number instead'}
+                      </button>
+                    )}
                   </p>
                 </>
               )}
             </motion.div>
 
-            {isPlatform ? null : (
-              <motion.p variants={itemVariants} className="mt-6 text-center text-sm text-foreground/40">
-                Want {tenant.platformName} for your gym?{' '}
-                <Link href={AUTH_ROUTES.register} className="font-medium text-cyan-700 dark:text-cyan-300 underline-offset-4 hover:underline">
-                  Start a free trial
-                </Link>
-              </motion.p>
-            )}
+            <motion.p variants={itemVariants} className="mt-6 text-center text-sm text-foreground/40">
+              Want {tenant.platformName} for your gym?{' '}
+              <Link href={AUTH_ROUTES.register} className="font-medium text-cyan-700 dark:text-cyan-300 underline-offset-4 hover:underline">
+                Start a free trial
+              </Link>
+            </motion.p>
 
             <motion.p variants={itemVariants} className="mt-8 text-center text-[11px] text-foreground/25">
               Powered by <span className="font-semibold text-foreground/40">{tenant.platformName}</span> · © {new Date().getFullYear()}

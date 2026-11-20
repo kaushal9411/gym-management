@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
-import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -12,25 +11,31 @@ import '../../../models/tenant_summary.dart';
 import '../../../repositories/public_tenant_repository.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/brand_mark.dart';
-import 'login_screen.dart';
 
-/// Design frame "2. Find your gym" — one entry surface for both staff and
-/// members, a real dropdown of every active gym (`GET /public/tenants`);
-/// the user picks, never types a gym name to submit. The search field only
-/// filters the already-loaded list client-side; it never itself resolves
-/// arbitrary text as a slug.
+class FindGymScreenArgs {
+  const FindGymScreenArgs({this.gyms});
+
+  /// A pre-filtered list to choose from — the gyms a just-verified login
+  /// belongs to (more than one). `null` shows every active gym
+  /// (`GET /public/tenants`) with a search field, for the flows that still
+  /// need a gym before any credentials exist (forgot password, phone login).
+  final List<TenantSummary>? gyms;
+}
+
+/// Gym picker. [LoginScreen] no longer starts here — it's the first screen,
+/// and only pushes this when the entered credentials belong to more than one
+/// gym ([FindGymScreenArgs.gyms]), or when "Forgot password" / "Log in with
+/// phone number" need a gym before any credentials have been checked (no
+/// [FindGymScreenArgs.gyms], so every active gym is listed). Picking a gym
+/// resolves its full branding and pops with the [TenantBranding] — the caller
+/// continues from there.
 ///
-/// User-requested change: this used to also ask staff-vs-member up front
-/// via a [RoleToggle] before showing the gym list. That's gone — which
-/// plane a login is on isn't decided here anymore; [LoginScreen] detects it
-/// from what's actually typed (an email vs. a Member ID), same "one
-/// credentials field, no separate screens" precedent as the web app's own
-/// unified `/login`. `rememberAs` used to be passed to [resolve] from this
-/// screen's toggle; since the role isn't known yet at gym-pick time now,
-/// that's deferred to [LoginScreen] recording it after a real login
-/// actually succeeds (`PublicTenantRepository.rememberGymForRole`).
+/// The search field only filters the already-loaded list client-side; it
+/// never itself resolves arbitrary text as a slug.
 class FindGymScreen extends StatefulWidget {
-  const FindGymScreen({super.key});
+  const FindGymScreen({super.key, this.args = const FindGymScreenArgs()});
+
+  final FindGymScreenArgs args;
 
   @override
   State<FindGymScreen> createState() => _FindGymScreenState();
@@ -46,7 +51,8 @@ class _FindGymScreenState extends State<FindGymScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _gyms = widget.args.gyms;
+    if (_gyms == null) _load();
     _searchController.addListener(() => setState(() {}));
   }
 
@@ -87,15 +93,10 @@ class _FindGymScreenState extends State<FindGymScreen> {
       _error = null;
     });
     try {
-      // No `rememberAs` — the role isn't known until a real login succeeds
-      // (see this file's doc comment / `LoginScreen`).
       final TenantBranding tenant =
           await getIt<PublicTenantRepository>().resolve(gym.slug);
       if (!mounted) return;
-      context.push(
-        AppRoutes.login,
-        extra: LoginScreenArgs(role: null, tenant: tenant),
-      );
+      context.pop(tenant);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
@@ -119,39 +120,46 @@ class _FindGymScreenState extends State<FindGymScreen> {
               // already uses when its own `role` is omitted.
               const BrandMark.glyph(role: AppRole.staff, size: 52),
               const SizedBox(height: 12),
-              Text('Find your gym', style: AppText.display(size: 24)),
+              Text(
+                widget.args.gyms == null ? 'Find your gym' : 'Choose your gym',
+                style: AppText.display(size: 24),
+              ),
               const SizedBox(height: 6),
               Text(
-                'Select your gym to continue',
+                widget.args.gyms == null
+                    ? 'Select your gym to continue'
+                    : 'Your account is linked to more than one gym. '
+                        'Which one do you want to sign in to?',
                 style: AppText.body(color: AppColors.inkSoft),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 18),
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.surface2,
-                  borderRadius: BorderRadius.circular(AppRadii.field),
-                  border: Border.all(color: AppColors.line),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  style: AppText.body(size: 15, weight: FontWeight.w600),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    filled: false,
-                    border: InputBorder.none,
-                    hintText: 'Search gyms…',
-                    hintStyle:
-                        AppText.body(size: 15, color: AppColors.inkFaint),
-                    prefixIcon: Icon(
-                      Icons.search_rounded,
-                      size: 18,
-                      color: AppColors.inkFaint,
+              if (widget.args.gyms == null)
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface2,
+                    borderRadius: BorderRadius.circular(AppRadii.field),
+                    border: Border.all(color: AppColors.line),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    style: AppText.body(size: 15, weight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      filled: false,
+                      border: InputBorder.none,
+                      hintText: 'Search gyms…',
+                      hintStyle:
+                          AppText.body(size: 15, color: AppColors.inkFaint),
+                      prefixIcon: Icon(
+                        Icons.search_rounded,
+                        size: 18,
+                        color: AppColors.inkFaint,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 13),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 13),
                   ),
                 ),
-              ),
               if (_error != null) ...[
                 const SizedBox(height: 10),
                 Text(
