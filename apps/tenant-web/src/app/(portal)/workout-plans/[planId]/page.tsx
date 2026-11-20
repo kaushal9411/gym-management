@@ -34,6 +34,7 @@ import {
   useWorkoutPlanStatusAction,
 } from '@/features/workouts/hooks/use-workouts';
 import type { PlanExerciseInput, WorkoutPlanDetail } from '@/features/workouts/types';
+import { businessDate } from '@/lib/business-time';
 
 type StatusActionKind = 'activate' | 'deactivate' | 'restore' | 'delete';
 
@@ -76,7 +77,7 @@ export default function WorkoutPlanDetailPage() {
   const [scheduleExercises, setScheduleExercises] = React.useState<PlanExerciseInput[]>([]);
   const [scheduleDirty, setScheduleDirty] = React.useState(false);
   const [assignMember, setAssignMember] = React.useState<MemberListItem | null>(null);
-  const [assignStartDate, setAssignStartDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [assignStartDate, setAssignStartDate] = React.useState(() => businessDate());
 
   React.useEffect(() => {
     if (plan.data && !form) setForm(toFormState(plan.data));

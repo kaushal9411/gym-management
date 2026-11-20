@@ -12,7 +12,7 @@ import { useTenant } from '@/features/tenant/tenant-provider';
 
 export function currencySymbol(code: string | undefined): string {
   try {
-    const part = new Intl.NumberFormat('en', { style: 'currency', currency: code || 'INR', currencyDisplay: 'narrowSymbol' }).formatToParts(0).find((p) => p.type === 'currency');
+    const part = new Intl.NumberFormat('en-IN', { style: 'currency', currency: code || 'INR', currencyDisplay: 'narrowSymbol' }).formatToParts(0).find((p) => p.type === 'currency');
     return part?.value ?? '₹';
   } catch {
     return '₹';

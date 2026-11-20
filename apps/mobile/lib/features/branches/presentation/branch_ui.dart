@@ -41,7 +41,6 @@ String todayKey() => branchWeekdays[DateTime.now().weekday - 1];
 /// server-side (max 64, not validated against the tz database), so the picker
 /// offers sensible values and keeps whatever the branch already has.
 const kTimezones = [
-  'UTC',
   'Asia/Kolkata',
   'Asia/Dubai',
   'Asia/Karachi',

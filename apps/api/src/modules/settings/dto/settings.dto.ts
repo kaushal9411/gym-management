@@ -71,6 +71,8 @@ export interface BusinessSettingsDto {
   weekStartDay: number;
   measurementUnit: 'METRIC' | 'IMPERIAL';
   locale: string;
+  /** Default fee charged when a member transfers their membership to another member (gym currency). */
+  membershipTransferFee: string;
   updatedAt: string;
 }
 
@@ -83,6 +85,7 @@ export interface UpdateBusinessSettingsInput {
   weekStartDay?: number;
   measurementUnit?: 'METRIC' | 'IMPERIAL';
   locale?: string;
+  membershipTransferFee?: number;
 }
 
 export interface BrandingDto {

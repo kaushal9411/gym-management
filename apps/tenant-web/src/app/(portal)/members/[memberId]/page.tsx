@@ -23,7 +23,8 @@ import { BranchSelect } from '@/features/members/components/branch-select';
 import { DocumentUpload } from '@/features/members/components/document-upload';
 import { MemberExtendedInfoFields } from '@/features/members/components/member-extended-info-fields';
 import { MemberHealthScreeningFields } from '@/features/members/components/member-health-screening-fields';
-import { FreezeHistoryTable, MembershipHistoryTable } from '@/features/members/components/membership-history-table';
+import { FreezeHistoryTable, MembershipHistoryTable, MembershipTransferHistoryTable } from '@/features/members/components/membership-history-table';
+import { TransferMembershipDialog } from '@/features/members/components/transfer-membership-dialog';
 import { MembershipPlanSelect } from '@/features/members/components/membership-plan-select';
 import { IconChip, cardHeaderStyle } from '@/features/members/components/detail/detail-ui';
 import { MemberAttendancePanel } from '@/features/members/components/detail/member-attendance-panel';
@@ -213,6 +214,7 @@ export default function MemberDetailPage() {
   const [confirmStatusAction, setConfirmStatusAction] = React.useState<StatusActionKind | null>(null);
   const [confirmFreeze, setConfirmFreeze] = React.useState(false);
   const [confirmCancel, setConfirmCancel] = React.useState(false);
+  const [transferOpen, setTransferOpen] = React.useState(false);
   const [confirmErase, setConfirmErase] = React.useState(false);
   const [confirmLink, setConfirmLink] = React.useState(false);
   const [branchId, setBranchId] = React.useState<string | null>(null);
@@ -992,6 +994,9 @@ export default function MemberDetailPage() {
               ) : null}
               {canUpgrade ? (
                 <div className="flex flex-wrap items-end gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setTransferOpen(true)}>
+                    Transfer membership
+                  </Button>
                   <Button size="sm" variant="destructive" onClick={() => setConfirmCancel(true)}>
                     Cancel membership
                   </Button>
@@ -1002,8 +1007,14 @@ export default function MemberDetailPage() {
 
           <div>
             <h3 className="mb-2 text-sm font-medium">Renewal history</h3>
-            <MembershipHistoryTable entries={data.membershipHistory} />
+            <MembershipHistoryTable entries={data.membershipHistory} transfers={data.membershipTransfers} />
           </div>
+          {data.membershipTransfers.length > 0 ? (
+            <div>
+              <h3 className="mb-2 text-sm font-medium">Membership transfers</h3>
+              <MembershipTransferHistoryTable transfers={data.membershipTransfers} memberId={data.id} />
+            </div>
+          ) : null}
           <div>
             <h3 className="mb-2 text-sm font-medium">Freeze history</h3>
             <FreezeHistoryTable entries={data.freezeHistory} />
@@ -1210,6 +1221,8 @@ export default function MemberDetailPage() {
         loading={freeze.isPending}
         onConfirm={handleFreeze}
       />
+
+      <TransferMembershipDialog memberId={data.id} memberName={data.name} open={transferOpen} onOpenChange={setTransferOpen} />
 
       <ConfirmDialog
         open={confirmCancel}

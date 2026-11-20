@@ -1,8 +1,9 @@
+import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 import type { MemberProfile } from '../repositories/audience.repository';
 
 /** "26 Oct 2026" - dates are stored as UTC-midnight DATE values. */
 export function formatDay(date: Date): string {
-  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }).format(date);
+  return new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: BUSINESS_TIMEZONE }).format(date);
 }
 
 /** INR only: "₹1,500" (whole rupees without decimals, otherwise two). */

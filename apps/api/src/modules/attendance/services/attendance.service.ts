@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs';
 
 import { ConflictError, ForbiddenError, NotFoundError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
+import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { emitToTenant } from '../../../infrastructure/realtime/socket-server';
 import { getBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
@@ -139,7 +140,7 @@ export class AttendanceService {
       orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
       select: { timezone: true },
     });
-    return branch?.timezone ?? 'UTC';
+    return branch?.timezone ?? BUSINESS_TIMEZONE;
   }
 
   async validateQrCode(input: ValidateQrCodeInput): Promise<QrValidationResultDto> {

@@ -27,6 +27,7 @@ import 'payment_actions.dart';
 import 'payments_ui.dart';
 import 'widgets/payment_card.dart';
 import 'widgets/payments_insights.dart';
+import '../../../core/utils/app_clock.dart';
 
 const _sorts = [
   ('paymentDate:desc', 'Date · newest first'),
@@ -215,7 +216,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
   }
 
   Future<void> _pickCustom() async {
-    final now = DateTime.now();
+    final now = AppClock.now();
     final cur = _range;
     final picked = await showDateRangePicker(
       context: context,

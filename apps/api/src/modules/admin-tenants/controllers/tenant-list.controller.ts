@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
+import { businessDate } from '../../../core/utils/business-time';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
 import { getAdminPermissions } from '../../admin-auth/middlewares/admin-authorize.middleware';
 import { tenantBulkService, type BulkParams } from '../services/tenant-bulk.service';
@@ -50,7 +51,7 @@ export class TenantListController {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="tenants-${new Date().toISOString().slice(0, 10)}.csv"`,
+      `attachment; filename="tenants-${businessDate()}.csv"`,
     );
     res.write(csvRow([...CSV_HEADERS]));
     for (let i = 0; i < rows.length; i += 250) {

@@ -3,6 +3,9 @@ import type {
   AssignMembershipPayload,
   BulkMemberActionResult,
   CancelMembershipPayload,
+  MembershipTransfer,
+  MembershipTransferPreview,
+  TransferMembershipPayload,
   CreateMemberPayload,
   CreateMembershipPlanPayload,
   DowngradeMembershipPayload,
@@ -26,6 +29,7 @@ import type {
   UpdateMembershipPlanPayload,
   UpgradeMembershipPayload,
 } from '../types';
+import { businessDate } from '@/lib/business-time';
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -119,6 +123,16 @@ class MemberService {
     return res.data.data;
   }
 
+  async getTransferPreview(id: string): Promise<MembershipTransferPreview> {
+    const res = await apiClient.get<ApiEnvelope<MembershipTransferPreview>>(`/members/${id}/membership/transfer-preview`);
+    return res.data.data;
+  }
+
+  async transferMembership(id: string, payload: TransferMembershipPayload): Promise<MembershipTransfer> {
+    const res = await apiClient.post<ApiEnvelope<MembershipTransfer>>(`/members/${id}/membership/transfer`, payload);
+    return res.data.data;
+  }
+
   async resumeMembership(id: string): Promise<void> {
     await apiClient.post(`/members/${id}/resume`);
   }
@@ -194,7 +208,7 @@ class MemberService {
 
   async gdprExport(id: string, memberCode: string): Promise<void> {
     const res = await apiClient.get<ApiEnvelope<MemberGdprExport>>(`/members/${id}/gdpr-export`);
-    downloadJson(res.data.data, `${memberCode}-data-export-${new Date().toISOString().slice(0, 10)}.json`);
+    downloadJson(res.data.data, `${memberCode}-data-export-${businessDate()}.json`);
   }
 
   async eraseGdprData(id: string): Promise<void> {

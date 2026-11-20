@@ -312,7 +312,7 @@ export class AdminTenantBillingService {
     const to = overrideEmail ?? owner?.email;
     if (!to) throw new ValidationError('This tenant has no owner email on file — provide one explicitly.');
 
-    const totalFormatted = new Intl.NumberFormat('en-US', { style: 'currency', currency: invoice.currency }).format(Number(invoice.total));
+    const totalFormatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: invoice.currency }).format(Number(invoice.total));
     const downloadUrl = portalPath(tenant.slug, `/billing/invoices/${invoice.id}`);
     const template = invoiceEmail({ tenantName: tenant.name }, owner?.name ?? 'there', invoice.invoiceNumber, totalFormatted, downloadUrl);
     const gate = await sendGatedEmail(this.tenantId, { to, subject: template.subject, html: template.html });

@@ -32,6 +32,7 @@ import type {
   UpdateIncomePayload,
   UpdatePaymentPayload,
 } from '../types';
+import { businessDate } from '@/lib/business-time';
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -110,12 +111,12 @@ class FinanceService {
 
   async exportPaymentsCsvUrl(params: Partial<ListPaymentsParams>): Promise<void> {
     const res = await apiClient.get('/payments/export', { params, responseType: 'blob' });
-    downloadBlob(res.data as Blob, `payments-export-${new Date().toISOString().slice(0, 10)}.csv`);
+    downloadBlob(res.data as Blob, `payments-export-${businessDate()}.csv`);
   }
 
   async exportPaymentsExcel(params: Partial<ListPaymentsParams>): Promise<void> {
     const res = await apiClient.get('/payments/export/excel', { params, responseType: 'blob' });
-    downloadBlob(res.data as Blob, `payments-export-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    downloadBlob(res.data as Blob, `payments-export-${businessDate()}.xlsx`);
   }
 
   // ── Invoices ───────────────────────────────────────────────────────────
@@ -183,12 +184,12 @@ class FinanceService {
 
   async exportIncomeCsv(params: Partial<ListIncomeParams>): Promise<void> {
     const res = await apiClient.get('/income/export', { params, responseType: 'blob' });
-    downloadBlob(res.data as Blob, `income-export-${new Date().toISOString().slice(0, 10)}.csv`);
+    downloadBlob(res.data as Blob, `income-export-${businessDate()}.csv`);
   }
 
   async exportIncomeExcel(params: Partial<ListIncomeParams>): Promise<void> {
     const res = await apiClient.get('/income/export/excel', { params, responseType: 'blob' });
-    downloadBlob(res.data as Blob, `income-export-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    downloadBlob(res.data as Blob, `income-export-${businessDate()}.xlsx`);
   }
 
   // ── Expenses ───────────────────────────────────────────────────────────
@@ -224,12 +225,12 @@ class FinanceService {
 
   async exportExpensesCsv(params: Partial<ListExpensesParams>): Promise<void> {
     const res = await apiClient.get('/expenses/export', { params, responseType: 'blob' });
-    downloadBlob(res.data as Blob, `expenses-export-${new Date().toISOString().slice(0, 10)}.csv`);
+    downloadBlob(res.data as Blob, `expenses-export-${businessDate()}.csv`);
   }
 
   async exportExpensesExcel(params: Partial<ListExpensesParams>): Promise<void> {
     const res = await apiClient.get('/expenses/export/excel', { params, responseType: 'blob' });
-    downloadBlob(res.data as Blob, `expenses-export-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    downloadBlob(res.data as Blob, `expenses-export-${businessDate()}.xlsx`);
   }
 }
 

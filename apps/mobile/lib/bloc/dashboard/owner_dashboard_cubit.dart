@@ -20,6 +20,7 @@ import '../../repositories/branch_repository.dart';
 import '../../repositories/dashboard_repository.dart';
 import '../../repositories/invoice_repository.dart';
 import '../../repositories/reports_repository.dart';
+import '../../core/utils/app_clock.dart';
 
 /// Which web permissions the viewer holds. Web hides each dashboard panel
 /// whose permission is missing (`reports:view` / `analytics:view` /
@@ -276,7 +277,7 @@ class OwnerDashboardCubit extends Cubit<OwnerDashboardState> {
   }
 
   Future<OwnerDashboardData> _fetch(String? branchId, int days) async {
-    final to = DateTime.now();
+    final to = AppClock.now();
     final from = to.subtract(Duration(days: days - 1));
     final r = access.reports;
     final a = access.analytics;

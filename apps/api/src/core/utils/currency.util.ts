@@ -12,7 +12,7 @@
  */
 export function deriveCurrencySymbol(currencyCode: string): string {
   try {
-    const part = new Intl.NumberFormat('en', { style: 'currency', currency: currencyCode })
+    const part = new Intl.NumberFormat('en-IN', { style: 'currency', currency: currencyCode })
       .formatToParts(0)
       .find((p) => p.type === 'currency');
     return part?.value ?? currencyCode;

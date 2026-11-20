@@ -1,5 +1,6 @@
 import { env } from '../../../config/env';
 import { logger } from '../../../core/logging/logger';
+import { businessDate } from '../../../core/utils/business-time';
 import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
@@ -127,7 +128,7 @@ async function tryRenewOrEnterGrace(tenantId: string, subscriptionId: string, te
   if (defaultMethod && ownerEmail) {
     try {
       const service = new SubscriptionService(getTenantScopedClient(tenantId));
-      await service.renew(tenantId, tenantSlug, tenantName, ownerEmail, `auto-renew:${subscriptionId}:${new Date().toISOString().slice(0, 10)}`);
+      await service.renew(tenantId, tenantSlug, tenantName, ownerEmail, `auto-renew:${subscriptionId}:${businessDate()}`);
       return;
     } catch (error) {
       logger.error('Automatic renewal charge failed — entering grace period', { tenantId, error: (error as Error).message });
@@ -148,7 +149,7 @@ async function remindGracePeriod(): Promise<void> {
   for (const subscription of subscriptions) {
     const owner = subscription.tenant.users[0];
     if (!owner || !subscription.graceEndsAt) continue;
-    const dedupeKey = `reminder:grace:${subscription.id}:${new Date().toISOString().slice(0, 10)}`;
+    const dedupeKey = `reminder:grace:${subscription.id}:${businessDate()}`;
     // eslint-disable-next-line no-await-in-loop -- see remindTrialsEndingSoon
     if (await cache.get(dedupeKey)) continue;
 

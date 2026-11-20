@@ -45,11 +45,11 @@ export const DEFAULT_BRANCH_FORM_STATE: BranchFormState = {
   addressLine2: '',
   city: '',
   state: '',
-  country: '',
+  country: 'India',
   postalCode: '',
   latitude: '',
   longitude: '',
-  timezone: '',
+  timezone: 'Asia/Kolkata',
   operatingHours: {},
   holidays: [],
   capacity: '',
@@ -103,7 +103,7 @@ export function BranchFormFields({ value, onChange, disabled, isEditing }: Branc
           </div>
           <div className="space-y-2">
             <Label htmlFor="branchTimezone">Timezone</Label>
-            <Input id="branchTimezone" value={value.timezone} disabled={disabled} placeholder="e.g. America/New_York" onChange={(e) => set('timezone', e.target.value)} />
+            <Input id="branchTimezone" value={value.timezone} disabled={disabled} placeholder="e.g. Asia/Kolkata" onChange={(e) => set('timezone', e.target.value)} />
           </div>
         </div>
       </PanelCard>

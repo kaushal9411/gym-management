@@ -10,6 +10,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../models/income_entry.dart';
 import '../../../models/user_profile.dart';
 import '../../team/presentation/widgets/team_ui.dart';
+import '../../../core/utils/app_clock.dart';
 
 /// Shared kit for the Income screens (list, add form): the access matrix,
 /// period maths, category metadata, formatting helpers and the entry card.
@@ -123,7 +124,7 @@ String ymd(DateTime d) => '${d.year.toString().padLeft(4, '0')}-'
   DateTimeRange? custom, [
   DateTime? now,
 ]) {
-  final n = now ?? DateTime.now();
+  final n = now ?? AppClock.now();
   final today = DateTime(n.year, n.month, n.day);
   switch (p) {
     case IncomePeriod.today:

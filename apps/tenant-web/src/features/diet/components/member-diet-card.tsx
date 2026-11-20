@@ -21,6 +21,7 @@ import {
   useUpdateDietProgress,
 } from '../hooks/use-diet';
 import type { MealType } from '../types';
+import { businessDate } from '@/lib/business-time';
 
 const MEAL_LABELS: Record<MealType, string> = {
   BREAKFAST: 'Breakfast',
@@ -33,7 +34,7 @@ const MEAL_LABELS: Record<MealType, string> = {
 };
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return businessDate();
 }
 
 interface MemberDietCardProps {

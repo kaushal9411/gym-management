@@ -13,6 +13,7 @@ import { useMemberList } from '@/features/members/hooks/use-members';
 import type { MemberListItem } from '@/features/members/types';
 import { useReportData } from '@/features/reports/hooks/use-reports';
 import { useCurrencySymbol } from '@/lib/currency';
+import { businessDate } from '@/lib/business-time';
 
 export type DashboardStatKind =
   | 'attendance'
@@ -42,7 +43,7 @@ function monthStartIso(): string {
 }
 
 function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
+  return businessDate();
 }
 
 function ViewAllLink({ href }: { href: string }) {

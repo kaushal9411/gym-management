@@ -36,14 +36,6 @@ const selectClassName = cn(
   'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted/40',
 );
 
-function detectTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
-  } catch {
-    return 'Asia/Kolkata';
-  }
-}
-
 /** Step 1 — gym + owner details, credentials, and legal acknowledgements. */
 export function AccountDetailsStep() {
   const { dispatch } = useOnboardingWizard();
@@ -62,7 +54,7 @@ export function AccountDetailsStep() {
       country: 'India',
       state: '',
       city: '',
-      timezone: detectTimezone(),
+      timezone: 'Asia/Kolkata', // FitCloud runs on Indian Standard Time — never guessed from the browser
       currency: 'INR',
       gstNumber: '',
       businessRegistrationNumber: '',

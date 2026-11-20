@@ -197,7 +197,7 @@ class Branch {
         notes: _asText(json['notes']),
         isDefault: json['isDefault'] as bool? ?? false,
         isActive: json['isActive'] as bool? ?? true,
-        timezone: json['timezone'] as String? ?? 'UTC',
+        timezone: json['timezone'] as String? ?? 'Asia/Kolkata',
         memberCount: _asInt(json['memberCount']) ?? 0,
         staffCount: _asInt(json['staffCount']) ?? 0,
         operatingHours: {

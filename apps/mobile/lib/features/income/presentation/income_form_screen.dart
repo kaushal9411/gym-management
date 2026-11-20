@@ -13,6 +13,7 @@ import '../../../shared/widgets/app_state_views.dart';
 import '../../manager/presentation/widgets/member_detail_anim.dart';
 import '../../team/presentation/widgets/team_ui.dart';
 import 'income_ui.dart';
+import '../../../core/utils/app_clock.dart';
 
 /// "Add income" — web's `AddIncomeDialog` as a page (pushed from the list's
 /// "+" for `finance:income-manage` holders; pops `true` after a save).
@@ -34,7 +35,7 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
   IncomeCategory _category = IncomeCategory.membershipFee;
-  DateTime _date = DateTime.now();
+  DateTime _date = AppClock.now();
   bool _loading = false;
   String? _error;
   String? _amountError;
@@ -165,7 +166,7 @@ class _IncomeFormScreenState extends State<IncomeFormScreen> {
                           value: _date,
                           clearable: false,
                           firstDate: DateTime(2020),
-                          lastDate: DateTime.now(),
+                          lastDate: AppClock.now(),
                           onChanged: (d) {
                             if (d != null) setState(() => _date = d);
                           },

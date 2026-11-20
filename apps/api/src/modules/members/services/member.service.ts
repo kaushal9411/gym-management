@@ -5,6 +5,7 @@ import { AppError, ConflictError, NotFoundError } from '../../../core/errors/app
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { generateOpaqueToken } from '../../../core/security/token.util';
 import { isDataUrl, presignGetUrl, uploadDataUrl } from '../../../core/storage/storage.service';
+import { businessDate } from '../../../core/utils/business-time';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { assertBranchAccess, getBranchAccess } from '../../authentication/middlewares/branch-access.middleware';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
@@ -31,6 +32,7 @@ import {
   type MemberDocumentDto,
   type MemberListItemDto,
   type MemberStatsDto,
+  type MembershipTransferDto,
   type PlanUsageDto,
   type PtSessionLogDto,
   type RenewMembershipInput,
@@ -46,6 +48,8 @@ import { MembershipPlanRepository } from '../repositories/membership-plan.reposi
 import { MembershipRepository } from '../repositories/membership.repository';
 import { PtSessionLogRepository } from '../repositories/pt-session-log.repository';
 import { addDuration } from '../utils/duration.util';
+
+import { MembershipTransferService } from './membership-transfer.service';
 
 
 interface RenewablePlan {
@@ -136,7 +140,7 @@ function toListItem(
   };
 }
 
-function toDetail(member: MemberRow, planUsage: PlanUsageDto | null, outstandingAmount = '0.00'): MemberDetailDto {
+function toDetail(member: MemberRow, planUsage: PlanUsageDto | null, outstandingAmount = '0.00', membershipTransfers: MembershipTransferDto[] = []): MemberDetailDto {
   const listItem = toListItem(member, outstandingAmount);
   const activeMembership = member.memberships.find((m) => m.status === 'ACTIVE');
   const canCheckIn = member.status === 'ACTIVE' && !!activeMembership && new Date(activeMembership.endDate) >= new Date();
@@ -188,6 +192,7 @@ function toDetail(member: MemberRow, planUsage: PlanUsageDto | null, outstanding
       : null,
     portalStatus: member.credential?.status ?? null,
     canCheckIn,
+    membershipTransfers,
     membershipHistory: member.memberships.map((m) => ({
       id: m.id,
       planId: m.planId,
@@ -260,7 +265,7 @@ export class MemberService {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-    const todayStart = new Date(`${now.toISOString().slice(0, 10)}T00:00:00.000Z`);
+    const todayStart = new Date(`${businessDate(now)}T00:00:00.000Z`);
     const in7 = new Date(now.getTime() + 7 * 86_400_000);
     const in30 = new Date(now.getTime() + 30 * 86_400_000);
     const fourteenAgo = new Date(now.getTime() - 14 * 86_400_000);
@@ -354,7 +359,14 @@ export class MemberService {
   async getById(id: string, actorUserId: string): Promise<MemberDetailDto> {
     const member = await this.mustFind(id, actorUserId);
     const outstandingByMember = await this.buildOutstandingAmounts([member.id]);
-    return toDetail(member, await this.buildPlanUsage(member), outstandingByMember.get(member.id) ?? '0.00');
+    const transfers = await new MembershipTransferService(this.tenantId).listForMember(member.id);
+    return toDetail(member, await this.buildPlanUsage(member), outstandingByMember.get(member.id) ?? '0.00', transfers);
+  }
+
+  /** Transfers this member sent or received — branch-checked like every other member read. */
+  async listMembershipTransfers(id: string, actorUserId: string): Promise<MembershipTransferDto[]> {
+    const member = await this.mustFind(id, actorUserId);
+    return new MembershipTransferService(this.tenantId).listForMember(member.id);
   }
 
   /**
@@ -369,7 +381,8 @@ export class MemberService {
     const member = await this.members.findDetail(this.tenantId, id);
     if (!member) throw new NotFoundError('Member not found.');
     const outstandingByMember = await this.buildOutstandingAmounts([member.id]);
-    return toDetail(member, await this.buildPlanUsage(member), outstandingByMember.get(member.id) ?? '0.00');
+    const transfers = await new MembershipTransferService(this.tenantId).listForMember(member.id);
+    return toDetail(member, await this.buildPlanUsage(member), outstandingByMember.get(member.id) ?? '0.00', transfers);
   }
 
   async create(input: CreateMemberInput, actor: IamActor): Promise<MemberDetailDto> {

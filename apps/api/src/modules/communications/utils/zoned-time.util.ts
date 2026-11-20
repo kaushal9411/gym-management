@@ -1,3 +1,4 @@
+import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 /** Wall-clock parts of an instant in an IANA timezone (invalid zones fall back to UTC). */
 export interface ZonedParts {
   year: number;
@@ -9,12 +10,12 @@ export interface ZonedParts {
 }
 
 export function safeTimezone(timezone: string | null | undefined): string {
-  if (!timezone) return 'UTC';
+  if (!timezone) return BUSINESS_TIMEZONE;
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: timezone });
     return timezone;
   } catch {
-    return 'UTC';
+    return BUSINESS_TIMEZONE;
   }
 }
 

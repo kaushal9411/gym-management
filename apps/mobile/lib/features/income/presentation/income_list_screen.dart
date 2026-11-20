@@ -19,6 +19,7 @@ import '../../team/presentation/widgets/team_ui.dart';
 import 'income_filters.dart';
 import 'income_insights.dart';
 import 'income_ui.dart';
+import '../../../core/utils/app_clock.dart';
 
 /// Sort choices: web's two sortable columns (Date, Amount) in both
 /// directions. `value` = `sortBy:sortDir` as the API takes them.
@@ -264,7 +265,7 @@ class _IncomeListScreenState extends State<IncomeListScreen> {
   }
 
   Future<void> _pickCustom() async {
-    final now = DateTime.now();
+    final now = AppClock.now();
     final r = _range;
     final picked = await showDateRangePicker(
       context: context,

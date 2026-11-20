@@ -132,7 +132,7 @@ export default function BusinessSettingsPage() {
                     <Input id="currencySymbol" maxLength={8} value={businessForm.currencySymbol} disabled={!canManage} onChange={(e) => setBusinessForm({ ...businessForm, currencySymbol: e.target.value })} />
                   </Field>
                   <Field label="Timezone" htmlFor="timezone" required>
-                    <Input id="timezone" placeholder="America/Los_Angeles" value={businessForm.timezone} disabled={!canManage} onChange={(e) => setBusinessForm({ ...businessForm, timezone: e.target.value })} />
+                    <Input id="timezone" placeholder="Asia/Kolkata" value={businessForm.timezone} disabled={!canManage} onChange={(e) => setBusinessForm({ ...businessForm, timezone: e.target.value })} />
                   </Field>
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -165,9 +165,14 @@ export default function BusinessSettingsPage() {
                     </select>
                   </Field>
                 </div>
-                <Field className="sm:w-64" label="Language" htmlFor="locale" hint="Future-ready — the portal UI is English-only today.">
-                  <Input id="locale" placeholder="en" value={businessForm.locale} disabled={!canManage} onChange={(e) => setBusinessForm({ ...businessForm, locale: e.target.value })} />
-                </Field>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Language" htmlFor="locale" hint="Future-ready — the portal UI is English-only today.">
+                    <Input id="locale" placeholder="en" value={businessForm.locale} disabled={!canManage} onChange={(e) => setBusinessForm({ ...businessForm, locale: e.target.value })} />
+                  </Field>
+                  <Field label="Membership transfer fee" htmlFor="membershipTransferFee" hint="Prefilled when a member transfers their membership to someone else. Staff can change or waive it per transfer.">
+                    <Input id="membershipTransferFee" type="number" min={0} step="0.01" inputMode="decimal" value={businessForm.membershipTransferFee} disabled={!canManage} onChange={(e) => setBusinessForm({ ...businessForm, membershipTransferFee: e.target.value })} />
+                  </Field>
+                </div>
               </SectionCard>
 
               <SectionCard tone="members" icon={Mail} title="Email settings" subtitle="The sender identity used for outbound emails from your gym.">

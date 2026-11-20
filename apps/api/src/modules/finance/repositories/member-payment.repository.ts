@@ -179,10 +179,10 @@ export class MemberPaymentRepository {
       }),
       this.rawScoped<{ day: string; amount: Prisma.Decimal; cnt: bigint }>(
         tenantId,
-        Prisma.sql`SELECT to_char(r.refunded_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day, SUM(r.amount) AS amount, COUNT(*) AS cnt
+        Prisma.sql`SELECT to_char(r.refunded_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS day, SUM(r.amount) AS amount, COUNT(*) AS cnt
           FROM member_payment_refunds r JOIN member_payments p ON p.id = r.payment_id
           WHERE r.tenant_id = ${tenantId}::uuid ${branchSql}
-            AND (r.refunded_at AT TIME ZONE 'UTC')::date BETWEEN ${previousRange.from}::date AND ${range.to}::date
+            AND (r.refunded_at AT TIME ZONE 'Asia/Kolkata')::date BETWEEN ${previousRange.from}::date AND ${range.to}::date
           GROUP BY 1`,
       ),
       this.rawScoped<{ name: string; revenue: Prisma.Decimal; cnt: bigint }>(

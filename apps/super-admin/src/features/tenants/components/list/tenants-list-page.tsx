@@ -17,6 +17,7 @@ import { ListInsights } from './list-insights';
 import { FilterBar, ViewTabs } from './list-toolbar';
 import { ListFooter, TenantTable } from './list-table';
 import { parseFilters, toApiQuery, toSearchString, type ListFilters } from './url-state';
+import { businessDate } from '@/lib/business-time';
 
 const MAX_SELECT = 100; // bulk endpoint cap
 
@@ -84,7 +85,7 @@ export function TenantsListPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `tenants-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `tenants-${businessDate()}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();

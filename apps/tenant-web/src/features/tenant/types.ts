@@ -65,7 +65,7 @@ export const PLATFORM_TENANT: Tenant = {
     secondaryColor: 'oklch(0.62 0.2 277)',
     welcomeMessage: 'The operating system for modern gyms.',
   },
-  timezone: 'UTC',
+  timezone: 'Asia/Kolkata',
   currency: 'INR',
   locale: 'en',
   subscription: null,

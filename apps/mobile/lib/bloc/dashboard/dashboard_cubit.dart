@@ -14,6 +14,7 @@ import '../../repositories/billing_repository.dart';
 import '../../repositories/branch_repository.dart';
 import '../../repositories/dashboard_repository.dart';
 import 'dashboard_state.dart';
+import '../../core/utils/app_clock.dart';
 
 class DashboardCubit extends Cubit<DashboardState> {
   DashboardCubit(
@@ -62,7 +63,7 @@ class DashboardCubit extends Cubit<DashboardState> {
     List<BranchOption> branches,
     String? branchId,
   ) async {
-    final to = DateTime.now();
+    final to = AppClock.now();
     final from = to.subtract(const Duration(days: 29));
 
     // Kick off all seven before awaiting any of them — genuine parallel

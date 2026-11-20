@@ -1,5 +1,6 @@
 import { TenantError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
+import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
 import type {
@@ -104,7 +105,7 @@ function toResolvedTenant(record: ResolvedTenantRecord, platformFlags: Map<strin
       emailLogoUrl: table?.emailLogoUrl ?? undefined,
       welcomeMessage: table?.welcomeMessage ?? jsonBranding.welcomeMessage ?? 'Welcome back. Sign in to continue.',
     },
-    timezone: record.settings?.timezone ?? 'UTC',
+    timezone: record.settings?.timezone ?? BUSINESS_TIMEZONE,
     currency: record.settings?.currency ?? 'INR',
     locale: record.settings?.locale ?? 'en',
     emailFromName: record.settings?.emailFromName ?? null,

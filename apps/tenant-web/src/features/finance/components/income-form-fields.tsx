@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import type { IncomeCategory } from '../types';
+import { businessDate } from '@/lib/business-time';
 
 const selectClassName = cn(
   'h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm',
@@ -20,7 +21,7 @@ export interface IncomeFormState {
 export const DEFAULT_INCOME_FORM_STATE: IncomeFormState = {
   category: 'MEMBERSHIP_FEE',
   amount: '',
-  incomeDate: new Date().toISOString().slice(0, 10),
+  incomeDate: businessDate(),
   description: '',
 };
 

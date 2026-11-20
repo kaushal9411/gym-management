@@ -189,6 +189,8 @@ export interface MemberDetail extends MemberListItem {
   portalStatus: MemberPortalStatus | null;
   canCheckIn: boolean;
   membershipHistory: MembershipHistoryEntry[];
+  /** Transfers this member sent or received, newest first. */
+  membershipTransfers: MembershipTransfer[];
   freezeHistory: MembershipFreezeEntry[];
   planUsage: PlanUsage | null;
   updatedAt: string;
@@ -328,6 +330,53 @@ export interface DowngradeMembershipPayload {
 
 export interface ExtendMembershipPayload {
   days: number;
+  reason?: string;
+}
+
+export interface MembershipTransferMemberRef {
+  id: string;
+  memberId: string;
+  name: string;
+}
+
+export interface MembershipTransfer {
+  id: string;
+  fromMember: MembershipTransferMemberRef;
+  toMember: MembershipTransferMemberRef;
+  fromMembershipId: string;
+  toMembershipId: string;
+  planId: string;
+  planName: string;
+  originalStartDate: string;
+  originalEndDate: string;
+  daysUsed: number;
+  daysRemaining: number;
+  priceAtAssignment: string;
+  fee: string;
+  reason: string | null;
+  transferredByName: string | null;
+  transferredAt: string;
+}
+
+export interface MembershipTransferPreview {
+  membership: {
+    id: string;
+    planId: string;
+    planName: string;
+    startDate: string;
+    endDate: string;
+    durationDays: number;
+    priceAtAssignment: string;
+    daysUsed: number;
+    daysRemaining: number;
+  } | null;
+  defaultFee: string;
+  blockedReason: string | null;
+}
+
+export interface TransferMembershipPayload {
+  toMemberId: string;
+  fee?: number;
   reason?: string;
 }
 

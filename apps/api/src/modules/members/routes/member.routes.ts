@@ -9,6 +9,7 @@ import {
   assignTrainerSchema,
   bulkMemberActionSchema,
   cancelMembershipSchema,
+  transferMembershipSchema,
   createMemberSchema,
   downgradeMembershipSchema,
   extendMembershipSchema,
@@ -245,6 +246,30 @@ memberRouter.post(
   requirePermission('memberships:upgrade'),
   validate({ params: memberParamSchema, body: cancelMembershipSchema }),
   asyncHandler(memberController.cancelMembership.bind(memberController)),
+);
+
+/** @openapi { "/members/{id}/membership/transfer-preview": { get: { tags: [Members], summary: What a membership transfer would move + the gym's default transfer fee, security: [{bearerAuth: []}], responses: { 200: { description: Transfer preview } } } } } */
+memberRouter.get(
+  '/:id/membership/transfer-preview',
+  requirePermission('memberships:upgrade'),
+  validate({ params: memberParamSchema }),
+  asyncHandler(memberController.transferPreview.bind(memberController)),
+);
+
+/** @openapi { "/members/{id}/membership/transfer": { post: { tags: [Members], summary: Transfer the current active membership to another member (sender's is cancelled, receiver gets the full plan period; fee recorded), security: [{bearerAuth: []}], responses: { 200: { description: Membership transferred }, 409: { description: Receiver already has an active membership } } } } } */
+memberRouter.post(
+  '/:id/membership/transfer',
+  requirePermission('memberships:upgrade'),
+  validate({ params: memberParamSchema, body: transferMembershipSchema }),
+  asyncHandler(memberController.transferMembership.bind(memberController)),
+);
+
+/** @openapi { "/members/{id}/membership-transfers": { get: { tags: [Members], summary: Membership transfers this member sent or received, security: [{bearerAuth: []}], responses: { 200: { description: Transfer history } } } } } */
+memberRouter.get(
+  '/:id/membership-transfers',
+  requirePermission('members:view'),
+  validate({ params: memberParamSchema }),
+  asyncHandler(memberController.listTransfers.bind(memberController)),
 );
 
 /** @openapi { "/members/{id}/branch": { put: { tags: [Members], summary: Transfer the member to a different branch, security: [{bearerAuth: []}], responses: { 200: { description: Transferred } } } } } */

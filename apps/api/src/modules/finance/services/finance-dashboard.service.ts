@@ -1,3 +1,4 @@
+import { businessDate } from '../../../core/utils/business-time';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import type { FinanceDashboardDto } from '../dto/finance.dto';
 import { ExpenseRepository } from '../repositories/expense.repository';
@@ -50,7 +51,7 @@ export class FinanceDashboardService {
   }
 
   async getSummary(branchId?: string): Promise<FinanceDashboardDto> {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr = businessDate();
     const today = new Date(`${todayStr}T00:00:00.000Z`);
     const todayEnd = new Date(`${todayStr}T23:59:59.999Z`);
     const monthStartStr = `${todayStr.slice(0, 7)}-01`;

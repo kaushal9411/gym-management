@@ -14,6 +14,7 @@ import type { IncomeCategory } from '../../types';
 import { INCOME_CATEGORY_META } from '../finance-badges';
 import { DEFAULT_INCOME_FORM_STATE, type IncomeFormState } from '../income-form-fields';
 import { Chip, FieldLabel } from '../payments/payments-ui';
+import { businessDate } from '@/lib/business-time';
 
 const CATEGORIES = Object.keys(INCOME_CATEGORY_META) as IncomeCategory[];
 
@@ -31,7 +32,7 @@ export function AddIncomeDialog({ open, onOpenChange }: { open: boolean; onOpenC
   // Fresh form on every open.
   React.useEffect(() => {
     if (open) {
-      setForm({ ...DEFAULT_INCOME_FORM_STATE, incomeDate: new Date().toISOString().slice(0, 10) });
+      setForm({ ...DEFAULT_INCOME_FORM_STATE, incomeDate: businessDate() });
       setError(null);
     }
   }, [open]);

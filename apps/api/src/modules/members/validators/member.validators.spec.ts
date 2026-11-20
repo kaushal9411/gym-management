@@ -6,6 +6,7 @@ import {
   createMemberSchema,
   createMembershipPlanSchema,
   extendMembershipSchema,
+  transferMembershipSchema,
   updateMemberSchema,
   updateMembershipPlanSchema,
   uploadMemberDocumentSchema,
@@ -221,6 +222,27 @@ describe('member validators', () => {
 
     it('accepts a positive day count with an optional reason', () => {
       expect(extendMembershipSchema.safeParse({ days: 15, reason: 'Gym closed for renovation' }).success).toBe(true);
+    });
+  });
+
+  describe('transferMembershipSchema', () => {
+    const toMemberId = '8f2b1c4e-5d6a-4b7c-9e8f-0a1b2c3d4e5f';
+
+    it('accepts a receiver on its own (fee then defaults to the gym setting server-side)', () => {
+      const parsed = transferMembershipSchema.safeParse({ toMemberId });
+      expect(parsed.success).toBe(true);
+      expect(parsed.success && parsed.data.fee).toBeUndefined();
+    });
+
+    it('accepts a waived (0) or custom fee, coercing a numeric string', () => {
+      expect(transferMembershipSchema.safeParse({ toMemberId, fee: 0 }).success).toBe(true);
+      const parsed = transferMembershipSchema.safeParse({ toMemberId, fee: '300.50' });
+      expect(parsed.success && parsed.data.fee).toBe(300.5);
+    });
+
+    it('rejects a negative fee and a non-uuid receiver', () => {
+      expect(transferMembershipSchema.safeParse({ toMemberId, fee: -1 }).success).toBe(false);
+      expect(transferMembershipSchema.safeParse({ toMemberId: 'MEM-0002' }).success).toBe(false);
     });
   });
 });

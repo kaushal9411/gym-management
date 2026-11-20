@@ -93,6 +93,7 @@ export const updateBusinessSettingsSchema = z
     weekStartDay: z.coerce.number().int().min(0).max(6).optional(),
     measurementUnit: z.enum(['METRIC', 'IMPERIAL']).optional(),
     locale: z.string().trim().min(2).max(10).optional(),
+    membershipTransferFee: z.coerce.number().min(0).max(10_000_000).optional(),
   })
   .refine((data) => Object.keys(data).length > 0, { message: 'Provide at least one field to update' });
 

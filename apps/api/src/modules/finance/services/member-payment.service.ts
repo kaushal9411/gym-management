@@ -151,6 +151,7 @@ export class MemberPaymentService {
     const finalAmount = Math.max(input.amount - discount + tax, 0);
     const paymentDate = input.paymentDate ? new Date(input.paymentDate) : new Date();
     const status = input.status ?? 'SUCCESS';
+    if (input.membershipId && (status === 'SUCCESS' || status === 'PENDING')) await this.assertCollectable(input.membershipId, finalAmount);
     const paymentNumber = await this.payments.nextPaymentNumber(this.tenantId);
 
     const payment = await this.payments.create({
@@ -237,6 +238,7 @@ export class MemberPaymentService {
       where: { tenantId: this.tenantId },
     });
     const currency = (settings?.currency ?? 'INR').toUpperCase();
+    if (input.membershipId) await this.assertCollectable(input.membershipId, finalAmount);
     const paymentNumber = await this.payments.nextPaymentNumber(this.tenantId);
 
     const payment = await this.payments.create({
@@ -303,6 +305,14 @@ export class MemberPaymentService {
     const finalAmount = Math.max(amount - discount + tax, 0);
     const wasSuccess = existing.status === 'SUCCESS';
 
+    // Editing can re-aim, re-price or re-activate a payment — hold it to the same "never more than is due" rule as recording one.
+    const touchesMoney = input.amount !== undefined || input.discount !== undefined || input.tax !== undefined || input.status !== undefined || input.membershipId !== undefined;
+    const nextMembershipId = input.membershipId === undefined ? (existing.membership?.id ?? null) : input.membershipId;
+    const nextStatus = input.status ?? existing.status;
+    if (touchesMoney && nextMembershipId && (nextStatus === 'SUCCESS' || nextStatus === 'PENDING')) {
+      await this.assertCollectable(nextMembershipId, finalAmount, id);
+    }
+
     await this.payments.update(id, {
       membershipId: input.membershipId,
       branchId: input.branchId,
@@ -319,6 +329,7 @@ export class MemberPaymentService {
     await this.audit(actor, 'member_payment.updated', id);
 
     const updated = await this.mustFind(id, actor.userId);
+    if (wasSuccess || updated.status === 'SUCCESS') await this.syncIncomeForPayment(updated);
     if (!wasSuccess && updated.status === 'SUCCESS') {
       const member = decryptMemberContactNullable(
         await this.db.member.findFirst({
@@ -337,6 +348,7 @@ export class MemberPaymentService {
     }
     if (payment.status === 'CANCELLED') throw new ConflictError(ErrorCode.CONFLICT, 'This payment is already cancelled.');
     await this.payments.update(id, { status: 'CANCELLED' });
+    await this.syncIncomeForPayment((await this.payments.findById(this.tenantId, id))!);
     await this.audit(actor, 'member_payment.cancelled', id);
   }
 
@@ -437,6 +449,39 @@ export class MemberPaymentService {
         });
       }
     }
+  }
+
+  /** Throws unless `finalAmount` still fits what is due on the membership — the one place the "no double payment" rule lives. */
+  private async assertCollectable(membershipId: string, finalAmount: number, excludePaymentId?: string): Promise<void> {
+    const { blocked, remaining } = await new MemberBalanceService(this.tenantId).collectable(membershipId, excludePaymentId);
+    if (blocked) throw new ConflictError(ErrorCode.CONFLICT, blocked);
+    if (finalAmount > remaining + 0.01) {
+      throw new ConflictError(
+        ErrorCode.CONFLICT,
+        remaining <= 0.01
+          ? 'This membership is already fully paid — a second payment for it can\'t be recorded.'
+          : `This payment is more than what is still due on this membership (${remaining.toFixed(2)}).`,
+      );
+    }
+  }
+
+  /**
+   * Keeps the auto-created MEMBERSHIP_FEE income row equal to its payment:
+   * a payment that counts as received (SUCCESS / refunded states) has a live
+   * row with its current amount, date and branch; one that no longer counts
+   * (cancelled, failed, back to pending) has its row soft-deleted. Without
+   * this an edited or cancelled payment left the revenue ledger stale.
+   */
+  private async syncIncomeForPayment(payment: MemberPaymentDetailRow): Promise<void> {
+    const income = await this.db.income.findFirst({ where: { tenantId: this.tenantId, sourcePaymentId: payment.id } });
+    if (!income) return;
+    const counts = payment.status === 'SUCCESS' || payment.status === 'PARTIALLY_REFUNDED' || payment.status === 'REFUNDED';
+    await this.db.income.update({
+      where: { id: income.id },
+      data: counts
+        ? { amount: payment.finalAmount, incomeDate: payment.paymentDate, branchId: payment.branch.id, deletedAt: null }
+        : { deletedAt: income.deletedAt ?? new Date() },
+    });
   }
 
   /** "Refunds must create financial history" — always a NEW row, the original payment is never mutated beyond its status flag. */
@@ -593,6 +638,7 @@ export class MemberPaymentService {
     const existingIncome = await this.db.income.findFirst({
       where: { tenantId: this.tenantId, sourcePaymentId: payment.id },
     });
+    if (existingIncome?.deletedAt) await this.syncIncomeForPayment(payment); // payment came back to life — bring its income row back with it
     if (!existingIncome) {
       await this.db.income.create({
         data: {

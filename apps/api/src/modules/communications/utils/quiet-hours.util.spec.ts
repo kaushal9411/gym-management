@@ -14,8 +14,9 @@ describe('zoned time helpers', () => {
     expect(wallTimeToUtc(2026, 10, 20, 8, 0, 'Asia/Kathmandu').toISOString()).toBe('2026-10-20T02:15:00.000Z');
   });
 
-  it('falls back to UTC for an invalid zone', () => {
-    expect(zonedParts(new Date('2026-10-19T10:00:00Z'), 'Not/AZone').hour).toBe(10);
+  it('falls back to Indian Standard Time (UTC+5:30) for an invalid or missing zone', () => {
+    expect(zonedParts(new Date('2026-10-19T10:00:00Z'), 'Not/AZone').hour).toBe(15);
+    expect(zonedParts(new Date('2026-10-19T10:00:00Z'), '').hour).toBe(15);
   });
 
   it('zonedDay gives the local calendar date', () => {

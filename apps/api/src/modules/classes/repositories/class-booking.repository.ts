@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 
+import { businessDate } from '../../../core/utils/business-time';
 import type { TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 
 const SESSION_INCLUDE = {
@@ -84,7 +85,7 @@ export class ClassBookingRepository {
         tenantId,
         memberId,
         status: 'BOOKED',
-        ...(opts?.upcomingOnly ? { classSession: { sessionDate: { gte: new Date(new Date().toISOString().slice(0, 10)) } } } : {}),
+        ...(opts?.upcomingOnly ? { classSession: { sessionDate: { gte: new Date(businessDate()) } } } : {}),
       },
       include: SESSION_INCLUDE,
       orderBy: { classSession: { sessionDate: 'asc' } },

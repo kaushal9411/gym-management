@@ -25,6 +25,7 @@ import { InvoicesSummaryBar, InvoicesTable } from './invoices-table';
 import { BANNER_BTN, Banner } from './pay-kit';
 import { PaymentsSummaryBar, PaymentsTable } from './payments-table';
 import { RANGES, parseFilters, toInvoiceQuery, toPaymentQuery, toSearchString, type PageFilters, type PaymentsTab } from './url-state';
+import { businessDate } from '@/lib/business-time';
 
 const RANGE_LABEL: Record<PaymentsRange, string> = { '30d': '30D', '90d': '90D', '12m': '12M' };
 
@@ -68,7 +69,7 @@ export function PaymentsPage() {
       const blob = await paymentsApi.exportCsv(payQuery);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = `payments-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.href = url; a.download = `payments-${businessDate()}.csv`;
       document.body.appendChild(a); a.click(); a.remove();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast.success('Payments exported (max 10,000 rows).');

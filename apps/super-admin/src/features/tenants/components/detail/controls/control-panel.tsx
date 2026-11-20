@@ -22,6 +22,7 @@ import { InlineConfirm, READONLY_TIP, Switch, type ConfirmCfg } from './confirm'
 import { LimitsEditor } from './limits-editor';
 import { ModulesEditor } from './modules-editor';
 import { NotesTags } from './notes-tags';
+import { businessDate } from '@/lib/business-time';
 
 export const STATUS_TONE: Record<TenantStatus, ChipTone> = { ACTIVE: 'green', TRIAL: 'amber', PAST_DUE: 'red', SUSPENDED: 'red', CANCELLED: 'slate' };
 
@@ -64,7 +65,7 @@ export function ControlPanel({ tenant, canManage }: { tenant: TenantOverview['te
   const changePlan = useChangePlan(tenant.id);
   const [planId, setPlanId] = useState('');
   const [planStep, setPlanStep] = useState<'pick' | 'manual'>('pick');
-  const [manual, setManual] = useState<{ mode: PaymentMode | ''; date: string; amount: string; notes: string }>({ mode: '', date: new Date().toISOString().slice(0, 10), amount: '', notes: '' });
+  const [manual, setManual] = useState<{ mode: PaymentMode | ''; date: string; amount: string; notes: string }>({ mode: '', date: businessDate(), amount: '', notes: '' });
   const [link, setLink] = useState<PaymentLinkResult | null>(null);
 
   const busy = suspend.isPending || activate.isPending || reactivate.isPending || maintenance.isPending || forceLogout.isPending || reset.isPending;
@@ -176,7 +177,7 @@ export function ControlPanel({ tenant, canManage }: { tenant: TenantOverview['te
                 </select>
                 <div className="grid grid-cols-2 gap-2">
                   <Input type="number" min="0" step="0.01" aria-label="Amount" placeholder="Amount" value={manual.amount} onChange={(e) => setManual((m) => ({ ...m, amount: e.target.value }))} />
-                  <Input type="date" aria-label="Payment date" max={new Date().toISOString().slice(0, 10)} value={manual.date} onChange={(e) => setManual((m) => ({ ...m, date: e.target.value }))} />
+                  <Input type="date" aria-label="Payment date" max={businessDate()} value={manual.date} onChange={(e) => setManual((m) => ({ ...m, date: e.target.value }))} />
                 </div>
                 <Input aria-label="Notes" placeholder="Reference / notes (optional)" value={manual.notes} onChange={(e) => setManual((m) => ({ ...m, notes: e.target.value }))} />
                 <p className="text-xs text-muted-foreground">Proof upload lives in the Subscription tab.</p>

@@ -84,16 +84,16 @@ export class AdminDashboardOverviewService {
       }),
       prisma.tenant.count({ where: { deletedAt: null, createdAt: { lt: curStart } } }),
       prisma.$queryRaw<DayRow[]>`
-        SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS d, count(*)::int AS v
+        SELECT to_char(created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS d, count(*)::int AS v
         FROM tenants WHERE deleted_at IS NULL AND created_at >= ${winStart} AND created_at < ${endExcl} GROUP BY 1`,
       scope.payments
         ? prisma.$queryRaw<DayRow[]>`
-          SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS d, sum(amount)::float8 AS v
+          SELECT to_char(created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS d, sum(amount)::float8 AS v
           FROM payments WHERE status = 'SUCCEEDED' AND created_at >= ${winStart} AND created_at < ${endExcl} GROUP BY 1`
         : Promise.resolve(null),
       scope.payments
         ? prisma.$queryRaw<DayRow[]>`
-          SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS d, count(*)::int AS v
+          SELECT to_char(created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS d, count(*)::int AS v
           FROM payments WHERE status = 'FAILED' AND created_at >= ${winStart} AND created_at < ${endExcl} GROUP BY 1`
         : Promise.resolve(null),
       scope.revenue
@@ -164,7 +164,7 @@ export class AdminDashboardOverviewService {
         include: { adminUser: { select: { name: true } } },
       }),
       prisma.$queryRaw<DayRow[]>`
-        SELECT to_char(m AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS d, count(*)::int AS v FROM (
+        SELECT to_char(m AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS d, count(*)::int AS v FROM (
           SELECT tenant_id, cur, min(ts) AS m FROM (
             SELECT tenant_id, COALESCE(cancelled_at, updated_at) AS ts,
                    (COALESCE(cancelled_at, updated_at) >= ${curStart}) AS cur FROM subscriptions

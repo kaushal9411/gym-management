@@ -23,6 +23,7 @@ import { CountChips, ErrorNote, MixBar, TableScroll, relTime, statusLabel, tdCla
 import { useTickets } from '../hooks/use-tickets';
 import type { TicketPriority, TicketStatus } from '../types';
 import { AgeBadge, PRIORITIES, PRIORITY_COLOR, STATUSES, STATUS_COLOR, TicketPriorityChip, TicketStatusChip, ageDays, fmtAge, isLive } from './support-kit';
+import { businessDate } from '@/lib/business-time';
 
 const AXIS = { fontSize: 11, fill: 'var(--muted-foreground)' } as const;
 
@@ -57,7 +58,7 @@ export function SupportPage() {
     if (now === null) return [];
     const days: Array<{ date: string; label: string; count: number }> = [];
     for (let i = 13; i >= 0; i--) {
-      const d = new Date(now - i * 86_400_000).toISOString().slice(0, 10);
+      const d = businessDate(new Date(now - i * 86_400_000));
       days.push({ date: d, label: shortDate(d), count: 0 });
     }
     for (const t of items) { const row = days.find((d) => d.date === t.createdAt.slice(0, 10)); if (row) row.count += 1; }

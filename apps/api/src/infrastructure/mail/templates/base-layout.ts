@@ -1,3 +1,4 @@
+import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 /**
  * Shared transactional-email shell + building blocks.
  *
@@ -385,7 +386,7 @@ export function formatDate(value: string | Date | null | undefined): string {
   if (!value) return '';
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
-  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: BUSINESS_TIMEZONE });
 }
 
 /** Derives a readable plain-text alternative from rendered HTML (used by the mailer for every message). */

@@ -64,6 +64,7 @@ function toBusinessSettingsDto(settings: TenantSettings): BusinessSettingsDto {
     weekStartDay: settings.weekStartDay,
     measurementUnit: settings.measurementUnit,
     locale: settings.locale,
+    membershipTransferFee: settings.membershipTransferFee.toString(),
     updatedAt: settings.updatedAt.toISOString(),
   };
 }

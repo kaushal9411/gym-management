@@ -1,5 +1,6 @@
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
+import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { dateInTimezone } from '../../attendance/utils/timezone.util';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
@@ -160,7 +161,7 @@ export class MemberSelfMeasurementService {
       select: { branch: { select: { timezone: true } } },
     });
     if (!member) throw new NotFoundError('Member not found.');
-    return dateInTimezone(member.branch.timezone || 'UTC');
+    return dateInTimezone(member.branch.timezone || BUSINESS_TIMEZONE);
   }
 
   private async audit(

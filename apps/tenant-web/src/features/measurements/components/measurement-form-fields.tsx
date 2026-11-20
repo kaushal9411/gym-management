@@ -3,9 +3,10 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { BodyMeasurement, BodyMeasurementFormValues, CreateBodyMeasurementPayload } from '../types';
+import { businessDate } from '@/lib/business-time';
 
 export const EMPTY_MEASUREMENT_FORM: BodyMeasurementFormValues = {
-  recordedAt: new Date().toISOString().slice(0, 10),
+  recordedAt: businessDate(),
   weightKg: '',
   heightCm: '',
   bodyFatPercent: '',

@@ -1,3 +1,4 @@
+import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 
 const DAY_MS = 86_400_000;
@@ -95,7 +96,7 @@ const SECTIONS: ContextSection[] = [
     permission: 'settings:read',
     build: async (db, tenantId) => {
       const settings = await db.tenantSettings.findUnique({ where: { tenantId }, select: { timezone: true, currency: true } });
-      return `Settings: timezone ${settings?.timezone ?? 'UTC'}, currency ${settings?.currency ?? 'INR'}.`;
+      return `Settings: timezone ${settings?.timezone ?? BUSINESS_TIMEZONE}, currency ${settings?.currency ?? 'INR'}.`;
     },
   },
 ];

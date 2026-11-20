@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { fileToDataUrl, fileToRawDataUrl } from '@/lib/image-to-data-url';
 import { cn } from '@/lib/utils';
 import type { ExpenseCategory } from '../types';
+import { businessDate } from '@/lib/business-time';
 
 const selectClassName = cn(
   'h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm',
@@ -30,7 +31,7 @@ export interface ExpenseFormState {
 export const DEFAULT_EXPENSE_FORM_STATE: ExpenseFormState = {
   category: 'RENT',
   amount: '',
-  expenseDate: new Date().toISOString().slice(0, 10),
+  expenseDate: businessDate(),
   description: '',
   receiptFileName: '',
   receiptDataUrl: '',

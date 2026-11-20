@@ -14,7 +14,7 @@ import { useTenant } from '@/features/tenant/tenant-provider';
 
 function formatMoney(amount: number, currency: string): string {
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount);
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount);
   } catch {
     return `${currency} ${amount}`;
   }

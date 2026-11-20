@@ -13,13 +13,14 @@ import { fieldClass } from '@/features/tenants/components/detail/tabs/_shared/ki
 import { fileToDataUrl } from '@/lib/image-to-data-url';
 import { fmtPrice } from '../lib/plan-utils';
 import type { Plan } from '../types';
+import { businessDate } from '@/lib/business-time';
 
 const MODES: Array<{ value: PaymentMode; label: string }> = [
   { value: 'CASH', label: 'Cash' }, { value: 'BANK_TRANSFER', label: 'Bank transfer' }, { value: 'UPI', label: 'UPI' },
   { value: 'CHEQUE', label: 'Cheque' }, { value: 'CARD', label: 'Card' }, { value: 'OTHER', label: 'Other' },
 ];
 const MAX_PROOF = 4 * 1024 * 1024;
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => businessDate();
 const price = (p: Plan, cycle: string) => Number(cycle === 'YEARLY' ? p.priceYearly : p.priceMonthly);
 const labelCls = 'mb-1 block text-xs font-medium text-muted-foreground';
 

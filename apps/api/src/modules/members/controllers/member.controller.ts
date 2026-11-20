@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
+import { businessDate } from '../../../core/utils/business-time';
 import { actorFrom } from '../../authentication/utils/actor.util';
 import type {
   AssignMembershipInput,
@@ -16,12 +17,14 @@ import type {
   MemberBulkImportRow,
   RenewMembershipInput,
   TransferBranchInput,
+  TransferMembershipInput,
   UpdateMemberInput,
   UpgradeMembershipInput,
   UploadDocumentInput,
 } from '../dto/member.dto';
 import { MemberGdprService } from '../services/member-gdpr.service';
 import { MemberService } from '../services/member.service';
+import { MembershipTransferService } from '../services/membership-transfer.service';
 
 function serviceFor(req: Request): MemberService {
   return new MemberService(req.tenant!.id);
@@ -115,6 +118,19 @@ export class MemberController {
     sendSuccess(res, member, 'Membership cancelled.');
   }
 
+  async transferPreview(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await new MembershipTransferService(req.tenant!.id).preview(req.params.id!, actorFrom(req)));
+  }
+
+  async transferMembership(req: Request, res: Response): Promise<void> {
+    const transfer = await new MembershipTransferService(req.tenant!.id).transfer(req.params.id!, req.body as TransferMembershipInput, actorFrom(req));
+    sendSuccess(res, transfer, 'Membership transferred.');
+  }
+
+  async listTransfers(req: Request, res: Response): Promise<void> {
+    sendSuccess(res, await serviceFor(req).listMembershipTransfers(req.params.id!, req.auth!.sub));
+  }
+
   async resumeMembership(req: Request, res: Response): Promise<void> {
     await serviceFor(req).resumeMembership(req.params.id!, actorFrom(req));
     sendSuccess(res, null, 'Membership resumed.');
@@ -182,7 +198,7 @@ export class MemberController {
     res
       .status(200)
       .setHeader('Content-Type', 'text/csv; charset=utf-8')
-      .setHeader('Content-Disposition', `attachment; filename="members-export-${new Date().toISOString().slice(0, 10)}.csv"`)
+      .setHeader('Content-Disposition', `attachment; filename="members-export-${businessDate()}.csv"`)
       .send(csv);
   }
 

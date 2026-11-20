@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 
+import { businessDate } from '../../../core/utils/business-time';
 import { csvRow } from '../../admin-tenants/utils/tenant-list.util';
 
 export const PAYMENT_SORTS = ['createdAt', 'amount', 'paidAt'] as const;
@@ -14,7 +15,7 @@ const dayStart = (d: string) => new Date(`${d}T00:00:00Z`);
 const nextDay = (d: string) => new Date(dayStart(d).getTime() + 86_400_000);
 
 export const todayStart = (now: Date = new Date()): Date =>
-  dayStart(now.toISOString().slice(0, 10));
+  dayStart(businessDate(now));
 
 export interface PaymentFilters {
   status?: string;

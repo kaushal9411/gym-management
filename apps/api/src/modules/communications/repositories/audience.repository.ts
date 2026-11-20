@@ -1,5 +1,6 @@
 import type { Prisma, TenantNotificationChannel } from '@prisma/client';
 
+import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 import type { TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { decryptMemberField, hashEmail, hashPhone } from '../../members/utils/member-pii.util';
 
@@ -175,7 +176,7 @@ export class AudienceRepository {
           phone: safeDecrypt(r.phone),
           branchId: r.branchId,
           branchName: r.branch.name,
-          timezone: r.branch.timezone || 'UTC',
+          timezone: r.branch.timezone || BUSINESS_TIMEZONE,
           planName: latest?.plan.name ?? null,
           endDate: latest?.endDate ?? null,
           amountDue,

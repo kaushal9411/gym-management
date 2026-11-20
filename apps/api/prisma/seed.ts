@@ -104,7 +104,7 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'memberships:restore', description: 'Restore a soft-deleted membership plan' },
   { key: 'memberships:assign', description: "Assign a membership plan to a member" },
   { key: 'memberships:renew', description: "Renew or extend a member's membership" },
-  { key: 'memberships:upgrade', description: "Upgrade, downgrade, or cancel a member's membership" },
+  { key: 'memberships:upgrade', description: "Upgrade, downgrade, cancel, or transfer a member's membership" },
   { key: 'memberships:freeze', description: "Freeze or resume a member's membership" },
 
   // Attendance Management (Prompt 16) — granular keys distinct from the

@@ -173,6 +173,8 @@ export interface MemberDetailDto extends MemberListItemDto {
   /** Real, enforced eligibility — see `AttendanceService#eligibility`, which independently derives the same result and actually rejects check-in on it. */
   canCheckIn: boolean;
   membershipHistory: MembershipHistoryEntryDto[];
+  /** Every membership transfer this member sent or received, newest first — the history the profile shows next to the plan. */
+  membershipTransfers: MembershipTransferDto[];
   freezeHistory: MembershipFreezeEntryDto[];
   planUsage: PlanUsageDto | null;
   updatedAt: string;
@@ -335,6 +337,56 @@ export interface DowngradeMembershipInput {
 export interface ExtendMembershipInput {
   days: number;
   reason?: string;
+}
+
+export interface TransferMembershipInput {
+  toMemberId: string;
+  /** Omitted = the gym's default transfer fee (Business Settings); 0 waives it. */
+  fee?: number;
+  reason?: string;
+}
+
+export interface MembershipTransferMemberRef {
+  id: string;
+  memberId: string;
+  name: string;
+}
+
+export interface MembershipTransferDto {
+  id: string;
+  fromMember: MembershipTransferMemberRef;
+  toMember: MembershipTransferMemberRef;
+  fromMembershipId: string;
+  toMembershipId: string;
+  planId: string;
+  planName: string;
+  originalStartDate: string;
+  originalEndDate: string;
+  daysUsed: number;
+  daysRemaining: number;
+  priceAtAssignment: string;
+  fee: string;
+  reason: string | null;
+  transferredByName: string | null;
+  transferredAt: string;
+}
+
+export interface MembershipTransferPreviewDto {
+  /** The package that would move — null when the member has no ACTIVE membership. */
+  membership: {
+    id: string;
+    planId: string;
+    planName: string;
+    startDate: string;
+    endDate: string;
+    durationDays: number;
+    priceAtAssignment: string;
+    daysUsed: number;
+    daysRemaining: number;
+  } | null;
+  defaultFee: string;
+  /** Why the sender cannot transfer right now (frozen, unpaid balance, no membership), or null. */
+  blockedReason: string | null;
 }
 
 export interface CancelMembershipInput {

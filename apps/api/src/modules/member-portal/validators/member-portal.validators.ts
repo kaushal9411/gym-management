@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { businessDate } from '../../../core/utils/business-time';
 import { measurementFields } from '../../measurements/validators/measurement.validators';
 import { hasMeasurementValue } from '../utils/member-measurement.util';
 
@@ -114,7 +115,7 @@ export const memberProfileUpdateSchema = z
     email: optionalField(z.string().trim().email('Enter a valid email address').max(254, 'Email is too long').toLowerCase()),
     phone: optionalField(profilePhone),
     dateOfBirth: optionalField(
-      profileDate.refine((d) => d <= new Date().toISOString().slice(0, 10), 'Date of birth cannot be in the future'),
+      profileDate.refine((d) => d <= businessDate(), 'Date of birth cannot be in the future'),
     ),
     gender: optionalField(
       z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'], {

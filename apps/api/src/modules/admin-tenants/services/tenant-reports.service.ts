@@ -1,3 +1,4 @@
+import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 import { Prisma, rawForTenant } from '../repositories/tenant-detail.db';
 import {
   adoptionShare,
@@ -279,7 +280,7 @@ export class TenantReportsService {
         ? { from: r.prevFrom.toISOString(), to: r.prevTo.toISOString() }
         : null,
       currentRange: { from: r.from.toISOString(), to: r.to.toISOString() },
-      timezone: 'UTC',
+      timezone: BUSINESS_TIMEZONE,
       kpis: {
         revenuePaid: {
           value: toMoney(revenue[0]?.cur),

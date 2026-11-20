@@ -23,6 +23,7 @@ import { overviewFromStats } from './overview-fallback';
 import { SystemHealth } from './system-health';
 import { Segmented, EmptyNote } from './ui';
 import { useNow } from './use-now';
+import { businessDate } from '@/lib/business-time';
 
 const RANGES: Array<{ value: OverviewRange; label: string; long: string; n: string }> = [
   { value: '7d', label: '7D', long: '7 days', n: '7' },
@@ -114,7 +115,7 @@ export function DashboardPage() {
           <Button variant="outline" size="icon" aria-label="Refresh data" title="Refresh" onClick={() => void qc.invalidateQueries({ queryKey: [...OVERVIEW_QUERY_KEY] })}>
             <RefreshCw className={`size-4 ${ov.isFetching ? 'animate-spin' : ''}`} aria-hidden />
           </Button>
-          <Button variant="outline" disabled={!data} onClick={() => data && downloadCsv(`fitcloud-overview-${range}-${new Date().toISOString().slice(0, 10)}.csv`, buildOverviewCsv(data, range, platformName))}>
+          <Button variant="outline" disabled={!data} onClick={() => data && downloadCsv(`fitcloud-overview-${range}-${businessDate()}.csv`, buildOverviewCsv(data, range, platformName))}>
             <Download className="size-4" aria-hidden />Export report
           </Button>
         </div>

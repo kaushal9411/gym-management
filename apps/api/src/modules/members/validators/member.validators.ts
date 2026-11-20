@@ -189,6 +189,12 @@ export const cancelMembershipSchema = z.object({
   reason: z.string().trim().max(500).optional(),
 });
 
+export const transferMembershipSchema = z.object({
+  toMemberId: z.string().uuid(),
+  fee: z.coerce.number().min(0).max(10_000_000).optional(),
+  reason: z.string().trim().max(500).optional(),
+});
+
 export const freezeMembershipSchema = z.object({
   reason: z.string().trim().max(500).optional(),
 });

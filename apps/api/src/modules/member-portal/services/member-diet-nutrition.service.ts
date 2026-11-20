@@ -1,4 +1,5 @@
 import { NotFoundError } from '../../../core/errors/app-error';
+import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { dateInTimezone } from '../../attendance/utils/timezone.util';
 import { buildDietInsights } from '../utils/member-diet-insights.util';
@@ -41,7 +42,7 @@ export class MemberDietNutritionService {
       select: { branch: { select: { timezone: true } } },
     });
     if (!member) throw new NotFoundError('Member not found.');
-    return dateInTimezone(member.branch.timezone || 'UTC');
+    return dateInTimezone(member.branch.timezone || BUSINESS_TIMEZONE);
   }
 
   async build(memberId: string, assignment: AssignmentLike): Promise<DietNutritionDto> {

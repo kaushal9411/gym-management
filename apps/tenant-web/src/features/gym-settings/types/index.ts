@@ -73,6 +73,8 @@ export interface BusinessSettings {
   weekStartDay: number;
   measurementUnit: MeasurementUnit;
   locale: string;
+  /** Default fee when a member transfers their membership to another member (gym currency), as a decimal string. */
+  membershipTransferFee: string;
   updatedAt: string;
 }
 

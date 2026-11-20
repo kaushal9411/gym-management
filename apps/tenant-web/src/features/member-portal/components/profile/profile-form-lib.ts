@@ -1,4 +1,5 @@
 import type { MemberProfilePatch, MemberSelfProfile } from '../../services/member-profile.service';
+import { businessDate } from '@/lib/business-time';
 
 /** Flat string form state keyed by the PATCH key names (`''` = empty). */
 export const FORM_KEYS = [
@@ -46,7 +47,7 @@ export function buildPatch(keys: FormKey[], values: FormState): MemberProfilePat
 const PHONE = /^\+?[0-9\s-]{7,15}$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => businessDate();
 
 /** Mirrors `memberProfileUpdateSchema` in apps/api (no stricter). Only validates the given keys. */
 export function validate(keys: FormKey[], v: FormState): FormErrors {

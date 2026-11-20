@@ -21,7 +21,7 @@ async function fetchPlans(): Promise<SubscriptionPlan[]> {
 
 function money(amount: number, currency: string): string {
   try {
-    return new Intl.NumberFormat(currency === 'INR' ? 'en-IN' : undefined, { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount);
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: 0 }).format(amount);
   } catch {
     return `${currency} ${amount.toLocaleString()}`;
   }

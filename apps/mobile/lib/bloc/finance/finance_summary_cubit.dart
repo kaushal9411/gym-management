@@ -8,6 +8,7 @@ import '../../repositories/branch_repository.dart';
 import '../../repositories/finance_repository.dart';
 import '../../repositories/reports_repository.dart';
 import 'finance_summary_state.dart';
+import '../../core/utils/app_clock.dart';
 
 class FinanceSummaryCubit extends Cubit<FinanceSummaryState> {
   FinanceSummaryCubit(
@@ -23,8 +24,8 @@ class FinanceSummaryCubit extends Cubit<FinanceSummaryState> {
   final ReportsRepository _reports;
 
   static DateTimeRange get _defaultRange => DateTimeRange(
-        start: DateTime.now().subtract(const Duration(days: 29)),
-        end: DateTime.now(),
+        start: AppClock.now().subtract(const Duration(days: 29)),
+        end: AppClock.now(),
       );
 
   Future<void> load() async {

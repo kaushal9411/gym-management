@@ -21,6 +21,7 @@ import { ListFooter } from '@/features/tenants/components/list/list-table';
 import { ErrorNote, TableScroll, fmtDateTime, relTime, tdClass, thClass } from '@/features/tenants/components/detail/tabs/_shared/kit';
 import { useAuditLogs } from '../hooks/use-audit';
 import type { AuditLogEntry } from '../types';
+import { businessDate } from '@/lib/business-time';
 
 const AXIS = { fontSize: 11, fill: 'var(--muted-foreground)' } as const;
 const FIELD = 'h-9 rounded-[9px] border border-input bg-card px-2.5 text-[13px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring';
@@ -59,7 +60,7 @@ export function AuditPage() {
   const daily = React.useMemo(() => {
     if (now === null) return [];
     const days: Array<{ date: string; label: string; count: number }> = [];
-    for (let i = 13; i >= 0; i--) { const d = new Date(now - i * 86_400_000).toISOString().slice(0, 10); days.push({ date: d, label: shortDate(d), count: 0 }); }
+    for (let i = 13; i >= 0; i--) { const d = businessDate(new Date(now - i * 86_400_000)); days.push({ date: d, label: shortDate(d), count: 0 }); }
     for (const l of sItems) { const r = days.find((d) => d.date === l.createdAt.slice(0, 10)); if (r) r.count += 1; }
     return days;
   }, [sItems, now]);

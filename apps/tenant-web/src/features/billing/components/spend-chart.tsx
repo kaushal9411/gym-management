@@ -13,7 +13,7 @@ export interface SpendPoint {
 export function SpendChart({ points, currency }: { points: SpendPoint[]; currency: string }) {
   const symbol = (() => {
     try {
-      return new Intl.NumberFormat(undefined, { style: 'currency', currency }).formatToParts(0).find((p) => p.type === 'currency')?.value ?? currency;
+      return new Intl.NumberFormat('en-IN', { style: 'currency', currency }).formatToParts(0).find((p) => p.type === 'currency')?.value ?? currency;
     } catch {
       return currency;
     }

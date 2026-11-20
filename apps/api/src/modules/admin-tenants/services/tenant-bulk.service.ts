@@ -1,5 +1,6 @@
 import { AppError, ForbiddenError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
+import { businessDate } from '../../../core/utils/business-time';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
 import { adminTenantRepository } from '../repositories/admin-tenant.repository';
@@ -95,7 +96,7 @@ export class TenantBulkService {
             mode === 'manual'
               ? {
                   paymentMode: params.paymentMode ?? ('OTHER' as const),
-                  paymentDate: params.paymentDate ?? new Date().toISOString().slice(0, 10),
+                  paymentDate: params.paymentDate ?? businessDate(),
                   notes: params.notes ?? 'Bulk plan change by admin',
                 }
               : undefined;

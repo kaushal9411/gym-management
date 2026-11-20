@@ -25,13 +25,14 @@ import { fileToDataUrl } from '@/lib/image-to-data-url';
 import { useTenantSubscription, useTenantSubscriptionHistory, type TabSubscription } from '../../../api/tabs';
 import { toTenantError, useExtendTrial } from '../../../hooks/use-tenants';
 import { ErrorNote, TabSkeleton, TableScroll, fieldClass, fmtDate, fmtDateTime, money, statusLabel, statusTone, tdClass, thClass, type TabProps } from './_shared/kit';
+import { businessDate } from '@/lib/business-time';
 
 const MODES: Array<{ value: PaymentMode; label: string }> = [
   { value: 'CASH', label: 'Cash' }, { value: 'BANK_TRANSFER', label: 'Bank transfer' }, { value: 'UPI', label: 'UPI' },
   { value: 'CHEQUE', label: 'Cheque' }, { value: 'CARD', label: 'Card' }, { value: 'OTHER', label: 'Other' },
 ];
 const MAX_PROOF = 4 * 1024 * 1024;
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => businessDate();
 
 const planPrice = (p: { priceMonthly: string; priceYearly: string }, cycle: string) => Number(cycle === 'YEARLY' ? p.priceYearly : p.priceMonthly);
 const monthly = (p: { priceMonthly: string; priceYearly: string }, cycle: string) => (cycle === 'YEARLY' ? Number(p.priceYearly) / 12 : Number(p.priceMonthly));

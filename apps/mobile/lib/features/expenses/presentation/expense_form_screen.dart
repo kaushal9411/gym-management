@@ -17,6 +17,7 @@ import '../../income/presentation/income_ui.dart';
 import '../../manager/presentation/widgets/member_detail_anim.dart';
 import '../../team/presentation/widgets/team_ui.dart';
 import 'expense_ui.dart';
+import '../../../core/utils/app_clock.dart';
 
 /// "Add an expense" — web's `/expenses/new` page.
 ///
@@ -46,7 +47,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
   final _descriptionController = TextEditingController();
   final _amountController = TextEditingController();
   ExpenseCategory _category = ExpenseCategory.rent;
-  DateTime _date = DateTime.now();
+  DateTime _date = AppClock.now();
   String? _receiptName;
   String? _receiptDataUrl;
   Uint8List? _receiptBytes;
@@ -286,7 +287,7 @@ class _ExpenseFormScreenState extends State<ExpenseFormScreen> {
               value: _date,
               clearable: false,
               firstDate: DateTime(2020),
-              lastDate: DateTime.now(),
+              lastDate: AppClock.now(),
               onChanged: (d) {
                 if (d != null) setState(() => _date = d);
               },

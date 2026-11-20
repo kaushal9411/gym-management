@@ -31,9 +31,9 @@ export function weekDays(weekStart: Date): Date[] {
   });
 }
 
-const dayFormatter = new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone: 'UTC' });
-const dateFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
-const rangeFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+const dayFormatter = new Intl.DateTimeFormat(undefined, { weekday: 'short', timeZone: 'Asia/Kolkata' });
+const dateFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', timeZone: 'Asia/Kolkata' });
+const rangeFormatter = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'Asia/Kolkata' });
 
 interface ClassCalendarProps {
   weekStart: Date;

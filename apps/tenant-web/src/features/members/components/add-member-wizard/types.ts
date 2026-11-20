@@ -1,4 +1,5 @@
 import type { Gender } from '../../types';
+import { businessDate } from '@/lib/business-time';
 
 /** Core `Member` profile fields (pre-existing on the backend since Prompt 14) that the wizard's step 1 collects inline — kept separate from `MemberExtendedInfoFormState`/`MemberHealthFormState` (the genuinely new field groups added in Prompt 82), since the edit page already has its own inline rendering of these same core fields and doesn't need this type. */
 export interface WizardCorePersonalState {
@@ -42,7 +43,7 @@ export function defaultWizardCorePersonalState(): WizardCorePersonalState {
     state: '',
     country: 'India',
     postalCode: '',
-    joiningDate: new Date().toISOString().slice(0, 10),
+    joiningDate: businessDate(),
     dobDay: '',
     dobMonth: '',
     dobYear: '',

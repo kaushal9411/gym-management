@@ -193,73 +193,73 @@ model Tenant {
   updatedAt             DateTime     @updatedAt @map("updated_at")
   deletedAt             DateTime?    @map("deleted_at")
 
-  settings              TenantSettings?
-  branding              TenantBranding?
-  profile               TenantProfile?
-  invoiceSettings       TenantInvoiceSettings?
-  limits                TenantLimit?
-  users                 User[]
-  roles                 Role[]
-  refreshTokens         RefreshToken[]
-  passwordResets        PasswordReset[]
-  emailVerifications    EmailVerification[]
-  otpCodes              OtpCode[]
-  mfaBackupCodes        MfaBackupCode[]
-  mfaSetupTokens        MfaSetupToken[]
-  loginHistory          LoginHistory[]
-  userSessions          UserSession[]
-  auditLogs             AuditLog[]
-  domains               TenantDomain[]
-  branches              Branch[]
-  modules               TenantModule[]
-  adminNotes            TenantAdminNote[]
-  adminTags             TenantAdminTags?
-  usage                 TenantUsage[]
-  subscriptions         Subscription[]
-  subscriptionHistory   SubscriptionHistory[]
-  billingAddress        BillingAddress?
-  paymentMethods        PaymentMethod[]
-  payments              Payment[]
-  invoices              Invoice[]
-  couponRedemptions     CouponRedemption[]
-  supportTickets        SupportTicket[]
-  notifications         TenantNotification[]
-  memberNotifications   MemberNotification[]
-  userPermissions       UserPermission[]
-  userBranches          UserBranch[]
-  userInvitations       UserInvitation[]
-  staffProfiles         StaffProfile[]
-  membershipPlans       MembershipPlan[]
-  members               Member[]
-  memberships           Membership[]
-  membershipFreezes     MembershipFreeze[]
-  memberDocuments       MemberDocument[]
-  bodyMeasurements      BodyMeasurement[]
-  attendances           Attendance[]
-  attendanceDevices     AttendanceDevice[]
-  exercises             Exercise[]
-  workoutPlans          WorkoutPlan[]
-  workoutPlanExercises  WorkoutPlanExercise[]
-  memberWorkoutPlans    MemberWorkoutPlan[]
-  memberWorkoutProgress MemberWorkoutProgress[]
+  settings                 TenantSettings?
+  branding                 TenantBranding?
+  profile                  TenantProfile?
+  invoiceSettings          TenantInvoiceSettings?
+  limits                   TenantLimit?
+  users                    User[]
+  roles                    Role[]
+  refreshTokens            RefreshToken[]
+  passwordResets           PasswordReset[]
+  emailVerifications       EmailVerification[]
+  otpCodes                 OtpCode[]
+  mfaBackupCodes           MfaBackupCode[]
+  mfaSetupTokens           MfaSetupToken[]
+  loginHistory             LoginHistory[]
+  userSessions             UserSession[]
+  auditLogs                AuditLog[]
+  domains                  TenantDomain[]
+  branches                 Branch[]
+  modules                  TenantModule[]
+  adminNotes               TenantAdminNote[]
+  adminTags                TenantAdminTags?
+  usage                    TenantUsage[]
+  subscriptions            Subscription[]
+  subscriptionHistory      SubscriptionHistory[]
+  billingAddress           BillingAddress?
+  paymentMethods           PaymentMethod[]
+  payments                 Payment[]
+  invoices                 Invoice[]
+  couponRedemptions        CouponRedemption[]
+  supportTickets           SupportTicket[]
+  notifications            TenantNotification[]
+  memberNotifications      MemberNotification[]
+  userPermissions          UserPermission[]
+  userBranches             UserBranch[]
+  userInvitations          UserInvitation[]
+  staffProfiles            StaffProfile[]
+  membershipPlans          MembershipPlan[]
+  members                  Member[]
+  memberships              Membership[]
+  membershipFreezes        MembershipFreeze[]
+  memberDocuments          MemberDocument[]
+  bodyMeasurements         BodyMeasurement[]
+  attendances              Attendance[]
+  attendanceDevices        AttendanceDevice[]
+  exercises                Exercise[]
+  workoutPlans             WorkoutPlan[]
+  workoutPlanExercises     WorkoutPlanExercise[]
+  memberWorkoutPlans       MemberWorkoutPlan[]
+  memberWorkoutProgress    MemberWorkoutProgress[]
   memberWorkoutDailyLogs   MemberWorkoutDailyLog[]
   memberWorkoutSessionLogs MemberWorkoutSessionLog[]
-  foods                 Food[]
-  dietPlans             DietPlan[]
-  dietPlanMeals         DietPlanMeal[]
-  memberDietPlans       MemberDietPlan[]
-  memberDietDailyLogs   MemberDietDailyLog[]
-  memberInvoices        MemberInvoice[]
-  memberInvoiceItems    MemberInvoiceItem[]
-  memberPayments        MemberPayment[]
-  memberPaymentRefunds  MemberPaymentRefund[]
-  incomeEntries         Income[]
-  leads                 Lead[]
-  leadActivities        LeadActivity[]
-  expenses              Expense[]
-  scheduledReports      ScheduledReport[]
-  tenantAnnouncements   TenantAnnouncement[]
-  notificationTemplates NotificationTemplate[]
+  foods                    Food[]
+  dietPlans                DietPlan[]
+  dietPlanMeals            DietPlanMeal[]
+  memberDietPlans          MemberDietPlan[]
+  memberDietDailyLogs      MemberDietDailyLog[]
+  memberInvoices           MemberInvoice[]
+  memberInvoiceItems       MemberInvoiceItem[]
+  memberPayments           MemberPayment[]
+  memberPaymentRefunds     MemberPaymentRefund[]
+  incomeEntries            Income[]
+  leads                    Lead[]
+  leadActivities           LeadActivity[]
+  expenses                 Expense[]
+  scheduledReports         ScheduledReport[]
+  tenantAnnouncements      TenantAnnouncement[]
+  notificationTemplates    NotificationTemplate[]
   notificationChannelLimit TenantNotificationChannelLimit?
   notificationUsage        TenantNotificationUsage[]
   notificationDeliveryLogs NotificationDeliveryLog[]
@@ -268,22 +268,23 @@ model Tenant {
   automationRules          NotificationAutomationRule[]
   automationDispatches     AutomationDispatch[]
   memberChannelPreferences MemberChannelPreference[]
-  aiConversations       AiConversation[]
-  aiMessages            AiMessage[]
-  aiRequestLogs         AiRequestLog[]
-  aiSettings            TenantAiSettings?
-  memberCredentials     MemberCredential[]
-  memberSessions        MemberSession[]
-  staffDeviceTokens     StaffDeviceToken[]
-  memberDeviceTokens    MemberDeviceToken[]
-  memberVerifications   MemberVerification[]
-  memberOtpCodes        MemberOtpCode[]
-  groupClasses          GroupClass[]
-  groupClassSchedules   GroupClassSchedule[]
-  classSessions         ClassSession[]
-  classBookings         ClassBooking[]
-  guestVisits           GuestVisit[]
-  ptSessionLogs         PtSessionLog[]
+  aiConversations          AiConversation[]
+  aiMessages               AiMessage[]
+  aiRequestLogs            AiRequestLog[]
+  aiSettings               TenantAiSettings?
+  memberCredentials        MemberCredential[]
+  memberSessions           MemberSession[]
+  staffDeviceTokens        StaffDeviceToken[]
+  memberDeviceTokens       MemberDeviceToken[]
+  memberVerifications      MemberVerification[]
+  memberOtpCodes           MemberOtpCode[]
+  groupClasses             GroupClass[]
+  groupClassSchedules      GroupClassSchedule[]
+  classSessions            ClassSession[]
+  classBookings            ClassBooking[]
+  guestVisits              GuestVisit[]
+  ptSessionLogs            PtSessionLog[]
+  membershipTransfers      MembershipTransfer[]
 
   @@map("tenants")
 }
@@ -302,7 +303,7 @@ model TenantSettings {
   tenantId                     String          @unique @map("tenant_id") @db.Uuid
   /// { primaryColor, primaryForeground, logoUrl?, welcomeMessage }
   branding                     Json            @default("{}")
-  timezone                     String          @default("UTC") @db.VarChar(64)
+  timezone                     String          @default("Asia/Kolkata") @db.VarChar(64)
   currency                     String          @default("INR") @db.Char(3)
   locale                       String          @default("en") @db.VarChar(10)
   emailFromName                String?         @map("email_from_name") @db.VarChar(120)
@@ -343,6 +344,8 @@ model TenantSettings {
   /// finish every item). Not part of `ResolvedTenant`/the tenant-resolve
   /// cache, so no `tenantService.invalidateCache` call is needed on write.
   onboardingChecklistDismissed Boolean         @default(false) @map("onboarding_checklist_dismissed")
+  /// Default fee (in the gym currency) charged when one member transfers their membership to another — prefilled on the transfer dialog, editable/waivable per transfer.
+  membershipTransferFee        Decimal         @default(0) @map("membership_transfer_fee") @db.Decimal(10, 2)
   createdAt                    DateTime        @default(now()) @map("created_at")
   updatedAt                    DateTime        @updatedAt @map("updated_at")
 
@@ -390,7 +393,7 @@ model User {
   updatedAt                DateTime   @updatedAt @map("updated_at")
   deletedAt                DateTime?  @map("deleted_at")
 
-  tenant                       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant                       Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   userRoles                    UserRole[]
   refreshTokens                RefreshToken[]
   passwordResets               PasswordReset[]
@@ -400,34 +403,35 @@ model User {
   mfaSetupTokens               MfaSetupToken[]
   loginHistory                 LoginHistory[]
   sessions                     UserSession[]
-  auditLogsAsActor             AuditLog[]            @relation("AuditActor")
+  auditLogsAsActor             AuditLog[]             @relation("AuditActor")
   userPermissions              UserPermission[]
   userBranches                 UserBranch[]
-  sentInvitations              UserInvitation[]      @relation("InvitationInviter")
+  sentInvitations              UserInvitation[]       @relation("InvitationInviter")
   staffProfile                 StaffProfile?
-  trainerFor                   Member[]              @relation("MemberTrainer")
-  attendanceCheckIns           Attendance[]          @relation("AttendanceCheckedInBy")
-  attendanceCheckOuts          Attendance[]          @relation("AttendanceCheckedOutBy")
-  workoutPlansAsTrainer        WorkoutPlan[]         @relation("WorkoutPlanTrainer")
-  memberWorkoutPlansAssignedBy MemberWorkoutPlan[]   @relation("MemberWorkoutPlanAssignedBy")
-  dietPlansAsTrainer           DietPlan[]            @relation("DietPlanTrainer")
-  memberDietPlansAssignedBy    MemberDietPlan[]      @relation("MemberDietPlanAssignedBy")
-  memberPaymentsRecorded       MemberPayment[]       @relation("MemberPaymentRecordedBy")
-  memberPaymentRefundsIssued   MemberPaymentRefund[] @relation("MemberPaymentRefundedBy")
-  incomeEntriesRecorded        Income[]              @relation("IncomeRecordedBy")
-  leadsAssigned                Lead[]                @relation("LeadAssignedTo")
-  leadsCreated                 Lead[]                @relation("LeadCreatedBy")
+  trainerFor                   Member[]               @relation("MemberTrainer")
+  attendanceCheckIns           Attendance[]           @relation("AttendanceCheckedInBy")
+  attendanceCheckOuts          Attendance[]           @relation("AttendanceCheckedOutBy")
+  workoutPlansAsTrainer        WorkoutPlan[]          @relation("WorkoutPlanTrainer")
+  memberWorkoutPlansAssignedBy MemberWorkoutPlan[]    @relation("MemberWorkoutPlanAssignedBy")
+  dietPlansAsTrainer           DietPlan[]             @relation("DietPlanTrainer")
+  memberDietPlansAssignedBy    MemberDietPlan[]       @relation("MemberDietPlanAssignedBy")
+  memberPaymentsRecorded       MemberPayment[]        @relation("MemberPaymentRecordedBy")
+  memberPaymentRefundsIssued   MemberPaymentRefund[]  @relation("MemberPaymentRefundedBy")
+  incomeEntriesRecorded        Income[]               @relation("IncomeRecordedBy")
+  leadsAssigned                Lead[]                 @relation("LeadAssignedTo")
+  leadsCreated                 Lead[]                 @relation("LeadCreatedBy")
   campaignsCreated             NotificationCampaign[] @relation("CampaignCreatedBy")
-  leadActivitiesCreated        LeadActivity[]        @relation("LeadActivityCreatedBy")
-  expensesRecorded             Expense[]             @relation("ExpenseRecordedBy")
-  scheduledReportsCreated      ScheduledReport[]     @relation("ScheduledReportCreatedBy")
-  tenantAnnouncementsCreated   TenantAnnouncement[]  @relation("TenantAnnouncementCreatedBy")
+  leadActivitiesCreated        LeadActivity[]         @relation("LeadActivityCreatedBy")
+  expensesRecorded             Expense[]              @relation("ExpenseRecordedBy")
+  scheduledReportsCreated      ScheduledReport[]      @relation("ScheduledReportCreatedBy")
+  tenantAnnouncementsCreated   TenantAnnouncement[]   @relation("TenantAnnouncementCreatedBy")
   aiConversations              AiConversation[]
-  groupClassesAsTrainer        GroupClass[]          @relation("GroupClassTrainer")
-  classSessionsAsTrainer       ClassSession[]        @relation("ClassSessionTrainer")
-  classBookingsMade            ClassBooking[]        @relation("ClassBookingBookedBy")
-  bodyMeasurementsRecorded     BodyMeasurement[]     @relation("BodyMeasurementRecordedBy")
-  ptSessionsAsTrainer          PtSessionLog[]        @relation("PtSessionTrainer")
+  groupClassesAsTrainer        GroupClass[]           @relation("GroupClassTrainer")
+  classSessionsAsTrainer       ClassSession[]         @relation("ClassSessionTrainer")
+  classBookingsMade            ClassBooking[]         @relation("ClassBookingBookedBy")
+  bodyMeasurementsRecorded     BodyMeasurement[]      @relation("BodyMeasurementRecordedBy")
+  ptSessionsAsTrainer          PtSessionLog[]         @relation("PtSessionTrainer")
+  membershipTransfersMade      MembershipTransfer[]   @relation("MembershipTransferBy")
   deviceTokens                 StaffDeviceToken[]
 
   @@unique([tenantId, email])
@@ -650,7 +654,7 @@ model StaffProfile {
   addressLine    String?        @map("address_line") @db.VarChar(200)
   city           String?        @db.VarChar(100)
   state          String?        @db.VarChar(100)
-  country        String?        @db.VarChar(100)
+  country        String?        @default("India") @db.VarChar(100)
   postalCode     String?        @map("postal_code") @db.VarChar(20)
   notes          String?
   employmentType EmploymentType @default(FULL_TIME) @map("employment_type")
@@ -887,7 +891,7 @@ model Member {
   addressLine              String?      @map("address_line") @db.VarChar(200)
   city                     String?      @db.VarChar(100)
   state                    String?      @db.VarChar(100)
-  country                  String?      @db.VarChar(100)
+  country                  String?      @default("India") @db.VarChar(100)
   postalCode               String?      @map("postal_code") @db.VarChar(20)
   emergencyContactName     String?      @map("emergency_contact_name") @db.VarChar(120)
   emergencyContactPhone    String?      @map("emergency_contact_phone") @db.VarChar(20)
@@ -949,35 +953,37 @@ model Member {
   updatedAt                   DateTime         @updatedAt @map("updated_at")
   deletedAt                   DateTime?        @map("deleted_at")
 
-  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch           Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  trainer          User?                @relation("MemberTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
-  referredByMember Member?              @relation("MemberReferral", fields: [referredByMemberId], references: [id], onDelete: SetNull)
-  referrals        Member[]             @relation("MemberReferral")
-  memberships      Membership[]
-  freezes          MembershipFreeze[]
-  documents        MemberDocument[]
-  bodyMeasurements BodyMeasurement[]
-  leadConversion   Lead?             @relation("LeadConvertedMember")
-  attendances      Attendance[]
-  workoutPlans     MemberWorkoutPlan[]
-  workoutDailyLogs   MemberWorkoutDailyLog[]
-  workoutSessionLogs MemberWorkoutSessionLog[]
-  dietPlans        MemberDietPlan[]
-  invoices         MemberInvoice[]
-  payments         MemberPayment[]
-  credential       MemberCredential?
-  sessions         MemberSession[]
-  verifications    MemberVerification[]
-  otpCodes         MemberOtpCode[]
-  classBookings    ClassBooking[]
-  guestVisits      GuestVisit[]
-  ptSessionLogs    PtSessionLog[]
-  deviceTokens     MemberDeviceToken[]
-  notifications    MemberNotification[]
-  campaignRecipients       NotificationCampaignRecipient[]
-  automationDispatches     AutomationDispatch[]
-  channelPreferences       MemberChannelPreference[]
+  tenant               Tenant                          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch               Branch                          @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  trainer              User?                           @relation("MemberTrainer", fields: [trainerId], references: [id], onDelete: SetNull)
+  referredByMember     Member?                         @relation("MemberReferral", fields: [referredByMemberId], references: [id], onDelete: SetNull)
+  referrals            Member[]                        @relation("MemberReferral")
+  memberships          Membership[]
+  freezes              MembershipFreeze[]
+  documents            MemberDocument[]
+  bodyMeasurements     BodyMeasurement[]
+  leadConversion       Lead?                           @relation("LeadConvertedMember")
+  attendances          Attendance[]
+  workoutPlans         MemberWorkoutPlan[]
+  workoutDailyLogs     MemberWorkoutDailyLog[]
+  workoutSessionLogs   MemberWorkoutSessionLog[]
+  dietPlans            MemberDietPlan[]
+  invoices             MemberInvoice[]
+  payments             MemberPayment[]
+  credential           MemberCredential?
+  sessions             MemberSession[]
+  verifications        MemberVerification[]
+  otpCodes             MemberOtpCode[]
+  classBookings        ClassBooking[]
+  guestVisits          GuestVisit[]
+  ptSessionLogs        PtSessionLog[]
+  transfersOut         MembershipTransfer[]            @relation("MembershipTransferFromMember")
+  transfersIn          MembershipTransfer[]            @relation("MembershipTransferToMember")
+  deviceTokens         MemberDeviceToken[]
+  notifications        MemberNotification[]
+  campaignRecipients   NotificationCampaignRecipient[]
+  automationDispatches AutomationDispatch[]
+  channelPreferences   MemberChannelPreference[]
 
   @@unique([tenantId, memberId])
   @@unique([tenantId, biometricId])
@@ -1095,17 +1101,17 @@ enum MemberOtpPurpose {
 /// `User` — the member plane had no OTP concept before this, so it gets its
 /// own parallel table rather than `OtpCode` growing a nullable second FK.
 model MemberOtpCode {
-  id          String            @id @default(uuid()) @db.Uuid
-  tenantId    String            @map("tenant_id") @db.Uuid
-  memberId    String            @map("member_id") @db.Uuid
-  codeHash    String            @map("code_hash")
+  id          String           @id @default(uuid()) @db.Uuid
+  tenantId    String           @map("tenant_id") @db.Uuid
+  memberId    String           @map("member_id") @db.Uuid
+  codeHash    String           @map("code_hash")
   purpose     MemberOtpPurpose
-  channel     OtpChannel        @default(EMAIL)
-  attempts    Int               @default(0)
-  maxAttempts Int               @default(5) @map("max_attempts")
-  expiresAt   DateTime          @map("expires_at")
-  consumedAt  DateTime?         @map("consumed_at")
-  createdAt   DateTime          @default(now()) @map("created_at")
+  channel     OtpChannel       @default(EMAIL)
+  attempts    Int              @default(0)
+  maxAttempts Int              @default(5) @map("max_attempts")
+  expiresAt   DateTime         @map("expires_at")
+  consumedAt  DateTime?        @map("consumed_at")
+  createdAt   DateTime         @default(now()) @map("created_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   member Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
@@ -1136,18 +1142,61 @@ model Membership {
   createdAt         DateTime         @default(now()) @map("created_at")
   updatedAt         DateTime         @updatedAt @map("updated_at")
 
-  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  member        Member             @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  plan          MembershipPlan     @relation(fields: [planId], references: [id], onDelete: Restrict)
-  freezes       MembershipFreeze[]
-  payments      MemberPayment[]
-  invoices      MemberInvoice[]
-  guestVisits   GuestVisit[]
-  ptSessionLogs PtSessionLog[]
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member         Member              @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  plan           MembershipPlan      @relation(fields: [planId], references: [id], onDelete: Restrict)
+  freezes        MembershipFreeze[]
+  payments       MemberPayment[]
+  invoices       MemberInvoice[]
+  guestVisits    GuestVisit[]
+  ptSessionLogs  PtSessionLog[]
+  transferredOut MembershipTransfer? @relation("MembershipTransferFromMembership")
+  transferredIn  MembershipTransfer? @relation("MembershipTransferToMembership")
 
   @@index([tenantId, memberId])
   @@index([tenantId, status])
   @@map("memberships")
+}
+
+/// A member handing their remaining membership to another member (e.g. they
+/// joined, came a couple of days, and want out). The sender's `Membership`
+/// flips to CANCELLED, the receiver gets a brand-new ACTIVE `Membership` on
+/// the same plan (full period restarting at `transferredAt`), and this row
+/// is the permanent link between the two plus a snapshot of what moved, so the
+/// history stays readable even if the plan is later edited or deleted.
+/// `fee` is a record only — no payment/income row is created for it.
+model MembershipTransfer {
+  id                String   @id @default(uuid()) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  fromMemberId      String   @map("from_member_id") @db.Uuid
+  toMemberId        String   @map("to_member_id") @db.Uuid
+  /// One transfer per membership on each side: a membership can be handed over once, and a received one is a fresh row.
+  fromMembershipId  String   @unique @map("from_membership_id") @db.Uuid
+  toMembershipId    String   @unique @map("to_membership_id") @db.Uuid
+  planId            String   @map("plan_id") @db.Uuid
+  planName          String   @map("plan_name") @db.VarChar(120)
+  /// Sender's original period + how much of it was used at transfer time.
+  originalStartDate DateTime @map("original_start_date") @db.Date
+  originalEndDate   DateTime @map("original_end_date") @db.Date
+  daysUsed          Int      @map("days_used")
+  daysRemaining     Int      @map("days_remaining")
+  priceAtAssignment Decimal  @map("price_at_assignment") @db.Decimal(10, 2)
+  fee               Decimal  @default(0) @db.Decimal(10, 2)
+  reason            String?
+  transferredBy     String?  @map("transferred_by") @db.Uuid
+  transferredAt     DateTime @default(now()) @map("transferred_at")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  tenant            Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fromMember        Member     @relation("MembershipTransferFromMember", fields: [fromMemberId], references: [id], onDelete: Restrict)
+  toMember          Member     @relation("MembershipTransferToMember", fields: [toMemberId], references: [id], onDelete: Restrict)
+  fromMembership    Membership @relation("MembershipTransferFromMembership", fields: [fromMembershipId], references: [id], onDelete: Restrict)
+  toMembership      Membership @relation("MembershipTransferToMembership", fields: [toMembershipId], references: [id], onDelete: Restrict)
+  transferredByUser User?      @relation("MembershipTransferBy", fields: [transferredBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, fromMemberId])
+  @@index([tenantId, toMemberId])
+  @@map("membership_transfers")
 }
 
 /// Guest-pass tracking (`MembershipPlan.guestPasses` quota) — one row per
@@ -1247,23 +1296,23 @@ model MemberDocument {
 /// unit conversion for IMPERIAL display, if ever added, is a frontend-only
 /// concern layered on top.
 model BodyMeasurement {
-  id             String   @id @default(uuid()) @db.Uuid
-  tenantId       String   @map("tenant_id") @db.Uuid
-  memberId       String   @map("member_id") @db.Uuid
-  recordedAt     DateTime @default(now()) @map("recorded_at")
-  weightKg       Decimal? @map("weight_kg") @db.Decimal(5, 2)
-  heightCm       Decimal? @map("height_cm") @db.Decimal(5, 2)
-  bodyFatPercent Decimal? @map("body_fat_percent") @db.Decimal(4, 1)
-  chestCm        Decimal? @map("chest_cm") @db.Decimal(5, 2)
-  waistCm        Decimal? @map("waist_cm") @db.Decimal(5, 2)
-  hipsCm         Decimal? @map("hips_cm") @db.Decimal(5, 2)
-  bicepsCm       Decimal? @map("biceps_cm") @db.Decimal(5, 2)
-  thighsCm       Decimal? @map("thighs_cm") @db.Decimal(5, 2)
+  id             String            @id @default(uuid()) @db.Uuid
+  tenantId       String            @map("tenant_id") @db.Uuid
+  memberId       String            @map("member_id") @db.Uuid
+  recordedAt     DateTime          @default(now()) @map("recorded_at")
+  weightKg       Decimal?          @map("weight_kg") @db.Decimal(5, 2)
+  heightCm       Decimal?          @map("height_cm") @db.Decimal(5, 2)
+  bodyFatPercent Decimal?          @map("body_fat_percent") @db.Decimal(4, 1)
+  chestCm        Decimal?          @map("chest_cm") @db.Decimal(5, 2)
+  waistCm        Decimal?          @map("waist_cm") @db.Decimal(5, 2)
+  hipsCm         Decimal?          @map("hips_cm") @db.Decimal(5, 2)
+  bicepsCm       Decimal?          @map("biceps_cm") @db.Decimal(5, 2)
+  thighsCm       Decimal?          @map("thighs_cm") @db.Decimal(5, 2)
   notes          String?
   /// Staff user (Owner/Manager/Trainer) who recorded this entry; null if
   /// that user is later removed (same nullable + SetNull shape as
   /// `Attendance.checkedInBy`).
-  recordedBy     String?  @map("recorded_by") @db.Uuid
+  recordedBy     String?           @map("recorded_by") @db.Uuid
   /// Who authored the entry. STAFF (default — every pre-existing row) =
   /// logged through the staff `/measurements` routes; MEMBER = the member
   /// logged it themselves via `/portal/measurements` (then `recordedBy` is
@@ -1273,8 +1322,8 @@ model BodyMeasurement {
   /// one MEMBER entry per member per calendar day (`recordedAt` is
   /// normalised to UTC midnight for those rows).
   source         MeasurementSource @default(STAFF)
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
 
   tenant         Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   member         Member @relation(fields: [memberId], references: [id], onDelete: Cascade)
@@ -1696,10 +1745,10 @@ model MemberWorkoutPlan {
   createdAt      DateTime                @default(now()) @map("created_at")
   updatedAt      DateTime                @updatedAt @map("updated_at")
 
-  tenant         Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  member         Member                  @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  workoutPlan    WorkoutPlan             @relation(fields: [workoutPlanId], references: [id], onDelete: Restrict)
-  assignedByUser User?                   @relation("MemberWorkoutPlanAssignedBy", fields: [assignedBy], references: [id], onDelete: SetNull)
+  tenant         Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  member         Member                    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  workoutPlan    WorkoutPlan               @relation(fields: [workoutPlanId], references: [id], onDelete: Restrict)
+  assignedByUser User?                     @relation("MemberWorkoutPlanAssignedBy", fields: [assignedBy], references: [id], onDelete: SetNull)
   progress       MemberWorkoutProgress[]
   dailyLogs      MemberWorkoutDailyLog[]
   sessionLogs    MemberWorkoutSessionLog[]
@@ -2639,7 +2688,7 @@ model TenantProfile {
   addressLine        String?  @map("address_line") @db.VarChar(200)
   city               String?  @db.VarChar(100)
   state              String?  @db.VarChar(100)
-  country            String?  @db.VarChar(100)
+  country            String?  @default("India") @db.VarChar(100)
   postalCode         String?  @map("postal_code") @db.VarChar(20)
   latitude           Decimal? @db.Decimal(9, 6)
   longitude          Decimal? @db.Decimal(9, 6)
@@ -2695,7 +2744,7 @@ model Branch {
   addressLine2   String?   @map("address_line2") @db.VarChar(200)
   city           String?   @db.VarChar(100)
   state          String?   @db.VarChar(100)
-  country        String?   @db.VarChar(100)
+  country        String?   @default("India") @db.VarChar(100)
   postalCode     String?   @map("postal_code") @db.VarChar(20)
   latitude       Decimal?  @db.Decimal(9, 6)
   longitude      Decimal?  @db.Decimal(9, 6)
@@ -2715,7 +2764,7 @@ model Branch {
   notes          String?
   isDefault      Boolean   @default(true) @map("is_default")
   isActive       Boolean   @default(true) @map("is_active")
-  timezone       String    @default("UTC") @db.VarChar(64)
+  timezone       String    @default("Asia/Kolkata") @db.VarChar(64)
   deletedAt      DateTime? @map("deleted_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
@@ -3324,7 +3373,7 @@ model SystemSetting {
 /// only a masked preview (`maskSecret`). Absence of this row (or of any one
 /// field on it) falls back to `apps/api/.env`'s `SMTP_*`/`KALEYRA_*` vars.
 model PlatformNotificationCredential {
-  id                     String   @id @default(uuid())  @db.Uuid
+  id                     String   @id @default(uuid()) @db.Uuid
   smtpHost               String?  @map("smtp_host")
   smtpPort               Int?     @map("smtp_port")
   smtpUser               String?  @map("smtp_user")
@@ -3442,7 +3491,7 @@ model ScheduledJob {
   category     JobCategory
   queueName    String        @map("queue_name") @db.VarChar(60)
   cronPattern  String        @map("cron_pattern") @db.VarChar(60)
-  timezone     String        @default("UTC") @db.VarChar(60)
+  timezone     String        @default("Asia/Kolkata") @db.VarChar(60)
   status       JobRunStatus  @default(SCHEDULED)
   isPaused     Boolean       @default(false) @map("is_paused")
   priority     Int           @default(0)
@@ -3561,24 +3610,24 @@ enum PlatformLeadTopic {
 /// `CmsPage`: the SaaS operator's own sales pipeline, read only through the
 /// super-admin API. (Distinct from `Lead`, which is a gym's own prospect list.)
 model PlatformLead {
-  id           String             @id @default(uuid()) @db.Uuid
-  name         String             @db.VarChar(120)
-  email        String             @db.VarChar(255)
-  phone        String?            @db.VarChar(20)
-  gymName      String?            @map("gym_name") @db.VarChar(120)
-  gymSlug      String?            @map("gym_slug") @db.VarChar(60)
+  id          String             @id @default(uuid()) @db.Uuid
+  name        String             @db.VarChar(120)
+  email       String             @db.VarChar(255)
+  phone       String?            @db.VarChar(20)
+  gymName     String?            @map("gym_name") @db.VarChar(120)
+  gymSlug     String?            @map("gym_slug") @db.VarChar(60)
   /// Free-text size band picked on the form, e.g. "under-100".
-  gymSize      String?            @map("gym_size") @db.VarChar(30)
-  topic        PlatformLeadTopic  @default(SALES)
-  message      String
+  gymSize     String?            @map("gym_size") @db.VarChar(30)
+  topic       PlatformLeadTopic  @default(SALES)
+  message     String
   /// Where the form lives: HOME_PAGE or STATUS_SCREEN.
-  source       String             @default("HOME_PAGE") @db.VarChar(30)
-  status       PlatformLeadStatus @default(NEW)
+  source      String             @default("HOME_PAGE") @db.VarChar(30)
+  status      PlatformLeadStatus @default(NEW)
   /// Internal notes written by the platform team.
-  notes        String?
-  contactedAt  DateTime?          @map("contacted_at")
-  createdAt    DateTime           @default(now()) @map("created_at")
-  updatedAt    DateTime           @updatedAt @map("updated_at")
+  notes       String?
+  contactedAt DateTime?          @map("contacted_at")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
 
   @@index([status, createdAt])
   @@index([email])
@@ -3896,15 +3945,15 @@ model TenantNotificationChannelLimit {
 /// needed — deliberately not reusing `TenantUsage`, which is a live
 /// cumulative gauge (members/branches/storage) that's never meant to reset.
 model TenantNotificationUsage {
-  id        String                     @id @default(uuid()) @db.Uuid
-  tenantId  String                     @map("tenant_id") @db.Uuid
+  id        String                    @id @default(uuid()) @db.Uuid
+  tenantId  String                    @map("tenant_id") @db.Uuid
   channel   TenantNotificationChannel
   /// "2026-10" — the calendar month this row counts, in the server's own
   /// UTC calendar (not each tenant's local timezone; a precise per-tenant
   /// billing-cycle-aligned period was explicitly scoped out).
-  periodKey String                     @map("period_key") @db.VarChar(7)
-  sentCount Int                        @default(0) @map("sent_count")
-  updatedAt DateTime                   @updatedAt @map("updated_at")
+  periodKey String                    @map("period_key") @db.VarChar(7)
+  sentCount Int                       @default(0) @map("sent_count")
+  updatedAt DateTime                  @updatedAt @map("updated_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -4211,12 +4260,12 @@ model Lead {
   updatedAt         DateTime        @updatedAt @map("updated_at")
   deletedAt         DateTime?       @map("deleted_at")
 
-  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  branch          Branch?          @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  interestedPlan  MembershipPlan?  @relation(fields: [interestedPlanId], references: [id], onDelete: SetNull)
-  assignedTo      User?            @relation("LeadAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
-  createdBy       User?            @relation("LeadCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
-  convertedMember Member?          @relation("LeadConvertedMember", fields: [convertedMemberId], references: [id], onDelete: SetNull)
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch          Branch?         @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  interestedPlan  MembershipPlan? @relation(fields: [interestedPlanId], references: [id], onDelete: SetNull)
+  assignedTo      User?           @relation("LeadAssignedTo", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  createdBy       User?           @relation("LeadCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  convertedMember Member?         @relation("LeadConvertedMember", fields: [convertedMemberId], references: [id], onDelete: SetNull)
   activities      LeadActivity[]
 
   @@index([tenantId, status])
@@ -4348,20 +4397,20 @@ model NotificationCampaign {
 /// is the at-most-once claim marker the batch worker sets before handing a
 /// message to a channel queue.
 model NotificationCampaignRecipient {
-  id            String                      @id @default(uuid()) @db.Uuid
-  tenantId      String                      @map("tenant_id") @db.Uuid
-  campaignId    String                      @map("campaign_id") @db.Uuid
-  memberId      String                      @map("member_id") @db.Uuid
+  id            String                    @id @default(uuid()) @db.Uuid
+  tenantId      String                    @map("tenant_id") @db.Uuid
+  campaignId    String                    @map("campaign_id") @db.Uuid
+  memberId      String                    @map("member_id") @db.Uuid
   channel       TenantNotificationChannel
-  status        CampaignRecipientStatus     @default(QUEUED)
+  status        CampaignRecipientStatus   @default(QUEUED)
   error         String?
-  deliveryLogId String?                     @map("delivery_log_id") @db.Uuid
-  sentAt        DateTime?                   @map("sent_at")
-  dispatchedAt  DateTime?                   @map("dispatched_at")
+  deliveryLogId String?                   @map("delivery_log_id") @db.Uuid
+  sentAt        DateTime?                 @map("sent_at")
+  dispatchedAt  DateTime?                 @map("dispatched_at")
   /// Quiet-hours hold: the earliest moment this message may go out.
-  deliverAfter  DateTime?                   @map("deliver_after")
-  createdAt     DateTime                    @default(now()) @map("created_at")
-  updatedAt     DateTime                    @updatedAt @map("updated_at")
+  deliverAfter  DateTime?                 @map("deliver_after")
+  createdAt     DateTime                  @default(now()) @map("created_at")
+  updatedAt     DateTime                  @updatedAt @map("updated_at")
 
   tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   campaign NotificationCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)

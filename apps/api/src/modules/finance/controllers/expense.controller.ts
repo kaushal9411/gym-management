@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
+import { businessDate } from '../../../core/utils/business-time';
 import { actorFrom } from '../../authentication/utils/actor.util';
 import type { CreateExpenseInput, ListExpensesQuery, UpdateExpenseInput, PaymentsAnalyticsQuery } from '../dto/finance.dto';
 import { ExpenseService } from '../services/expense.service';
@@ -42,7 +43,7 @@ export class ExpenseController {
     res
       .status(200)
       .setHeader('Content-Type', 'text/csv; charset=utf-8')
-      .setHeader('Content-Disposition', `attachment; filename="expenses-export-${new Date().toISOString().slice(0, 10)}.csv"`)
+      .setHeader('Content-Disposition', `attachment; filename="expenses-export-${businessDate()}.csv"`)
       .send(csv);
   }
 
@@ -51,7 +52,7 @@ export class ExpenseController {
     res
       .status(200)
       .setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-      .setHeader('Content-Disposition', `attachment; filename="expenses-export-${new Date().toISOString().slice(0, 10)}.xlsx"`)
+      .setHeader('Content-Disposition', `attachment; filename="expenses-export-${businessDate()}.xlsx"`)
       .send(Buffer.from(buffer));
   }
 }

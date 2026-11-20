@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/network/api_exception.dart';
 import '../../models/payments_analytics.dart';
 import '../../repositories/payment_repository.dart';
+import '../../core/utils/app_clock.dart';
 
 /// Period chips above the Payments analytics header. Ranges are UTC days
 /// (the API buckets by UTC day) and always end today, except lastMonth.
@@ -24,7 +25,7 @@ extension PaymentsPeriodX on PaymentsPeriod {
 
   /// `(from, to)` as `YYYY-MM-DD`.
   ({String from, String to}) range([DateTime? now]) {
-    final n = (now ?? DateTime.now()).toUtc();
+    final n = now ?? AppClock.now();
     final today = DateTime.utc(n.year, n.month, n.day);
     String fmt(DateTime d) => '${d.year.toString().padLeft(4, '0')}-'
         '${d.month.toString().padLeft(2, '0')}-'

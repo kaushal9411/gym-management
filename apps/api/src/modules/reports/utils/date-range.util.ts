@@ -1,3 +1,4 @@
+import { businessDate } from '../../../core/utils/business-time';
 /**
  * Shared date-range/trend helpers — the same "YYYY-MM-DD string math +
  * gap-filled daily series" shape used ad hoc in `attendance.service.ts` and
@@ -13,7 +14,7 @@ export function addDaysStr(dateStr: string, days: number): string {
 }
 
 export function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  return businessDate();
 }
 
 /** Resolves an optional (dateFrom, dateTo) filter pair to a concrete [from, to] string range, defaulting to the last `defaultDays` days ending today. */

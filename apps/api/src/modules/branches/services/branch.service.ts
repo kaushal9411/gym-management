@@ -2,6 +2,7 @@ import type { Prisma } from '@prisma/client';
 
 import { ConflictError, NotFoundError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
+import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import type { IamActor } from '../../authentication/utils/actor.util';
@@ -76,7 +77,7 @@ export class BranchService {
     const isDefault = input.isDefault ?? isFirstBranch;
     if (isDefault) await this.branches.clearDefault(this.tenantId);
 
-    const timezone = input.timezone ?? (await this.db.tenantSettings.findUnique({ where: { tenantId: this.tenantId }, select: { timezone: true } }))?.timezone ?? 'UTC';
+    const timezone = input.timezone ?? (await this.db.tenantSettings.findUnique({ where: { tenantId: this.tenantId }, select: { timezone: true } }))?.timezone ?? BUSINESS_TIMEZONE;
 
     const branch = await this.branches.create({
       tenantId: this.tenantId,

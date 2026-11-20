@@ -26,6 +26,7 @@ import { CouponFormPanel } from './coupon-form';
 import { DeleteCouponConfirm } from './delete-confirm';
 import { SCOPE_LABEL, TYPE_LABEL, couponStatus, expiryInfo, relativeAgo, toCsv, valueLabel } from './lib';
 import { PAGE_SIZE, SORTS, STATUS_FILTERS, TYPES, parseFilters, toSearchString, type CouponFilters, type CouponSort, type StatusFilter } from './url-state';
+import { businessDate } from '@/lib/business-time';
 
 const BANNER_BTN = 'inline-flex h-9 items-center gap-2 rounded-[9px] border border-white/30 bg-white/15 px-3.5 text-[13px] font-semibold text-white outline-none transition-colors hover:bg-white/25 focus-visible:ring-2 focus-visible:ring-white disabled:opacity-60';
 const SELECT = 'h-9 rounded-[9px] border border-input bg-card px-2.5 text-[13px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring';
@@ -100,7 +101,7 @@ export function CouponsPage() {
   const exportCsv = () => {
     const header = ['Code', 'Type', 'Value', 'Scope', 'Status', 'Uses (timesRedeemed)', 'Max redemptions', 'Redemptions logged', 'Discount given', 'Expires', 'Last redeemed', 'Created'];
     const body = rows.map((c) => [c.code, TYPE_LABEL[c.type], valueLabel(c), SCOPE_LABEL[c.scope], couponStatus(c, now ?? 0), c.timesRedeemed, c.maxRedemptions ?? '', c.computed?.redemptions ?? c._count?.redemptions ?? '', c.computed?.discountGiven ?? '', c.expiresAt ?? '', c.computed?.lastRedeemedAt ?? '', c.createdAt]);
-    downloadCsv(`coupons-${new Date().toISOString().slice(0, 10)}.csv`, toCsv([header, ...body]));
+    downloadCsv(`coupons-${businessDate()}.csv`, toCsv([header, ...body]));
     toast.success(`Exported ${rows.length} coupon${rows.length === 1 ? '' : 's'}`);
   };
 

@@ -50,7 +50,7 @@ export default function BillingAddressPage() {
           taxId: address.taxId ?? '',
         }
       : undefined,
-    defaultValues: { legalName: '', line1: '', line2: '', city: '', state: '', postalCode: '', country: '', taxId: '' },
+    defaultValues: { legalName: '', line1: '', line2: '', city: '', state: '', postalCode: '', country: 'IN', taxId: '' },
   });
 
   // Live preview of what's typed (react-hook-form watch — display only, no effect on validation/submit).
@@ -125,7 +125,7 @@ export default function BillingAddressPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="country">Country code</Label>
-                  <Input id="country" placeholder="US" invalid={!!fieldError('country')} {...form.register('country')} />
+                  <Input id="country" placeholder="IN" invalid={!!fieldError('country')} {...form.register('country')} />
                   {fieldError('country') ? <p role="alert" className="text-xs text-destructive">{fieldError('country')}</p> : null}
                 </div>
               </div>

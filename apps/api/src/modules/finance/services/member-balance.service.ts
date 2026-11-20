@@ -24,6 +24,43 @@ export class MemberBalanceService {
     this.invoiceService = new MemberInvoiceService(tenantId);
   }
 
+  /**
+   * What can still be collected against a membership — the guard behind "a
+   * member can never pay twice for one membership". `expected` is the same
+   * discount-then-tax price `reconcileOne` bills; what's already committed is
+   * every PENDING/SUCCESS/refunded payment on it NET of refunds (so a refunded
+   * mistake can be re-recorded, but a live payment can't be doubled).
+   * `excludePaymentId` lets an edit to a payment be judged without counting
+   * itself. A cancelled/superseded membership, or one received by transfer
+   * (already paid by the sender), can't take payments at all — `blocked` says why.
+   */
+  async collectable(membershipId: string, excludePaymentId?: string): Promise<{ blocked: string | null; remaining: number }> {
+    const m = await this.db.membership.findFirst({
+      where: { tenantId: this.tenantId, id: membershipId },
+      include: { plan: { select: { discountPercentage: true, taxPercentage: true } } },
+    });
+    if (!m) return { blocked: 'Membership not found.', remaining: 0 };
+    if (m.status === 'CANCELLED' || m.status === 'SUPERSEDED') {
+      return { blocked: 'This membership is no longer active, so a payment cannot be recorded against it.', remaining: 0 };
+    }
+    const transferredIn = await this.db.membershipTransfer.findFirst({ where: { tenantId: this.tenantId, toMembershipId: m.id }, select: { id: true } });
+    if (transferredIn) return { blocked: 'This membership was transferred from another member and is already paid for.', remaining: 0 };
+
+    const payments = await this.db.memberPayment.findMany({
+      where: {
+        tenantId: this.tenantId,
+        membershipId,
+        status: { in: ['PENDING', 'SUCCESS', 'PARTIALLY_REFUNDED', 'REFUNDED'] },
+        ...(excludePaymentId ? { id: { not: excludePaymentId } } : {}),
+      },
+      select: { finalAmount: true, refunds: { select: { amount: true } } },
+    });
+    const net = payments.reduce((sum, p) => sum + Number(p.finalAmount) - p.refunds.reduce((r, x) => r + Number(x.amount), 0), 0);
+    const base = Number(m.priceAtAssignment);
+    const expected = (base - (base * Number(m.plan.discountPercentage)) / 100) * (1 + Number(m.plan.taxPercentage) / 100);
+    return { blocked: null, remaining: Math.round((expected - net) * 100) / 100 };
+  }
+
   /** The open balance invoice for a membership, if any. */
   async findOpenBalanceInvoice(membershipId: string): Promise<{ id: string; totalAmount: { toString(): string } } | null> {
     return this.db.memberInvoice.findFirst({
@@ -62,6 +99,9 @@ export class MemberBalanceService {
     plan: { name: string; discountPercentage: { toString(): string }; taxPercentage: { toString(): string } };
     member: { branchId: string };
   }): Promise<void> {
+    // A membership received via transfer was paid for by the sender — never invoice the receiver for it.
+    const transferredIn = await this.db.membershipTransfer.findFirst({ where: { tenantId: this.tenantId, toMembershipId: m.id }, select: { id: true } });
+    if (transferredIn) return;
     const paid = await this.db.memberPayment.aggregate({
       where: { tenantId: this.tenantId, membershipId: m.id, status: 'SUCCESS' },
       _sum: { finalAmount: true },

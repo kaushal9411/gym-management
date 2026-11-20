@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
+import { businessDate } from '../../../core/utils/business-time';
 import { actorFrom } from '../../authentication/utils/actor.util';
 import { LeadService } from '../services/lead.service';
 import type {
@@ -40,7 +41,7 @@ export class LeadController {
     res
       .status(200)
       .setHeader('Content-Type', 'text/csv; charset=utf-8')
-      .setHeader('Content-Disposition', `attachment; filename="leads-export-${new Date().toISOString().slice(0, 10)}.csv"`)
+      .setHeader('Content-Disposition', `attachment; filename="leads-export-${businessDate()}.csv"`)
       .send(csv);
   }
 

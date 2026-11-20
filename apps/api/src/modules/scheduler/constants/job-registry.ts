@@ -1,3 +1,4 @@
+import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 import { dailyAttendanceSummary, monthlyAttendanceSummary, weeklyAttendanceSummary } from '../handlers/attendance.handlers';
 import { classSessionGeneration } from '../handlers/class-session.handlers';
 import { classReminders, communicationsDispatch, weMissYou } from '../handlers/communications.handlers';
@@ -24,7 +25,7 @@ import { platformSubscriptionBillingSweep } from '../handlers/subscription-billi
 import type { JobDefinition } from '../types';
 
 const MIN = 60_000;
-const DEFAULT_TIMEZONE = 'UTC';
+const DEFAULT_TIMEZONE = BUSINESS_TIMEZONE;
 
 function job(partial: Omit<JobDefinition, 'timezone' | 'priority' | 'maxRetries' | 'retryDelayMs' | 'timeoutMs'> & Partial<Pick<JobDefinition, 'priority' | 'maxRetries' | 'retryDelayMs' | 'timeoutMs'>>): JobDefinition {
   return {

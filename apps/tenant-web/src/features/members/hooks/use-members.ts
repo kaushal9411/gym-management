@@ -15,6 +15,7 @@ import type {
   ListMembershipPlansParams,
   MemberBulkImportRow,
   MemberDocumentType,
+  TransferMembershipPayload,
   RenewMembershipPayload,
   UpdateMemberPayload,
   UpdateMembershipPlanPayload,
@@ -154,6 +155,19 @@ export function useCancelMembership() {
   const invalidate = useInvalidateMembers();
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: CancelMembershipPayload }) => memberService.cancelMembership(id, payload),
+    onSuccess: invalidate,
+  });
+}
+
+/** Loaded only while the transfer dialog is open — it carries the gym's default fee and why this member can't transfer yet. */
+export function useMembershipTransferPreview(id: string, enabled: boolean) {
+  return useQuery({ queryKey: ['members', 'transfer-preview', id], queryFn: () => memberService.getTransferPreview(id), enabled, staleTime: 0 });
+}
+
+export function useTransferMembership() {
+  const invalidate = useInvalidateMembers();
+  return useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: TransferMembershipPayload }) => memberService.transferMembership(id, payload),
     onSuccess: invalidate,
   });
 }

@@ -10,6 +10,7 @@ import '../../../income/presentation/income_ui.dart';
 import '../../../team/presentation/widgets/team_ui.dart';
 import 'rpt_format.dart';
 import 'rpt_theme.dart';
+import '../../../../core/utils/app_clock.dart';
 
 /// The range of equal length that ends the day before [from] (web's
 /// `previousRange`). Inputs and outputs are `YYYY-MM-DD`; the maths is in UTC
@@ -146,7 +147,7 @@ class RptPeriodController extends ChangeNotifier {
 
   /// Opens the date-range picker; picking a range selects Custom.
   Future<void> pickCustom(BuildContext context) async {
-    final now = DateTime.now();
+    final now = AppClock.now();
     final r = range;
     final picked = await showDateRangePicker(
       context: context,

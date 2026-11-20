@@ -16,6 +16,7 @@ import '../../reports/presentation/widgets/donut_chart.dart';
 import '../../reports/presentation/widgets/report_filter_bar.dart';
 import '../../team/presentation/widgets/team_ui.dart';
 import 'widgets/revenue_expense_chart.dart';
+import '../../../core/utils/app_clock.dart';
 
 const _methodColors = {
   'UPI': AppColors.staffB,
@@ -58,7 +59,7 @@ class _FinanceTabView extends StatelessWidget {
     final picked = await showDateRangePicker(
       context: context,
       firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      lastDate: AppClock.now(),
       initialDateRange: current,
     );
     if (picked == null || !context.mounted) return;

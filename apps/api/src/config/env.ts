@@ -1,4 +1,7 @@
 import 'dotenv/config';
+
+// FitCloud runs on Indian Standard Time — pin the process clock before anything builds a Date (see core/utils/business-time.ts).
+process.env.TZ = 'Asia/Kolkata';
 import { z } from 'zod';
 
 /**

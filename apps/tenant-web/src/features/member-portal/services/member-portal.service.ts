@@ -2,6 +2,7 @@ import type { BodyMeasurement } from '@/features/measurements/types';
 import type { DietNutrition } from '../lib/diet-nutrition';
 import type { WorkoutCompleteInput, WorkoutHistory, WorkoutLogEntry, WorkoutLogInput, WorkoutLogPatch, WorkoutTracking } from '../lib/workout-tracking';
 import { memberApiClient, toMemberAuthServiceError } from './member-api-client';
+import { businessDate } from '@/lib/business-time';
 
 interface Envelope<T> {
   success: boolean;
@@ -492,7 +493,7 @@ export const memberPortalService = {
     const url = window.URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${memberCode}-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `${memberCode}-data-export-${businessDate()}.json`;
     document.body.appendChild(link);
     link.click();
     link.remove();

@@ -21,6 +21,7 @@ import {
   useRemoveWorkoutAssignment,
 } from '../hooks/use-workouts';
 import type { ExerciseProgressStatus } from '../types';
+import { businessDate } from '@/lib/business-time';
 
 interface MemberWorkoutCardProps {
   memberId: string;
@@ -37,7 +38,7 @@ export function MemberWorkoutCard({ memberId }: MemberWorkoutCardProps) {
   const markProgress = useMarkWorkoutProgress();
 
   const [planId, setPlanId] = React.useState('');
-  const [startDate, setStartDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = React.useState(() => businessDate());
 
   const current = data.data?.current ?? null;
   const history = data.data?.history ?? [];

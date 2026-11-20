@@ -1,5 +1,6 @@
 import type { MemberPaymentMethod, MemberPaymentStatus } from '@prisma/client';
 
+import { businessDate } from '../../../core/utils/business-time';
 import type { PaymentsAnalyticsDto } from '../dto/finance.dto';
 
 /** Statuses that count as money actually collected (gross — refunds are reported separately). */
@@ -26,7 +27,7 @@ export interface DateRange {
 
 /** Default = current (UTC, as elsewhere in finance) calendar month to today. Previous = the immediately preceding range of identical length. */
 export function resolveRanges(dateFrom?: string, dateTo?: string, now: Date = new Date()): { range: DateRange; previousRange: DateRange; today: string } {
-  const today = now.toISOString().slice(0, 10);
+  const today = businessDate(now);
   const to = dateTo ?? today;
   const from = dateFrom ?? `${to.slice(0, 7)}-01`;
   const length = daysInclusive(from, to);

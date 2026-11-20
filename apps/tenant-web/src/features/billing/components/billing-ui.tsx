@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 
 export function formatMoney(amount: number, currency: string, fractionDigits = 0): string {
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: fractionDigits }).format(amount);
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: fractionDigits }).format(amount);
   } catch {
     return `${currency} ${amount}`;
   }

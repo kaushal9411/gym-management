@@ -20,6 +20,7 @@ import { type PlanActionKind } from './plan-actions';
 import { PlanCard, PlansTable, type CardHandlers, type SortKey } from './plan-card';
 import { PlanForm } from './plan-form';
 import { PlansInsights } from './plans-insights';
+import { businessDate } from '@/lib/business-time';
 
 /*
  * Dropped (no backing data): plan versioning / grandfathering of existing subscribers - the API has neither, price edits simply apply at each next renewal.
@@ -112,7 +113,7 @@ export function PlansListPage() {
     <div className="mx-auto max-w-[1600px] space-y-4">
       <PageBanner title="Plans" subtitle={subtitle}>
         <button type="button" className={BANNER_BTN} onClick={() => { setPanel(null); setEditing('create'); }}><Plus className="size-4" aria-hidden />New plan</button>
-        <button type="button" className={BANNER_BTN} disabled={!plans?.length} onClick={() => downloadCsv(`plans-${new Date().toISOString().slice(0, 10)}.csv`, buildPlansCsv(shown))}><Download className="size-4" aria-hidden />Export CSV</button>
+        <button type="button" className={BANNER_BTN} disabled={!plans?.length} onClick={() => downloadCsv(`plans-${businessDate()}.csv`, buildPlansCsv(shown))}><Download className="size-4" aria-hidden />Export CSV</button>
       </PageBanner>
 
       {editing ? (

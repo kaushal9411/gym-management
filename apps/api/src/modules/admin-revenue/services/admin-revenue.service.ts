@@ -1,3 +1,4 @@
+import { businessDate } from '../../../core/utils/business-time';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { addDaysStr } from '../../finance/utils/payments-analytics.util';
 import { aggregateMrr, dayStart, fillDays, money } from '../utils/revenue-insights.util';
@@ -21,7 +22,7 @@ export class AdminRevenueService {
 
   /** Daily SUCCEEDED revenue for the last `days` UTC days (today inclusive). `currency` omitted = all currencies summed (points carry `currency: null`). */
   async growth(days = 30, currency?: string) {
-    const to = new Date().toISOString().slice(0, 10);
+    const to = businessDate();
     const from = addDaysStr(to, -(days - 1));
     const start = dayStart(from);
     const endExcl = dayStart(addDaysStr(to, 1));

@@ -1,4 +1,5 @@
 import { NotFoundError } from '../../../core/errors/app-error';
+import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { dateInTimezone } from '../../attendance/utils/timezone.util';
 import type { MemberPlanDto } from '../dto/member-portal.dto';
@@ -36,7 +37,7 @@ export class MemberPlanService {
     if (!membership) return null;
 
     const plan = membership.plan;
-    const today = dateInTimezone(member.branch.timezone || 'UTC', now);
+    const today = dateInTimezone(member.branch.timezone || BUSINESS_TIMEZONE, now);
     const endDate = membership.endDate.toISOString().slice(0, 10);
     const { daysLeft, expired } = membershipCountdown(endDate, today);
 

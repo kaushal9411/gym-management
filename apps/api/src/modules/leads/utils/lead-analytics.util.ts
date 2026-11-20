@@ -1,3 +1,4 @@
+import { businessDate } from '../../../core/utils/business-time';
 import { addDaysStr, daysInclusive, type DateRange } from '../../finance/utils/payments-analytics.util';
 import type { LeadAnalyticsDto } from '../dto/lead.dto';
 import { LEAD_LOST_REASONS, LEAD_SOURCES } from '../validators/lead.validators';
@@ -15,7 +16,7 @@ export function resolveLeadRanges(
   dateTo?: string,
   now: Date = new Date(),
 ): { range: DateRange; previousRange: DateRange; today: string } {
-  const today = now.toISOString().slice(0, 10);
+  const today = businessDate(now);
   let from = today;
   let to = today;
   switch (key) {

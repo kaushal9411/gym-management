@@ -40,7 +40,7 @@ export class TicketRepository {
     const [, rows] = await this.db.$transaction([
       this.db.$executeRaw`SELECT set_config('app.tenant_id', ${tenantId}, true)`,
       this.db.$queryRaw<Array<{ date: string; priority: string; count: number }>>(
-        Prisma.sql`SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS date, priority::text AS priority, COUNT(*)::int AS count
+        Prisma.sql`SELECT to_char(created_at AT TIME ZONE 'Asia/Kolkata', 'YYYY-MM-DD') AS date, priority::text AS priority, COUNT(*)::int AS count
           FROM support_tickets
           WHERE tenant_id = ${tenantId}::uuid AND created_at >= ${spanFrom} AND created_at < ${spanToExclusive}
           GROUP BY 1, 2`,

@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 
+import { businessDate } from '../../../core/utils/business-time';
 import type { TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import type { InvoiceItemInput, ListInvoicesQuery } from '../dto/finance.dto';
 import {
@@ -28,7 +29,7 @@ const DETAIL_INCLUDE = {
 export type MemberInvoiceListRow = Prisma.MemberInvoiceGetPayload<{ include: typeof LIST_INCLUDE }>;
 export type MemberInvoiceDetailRow = Prisma.MemberInvoiceGetPayload<{ include: typeof DETAIL_INCLUDE }>;
 
-const todayUtc = (): string => new Date().toISOString().slice(0, 10);
+const todayUtc = (): string => businessDate();
 const dayStart = (d: string) => new Date(`${d}T00:00:00.000Z`);
 
 /** `undefined` = no branch restriction; `[]` = nothing visible (foreign branch / empty scope). */

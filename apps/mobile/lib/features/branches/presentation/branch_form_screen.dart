@@ -16,6 +16,7 @@ import '../../team/presentation/widgets/team_ui.dart';
 import 'branch_ui.dart';
 import 'widgets/branch_holidays_editor.dart';
 import 'widgets/branch_hours_editor.dart';
+import '../../../core/utils/app_clock.dart';
 
 final _emailRe = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 final _codeRe = RegExp(r'^[A-Za-z0-9-]+$');
@@ -71,7 +72,7 @@ class _BranchFormScreenState extends State<BranchFormScreen> {
   late final _addr2 = TextEditingController(text: _b?.addressLine2 ?? '');
   late final _city = TextEditingController(text: _b?.city ?? '');
   late final _state = TextEditingController(text: _b?.state ?? '');
-  late final _country = TextEditingController(text: _b?.country ?? '');
+  late final _country = TextEditingController(text: _b?.country ?? AppClock.country);
   late final _postal = TextEditingController(text: _b?.postalCode ?? '');
   late final _lat = TextEditingController(
     text: _b?.latitude == null ? '' : '${_b!.latitude}',
@@ -90,7 +91,7 @@ class _BranchFormScreenState extends State<BranchFormScreen> {
   );
   late final _notes = TextEditingController(text: _b?.notes ?? '');
 
-  late String? _timezone = _b?.timezone;
+  late String? _timezone = _b?.timezone ?? AppClock.timezone;
   late bool _allowCheckIn = _b?.allowCheckIn ?? true;
   late Map<String, DayHours> _hours =
       normalizeHours(_b?.operatingHours ?? const {});

@@ -1,3 +1,4 @@
+import { businessDate } from '../../../core/utils/business-time';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { addDaysStr } from '../../finance/utils/payments-analytics.util';
 import {
@@ -124,7 +125,7 @@ export class RevenueInsightsService {
     const winStart = dayStart(previousRange.from);
     const curStart = dayStart(range.from);
     const endExcl = dayStart(addDaysStr(range.to, 1));
-    const today = now.toISOString().slice(0, 10);
+    const today = businessDate(now);
     const staleBefore = new Date(now.getTime() - DAY_MS);
     const months = lastMonths(now, 12);
     const monthStart = dayStart(`${months[0]}-01`);

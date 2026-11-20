@@ -25,6 +25,7 @@ import '../../manager/presentation/widgets/member_detail_anim.dart';
 import '../../team/presentation/widgets/team_ui.dart';
 import 'payment_actions.dart';
 import 'payments_ui.dart';
+import '../../../core/utils/app_clock.dart';
 
 enum _Channel { offline, link }
 
@@ -101,7 +102,7 @@ class _RecordPaymentScreenState extends State<RecordPaymentScreen> {
   String? _resending; // 'email' | 'sms'
 
   static DateTime _today() {
-    final n = DateTime.now();
+    final n = AppClock.now();
     return DateTime(n.year, n.month, n.day);
   }
 

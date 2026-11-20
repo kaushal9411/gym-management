@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
+import { businessDate } from '../../../core/utils/business-time';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
 import type { RevenueRange } from '../../admin-revenue/utils/revenue-insights.util';
 import {
@@ -56,7 +57,7 @@ export class AdminPaymentController {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="payments-${new Date().toISOString().slice(0, 10)}.csv"`,
+      `attachment; filename="payments-${businessDate()}.csv"`,
     );
     res.send(buildPaymentsCsv(rows));
   }

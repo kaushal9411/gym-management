@@ -1,4 +1,5 @@
 import { ValidationError } from '../../../core/errors/app-error';
+import { businessDate } from '../../../core/utils/business-time';
 import type { ReportFilters, ReportType } from '../dto/reports.dto';
 
 import { AnalyticsService } from './analytics.service';
@@ -108,18 +109,18 @@ export class ReportExportService {
 
   async exportCsv(reportType: ReportType, userId: string, filters: ReportFilters): Promise<{ filename: string; content: string }> {
     const table = await this.buildTable(reportType, userId, filters);
-    return { filename: `${reportType}-${new Date().toISOString().slice(0, 10)}.csv`, content: renderCsv(table) };
+    return { filename: `${reportType}-${businessDate()}.csv`, content: renderCsv(table) };
   }
 
   async exportExcel(reportType: ReportType, userId: string, filters: ReportFilters): Promise<{ filename: string; content: Buffer }> {
     const table = await this.buildTable(reportType, userId, filters);
     const content = await renderInWorker('excel', table);
-    return { filename: `${reportType}-${new Date().toISOString().slice(0, 10)}.xlsx`, content };
+    return { filename: `${reportType}-${businessDate()}.xlsx`, content };
   }
 
   async exportPdf(reportType: ReportType, userId: string, filters: ReportFilters): Promise<{ filename: string; content: Buffer }> {
     const table = await this.buildTable(reportType, userId, filters);
     const content = await renderInWorker('pdf', table);
-    return { filename: `${reportType}-${new Date().toISOString().slice(0, 10)}.pdf`, content };
+    return { filename: `${reportType}-${businessDate()}.pdf`, content };
   }
 }

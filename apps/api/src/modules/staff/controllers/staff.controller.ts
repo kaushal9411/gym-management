@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 
 import { sendSuccess } from '../../../core/http/response';
+import { businessDate } from '../../../core/utils/business-time';
 import { actorFrom } from '../../authentication/utils/actor.util';
 import type {
   AssignBranchesInput,
@@ -94,7 +95,7 @@ export class StaffController {
     res
       .status(200)
       .setHeader('Content-Type', 'text/csv; charset=utf-8')
-      .setHeader('Content-Disposition', `attachment; filename="staff-export-${new Date().toISOString().slice(0, 10)}.csv"`)
+      .setHeader('Content-Disposition', `attachment; filename="staff-export-${businessDate()}.csv"`)
       .send(csv);
   }
 

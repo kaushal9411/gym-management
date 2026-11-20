@@ -16,10 +16,11 @@ import { ProfileRequestError, type MemberSelfProfile } from '../../services/memb
 import { SectionCard } from '../kit';
 import { ChipSelect, Field, FieldInput } from './fields';
 import { buildPatch, changedKeys, emailChanged, toFormState, validate, type FormErrors, type FormKey, type FormState } from './profile-form-lib';
+import { businessDate } from '@/lib/business-time';
 
 const GENDERS: Array<[string, string]> = [['MALE', 'Male'], ['FEMALE', 'Female'], ['OTHER', 'Other'], ['PREFER_NOT_TO_SAY', 'Prefer not to say']];
 const opts = (m: Record<string, string>): Array<[string, string]> => Object.entries(m);
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => businessDate();
 
 /** Self-service edit form. Draft overlays the query data (no seeding effect); only changed keys are PATCHed. */
 export function ProfileForm({ profile, footer }: { profile: MemberSelfProfile; footer?: React.ReactNode }) {

@@ -28,6 +28,7 @@ import { formatMoney } from '@/features/members/components/detail/detail-ui';
 import type { MemberListItem } from '@/features/members/types';
 import { useCurrencySymbol } from '@/lib/currency';
 import { cn } from '@/lib/utils';
+import { businessDate } from '@/lib/business-time';
 
 /** Offline/manual methods only — Online is its own dedicated Payment Link flow, not a value staff pick here. No card-number/expiry/CVV fields exist anywhere on this page. */
 const OFFLINE_METHODS: { value: MemberPaymentMethod; label: string }[] = [
@@ -68,7 +69,7 @@ export default function RecordPaymentPage() {
   const [discount, setDiscount] = React.useState('');
   const [tax, setTax] = React.useState('');
   const [method, setMethod] = React.useState<MemberPaymentMethod>('CASH');
-  const [paymentDate, setPaymentDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [paymentDate, setPaymentDate] = React.useState(() => businessDate());
   const [transactionReference, setTransactionReference] = React.useState('');
   const [notes, setNotes] = React.useState('');
   const [notifyEmail, setNotifyEmail] = React.useState(false);

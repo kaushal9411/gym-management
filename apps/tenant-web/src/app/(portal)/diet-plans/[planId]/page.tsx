@@ -34,6 +34,7 @@ import {
 } from '@/features/diet/hooks/use-diet';
 import type { DietPlanDetail, PlanMealInput } from '@/features/diet/types';
 import { PanelCard } from '@/features/members/components/detail/detail-ui';
+import { businessDate } from '@/lib/business-time';
 
 type StatusActionKind = 'activate' | 'deactivate' | 'restore' | 'delete';
 
@@ -76,7 +77,7 @@ export default function DietPlanDetailPage() {
   const [builderMeals, setBuilderMeals] = React.useState<PlanMealInput[]>([]);
   const [mealsDirty, setMealsDirty] = React.useState(false);
   const [assignMember, setAssignMember] = React.useState<MemberListItem | null>(null);
-  const [assignStartDate, setAssignStartDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [assignStartDate, setAssignStartDate] = React.useState(() => businessDate());
 
   React.useEffect(() => {
     if (plan.data && !form) setForm(toFormState(plan.data));

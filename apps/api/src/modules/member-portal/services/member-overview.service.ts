@@ -1,4 +1,5 @@
 import { NotFoundError } from '../../../core/errors/app-error';
+import { businessDate } from '../../../core/utils/business-time';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { MemberDietPlanRepository } from '../../diet/repositories/member-diet-plan.repository';
 import { MemberInvoiceService } from '../../finance/services/member-invoice.service';
@@ -54,7 +55,7 @@ export class MemberOverviewService {
 
   async getOverview(memberId: string, now: Date = new Date()): Promise<MemberOverviewDto> {
     const t = this.tenantId;
-    const today = now.toISOString().slice(0, 10);
+    const today = businessDate(now);
     const windowFrom = addDaysStr(today, -(DAILY_WINDOW_DAYS - 1));
     const paidSince = addDaysStr(today, -89);
 

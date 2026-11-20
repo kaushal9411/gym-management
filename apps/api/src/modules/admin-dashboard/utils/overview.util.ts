@@ -1,3 +1,4 @@
+import { businessDate } from '../../../core/utils/business-time';
 import {
   addDaysStr,
   resolveRanges,
@@ -19,7 +20,7 @@ export function resolveOverviewRanges(
   now: Date = new Date(),
 ): { range: DateRange; previousRange: DateRange } {
   const days = rangeDays(range);
-  const to = now.toISOString().slice(0, 10);
+  const to = businessDate(now);
   const r = resolveRanges(addDaysStr(to, -(days - 1)), to, now);
   return { range: r.range, previousRange: r.previousRange };
 }

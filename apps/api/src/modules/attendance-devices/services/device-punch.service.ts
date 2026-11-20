@@ -1,5 +1,6 @@
 import { ConflictError, NotFoundError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
+import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { emitToTenant } from '../../../infrastructure/realtime/socket-server';
 import type { AttendanceRecordDto } from '../../attendance/dto/attendance.dto';
@@ -124,6 +125,6 @@ export class DevicePunchService {
 
   private async branchTimezone(branchId: string): Promise<string> {
     const branch = await this.db.branch.findFirst({ where: { tenantId: this.tenantId, id: branchId }, select: { timezone: true } });
-    return branch?.timezone ?? 'UTC';
+    return branch?.timezone ?? BUSINESS_TIMEZONE;
   }
 }
