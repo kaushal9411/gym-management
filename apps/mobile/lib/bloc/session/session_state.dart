@@ -1,6 +1,5 @@
 import 'package:equatable/equatable.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../models/member_profile.dart';
 import '../../models/tenant_branding.dart';
 import '../../models/user_profile.dart';
@@ -17,18 +16,13 @@ class SessionUnknown extends SessionState {
   const SessionUnknown();
 }
 
-/// Signed out. [rememberedRole] is set when this device remembers which
-/// plane (staff vs. member) was last signed in — it only preselects the
-/// Staff/Member tab on the login screen. The gym is never remembered or
-/// asked for up front: login discovers it from the credentials
-/// (`PublicTenantRepository.discoverGyms`).
+/// Signed out. The gym is never remembered or asked for up front: login
+/// discovers it from the credentials (`PublicTenantRepository.discoverGyms`).
 class SessionUnauthenticated extends SessionState {
-  const SessionUnauthenticated({this.rememberedRole});
-
-  final AppRole? rememberedRole;
+  const SessionUnauthenticated();
 
   @override
-  List<Object?> get props => [rememberedRole];
+  List<Object?> get props => const [];
 }
 
 class SessionAuthenticatedStaff extends SessionState {

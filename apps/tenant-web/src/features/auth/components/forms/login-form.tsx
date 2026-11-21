@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { motion } from 'framer-motion';
-import { Dumbbell, Lock, Phone, User } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { BadgeCheck, Dumbbell, Lock, Phone, User } from 'lucide-react';
 
 import { Checkbox } from '@/components/ui/checkbox';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -17,15 +17,21 @@ import { cn } from '@/lib/utils';
 import { MEMBER_PORTAL_ROUTES } from '@/features/member-portal/constants';
 import { useMemberAuth, useMemberLogin, useMemberRequestPhoneOtp } from '@/features/member-portal/hooks/use-member-auth';
 import { toMemberAuthServiceError } from '@/features/member-portal/services/member-api-client';
-import { FindGymForm } from '@/features/tenant/components/find-gym-form';
 import { TenantLogo } from '@/features/tenant/components/tenant-logo';
-import { continueToGym, discoverGyms, PlatformLoginError, type DiscoveredGym } from '@/features/tenant/platform-login';
+import { continueToGym, discoverGyms, PlatformLoginError, requestPasswordResetAnywhere, type DiscoveredGym } from '@/features/tenant/platform-login';
 import { buildPlatformLoginUrl } from '@/features/tenant/subdomain-urls';
 import { useTenant } from '@/features/tenant/tenant-provider';
 import { useAppSelector } from '@/store/hooks';
 import { AUTH_ROUTES, POST_LOGIN_REDIRECT } from '../../constants';
 import { useLogin, useRequestPhoneOtp, toAuthError } from '../../hooks/use-auth';
-import { phoneLoginSchema, unifiedLoginSchema, type PhoneLoginFormValues, type UnifiedLoginFormValues } from '../../schemas';
+import {
+  phoneLoginSchema,
+  unifiedForgotPasswordSchema,
+  unifiedLoginSchema,
+  type PhoneLoginFormValues,
+  type UnifiedForgotPasswordFormValues,
+  type UnifiedLoginFormValues,
+} from '../../schemas';
 import { looksLikeEmail } from '../../utils/identifier';
 import { getRememberedEmail, setRememberedEmail } from '../../utils/remember-me';
 import { FormAlert } from '../form-alert';
@@ -59,6 +65,39 @@ const DARK_FIELD_CLASS =
 const LINK_BUTTON_CLASS =
   'font-medium text-cyan-700 dark:text-cyan-300 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 rounded-sm';
 
+/**
+ * One field serves both audiences: an email is staff, anything else is a Member ID
+ * (same "@" rule the submit handler uses). This chip says which sign-in the
+ * visitor is on, in that role's colours, and cross-fades as they type.
+ */
+function WhoChip({ identifier }: { identifier: string }) {
+  const value = identifier.trim();
+  const who = value === '' ? 'unknown' : looksLikeEmail(value) ? 'staff' : 'member';
+  const label = who === 'staff' ? 'Staff sign-in · work email' : who === 'member' ? 'Member sign-in · Member ID' : 'Staff use email · Members use Member ID';
+  return (
+    <div className="mt-2 min-h-7" aria-live="polite">
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.span
+          key={who}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+          className={cn(
+            'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold',
+            who === 'staff' && 'bg-linear-to-r from-[#ff6b5b] to-[#8b5cf6] text-white',
+            who === 'member' && 'bg-linear-to-r from-[#c6f135] to-[#14e0b4] text-[#0b231d]',
+            who === 'unknown' && 'border border-foreground/10 bg-foreground/5 text-foreground/55',
+          )}
+        >
+          <BadgeCheck className="size-3.5" aria-hidden />
+          {label}
+        </motion.span>
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function LoginForm() {
   const router = useRouter();
   const login = useLogin();
@@ -82,13 +121,20 @@ export function LoginForm() {
   const [platformPending, setPlatformPending] = React.useState(false);
   // Set only when the credentials belong to more than one gym — the visitor then picks which.
   const [platformGyms, setPlatformGyms] = React.useState<DiscoveredGym[] | null>(null);
-  // Escape hatch for flows that need a gym before any credentials exist (forgot password, phone login).
-  const [pickGymManually, setPickGymManually] = React.useState(false);
+  // "Forgot password?" on the bare host: asks for the email / Member ID only (no gym) - the server mails every gym it exists in.
+  const [forgotOpen, setForgotOpen] = React.useState(false);
+  const [forgotPending, setForgotPending] = React.useState(false);
+  const [forgotSent, setForgotSent] = React.useState(false);
   const pendingLogin = React.useRef<{ actorType: 'staff' | 'member'; identifier: string; password: string; rememberMe: boolean } | null>(null);
 
   const form = useForm<UnifiedLoginFormValues>({
     resolver: zodResolver(unifiedLoginSchema),
     defaultValues: { identifier: '', password: '', rememberMe: false },
+  });
+
+  const forgotForm = useForm<UnifiedForgotPasswordFormValues>({
+    resolver: zodResolver(unifiedForgotPasswordSchema),
+    defaultValues: { identifier: '' },
   });
 
   const phoneForm = useForm<PhoneLoginFormValues>({
@@ -208,6 +254,32 @@ export function LoginForm() {
     );
   });
 
+  const onSubmitForgot = forgotForm.handleSubmit(async (values) => {
+    setInlineError(null);
+    setForgotPending(true);
+    try {
+      await requestPasswordResetAnywhere(values.identifier);
+      setForgotSent(true);
+    } catch (error) {
+      setInlineError({ locked: false, message: error instanceof PlatformLoginError ? error.message : 'Something went wrong. Please try again.' });
+    } finally {
+      setForgotPending(false);
+    }
+  });
+
+  function openForgot() {
+    setInlineError(null);
+    setForgotSent(false);
+    forgotForm.reset({ identifier: form.getValues('identifier') });
+    setForgotOpen(true);
+  }
+
+  function closeForgot() {
+    setInlineError(null);
+    setForgotOpen(false);
+    setForgotSent(false);
+  }
+
   const onSubmitPhone = phoneForm.handleSubmit((values) => {
     setInlineError(null);
     const onSuccess = () => router.push(`${AUTH_ROUTES.verifyPhoneOtp}?phone=${encodeURIComponent(values.phone)}&role=${phoneRole}`);
@@ -230,6 +302,7 @@ export function LoginForm() {
   const identifierValue = form.watch('identifier');
   const passwordValue = form.watch('password');
   const phoneValue = phoneForm.watch('phone');
+  const forgotValue = forgotForm.watch('identifier');
 
   function toggleMode() {
     setInlineError(null);
@@ -321,26 +394,76 @@ export function LoginForm() {
 
               <div className="mb-6 space-y-1 text-center">
                 <h1 className="text-2xl font-bold tracking-tight text-foreground">
-                  {isPlatform && pickGymManually ? 'Looking for your gym?' : isPlatform && platformGyms ? 'Choose your gym' : 'Welcome Back'}
+                  {isPlatform && forgotOpen ? 'Reset your password' : isPlatform && platformGyms ? 'Choose your gym' : 'Welcome Back'}
                 </h1>
                 <p className="text-sm text-foreground/50">
-                  {isPlatform && pickGymManually
-                    ? 'Select your gym to continue.'
+                  {isPlatform && forgotOpen
+                    ? "Enter your email or Member ID and we'll send you a reset link."
                     : isPlatform && platformGyms
                       ? 'Your account is linked to more than one gym. Which one do you want to sign in to?'
-                      : 'Sign in to keep your gym running at full pace.'}
+                      : 'One sign-in for staff and members.'}
                 </p>
               </div>
 
-              {isPlatform && pickGymManually ? (
-                <>
-                  <FindGymForm bare dark />
-                  <p className="mt-5 text-center text-sm">
-                    <button type="button" onClick={() => setPickGymManually(false)} className={LINK_BUTTON_CLASS}>
-                      Sign in with email / member ID instead
-                    </button>
-                  </p>
-                </>
+              {isPlatform && forgotOpen ? (
+                forgotSent ? (
+                  <>
+                    <FormAlert variant="success" message="If an account exists for that email or Member ID, we've sent a password reset link." />
+                    <LoadingButton
+                      type="button"
+                      onClick={closeForgot}
+                      className="login-ripple-btn relative mt-5 h-12 w-full overflow-hidden border-0 text-[15px] font-bold uppercase tracking-wide text-white"
+                    >
+                      Back to sign in
+                    </LoadingButton>
+                  </>
+                ) : (
+                  <>
+                    <FormAlert variant="error" message={inlineError?.message ?? null} />
+                    <form onSubmit={onSubmitForgot} noValidate className="space-y-5" style={{ marginTop: inlineError?.message ? '1.25rem' : 0 }}>
+                      <div className="space-y-2">
+                        <Label htmlFor="forgot-identifier" className="text-xs font-medium uppercase tracking-wide text-foreground/60">
+                          Email or Member ID
+                        </Label>
+                        <IconField
+                          id="forgot-identifier"
+                          icon={User}
+                          type="text"
+                          autoComplete="username"
+                          placeholder="you@example.com or MEM-0001"
+                          invalid={!!forgotForm.formState.errors.identifier}
+                          showSuccess={forgotForm.formState.touchedFields.identifier && !!forgotValue}
+                          aria-describedby={forgotForm.formState.errors.identifier ? 'forgot-identifier-error' : undefined}
+                          disabled={forgotPending}
+                          iconClassName="text-foreground/40 group-focus-within:text-orange-400"
+                          glowClassName="shadow-[0_0_0_4px_rgba(255,138,61,0.18)]"
+                          className={DARK_FIELD_CLASS}
+                          {...forgotForm.register('identifier')}
+                        />
+                        {forgotForm.formState.errors.identifier ? (
+                          <p id="forgot-identifier-error" role="alert" className="text-xs text-red-400">
+                            {forgotForm.formState.errors.identifier.message}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <LoadingButton
+                        type="submit"
+                        loading={forgotPending}
+                        loadingText="Sending…"
+                        disabled={!forgotValue.trim()}
+                        className="login-ripple-btn relative h-12 w-full overflow-hidden border-0 text-[15px] font-bold uppercase tracking-wide text-white"
+                      >
+                        Send reset link
+                      </LoadingButton>
+                    </form>
+                    <p className="mt-5 text-center text-sm">
+                      <button type="button" onClick={closeForgot} className={LINK_BUTTON_CLASS}>
+                        Back to sign in
+                      </button>
+                    </p>
+                  </>
+                )
               ) : isPlatform && platformGyms ? (
                 <>
                   <FormAlert variant="error" message={inlineError?.message ?? null} />
@@ -454,6 +577,7 @@ export function LoginForm() {
                           {form.formState.errors.identifier.message}
                         </p>
                       ) : null}
+                      <WhoChip identifier={identifierValue} />
                     </div>
 
                     <div className="space-y-2">
@@ -462,8 +586,8 @@ export function LoginForm() {
                           Password
                         </Label>
                         {isPlatform ? (
-                          // Needs a gym before any credentials exist to discover one from.
-                          <button type="button" onClick={() => setPickGymManually(true)} className={cn('text-xs', LINK_BUTTON_CLASS)}>
+                          // No gym in the address: reset by email / Member ID alone (the server mails every gym it exists in).
+                          <button type="button" onClick={openForgot} className={cn('text-xs', LINK_BUTTON_CLASS)}>
                             Forgot password?
                           </button>
                         ) : (
@@ -555,17 +679,14 @@ export function LoginForm() {
                   </form>
                   )}
 
-                  <p className="mt-5 text-center text-sm">
-                    {isPlatform ? (
-                      <button type="button" onClick={() => setPickGymManually(true)} className={LINK_BUTTON_CLASS}>
-                        Choose your gym instead
-                      </button>
-                    ) : (
+                  {/* Phone sign-in needs a gym first, so it stays hidden on the bare host. */}
+                  {!isPlatform ? (
+                    <p className="mt-5 text-center text-sm">
                       <button type="button" onClick={toggleMode} className={LINK_BUTTON_CLASS}>
                         {mode === 'phone' ? 'Use email / member ID instead' : 'Use phone number instead'}
                       </button>
-                    )}
-                  </p>
+                    </p>
+                  ) : null}
                 </>
               )}
             </motion.div>

@@ -40,6 +40,8 @@ export interface Tenant {
   name: string;
   status: TenantStatus;
   maintenanceMode: boolean;
+  /** Message from the platform-wide maintenance switch (super admin Settings), when that is what is on. */
+  maintenanceMessage?: string | null;
   branding: TenantBranding;
   timezone: string;
   currency: string;
@@ -50,6 +52,8 @@ export interface Tenant {
   defaultBranch: TenantBranch | null;
   /** The super-admin-configured platform/app name (`GET /public/platform-config`) — distinct from `name`, which is the GYM's name. Used for "Powered by <platformName>" style copy regardless of which tenant is loaded. Defaults to "FitCloud" until resolved or if the call fails. */
   platformName: string;
+  /** Support email from the super admin's Company Information (`GET /public/platform-config`), when set — shown on the maintenance page. */
+  supportEmail?: string | null;
 }
 
 /** The platform itself, used on non-tenant hosts (localhost, fitcloud.com) or when resolution fails. */

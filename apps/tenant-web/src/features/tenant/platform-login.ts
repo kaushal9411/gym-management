@@ -5,6 +5,7 @@ import { buildTenantLoginUrl, buildTenantUrl } from './subdomain-urls';
  * an email / Member ID + password; `discoverGyms` finds which gym(s) those
  * credentials belong to (`POST /public/auth/discover-gyms`), and
  * `continueToGym` takes them into the chosen gym's own subdomain.
+ * `requestPasswordResetAnywhere` is the gym-less "Forgot password?" counterpart.
  */
 export interface DiscoveredGym {
   slug: string;
@@ -57,6 +58,16 @@ async function postJson<T>(path: string, body: unknown, headers: Record<string, 
 export async function discoverGyms(input: { actorType: 'staff' | 'member'; identifier: string; password: string }): Promise<DiscoveredGym[]> {
   const data = await postJson<{ gyms: DiscoveredGym[] }>('/public/auth/discover-gyms', input);
   return data.gyms;
+}
+
+/**
+ * Forgot password without knowing the gym (`POST /public/auth/forgot-password`, no auth, no tenant header).
+ * The server mails a reset link for every gym the identifier (staff email or Member ID) exists in and always
+ * answers 200 with a generic message, so success never says whether an account exists. Throws a
+ * `PlatformLoginError` only for rate limiting / validation / network failures.
+ */
+export async function requestPasswordResetAnywhere(identifier: string): Promise<void> {
+  await postJson<unknown>('/public/auth/forgot-password', { identifier: identifier.trim() });
 }
 
 interface StaffTokens {

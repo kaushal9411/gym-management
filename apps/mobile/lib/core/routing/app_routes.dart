@@ -3,7 +3,6 @@ class AppRoutes {
   AppRoutes._();
 
   static const splash = '/splash';
-  static const findGym = '/find-gym';
   static const login = '/login';
   static const otp = '/otp';
   static const mfaSetup = '/mfa-setup';

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { LoginForm } from '@/features/auth/components/forms/login-form';
+import { MaintenanceGate } from '@/features/auth/components/status/maintenance-gate';
 
 export const metadata: Metadata = { title: 'Sign in' };
 
@@ -14,5 +15,9 @@ export const metadata: Metadata = { title: 'Sign in' };
  * `/register` already uses for the same reason.
  */
 export default function LoginPage() {
-  return <LoginForm />;
+  return (
+    <MaintenanceGate>
+      <LoginForm />
+    </MaintenanceGate>
+  );
 }

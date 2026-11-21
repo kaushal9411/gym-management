@@ -3,7 +3,8 @@ import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
 
-import { PLATFORM_IDENTITY_SETTING_KEY, PLATFORM_NAME_CACHE_KEY } from './platform-config.service';
+import { COMPANY_INFO_CACHE_KEY, COMPANY_INFO_SETTING_KEY, PLATFORM_IDENTITY_SETTING_KEY, PLATFORM_NAME_CACHE_KEY } from './platform-config.service';
+import { PLATFORM_MAINTENANCE_CACHE_KEY, PLATFORM_MAINTENANCE_SETTING_KEY } from './platform-maintenance.service';
 
 /** `platform_identity`'s value shape is the one key-value pair worth a dedicated check — everything else is intentionally free-form JSON. */
 function validatePlatformIdentity(value: unknown): void {
@@ -38,6 +39,8 @@ export class AdminSettingsService {
       update: { value: value as object, category },
     });
     if (key === PLATFORM_IDENTITY_SETTING_KEY) await cache.del(PLATFORM_NAME_CACHE_KEY);
+    if (key === COMPANY_INFO_SETTING_KEY) await cache.del(COMPANY_INFO_CACHE_KEY);
+    if (key === PLATFORM_MAINTENANCE_SETTING_KEY) await cache.del(PLATFORM_MAINTENANCE_CACHE_KEY);
     await adminAuditLogRepository.record({ adminUserId, actorRole: adminRole, action: 'admin.system_setting_updated', entityType: 'SystemSetting', entityId: key });
     return setting;
   }

@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import 'bloc/platform/platform_config_cubit.dart';
+import 'bloc/maintenance/maintenance_cubit.dart';
 import 'bloc/session/session_cubit.dart';
 import 'bloc/theme/theme_cubit.dart';
 import 'core/di/service_locator.dart';
@@ -12,6 +13,7 @@ import 'core/push/push_notification_service.dart';
 import 'core/routing/app_router.dart';
 import 'core/storage/secure_storage.dart';
 import 'core/theme/app_theme.dart';
+import 'features/maintenance/presentation/maintenance_host.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +33,9 @@ Future<void> main() async {
   // Cached to on-device storage too: `local_notifications.dart`'s FCM
   // background isolate has no access to this cubit (or any DI container)
   // and reads the cached value directly instead.
+  // Created first so it is already listening when `load()` below reports a
+  // platform-wide maintenance switch (the bus drops events nobody hears).
+  getIt<MaintenanceCubit>();
   final platformConfigCubit = getIt<PlatformConfigCubit>();
   await platformConfigCubit.load();
   await getIt<SecureStorage>().saveAppName(platformConfigCubit.state.appName);
@@ -65,6 +70,17 @@ class _FitCloudAppState extends State<FitCloudApp> with WidgetsBindingObserver {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Back from the background: re-read the platform config, which also
+    // raises the Maintenance screen if the platform switch was flipped on
+    // meanwhile. While that screen is up it polls on its own.
+    if (state == AppLifecycleState.resumed &&
+        !getIt<MaintenanceCubit>().state.active) {
+      widget.platformConfigCubit.load();
+    }
+  }
+
+  @override
   void didChangePlatformBrightness() {
     if (getIt<ThemeCubit>().onPlatformBrightnessChanged()) _repaintEverything();
   }
@@ -93,6 +109,7 @@ class _FitCloudAppState extends State<FitCloudApp> with WidgetsBindingObserver {
           value: widget.platformConfigCubit,
         ),
         BlocProvider<ThemeCubit>.value(value: getIt<ThemeCubit>()),
+        BlocProvider<MaintenanceCubit>.value(value: getIt<MaintenanceCubit>()),
       ],
       child: BlocListener<ThemeCubit, ThemeMode>(
         listener: (_, __) => _repaintEverything(),
@@ -104,6 +121,8 @@ class _FitCloudAppState extends State<FitCloudApp> with WidgetsBindingObserver {
             darkTheme: AppTheme.dark,
             themeMode: mode,
             routerConfig: _router,
+            builder: (context, child) =>
+                MaintenanceHost(child: child ?? const SizedBox.shrink()),
           ),
         ),
       ),

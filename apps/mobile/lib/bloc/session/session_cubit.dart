@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../core/network/api_exception.dart';
 import '../../core/network/auth_event_bus.dart';
 import '../../core/push/push_notification_service.dart';
 import '../../core/storage/secure_storage.dart';
-import '../../core/theme/app_colors.dart';
 import '../../core/utils/app_currency.dart';
 import '../../models/member_profile.dart';
 import '../../models/tenant_branding.dart';
@@ -74,36 +74,19 @@ class SessionCubit extends Cubit<SessionState> {
               return;
             }
         }
+      } on ApiException catch (e) {
+        // Maintenance is not a dead session: keep the tokens and stay on the
+        // splash. The app-wide maintenance overlay (MaintenanceCubit, raised by
+        // the Dio interceptor) covers it; once maintenance ends it calls
+        // restore() again.
+        if (e.isMaintenance) return;
+        // Anything else falls through to the sign-out below.
       } catch (_) {
         // Falls through to the remembered-gym lookup below.
       }
       await _storage.clearSession();
     }
-    emit(await _unauthenticatedWithMemory());
-  }
-
-  /// No valid session, but this device may still remember which role
-  /// (staff vs. member) it was last used for — only used to preselect the
-  /// matching tab on the login screen, so it needs no network call. Any
-  /// failure (nothing remembered) falls back to a bare unauthenticated state.
-  Future<SessionUnauthenticated> _unauthenticatedWithMemory() async {
-    final slug = await _storage.readTenantSlug();
-    if (slug == null) return const SessionUnauthenticated();
-    try {
-      final recents = await _publicTenantRepository.recentGyms();
-      for (final gym in recents) {
-        if (gym.slug == slug) {
-          return SessionUnauthenticated(
-            rememberedRole: gym.actorType == ActorType.staff
-                ? AppRole.staff
-                : AppRole.member,
-          );
-        }
-      }
-      return const SessionUnauthenticated();
-    } catch (_) {
-      return const SessionUnauthenticated();
-    }
+    emit(const SessionUnauthenticated());
   }
 
   void staffSignedIn(UserProfile user, TenantBranding tenant) {
@@ -164,7 +147,7 @@ class SessionCubit extends Cubit<SessionState> {
       await _memberAuthRepository.logout();
     }
     AppCurrency.reset();
-    emit(await _unauthenticatedWithMemory());
+    emit(const SessionUnauthenticated());
   }
 
   Future<void> _handleForcedLogout() async {
@@ -174,7 +157,7 @@ class SessionCubit extends Cubit<SessionState> {
       await _pushNotificationService.unregister(actorType);
     }
     await _storage.clearSession();
-    emit(await _unauthenticatedWithMemory());
+    emit(const SessionUnauthenticated());
   }
 
   @override

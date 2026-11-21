@@ -3,8 +3,9 @@ import { Router } from 'express';
 import { env } from '../../../config/env';
 import { createRateLimiter } from '../../../core/middleware/rate-limiter';
 import { validate } from '../../../core/middleware/validate.middleware';
+import { crossGymAccessController } from '../controllers/cross-gym-access.controller';
 import { gymDiscoveryController } from '../controllers/gym-discovery.controller';
-import { discoverGymsSchema } from '../validators/gym-discovery.validators';
+import { crossGymForgotPasswordSchema, crossGymPhoneRequestSchema, crossGymPhoneVerifySchema, discoverGymsSchema } from '../validators/gym-discovery.validators';
 
 export const gymDiscoveryRouter: Router = Router();
 
@@ -51,4 +52,65 @@ gymDiscoveryRouter.post(
   discoverRateLimiter(),
   validate({ body: discoverGymsSchema }),
   asyncHandler(gymDiscoveryController.discover.bind(gymDiscoveryController)),
+);
+
+// ── Forgot password / phone login without picking a gym ──────────────────
+
+const crossGymLimiter = (prefix: string, max: number, key: 'identifier' | 'phone') =>
+  createRateLimiter({
+    windowMs: 15 * 60_000,
+    max: env.isProduction ? max : 100,
+    prefix,
+    keyGenerator: (req) => `${req.ip}:${String(req.body?.[key] ?? '').toLowerCase()}`,
+  });
+
+/**
+ * @openapi
+ * /public/auth/forgot-password:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Forgot password for staff (email) or members (Member ID) without choosing a gym (no auth, no tenant)
+ *     description: Sends the reset email for every gym the identifier exists in. Always answers the same way — never reveals whether an account exists.
+ *     responses:
+ *       200: { description: Generic acknowledgement }
+ */
+gymDiscoveryRouter.post(
+  '/forgot-password',
+  crossGymLimiter('xgym-forgot', 5, 'identifier'),
+  validate({ body: crossGymForgotPasswordSchema }),
+  asyncHandler(crossGymAccessController.forgotPassword.bind(crossGymAccessController)),
+);
+
+/**
+ * @openapi
+ * /public/auth/phone-login/request-otp:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Email a phone-login code without choosing a gym (no auth, no tenant)
+ *     responses:
+ *       200: { description: Generic acknowledgement }
+ */
+gymDiscoveryRouter.post(
+  '/phone-login/request-otp',
+  crossGymLimiter('xgym-phone-otp', 5, 'phone'),
+  validate({ body: crossGymPhoneRequestSchema }),
+  asyncHandler(crossGymAccessController.requestPhoneOtp.bind(crossGymAccessController)),
+);
+
+/**
+ * @openapi
+ * /public/auth/phone-login/verify-otp:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Verify a phone-login code; the gym whose code it is signs the person in (no auth, no tenant)
+ *     description: Returns that gym's normal login result plus `tenantSlug` so the app can load only that gym.
+ *     responses:
+ *       200: { description: Login result (or a 2FA / MFA-setup challenge) with tenantSlug }
+ *       401: { description: Incorrect or expired code }
+ */
+gymDiscoveryRouter.post(
+  '/phone-login/verify-otp',
+  crossGymLimiter('xgym-phone-verify', 10, 'phone'),
+  validate({ body: crossGymPhoneVerifySchema }),
+  asyncHandler(crossGymAccessController.verifyPhoneOtp.bind(crossGymAccessController)),
 );

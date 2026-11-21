@@ -12,7 +12,6 @@ import '../../../core/storage/secure_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../models/staff_login_result.dart';
-import '../../../models/tenant_branding.dart';
 import '../../../repositories/auth_repository.dart';
 import '../../../repositories/member_auth_repository.dart';
 import '../../../repositories/public_tenant_repository.dart';
@@ -25,15 +24,10 @@ import 'staff_mfa_setup_screen.dart';
 import 'staff_otp_screen.dart';
 
 class PhoneOtpScreenArgs {
-  const PhoneOtpScreenArgs({
-    required this.phone,
-    required this.role,
-    required this.tenant,
-  });
+  const PhoneOtpScreenArgs({required this.phone, required this.role});
 
   final String phone;
   final AppRole role;
-  final TenantBranding tenant;
 }
 
 /// Same component vocabulary as [StaffOtpScreen] (glass card, [OtpInput]),
@@ -42,6 +36,11 @@ class PhoneOtpScreenArgs {
 /// [LoginScreen]'s `_submitStaff` pattern-matches (success / 2FA challenge /
 /// mandatory-setup challenge), member verification always resolves to a
 /// session directly (that plane has no OTP/2FA challenge of its own).
+///
+/// No gym is known up front: verify goes to the public endpoint, which returns
+/// the `tenantSlug` (already saved by the repository, so `X-Tenant-Slug` is
+/// sent from then on); the gym's branding is then resolved and the flow
+/// continues exactly as a normal login would.
 class PhoneOtpScreen extends StatefulWidget {
   const PhoneOtpScreen({super.key, required this.args});
 
@@ -80,15 +79,6 @@ class _PhoneOtpScreenState extends State<PhoneOtpScreen> {
     });
   }
 
-  Future<void> _rememberRole(ActorType actorType) async {
-    try {
-      await getIt<PublicTenantRepository>()
-          .rememberGymForRole(widget.args.tenant, actorType);
-    } catch (_) {
-      // Best-effort — a storage failure shouldn't block a login that already succeeded.
-    }
-  }
-
   Future<void> _verify(String code) async {
     setState(() {
       _verifying = true;
@@ -102,6 +92,9 @@ class _PhoneOtpScreenState extends State<PhoneOtpScreen> {
       }
     } on ApiException catch (e) {
       if (!mounted) return;
+      // Maintenance is not a form error — the app-wide Maintenance screen
+      // takes over; show nothing here.
+      if (e.isMaintenance) return;
       _otpKey.currentState?.clear();
       setState(() => _error = e.message);
     } finally {
@@ -110,14 +103,14 @@ class _PhoneOtpScreenState extends State<PhoneOtpScreen> {
   }
 
   Future<void> _verifyStaff(String code) async {
-    final result = await getIt<AuthRepository>()
-        .verifyPhoneOtp(phone: widget.args.phone, code: code);
+    final verified = await getIt<AuthRepository>()
+        .verifyPublicPhoneOtp(phone: widget.args.phone, code: code);
+    final tenant =
+        await getIt<PublicTenantRepository>().resolve(verified.tenantSlug);
     if (!mounted) return;
-    switch (result) {
+    switch (verified.result) {
       case StaffLoginSuccess(:final user):
-        await _rememberRole(ActorType.staff);
-        if (!mounted) return;
-        context.read<SessionCubit>().staffSignedIn(user, widget.args.tenant);
+        context.read<SessionCubit>().staffSignedIn(user, tenant);
       case StaffOtpRequired(:final email, :final purpose):
         context.push(
           AppRoutes.otp,
@@ -125,7 +118,7 @@ class _PhoneOtpScreenState extends State<PhoneOtpScreen> {
             email: email,
             purpose: purpose,
             role: AppRole.staff,
-            tenant: widget.args.tenant,
+            tenant: tenant,
           ),
         );
       case StaffMfaSetupRequired(:final email, :final setupToken):
@@ -135,21 +128,20 @@ class _PhoneOtpScreenState extends State<PhoneOtpScreen> {
             setupToken: setupToken,
             email: email,
             role: AppRole.staff,
-            tenant: widget.args.tenant,
+            tenant: tenant,
           ),
         );
     }
   }
 
   Future<void> _verifyMember(String code) async {
-    final result = await getIt<MemberAuthRepository>()
-        .verifyPhoneOtp(phone: widget.args.phone, code: code);
+    final verified = await getIt<MemberAuthRepository>()
+        .verifyPublicPhoneOtp(phone: widget.args.phone, code: code);
+    final tenant =
+        await getIt<PublicTenantRepository>().resolve(verified.tenantSlug);
     if (!mounted) return;
-    await _rememberRole(ActorType.member);
-    if (!mounted) return;
-    context
-        .read<SessionCubit>()
-        .memberSignedIn(result.member, widget.args.tenant);
+
+    context.read<SessionCubit>().memberSignedIn(verified.result.member, tenant);
   }
 
   Future<void> _resend() async {
@@ -158,16 +150,16 @@ class _PhoneOtpScreenState extends State<PhoneOtpScreen> {
       _error = null;
     });
     try {
-      if (_isStaff) {
-        await getIt<AuthRepository>()
-            .resendPhoneOtp(phone: widget.args.phone);
-      } else {
-        await getIt<MemberAuthRepository>()
-            .resendPhoneOtp(phone: widget.args.phone);
-      }
+      await getIt<PublicTenantRepository>().requestPhoneOtp(
+        actorType: _isStaff ? ActorType.staff : ActorType.member,
+        phone: widget.args.phone,
+      );
       _startCooldown();
     } on ApiException catch (e) {
       if (!mounted) return;
+      // Maintenance is not a form error — the app-wide Maintenance screen
+      // takes over; show nothing here.
+      if (e.isMaintenance) return;
       setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _resending = false);
@@ -186,11 +178,7 @@ class _PhoneOtpScreenState extends State<PhoneOtpScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             children: [
-              BrandMark.initials(
-                initials: widget.args.tenant.initials,
-                role: role,
-                size: 60,
-              ),
+              BrandMark.glyph(role: role, size: 60),
               const SizedBox(height: 18),
               Text(
                 'Enter verification code',

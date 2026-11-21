@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { ForgotPasswordForm } from '@/features/auth/components/forms/forgot-password-form';
+import { MaintenanceGate } from '@/features/auth/components/status/maintenance-gate';
 
 export const metadata: Metadata = { title: 'Forgot password' };
 
@@ -12,5 +13,9 @@ export const metadata: Metadata = { title: 'Forgot password' };
  * every other auth/status route.
  */
 export default function ForgotPasswordPage() {
-  return <ForgotPasswordForm />;
+  return (
+    <MaintenanceGate>
+      <ForgotPasswordForm />
+    </MaintenanceGate>
+  );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { PhoneOtpForm } from '@/features/auth/components/forms/phone-otp-form';
+import { MaintenanceGate } from '@/features/auth/components/status/maintenance-gate';
 
 export const metadata: Metadata = { title: 'Verify code' };
 
@@ -18,5 +19,9 @@ interface VerifyPhoneOtpPageProps {
 export default async function VerifyPhoneOtpPage({ searchParams }: VerifyPhoneOtpPageProps) {
   const { phone = '', role = 'staff' } = await searchParams;
   const safeRole = role === 'member' ? 'member' : 'staff';
-  return <PhoneOtpForm phone={phone} role={safeRole} />;
+  return (
+    <MaintenanceGate>
+      <PhoneOtpForm phone={phone} role={safeRole} />
+    </MaintenanceGate>
+  );
 }

@@ -15,13 +15,15 @@ import { adminFeatureFlagRouter } from '../../modules/admin-feature-flags/routes
 import { adminLeadRouter } from '../../modules/admin-leads/routes/admin-lead.routes';
 import { adminNotificationSettingsRouter } from '../../modules/admin-notification-settings/routes/admin-notification-settings.routes';
 import { adminNotificationRouter } from '../../modules/admin-notifications/routes/admin-notification.routes';
+import { adminPaymentGatewaysRouter } from '../../modules/admin-payment-gateways/routes/admin-payment-gateways.routes';
 import { adminPaymentRouter } from '../../modules/admin-payments/routes/admin-payment.routes';
 import { adminPlanRouter } from '../../modules/admin-plans/routes/admin-plan.routes';
 import { adminReferenceDataRouter } from '../../modules/admin-reference-data/routes/admin-reference-data.routes';
 import { adminRevenueRouter } from '../../modules/admin-revenue/routes/admin-revenue.routes';
 import { adminRoleRouter } from '../../modules/admin-roles/routes/admin-role.routes';
 import { adminSettingsRouter } from '../../modules/admin-settings/routes/admin-settings.routes';
-import { getPlatformName } from '../../modules/admin-settings/services/platform-config.service';
+import { getCompanyInfo, getPlatformName } from '../../modules/admin-settings/services/platform-config.service';
+import { getPlatformMaintenance } from '../../modules/admin-settings/services/platform-maintenance.service';
 import { adminTicketRouter } from '../../modules/admin-support/routes/admin-ticket.routes';
 import { adminTemplateRouter } from '../../modules/admin-templates/routes/admin-template.routes';
 import { adminTenantBillingRouter } from '../../modules/admin-tenants/routes/admin-tenant-billing.routes';
@@ -109,6 +111,7 @@ v1Router.use('/admin/notification-settings', adminNotificationSettingsRouter);
 v1Router.use('/admin/cms', adminCmsRouter);
 v1Router.use('/admin/notifications', adminNotificationRouter);
 v1Router.use('/admin/settings', adminSettingsRouter);
+v1Router.use('/admin/payment-gateways', adminPaymentGatewaysRouter);
 v1Router.use('/admin/audit-logs', adminAuditRouter);
 v1Router.use('/admin/roles', adminRoleRouter);
 v1Router.use('/admin/reference-data', adminReferenceDataRouter);
@@ -244,14 +247,15 @@ v1Router.get('/public/tenants', async (_req, res, next) => {
  * /public/platform-config:
  *   get:
  *     tags: [Authentication]
- *     summary: The super-admin-configured platform/app name (no auth required)
+ *     summary: The super-admin-configured platform/app name plus the optional support email / website from Company Information (no auth required)
  *     description: Used by every client (tenant-web, super-admin, mobile) to show the platform's own display name before login and anywhere there's no tenant to brand as. Falls back to "FitCloud" if never configured.
  *     responses:
  *       200: { description: Platform config }
  */
 v1Router.get('/public/platform-config', async (_req, res, next) => {
   try {
-    sendSuccess(res, { appName: await getPlatformName() });
+    const [appName, company, maintenance] = await Promise.all([getPlatformName(), getCompanyInfo(), getPlatformMaintenance()]);
+    sendSuccess(res, { appName, supportEmail: company.supportEmail, website: company.website, maintenance });
   } catch (error) {
     next(error);
   }

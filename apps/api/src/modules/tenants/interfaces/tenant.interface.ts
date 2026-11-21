@@ -11,7 +11,10 @@ export interface ResolvedTenant {
   slug: string;
   name: string;
   status: TenantStatus;
+  /** This gym's own switch OR the platform-wide one (super admin Settings). */
   maintenanceMode: boolean;
+  /** Message from the platform-wide switch, when that is what's on. */
+  maintenanceMessage?: string | null;
   branding: {
     primaryColor: string;
     primaryForeground: string;

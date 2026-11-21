@@ -1,3 +1,4 @@
+import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../repositories/public_tenant_repository.dart';
@@ -6,10 +7,18 @@ import '../../repositories/public_tenant_repository.dart';
 /// never throws (falls back to the static default itself), so there's no
 /// loading/error state worth modelling here, unlike every other cubit in
 /// this app.
-class PlatformConfigState {
-  const PlatformConfigState(this.appName);
+class PlatformConfigState extends Equatable {
+  const PlatformConfigState(this.appName, {this.supportEmail});
 
   final String appName;
+
+  /// The super admin's support address (Company Information), when set.
+  final String? supportEmail;
+
+  /// Equatable so a periodic reload (on app resume) that changes nothing
+  /// doesn't rebuild the whole app.
+  @override
+  List<Object?> get props => [appName, supportEmail];
 }
 
 /// App-wide singleton (registered the same way as `SessionCubit` in
@@ -24,9 +33,10 @@ class PlatformConfigCubit extends Cubit<PlatformConfigState> {
   final PublicTenantRepository _repository;
 
   Future<void> load() async {
-    final appName = await _repository
-        .getPlatformConfig()
-        .timeout(const Duration(seconds: 3), onTimeout: () => state.appName);
-    emit(PlatformConfigState(appName));
+    final config = await _repository.getPlatformInfo().timeout(
+      const Duration(seconds: 3),
+      onTimeout: () => PlatformInfo(state.appName, state.supportEmail),
+    );
+    emit(PlatformConfigState(config.appName, supportEmail: config.supportEmail));
   }
 }

@@ -1,8 +1,8 @@
-import { env } from '../../../config/env';
 import { AppError, ConflictError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { assertPasswordPolicy, passwordService } from '../../../core/security/password.service';
 import { prisma } from '../../../infrastructure/database/prisma';
+import { getRazorpayKeyId } from '../../admin-payment-gateways/services/razorpay-config.service';
 import type { DeviceInfo } from '../../authentication/types/auth.types';
 import { createOrder, verifyOrderPaymentSignature } from '../../finance/services/razorpay-gateway.service';
 import { planRepository } from '../repositories/plan.repository';
@@ -151,7 +151,7 @@ export class OnboardingService {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      keyId: env.razorpay.keyId!,
+      keyId: (await getRazorpayKeyId())!,
     };
   }
 
@@ -172,7 +172,7 @@ export class OnboardingService {
       throw new AppError(ErrorCode.VALIDATION_ERROR, 'This payment does not match the order being verified.', 400);
     }
 
-    const valid = verifyOrderPaymentSignature({
+    const valid = await verifyOrderPaymentSignature({
       orderId: params.razorpayOrderId,
       paymentId: params.razorpayPaymentId,
       signature: params.razorpaySignature,

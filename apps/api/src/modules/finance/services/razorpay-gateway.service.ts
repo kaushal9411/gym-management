@@ -2,9 +2,9 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 
 import Razorpay from 'razorpay';
 
-import { env } from '../../../config/env';
 import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
+import { getRazorpayConfig } from '../../admin-payment-gateways/services/razorpay-config.service';
 
 /**
  * Real Razorpay integration for Member Payments' online-payment flow
@@ -16,14 +16,19 @@ import { ErrorCode } from '../../../core/errors/error-codes';
  * own subscription — different money movement, different credentials, no
  * shared code.
  */
-let client: Razorpay | null = null;
+let client: { cacheKey: string; instance: Razorpay } | null = null;
 
-function getClient(): Razorpay {
-  if (!env.razorpay.isConfigured) {
+/** Rebuilt whenever the resolved key changes (super admin saved new credentials), reused otherwise. */
+async function getClient(): Promise<Razorpay> {
+  const config = await getRazorpayConfig();
+  if (!config.keyId || !config.keySecret) {
     throw new AppError(ErrorCode.VALIDATION_ERROR, 'Online payments are not configured for this environment.', 503);
   }
-  client ??= new Razorpay({ key_id: env.razorpay.keyId!, key_secret: env.razorpay.keySecret! });
-  return client;
+  const cacheKey = `${config.keyId}:${config.keySecret}`;
+  if (client?.cacheKey !== cacheKey) {
+    client = { cacheKey, instance: new Razorpay({ key_id: config.keyId, key_secret: config.keySecret }) };
+  }
+  return client.instance;
 }
 
 export interface RazorpayPaymentLink {
@@ -50,7 +55,7 @@ export async function createPaymentLink(params: {
   notifySms: boolean;
   notes?: Record<string, string>;
 }): Promise<RazorpayPaymentLink> {
-  const link = await getClient().paymentLink.create({
+  const link = await (await getClient()).paymentLink.create({
     amount: params.amountInSmallestUnit,
     currency: params.currency,
     description: params.description,
@@ -68,7 +73,7 @@ export async function createPaymentLink(params: {
 
 /** Manually (re)sends the Payment Link notification — Razorpay's own `notifyBy`, for staff to resend after generation without cancelling/recreating the link. */
 export async function notifyPaymentLink(paymentLinkId: string, medium: 'email' | 'sms'): Promise<void> {
-  await getClient().paymentLink.notifyBy(paymentLinkId, medium);
+  await (await getClient()).paymentLink.notifyBy(paymentLinkId, medium);
 }
 
 /**
@@ -78,7 +83,7 @@ export async function notifyPaymentLink(paymentLinkId: string, medium: 'email' |
  * instead of a webhook.
  */
 export async function fetchPaymentLink(paymentLinkId: string): Promise<RazorpayPaymentLinkStatus> {
-  const link = await getClient().paymentLink.fetch(paymentLinkId);
+  const link = await (await getClient()).paymentLink.fetch(paymentLinkId);
   return {
     id: link.id,
     shortUrl: link.short_url,
@@ -105,7 +110,7 @@ export async function createOrder(params: {
   receipt: string;
   notes?: Record<string, string>;
 }): Promise<RazorpayOrder> {
-  const order = await getClient().orders.create({
+  const order = await (await getClient()).orders.create({
     amount: params.amountInSmallestUnit,
     currency: params.currency,
     receipt: params.receipt,
@@ -121,9 +126,10 @@ export async function createOrder(params: {
  * local computation, no API call — unlike polling a Payment Link's status,
  * this can't be affected by upstream API flakiness.
  */
-export function verifyOrderPaymentSignature(params: { orderId: string; paymentId: string; signature: string }): boolean {
-  if (!env.razorpay.isConfigured) return false;
-  const expected = createHmac('sha256', env.razorpay.keySecret!)
+export async function verifyOrderPaymentSignature(params: { orderId: string; paymentId: string; signature: string }): Promise<boolean> {
+  const { keySecret } = await getRazorpayConfig();
+  if (!keySecret) return false;
+  const expected = createHmac('sha256', keySecret)
     .update(`${params.orderId}|${params.paymentId}`)
     .digest('hex');
   return expected === params.signature;
@@ -139,9 +145,10 @@ export function verifyOrderPaymentSignature(params: { orderId: string; paymentId
  * against a real delivery (see `app.ts`'s `express.json({ verify })`, which
  * captures `req.rawBody` for exactly this).
  */
-export function verifyWebhookSignature(rawBody: string | Buffer, signature: string | undefined): boolean {
-  if (!signature || !env.razorpay.webhookSecret) return false;
-  const expected = createHmac('sha256', env.razorpay.webhookSecret).update(rawBody).digest('hex');
+export async function verifyWebhookSignature(rawBody: string | Buffer, signature: string | undefined): Promise<boolean> {
+  const { webhookSecret } = await getRazorpayConfig();
+  if (!signature || !webhookSecret) return false;
+  const expected = createHmac('sha256', webhookSecret).update(rawBody).digest('hex');
   const expectedBuf = Buffer.from(expected, 'hex');
   const signatureBuf = Buffer.from(signature, 'hex');
   if (expectedBuf.length !== signatureBuf.length) return false;

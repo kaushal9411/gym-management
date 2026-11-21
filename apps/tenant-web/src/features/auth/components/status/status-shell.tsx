@@ -14,6 +14,8 @@ interface StatusShellProps {
   maxWidth?: string;
   /** Extra classes for the card (padding is up to the content). */
   cardClassName?: string;
+  /** Optional CSS `background` replacing the default brand gradient (e.g. a multi-colour gradient for the maintenance page). */
+  backdrop?: string;
 }
 
 /**
@@ -22,12 +24,12 @@ interface StatusShellProps {
  * + dotted grid, tenant logo/name header with theme toggle, a centred glass
  * card, and the "Powered by &lt;platform&gt;" footer.
  */
-export function StatusShell({ children, maxWidth = 'max-w-xl', cardClassName }: StatusShellProps) {
+export function StatusShell({ children, maxWidth = 'max-w-xl', cardClassName, backdrop }: StatusShellProps) {
   const tenant = useTenant();
   const reduce = useReducedMotion() ?? false;
 
   return (
-    <div className="gradient-brand relative isolate flex min-h-dvh flex-col overflow-hidden text-primary-foreground">
+    <div className={cn(!backdrop && 'gradient-brand', 'relative isolate flex min-h-dvh flex-col overflow-hidden text-primary-foreground')} style={backdrop ? { background: backdrop } : undefined}>
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
         <motion.div className="absolute -left-32 -top-32 size-[28rem] rounded-full bg-white/15 blur-3xl" animate={reduce ? undefined : { x: [0, 40, 0], y: [0, 30, 0] }} transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }} />
         <motion.div className="absolute -bottom-40 -right-24 size-[32rem] rounded-full bg-black/20 blur-3xl" animate={reduce ? undefined : { x: [0, -50, 0], y: [0, -30, 0] }} transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }} />

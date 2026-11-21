@@ -1,9 +1,9 @@
 import type { DeviceTokenPlatform, Prisma, TenantNotificationCategory } from '@prisma/client';
 
-import { env } from '../../../config/env';
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
+import { getRazorpayKeyId } from '../../admin-payment-gateways/services/razorpay-config.service';
 import { AttendanceRepository } from '../../attendance/repositories/attendance.repository';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
 import { ClassBookingService } from '../../classes/services/class-booking.service';
@@ -155,7 +155,7 @@ export class MemberPortalService {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      keyId: env.razorpay.keyId!,
+      keyId: (await getRazorpayKeyId())!,
     };
   }
 
@@ -179,7 +179,7 @@ export class MemberPortalService {
       throw new AppError(ErrorCode.VALIDATION_ERROR, 'This payment does not match the order being verified.', 400);
     }
 
-    const valid = verifyOrderPaymentSignature({
+    const valid = await verifyOrderPaymentSignature({
       orderId: input.razorpayOrderId,
       paymentId: input.razorpayPaymentId,
       signature: input.razorpaySignature,
@@ -262,7 +262,7 @@ export class MemberPortalService {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      keyId: env.razorpay.keyId!,
+      keyId: (await getRazorpayKeyId())!,
     };
   }
 
@@ -284,7 +284,7 @@ export class MemberPortalService {
       throw new AppError(ErrorCode.VALIDATION_ERROR, 'This payment does not match the order being verified.', 400);
     }
 
-    const valid = verifyOrderPaymentSignature({
+    const valid = await verifyOrderPaymentSignature({
       orderId: input.razorpayOrderId,
       paymentId: input.razorpayPaymentId,
       signature: input.razorpaySignature,

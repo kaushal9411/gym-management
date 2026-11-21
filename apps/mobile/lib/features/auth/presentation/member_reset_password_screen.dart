@@ -88,6 +88,9 @@ class _MemberResetPasswordScreenState
       setState(() => _done = true);
     } on ApiException catch (e) {
       if (!mounted) return;
+      // Maintenance is not a form error — the app-wide Maintenance screen
+      // takes over; show nothing here.
+      if (e.isMaintenance) return;
       setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);

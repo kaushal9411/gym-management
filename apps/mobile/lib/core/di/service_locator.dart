@@ -7,6 +7,7 @@ import '../../bloc/dashboard/owner_dashboard_cubit.dart';
 import '../../bloc/theme/theme_cubit.dart';
 import '../../bloc/finance/finance_summary_cubit.dart';
 import '../../bloc/finance/payments_analytics_cubit.dart';
+import '../../bloc/maintenance/maintenance_cubit.dart';
 import '../../bloc/platform/platform_config_cubit.dart';
 import '../../bloc/reports/reports_overview_cubit.dart';
 import '../../bloc/session/session_cubit.dart';
@@ -51,6 +52,7 @@ import '../../repositories/tenant_notification_repository.dart';
 import '../../repositories/tenant_role_repository.dart';
 import '../../repositories/workout_plan_repository.dart';
 import '../network/auth_event_bus.dart';
+import '../network/maintenance_event_bus.dart';
 import '../network/dio_client.dart';
 import '../push/push_notification_service.dart';
 import '../storage/secure_storage.dart';
@@ -66,13 +68,18 @@ void setupServiceLocator() {
   );
   getIt.registerLazySingleton<SecureStorage>(() => SecureStorage(getIt()));
   getIt.registerLazySingleton<AuthEventBus>(() => AuthEventBus());
+  getIt.registerLazySingleton<MaintenanceEventBus>(
+    () => MaintenanceEventBus(),
+  );
   getIt.registerLazySingleton<ThemeCubit>(() => ThemeCubit(getIt()));
 
-  getIt.registerLazySingleton<DioClient>(() => DioClient(getIt(), getIt()));
+  getIt.registerLazySingleton<DioClient>(
+    () => DioClient(getIt(), getIt(), getIt<MaintenanceEventBus>()),
+  );
   getIt.registerLazySingleton<Dio>(() => getIt<DioClient>().dio);
 
   getIt.registerLazySingleton<PublicTenantRepository>(
-    () => PublicTenantRepository(getIt(), getIt()),
+    () => PublicTenantRepository(getIt(), getIt(), getIt<MaintenanceEventBus>()),
   );
   getIt.registerLazySingleton<AuthRepository>(
     () => AuthRepository(getIt(), getIt()),
@@ -226,6 +233,14 @@ void setupServiceLocator() {
       storage: getIt(),
       authEventBus: getIt(),
       pushNotificationService: getIt(),
+    ),
+  );
+
+  getIt.registerLazySingleton<MaintenanceCubit>(
+    () => MaintenanceCubit(
+      bus: getIt(),
+      repository: getIt(),
+      storage: getIt(),
     ),
   );
 

@@ -6,32 +6,32 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../models/tenant_branding.dart';
-import '../../../repositories/auth_repository.dart';
-import '../../../repositories/member_auth_repository.dart';
+import '../../../core/storage/secure_storage.dart';
+import '../../../repositories/public_tenant_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
 import '../../../shared/widgets/app_state_views.dart';
+import '../../../shared/widgets/role_toggle.dart';
 import 'phone_otp_screen.dart';
 
 class PhoneLoginScreenArgs {
-  const PhoneLoginScreenArgs({required this.role, required this.tenant});
+  const PhoneLoginScreenArgs({required this.role});
 
   /// Inherited from whichever tab was active on [LoginScreen] — phone
   /// numbers can't self-disambiguate staff vs. member the way email/Member
   /// ID can, so there's no toggle here; the role is already decided.
   final AppRole role;
-  final TenantBranding tenant;
 }
 
 /// Not a literal design frame — a second front door onto the same
 /// `completeLoginAfterPrimaryFactor` cascade [LoginScreen] uses, reached via
-/// "Log in with phone number instead". Staff hits
-/// `POST /auth/phone-login/request-otp`, member hits
-/// `POST /member/auth/phone-login/request-otp` — both always return 200
-/// without revealing whether the phone number has a matching account (same
-/// no-enumeration contract as [ForgotPasswordScreen]).
+/// "Log in with phone number instead". No gym is asked for: the
+/// [RoleToggle] picks `actorType` and
+/// `POST /public/auth/phone-login/request-otp` always returns 200 without
+/// revealing whether the phone number has a matching account (same
+/// no-enumeration contract as [ForgotPasswordScreen]). The gym is only learnt
+/// at verify time (see [PhoneOtpScreen]).
 class PhoneLoginScreen extends StatefulWidget {
   const PhoneLoginScreen({super.key, required this.args});
 
@@ -46,7 +46,9 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
   bool _loading = false;
   String? _error;
 
-  bool get _isStaff => widget.args.role == AppRole.staff;
+  late AppRole _role = widget.args.role;
+
+  bool get _isStaff => _role == AppRole.staff;
 
   @override
   void dispose() {
@@ -65,22 +67,20 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       _error = null;
     });
     try {
-      if (_isStaff) {
-        await getIt<AuthRepository>().requestPhoneOtp(phone: phone);
-      } else {
-        await getIt<MemberAuthRepository>().requestPhoneOtp(phone: phone);
-      }
+      await getIt<PublicTenantRepository>().requestPhoneOtp(
+        actorType: _isStaff ? ActorType.staff : ActorType.member,
+        phone: phone,
+      );
       if (!mounted) return;
       context.push(
         AppRoutes.phoneOtp,
-        extra: PhoneOtpScreenArgs(
-          phone: phone,
-          role: widget.args.role,
-          tenant: widget.args.tenant,
-        ),
+        extra: PhoneOtpScreenArgs(phone: phone, role: _role),
       );
     } on ApiException catch (e) {
       if (!mounted) return;
+      // Maintenance is not a form error — the app-wide Maintenance screen
+      // takes over; show nothing here.
+      if (e.isMaintenance) return;
       setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -89,7 +89,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final role = widget.args.role;
+    final role = _role;
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(
@@ -104,6 +104,11 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
           child: Column(
             children: [
               const SizedBox(height: 12),
+              RoleToggle(
+                value: _role,
+                onChanged: (r) => setState(() => _role = r),
+              ),
+              const SizedBox(height: 16),
               Text(
                 'We\'ll send a one-time code to the email on file for this number.',
                 style: AppText.body(color: AppColors.inkSoft),

@@ -6,9 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
-import '../../../models/tenant_branding.dart';
-import '../../../repositories/auth_repository.dart';
-import '../../../repositories/member_auth_repository.dart';
+import '../../../repositories/public_tenant_repository.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_card.dart';
 import '../../../shared/widgets/app_labeled_field.dart';
@@ -17,21 +15,22 @@ import '../../../shared/widgets/app_state_views.dart';
 class ForgotPasswordScreenArgs {
   const ForgotPasswordScreenArgs({
     required this.role,
-    required this.tenant,
     this.prefill,
   });
 
+  /// Only the starting look (colours/labels) while the field is empty — the
+  /// role afterwards follows what is typed.
   final AppRole role;
-  final TenantBranding tenant;
   final String? prefill;
 }
 
 /// Not a literal design frame (the login screens only link out to this),
-/// built with the same component vocabulary. Staff hits
-/// `POST /auth/forgot-password` (email), member hits
-/// `POST /member/auth/forgot-password` (memberId) — always succeeds
-/// without revealing whether the account exists, so the UI shows one
-/// generic confirmation regardless of the response.
+/// built with the same component vocabulary. No gym is asked for or resolved:
+/// the one field (work email or Member ID) goes to
+/// `POST /public/auth/forgot-password` and the server emails a reset link for
+/// every gym that identifier exists in — always succeeds without revealing
+/// whether the account exists, so the UI shows one generic confirmation
+/// regardless of the response.
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key, required this.args});
 
@@ -48,7 +47,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _sent = false;
   String? _error;
 
-  bool get _isStaff => widget.args.role == AppRole.staff;
+  /// One field for both: an email is staff, anything else a Member ID. An
+  /// empty field falls back to the role the login screen detected.
+  bool get _isStaff {
+    final t = _controller.text.trim();
+    if (t.isEmpty) return widget.args.role == AppRole.staff;
+    return t.contains('@');
+  }
+
+  AppRole get _role => _isStaff ? AppRole.staff : AppRole.member;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() => setState(() {}));
+  }
 
   @override
   void dispose() {
@@ -70,15 +83,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _error = null;
     });
     try {
-      if (_isStaff) {
-        await getIt<AuthRepository>().forgotPassword(email: value);
-      } else {
-        await getIt<MemberAuthRepository>().forgotPassword(memberId: value);
-      }
+      await getIt<PublicTenantRepository>().forgotPassword(identifier: value);
       if (!mounted) return;
       setState(() => _sent = true);
     } on ApiException catch (e) {
       if (!mounted) return;
+      // Maintenance is not a form error — the app-wide Maintenance screen
+      // takes over; show nothing here.
+      if (e.isMaintenance) return;
       setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -87,7 +99,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final role = widget.args.role;
+    final role = _role;
     return Scaffold(
       backgroundColor: AppColors.bg,
       appBar: AppBar(

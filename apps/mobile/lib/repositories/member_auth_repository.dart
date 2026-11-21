@@ -40,47 +40,31 @@ class MemberAuthRepository {
 
   // ── Phone-number login (OTP, delivered by email for now) ───────────────
 
-  Future<void> requestPhoneOtp({required String phone}) async {
-    try {
-      await _dio.post<void>(
-        '/member/auth/phone-login/request-otp',
-        data: {'phone': phone},
-      );
-    } on DioException catch (e) {
-      throw _mapError(e);
-    }
-  }
-
-  Future<MemberAuthSuccess> verifyPhoneOtp({
+  /// `POST /public/auth/phone-login/verify-otp` (`actorType: member`) — no
+  /// gym is known yet; the server returns the member's `tenantSlug`
+  /// alongside the usual [MemberAuthSuccess]. The slug is saved BEFORE the
+  /// tokens so the Dio interceptor already sends `X-Tenant-Slug`. The code is
+  /// requested (and re-requested) via [PublicTenantRepository.requestPhoneOtp].
+  Future<({MemberAuthSuccess result, String tenantSlug})> verifyPublicPhoneOtp({
     required String phone,
     required String code,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
-        '/member/auth/phone-login/verify-otp',
-        data: {'phone': phone, 'code': code},
+        '/public/auth/phone-login/verify-otp',
+        data: {'actorType': 'member', 'phone': phone, 'code': code},
       );
-      final result = MemberAuthSuccess.fromJson(
-        response.data!['data'] as Map<String, dynamic>,
-      );
+      final data = response.data!['data'] as Map<String, dynamic>;
+      final tenantSlug = data['tenantSlug'] as String;
+      final result = MemberAuthSuccess.fromJson(data);
+      await _storage.saveTenantSlug(tenantSlug);
       await _storage.saveSession(
         actorType: ActorType.member,
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
       );
       await _storage.saveMemberProfile(result.member.toJson());
-      return result;
-    } on DioException catch (e) {
-      throw _mapError(e);
-    }
-  }
-
-  Future<void> resendPhoneOtp({required String phone}) async {
-    try {
-      await _dio.post<void>(
-        '/member/auth/phone-login/resend-otp',
-        data: {'phone': phone},
-      );
+      return (result: result, tenantSlug: tenantSlug);
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -93,19 +77,8 @@ class MemberAuthRepository {
     return json == null ? null : MemberProfile.fromJson(json);
   }
 
-  Future<void> forgotPassword({required String memberId}) async {
-    try {
-      await _dio.post<void>(
-        '/member/auth/forgot-password',
-        data: {'memberId': memberId},
-      );
-    } on DioException catch (e) {
-      throw _mapError(e);
-    }
-  }
-
   /// Consumes the token from the emailed reset link and sets a new
-  /// password — the counterpart to [forgotPassword]. No deep-link handling
+  /// password — the counterpart to the public forgot-password call. No deep-link handling
   /// exists in this app yet, so the caller is a token the user pastes in
   /// manually rather than one resolved from a tapped link.
   Future<void> resetPassword({

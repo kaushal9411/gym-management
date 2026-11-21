@@ -74,42 +74,27 @@ class AuthRepository {
 
   // ── Phone-number login (OTP, delivered by email for now) ───────────────
 
-  Future<void> requestPhoneOtp({required String phone}) async {
-    try {
-      await _dio.post<void>(
-        '/auth/phone-login/request-otp',
-        data: {'phone': phone},
-      );
-    } on DioException catch (e) {
-      throw _mapError(e);
-    }
-  }
-
-  Future<StaffLoginResult> verifyPhoneOtp({
+  /// `POST /public/auth/phone-login/verify-otp` (`actorType: staff`) — no
+  /// gym is known yet: the server finds it from the phone number and returns
+  /// its `tenantSlug` alongside the usual [StaffLoginResult]. The slug is
+  /// saved BEFORE the tokens so the Dio interceptor already sends
+  /// `X-Tenant-Slug` for everything after. The code is requested (and
+  /// re-requested) via [PublicTenantRepository.requestPhoneOtp].
+  Future<({StaffLoginResult result, String tenantSlug})> verifyPublicPhoneOtp({
     required String phone,
     required String code,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
-        '/auth/phone-login/verify-otp',
-        data: {'phone': phone, 'code': code},
+        '/public/auth/phone-login/verify-otp',
+        data: {'actorType': 'staff', 'phone': phone, 'code': code},
       );
-      final result = StaffLoginResult.fromJson(
-        response.data!['data'] as Map<String, dynamic>,
-      );
+      final data = response.data!['data'] as Map<String, dynamic>;
+      final tenantSlug = data['tenantSlug'] as String;
+      final result = StaffLoginResult.fromJson(data);
+      await _storage.saveTenantSlug(tenantSlug);
       if (result is StaffLoginSuccess) await _persist(result);
-      return result;
-    } on DioException catch (e) {
-      throw _mapError(e);
-    }
-  }
-
-  Future<void> resendPhoneOtp({required String phone}) async {
-    try {
-      await _dio.post<void>(
-        '/auth/phone-login/resend-otp',
-        data: {'phone': phone},
-      );
+      return (result: result, tenantSlug: tenantSlug);
     } on DioException catch (e) {
       throw _mapError(e);
     }
@@ -162,7 +147,7 @@ class AuthRepository {
     }
   }
 
-  /// `PATCH /auth/change-password` — distinct from [forgotPassword]:
+  /// `PATCH /auth/change-password` — distinct from the public forgot-password flow:
   /// requires proving the current password, and on success the backend
   /// revokes every other active session (this device stays signed in).
   Future<void> changePassword({
@@ -177,14 +162,6 @@ class AuthRepository {
           'newPassword': newPassword,
         },
       );
-    } on DioException catch (e) {
-      throw _mapError(e);
-    }
-  }
-
-  Future<void> forgotPassword({required String email}) async {
-    try {
-      await _dio.post<void>('/auth/forgot-password', data: {'email': email});
     } on DioException catch (e) {
       throw _mapError(e);
     }

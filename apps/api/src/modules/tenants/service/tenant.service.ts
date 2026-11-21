@@ -3,6 +3,7 @@ import { ErrorCode } from '../../../core/errors/error-codes';
 import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
+import { getPlatformMaintenance } from '../../admin-settings/services/platform-maintenance.service';
 import type {
   PublicTenantSummary,
   ResolvedTenant,
@@ -83,7 +84,7 @@ function reviveTenantRecordDates(record: ResolvedTenantRecord): ResolvedTenantRe
  * before it existed — not a rearchitecture, just resolving an inherited
  * inconsistency honestly instead of silently picking one and breaking the other.
  */
-function toResolvedTenant(record: ResolvedTenantRecord, platformFlags: Map<string, boolean>): ResolvedTenant {
+function toResolvedTenant(record: ResolvedTenantRecord, platformFlags: Map<string, boolean>, platformMaintenance?: { enabled: boolean; message: string | null }): ResolvedTenant {
   const jsonBranding = (record.settings?.branding ?? {}) as Partial<TenantBrandingShape>;
   const table = record.branding;
   const subscription = record.subscriptions[0] ?? null;
@@ -93,7 +94,8 @@ function toResolvedTenant(record: ResolvedTenantRecord, platformFlags: Map<strin
     slug: record.slug,
     name: record.name,
     status: record.status,
-    maintenanceMode: record.maintenanceMode,
+    maintenanceMode: record.maintenanceMode || Boolean(platformMaintenance?.enabled),
+    maintenanceMessage: platformMaintenance?.enabled ? platformMaintenance.message : null,
     branding: {
       primaryColor: table?.primaryColor ?? jsonBranding.primaryColor ?? 'oklch(0.51 0.23 277)',
       primaryForeground: table?.primaryForeground ?? jsonBranding.primaryForeground ?? 'oklch(0.985 0 0)',
@@ -139,14 +141,16 @@ export class TenantService {
   constructor(private readonly repository: TenantRepositoryPort) {}
 
   /** Cache-aside resolve by subdomain slug. Returns null for unknown tenants. */
-  async resolveBySlug(slug: string): Promise<{ tenant: ResolvedTenant; record: ResolvedTenantRecord } | null> {
+  async resolveBySlug(slug: string): Promise<{ tenant: ResolvedTenant; record: ResolvedTenantRecord; maintenanceMessage: string | null } | null> {
     const cached = await cache.get<ResolvedTenantRecord>(slugCacheKey(slug));
     const record = cached ? reviveTenantRecordDates(cached) : await this.repository.findBySlug(slug);
     if (!record) return null;
 
     if (!cached) await cache.set(slugCacheKey(slug), record, CACHE_TTL_SECONDS);
-    const platformFlags = await getPlatformFeatureFlagMap();
-    return { tenant: toResolvedTenant(record, platformFlags), record };
+    const [platformFlags, platformMaintenance] = await Promise.all([getPlatformFeatureFlagMap(), getPlatformMaintenance()]);
+    // The platform-wide switch is applied AFTER caching (never baked into the 5-minute tenant record) so it takes effect within seconds.
+    const effective = platformMaintenance.enabled && !record.maintenanceMode ? { ...record, maintenanceMode: true } : record;
+    return { tenant: toResolvedTenant(effective, platformFlags, platformMaintenance), record: effective, maintenanceMessage: platformMaintenance.enabled ? platformMaintenance.message : null };
   }
 
   /**
@@ -184,11 +188,11 @@ export class TenantService {
    * log in and pay, otherwise expiry is an unrecoverable dead end.
    * Suspension (an admin decision) and maintenance always block.
    */
-  assertTenantAccessible(record: ResolvedTenantRecord, options?: { allowExpired?: boolean }): void {
+  assertTenantAccessible(record: ResolvedTenantRecord, options?: { allowExpired?: boolean; maintenanceMessage?: string | null }): void {
     const now = new Date();
 
     if (record.maintenanceMode) {
-      throw new TenantError(ErrorCode.MAINTENANCE, 'This gym portal is undergoing scheduled maintenance', 503);
+      throw new TenantError(ErrorCode.MAINTENANCE, options?.maintenanceMessage || 'This gym portal is undergoing scheduled maintenance', 503);
     }
     if (record.status === 'SUSPENDED' || record.status === 'CANCELLED') {
       throw new TenantError(ErrorCode.TENANT_SUSPENDED, 'This gym account has been suspended', 403);

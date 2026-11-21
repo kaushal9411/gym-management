@@ -2,11 +2,11 @@ import { randomUUID } from 'node:crypto';
 
 import type { SubscriptionHistoryAction } from '@prisma/client';
 
-import { env } from '../../../config/env';
 import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { eventBus } from '../../../core/events/event-bus';
 import type { TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
+import { getRazorpayKeyId } from '../../admin-payment-gateways/services/razorpay-config.service';
 import { applyOverridesToPlan, parseOverrides } from '../../admin-tenants/utils/tenant-limits.util';
 import { BillingAddressRepository } from '../../billing/repositories/billing-address.repository';
 import { CouponService } from '../../coupon/services/coupon.service';
@@ -203,7 +203,7 @@ export class SubscriptionService {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      keyId: env.razorpay.keyId!,
+      keyId: (await getRazorpayKeyId())!,
       invoice,
       plan,
     };
@@ -233,7 +233,7 @@ export class SubscriptionService {
       throw new AppError(ErrorCode.VALIDATION_ERROR, 'This payment does not match the order being verified.', 400);
     }
 
-    const valid = verifyOrderPaymentSignature({
+    const valid = await verifyOrderPaymentSignature({
       orderId: input.razorpayOrderId,
       paymentId: input.razorpayPaymentId,
       signature: input.razorpaySignature,

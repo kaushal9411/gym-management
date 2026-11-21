@@ -9,6 +9,7 @@ class TenantBranding {
     required this.maintenanceMode,
     required this.primaryColor,
     this.logoUrl,
+    this.maintenanceMessage,
     this.featureFlags = const [],
   });
 
@@ -18,6 +19,10 @@ class TenantBranding {
   final bool maintenanceMode;
   final String primaryColor;
   final String? logoUrl;
+
+  /// The admin's custom maintenance text, when one is set; null means "use
+  /// the default copy". Only meaningful while [maintenanceMode] is true.
+  final String? maintenanceMessage;
 
   /// Enabled module keys for this tenant's plan (`ResolvedTenant.
   /// featureFlags` — mirrors `tenant.featureFlags` on the web app, which
@@ -49,7 +54,14 @@ class TenantBranding {
       maintenanceMode: json['maintenanceMode'] as bool? ?? false,
       primaryColor: branding['primaryColor'] as String? ?? '',
       logoUrl: branding['logoUrl'] as String?,
+      maintenanceMessage: _nonBlank(json['maintenanceMessage']),
       featureFlags: (json['featureFlags'] as List?)?.cast<String>() ?? const [],
     );
+  }
+
+  static String? _nonBlank(Object? v) {
+    if (v is! String) return null;
+    final t = v.trim();
+    return t.isEmpty ? null : t;
   }
 }

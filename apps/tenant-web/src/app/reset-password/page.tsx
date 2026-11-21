@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { ResetPasswordForm } from '@/features/auth/components/forms/reset-password-form';
+import { MaintenanceGate } from '@/features/auth/components/status/maintenance-gate';
 
 export const metadata: Metadata = { title: 'Reset password' };
 
@@ -17,5 +18,9 @@ interface ResetPasswordPageProps {
  */
 export default async function ResetPasswordPage({ searchParams }: ResetPasswordPageProps) {
   const { token = '' } = await searchParams;
-  return <ResetPasswordForm token={token} />;
+  return (
+    <MaintenanceGate>
+      <ResetPasswordForm token={token} />
+    </MaintenanceGate>
+  );
 }

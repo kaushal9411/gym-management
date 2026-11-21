@@ -8,6 +8,7 @@ interface TenantResolveApiResponse {
     name: string;
     status: Tenant['status'];
     maintenanceMode: boolean;
+    maintenanceMessage?: string | null;
     branding: Tenant['branding'];
     timezone: string;
     currency: string;
@@ -22,7 +23,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1
 
 interface PlatformConfigApiResponse {
   success: boolean;
-  data: { appName: string } | null;
+  data: { appName: string; supportEmail?: string | null } | null;
 }
 
 /**
@@ -33,14 +34,16 @@ interface PlatformConfigApiResponse {
  * resolve call below is already deduped. Any failure degrades to the
  * static default rather than breaking the request.
  */
-async function resolvePlatformName(): Promise<string> {
+async function resolvePlatformConfig(): Promise<{ platformName: string; supportEmail: string | null }> {
+  const fallback = { platformName: PLATFORM_TENANT.platformName, supportEmail: null };
   try {
     const res = await fetch(`${API_URL}/public/platform-config`, { cache: 'no-store' });
-    if (!res.ok) return PLATFORM_TENANT.platformName;
+    if (!res.ok) return fallback;
     const body = (await res.json()) as PlatformConfigApiResponse;
-    return body.success && body.data?.appName ? body.data.appName : PLATFORM_TENANT.platformName;
+    if (!body.success || !body.data) return fallback;
+    return { platformName: body.data.appName || fallback.platformName, supportEmail: body.data.supportEmail ?? null };
   } catch {
-    return PLATFORM_TENANT.platformName;
+    return fallback;
   }
 }
 
@@ -60,9 +63,9 @@ async function resolvePlatformName(): Promise<string> {
  * rather than crashing the whole request.
  */
 export async function resolveTenant(slug: string | null | undefined): Promise<Tenant> {
-  if (!slug) return { ...PLATFORM_TENANT, platformName: await resolvePlatformName() };
+  if (!slug) return { ...PLATFORM_TENANT, ...(await resolvePlatformConfig()) };
 
-  const [tenantResult, platformName] = await Promise.all([
+  const [tenantResult, platformConfig] = await Promise.all([
     (async (): Promise<Tenant> => {
       try {
         const res = await fetch(`${API_URL}/public/tenants/resolve?slug=${encodeURIComponent(slug)}`, {
@@ -79,6 +82,7 @@ export async function resolveTenant(slug: string | null | undefined): Promise<Te
           name: body.data.name,
           status: body.data.status,
           maintenanceMode: body.data.maintenanceMode,
+          maintenanceMessage: body.data.maintenanceMessage ?? null,
           branding: body.data.branding,
           timezone: body.data.timezone,
           currency: body.data.currency,
@@ -93,8 +97,8 @@ export async function resolveTenant(slug: string | null | undefined): Promise<Te
         return { ...PLATFORM_TENANT, slug };
       }
     })(),
-    resolvePlatformName(),
+    resolvePlatformConfig(),
   ]);
 
-  return { ...tenantResult, platformName };
+  return { ...tenantResult, ...platformConfig };
 }

@@ -101,7 +101,7 @@ export function tenantMiddleware(platformRoutePrefixes: string[]) {
         throw new TenantError(ErrorCode.TENANT_NOT_FOUND, `No gym found for "${slug}"`, 404);
       }
 
-      tenantService.assertTenantAccessible(resolved.record, { allowExpired: isExpiryExemptPath(req.path) });
+      tenantService.assertTenantAccessible(resolved.record, { allowExpired: isExpiryExemptPath(req.path), maintenanceMessage: resolved.maintenanceMessage });
 
       req.tenant = resolved.tenant;
       updateRequestContext({ tenantId: resolved.tenant.id, tenantSlug: resolved.tenant.slug });

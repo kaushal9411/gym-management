@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../bloc/session/session_cubit.dart';
@@ -7,7 +8,6 @@ import '../../features/attendance/presentation/attendance_history_screen.dart';
 import '../../features/attendance/presentation/attendance_today_screen.dart';
 import '../../features/announcements/presentation/schedule_announcement_screen.dart';
 import '../../features/announcements/presentation/announcements_screen.dart';
-import '../../features/auth/presentation/find_gym_screen.dart';
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/member_reset_password_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
@@ -189,7 +189,6 @@ import 'go_router_refresh_stream.dart';
 /// depending on session state.
 const _signedOutPaths = {
   AppRoutes.splash,
-  AppRoutes.findGym,
   AppRoutes.login,
   AppRoutes.otp,
   AppRoutes.mfaSetup,
@@ -228,27 +227,27 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         builder: (context, state) => const SplashScreen(),
       ),
       GoRoute(
-        path: AppRoutes.findGym,
-        builder: (context, state) => FindGymScreen(
-          args: state.extra as FindGymScreenArgs? ?? const FindGymScreenArgs(),
-        ),
-      ),
-      GoRoute(
         path: AppRoutes.login,
-        builder: (context, state) {
-          final extra = state.extra as LoginScreenArgs?;
-          if (extra != null) return LoginScreen(args: extra);
-          // Reached via the redirect (no `extra` passed) — preselect the
-          // tab for the role this device last signed in as.
-          final session = sessionCubit.state;
-          return LoginScreen(
-            args: LoginScreenArgs(
-              role: session is SessionUnauthenticated
-                  ? session.rememberedRole
-                  : null,
-            ),
-          );
-        },
+        pageBuilder: (context, state) => CustomTransitionPage<void>(
+          key: state.pageKey,
+          child: const LoginScreen(),
+          transitionDuration: const Duration(milliseconds: 520),
+          reverseTransitionDuration: const Duration(milliseconds: 320),
+          transitionsBuilder: (context, animation, secondary, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: ScaleTransition(
+                scale: Tween(begin: 0.97, end: 1.0).animate(curved),
+                child: child,
+              ),
+            );
+          },
+        ),
       ),
       GoRoute(
         path: AppRoutes.otp,

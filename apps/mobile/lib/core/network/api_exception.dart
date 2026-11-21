@@ -36,6 +36,17 @@ class ApiException implements Exception {
   /// `shortChannels` of a 409 QUOTA_EXCEEDED), when the server sent one.
   final Map<String, dynamic>? data;
 
+  /// The API's `errors[0].code` for a maintenance-mode 503. The gym's own
+  /// switch and the platform-wide switch both answer with it.
+  static const maintenanceCode = 'MAINTENANCE';
+
+  /// True when the server is in maintenance mode (HTTP 503 +
+  /// `errors[0].code == 'MAINTENANCE'`). Not a generic server error and never
+  /// an auth failure: callers must not sign the user out because of it. The
+  /// [message] is the admin's custom text when one was set.
+  bool get isMaintenance =>
+      statusCode == 503 && code == ApiException.maintenanceCode;
+
   /// True for connectivity failures (no response reached the server at all).
   factory ApiException.network() => const ApiException(
         message:
