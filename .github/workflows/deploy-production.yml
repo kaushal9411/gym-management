@@ -1,11 +1,21 @@
 # ══════════════════════════════════════════════════════════════════════
-# Deploy PRODUCTION — every push to `main` (after CI passes) SSHes into
-# the single EC2 box running api/tenant-web/super-admin under pm2 and
-# runs the same pull → install → migrate → build → pm2 restart sequence
-# as infrastructure/testing-deploy/07-redeploy-via-git.sh, which this
-# mirrors exactly. There is no container registry, ECS, or terraform in
-# this project — this workflow targets the real, currently-running
-# deployment, not a future one.
+# Deploy PRODUCTION — every push to `main` (after CI passes).
+#
+# The production box is a ~1GB t3.micro, and building api + tenant-web +
+# super-admin ON it kept running out of memory (it once hung for the full
+# timeout and took the live site down). So the build now happens HERE, on
+# the GitHub runner (7GB RAM), and only the finished output is shipped:
+#
+#   1. read the production NEXT_PUBLIC_* values off the server's .env files
+#      (they are baked into the browser bundle at build time)
+#   2. scripts/deploy/build-release.sh  -> release.tgz  (compiled api, .next
+#      for both web apps, prisma schema + migrations)
+#   3. scp it to the server and run scripts/deploy/remote-finalize.sh there:
+#      swap the build, prisma migrate deploy, pm2 restart, health check.
+#
+# The same scripts power `pnpm deploy:server` for a manual deploy from your
+# own machine (see docs/DEPLOYMENT.md). No container registry / ECS / terraform
+# in this project — this targets the single EC2 box running under pm2.
 # ══════════════════════════════════════════════════════════════════════
 name: Deploy Production
 
@@ -22,77 +32,54 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy via SSH (git pull + build + pm2 restart)
+    name: Build on runner, ship to server
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
     steps:
-      - name: Deploy to production server
-        id: deploy
-        uses: appleboy/ssh-action@v1.2.0
+      - uses: actions/checkout@v4
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script_stop: true
-          # Default is 10m — building api+tenant-web+super-admin sequentially
-          # on this box's small instance size started exceeding that once
-          # firebase-admin (Prompt 89) pulled in a much heavier dependency
-          # tree (most of the Google Cloud SDK — gRPC, Firestore, Storage
-          # clients — just to use its messaging piece). Confirmed live: the
-          # deploy got killed by this exact timeout mid-`tsc` build, not a
-          # real build error (git/install/migrate all succeeded first).
-          #
-          # A later attempt to speed this up by building all 3 apps in
-          # PARALLEL via `pnpm turbo run build` instead of sequentially was
-          # reverted — this box only has ~900MB RAM, and 3 concurrent
-          # TS/Next builds exhausted it badly enough that the deploy hung for
-          # the full 30m timeout AND took the already-running pm2 processes
-          # down with it (confirmed live: a real production outage, not just
-          # a slow/failed deploy — see PROJECT-STATE.md). Sequential is
-          # slower but proven not to repeat this; don't re-parallelize
-          # without first confirming this box has materially more RAM.
-          command_timeout: 30m
-          script: |
-            cd ~/gym-management
-            export PATH="$PATH:$(npm config get prefix)/bin"
-            export NODE_OPTIONS="--max-old-space-size=1536"
+          # Build exactly the commit CI just verified (not whatever main moved to since).
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
 
-            echo "-- git fetch + reset --hard origin/main --"
-            git fetch origin main
-            git reset --hard origin/main
+      - name: Set up SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
-            # tenant-web/super-admin run as `next start`, which reads
-            # node_modules/.next live on every request — rebuilding in place
-            # underneath them while they're still serving traffic caused a
-            # real production incident (hundreds of pm2 crash-restarts,
-            # CPU/swap thrashing). `fitcloud-api` is a single pre-loaded
-            # compiled file (no live per-request disk reads), so it's never
-            # affected and stays up the whole time. Stopping these two up
-            # front (not just around their own build step) covers `pnpm
-            # install` too, which rewrites the shared node_modules for every
-            # workspace package before any individual app build even starts.
-            echo "-- stopping tenant-web/super-admin for the install+build window --"
-            pm2 stop fitcloud-tenant-web fitcloud-super-admin
+      - name: Read production NEXT_PUBLIC_* from the server
+        run: |
+          mkdir -p "$RUNNER_TEMP/envs"
+          SSH="ssh -i $HOME/.ssh/deploy_key $DEPLOY_USER@$DEPLOY_HOST"
+          $SSH 'cat ~/gym-management/apps/tenant-web/.env' > "$RUNNER_TEMP/envs/tenant-web.env"
+          $SSH 'cat ~/gym-management/apps/super-admin/.env' > "$RUNNER_TEMP/envs/super-admin.env"
+          grep -q NEXT_PUBLIC_API_URL "$RUNNER_TEMP/envs/tenant-web.env"
 
-            echo "-- pnpm install --"
-            pnpm install
+      - name: Build release (api + tenant-web + super-admin)
+        id: build
+        env:
+          ENV_DIR: ${{ runner.temp }}/envs
+          RELEASE_OUT: ${{ runner.temp }}/release
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: bash scripts/deploy/build-release.sh
 
-            echo "-- prisma generate + migrate deploy (no-op if nothing changed) --"
-            pnpm --filter @gym-saas/api run prisma:generate
-            pnpm --filter @gym-saas/api exec prisma migrate deploy
-
-            echo "-- building + restarting api --"
-            pnpm --filter @gym-saas/api run build
-            pm2 restart fitcloud-api
-
-            echo "-- building + starting tenant-web --"
-            pnpm --filter @gym-saas/tenant-web run build
-            pm2 start fitcloud-tenant-web
-
-            echo "-- building + starting super-admin --"
-            pnpm --filter @gym-saas/super-admin run build
-            pm2 start fitcloud-super-admin
-            pm2 save
+      - name: Ship + finalize on the server
+        id: deploy
+        run: |
+          SSH_OPTS="-i $HOME/.ssh/deploy_key -o ServerAliveInterval=30"
+          scp $SSH_OPTS "$RUNNER_TEMP/release/release.tgz" "$DEPLOY_USER@$DEPLOY_HOST:/tmp/fitcloud-release.tgz"
+          scp $SSH_OPTS scripts/deploy/remote-finalize.sh "$DEPLOY_USER@$DEPLOY_HOST:/tmp/fitcloud-finalize.sh"
+          ssh $SSH_OPTS "$DEPLOY_USER@$DEPLOY_HOST" 'bash /tmp/fitcloud-finalize.sh /tmp/fitcloud-release.tgz && rm -f /tmp/fitcloud-release.tgz /tmp/fitcloud-finalize.sh'
 
       - name: Smoke test
         id: smoke
@@ -106,9 +93,12 @@ jobs:
       - name: Email result
         if: always()
         run: |
-          if [ "${{ steps.deploy.outcome }}" != "success" ]; then
+          if [ "${{ steps.build.outcome }}" != "success" ]; then
+            echo "SUBJECT=FitCloud DEPLOY FAILED (build)" >> "$GITHUB_ENV"
+            echo "BODY=The release build failed on the GitHub runner — nothing was sent to the server, production is untouched. See run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+          elif [ "${{ steps.deploy.outcome }}" != "success" ]; then
             echo "SUBJECT=FitCloud DEPLOY FAILED" >> "$GITHUB_ENV"
-            echo "BODY=Deploy step failed (SSH/build/pm2 restart). See run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> "$GITHUB_ENV"
+            echo "BODY=Build succeeded but shipping/finalizing on the server failed (upload, migrate, or pm2 restart). See run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> "$GITHUB_ENV"
           elif [ "${{ steps.smoke.outcome }}" != "success" ]; then
             echo "SUBJECT=FitCloud DEPLOY partially failed (smoke test)" >> "$GITHUB_ENV"
             echo "BODY=Deploy succeeded but the post-deploy health check never returned healthy within 150s. See run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >> "$GITHUB_ENV"

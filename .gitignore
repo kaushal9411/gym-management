@@ -54,3 +54,7 @@ Thumbs.db
 *.pem
 .vercel
 .sentryclirc
+
+# local deploy tooling
+scripts/deploy/deploy.config
+release/

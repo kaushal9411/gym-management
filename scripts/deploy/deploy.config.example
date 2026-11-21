@@ -1,0 +1,7 @@
+# Copy to scripts/deploy/deploy.config (gitignored) and fill in.
+DEPLOY_HOST=            # the server's public IP or hostname (same as the DEPLOY_HOST GitHub secret)
+DEPLOY_USER=ubuntu
+DEPLOY_KEY=~/.ssh/fitcloud.pem    # path to the SSH private key (same key as the DEPLOY_SSH_KEY GitHub secret)
+HEALTH_URL=https://api.appkraft.info/health
+# On Linux the build runs natively; set this to force a Linux container instead.
+# DEPLOY_USE_DOCKER=1

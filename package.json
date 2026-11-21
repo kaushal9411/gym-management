@@ -17,7 +17,8 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,yml,yaml}\"",
     "audit": "pnpm audit --audit-level=high",
     "test:a11y": "playwright test --config=e2e/playwright.config.ts",
-    "clean": "turbo clean && rimraf node_modules"
+    "clean": "turbo clean && rimraf node_modules",
+    "deploy:server": "bash scripts/deploy/deploy.sh"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
