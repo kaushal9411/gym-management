@@ -1,4 +1,4 @@
-export type CmsPageType = 'LANDING' | 'BLOG' | 'FAQ' | 'TESTIMONIAL' | 'TERMS' | 'PRIVACY' | 'COOKIE';
+export type CmsPageType = 'FAQ' | 'TERMS' | 'PRIVACY' | 'COOKIE';
 
 export interface CmsPage {
   id: string;

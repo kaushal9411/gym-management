@@ -35,7 +35,7 @@ export function CmsPageForm({ page }: { page?: CmsPage }) {
   const updatePage = useUpdateCmsPage();
   const deletePage = useDeleteCmsPage();
 
-  const [type, setType] = React.useState<CmsPageType>(page?.type ?? 'BLOG');
+  const [type, setType] = React.useState<CmsPageType>(page?.type ?? 'FAQ');
   const [title, setTitle] = React.useState(page?.title ?? '');
   const [slug, setSlug] = React.useState(page?.slug ?? '');
   const [slugTouched, setSlugTouched] = React.useState(isEdit);
@@ -43,7 +43,7 @@ export function CmsPageForm({ page }: { page?: CmsPage }) {
   const [bodyIsDefault, setBodyIsDefault] = React.useState(!isEdit);
   const [isPublished, setIsPublished] = React.useState(page?.isPublished ?? false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
-  const initial = React.useRef({ type: page?.type ?? 'BLOG', title: page?.title ?? '', body: contentValue(page, page?.type ?? 'BLOG'), isPublished: page?.isPublished ?? false });
+  const initial = React.useRef({ type: page?.type ?? 'FAQ', title: page?.title ?? '', body: contentValue(page, page?.type ?? 'FAQ'), isPublished: page?.isPublished ?? false });
 
   const dirty = isEdit
     ? type !== initial.current.type || title !== initial.current.title || body !== initial.current.body || isPublished !== initial.current.isPublished

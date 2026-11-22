@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-const CMS_PAGE_TYPES = ['LANDING', 'BLOG', 'FAQ', 'TESTIMONIAL', 'TERMS', 'PRIVACY', 'COOKIE'] as const;
+/**
+ * The only page types the CMS manages: help-centre FAQs and the legal pages. LANDING / BLOG / TESTIMONIAL were removed from the product
+ * (nothing ever rendered them); the Prisma enum still lists them to avoid a destructive migration, so they are rejected here and hidden from lists.
+ */
+export const CMS_PAGE_TYPES = ['FAQ', 'TERMS', 'PRIVACY', 'COOKIE'] as const;
 
 export const createCmsPageSchema = z.object({
   slug: z.string().trim().toLowerCase().min(1).max(160).regex(/^[a-z0-9-]+$/, 'Lowercase letters, numbers, hyphens only'),

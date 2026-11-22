@@ -1,9 +1,11 @@
 import type { CmsPageType } from '@prisma/client';
 
+
 import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { adminAuditLogRepository } from '../../admin-audit/repositories/admin-audit-log.repository';
+import { CMS_PAGE_TYPES } from '../validators/admin-cms.validators';
 
 export interface UpsertCmsPageInput {
   slug: string;
@@ -15,7 +17,7 @@ export interface UpsertCmsPageInput {
 
 export class AdminCmsService {
   async list(type?: CmsPageType) {
-    return prisma.cmsPage.findMany({ where: type ? { type } : {}, orderBy: { updatedAt: 'desc' } });
+    return prisma.cmsPage.findMany({ where: type ? { type } : { type: { in: [...CMS_PAGE_TYPES] } }, orderBy: { updatedAt: 'desc' } });
   }
 
   /**

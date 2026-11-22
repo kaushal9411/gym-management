@@ -17,7 +17,7 @@ export const publicCmsRouter: Router = Router();
  * see `AdminCmsService#listPublished`.
  */
 
-/** @openapi { "/public/cms/pages": { get: { tags: [Authentication], summary: "Published CMS pages of one type (FAQ/TERMS/PRIVACY/COOKIE/LANDING/BLOG/TESTIMONIAL) — no auth required, drafts never included", responses: { 200: { description: "CmsPage[]" } } } } } */
+/** @openapi { "/public/cms/pages": { get: { tags: [Authentication], summary: "Published CMS pages of one type (FAQ/TERMS/PRIVACY/COOKIE) — no auth required, drafts never included", responses: { 200: { description: "CmsPage[]" } } } } } */
 publicCmsRouter.get('/pages', validate({ query: publicCmsPageQuerySchema }), async (req, res, next) => {
   try {
     const { type } = req.query as unknown as { type: Parameters<typeof adminCmsService.listPublished>[0] };

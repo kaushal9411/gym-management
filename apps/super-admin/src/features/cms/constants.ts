@@ -1,12 +1,9 @@
 import type { CmsPageType } from './types';
 
-export const PAGE_TYPES: CmsPageType[] = ['LANDING', 'BLOG', 'FAQ', 'TESTIMONIAL', 'TERMS', 'PRIVACY', 'COOKIE'];
+export const PAGE_TYPES: CmsPageType[] = ['FAQ', 'TERMS', 'PRIVACY', 'COOKIE'];
 
 export const PAGE_TYPE_META: Record<CmsPageType, { label: string; description: string }> = {
-  LANDING: { label: 'Landing page', description: 'Marketing homepage content (fitcloud.com) — hero, features, calls to action.' },
-  BLOG: { label: 'Blog post', description: 'An article for the public blog.' },
-  FAQ: { label: 'FAQ', description: 'One question + answer, shown in tenant Help Centers and the marketing site.' },
-  TESTIMONIAL: { label: 'Testimonial', description: 'A customer quote for the marketing site.' },
+  FAQ: { label: 'FAQ', description: 'One question + answer, shown in the Help Center (Support) of every gym portal.' },
   TERMS: { label: 'Terms of Service', description: 'Shown at /terms — linked from the signup form.' },
   PRIVACY: { label: 'Privacy Policy', description: 'Shown at /privacy — linked from the signup form.' },
   COOKIE: { label: 'Cookie Policy', description: 'Cookie usage disclosure.' },
@@ -22,17 +19,7 @@ const LEGAL_DISCLAIMER =
 
 /** Pre-filled starting content offered when creating a new page of each type — never auto-published (`isPublished` still defaults false), so nothing goes live without a deliberate edit + publish. */
 export const DEFAULT_CONTENT: Record<CmsPageType, string> = {
-  LANDING: [
-    '<h2>Welcome to FitCloud</h2>',
-    '<p>The all-in-one platform to run your gym — memberships, attendance, billing, and more, all from one dashboard.</p>',
-    '<p><strong>Get started free — no credit card required.</strong></p>',
-  ].join('\n'),
-  BLOG: ['<p>Write your introduction here…</p>', '<h2>Section heading</h2>', '<p>Body content goes here.</p>'].join('\n'),
   FAQ: '<p>Write the answer to this question here.</p>',
-  TESTIMONIAL: [
-    '<blockquote>"This platform completely transformed how we run our gym."</blockquote>',
-    '<p><strong>— Jane Doe</strong>, Owner, Example Fitness</p>',
-  ].join('\n'),
   TERMS: [
     LEGAL_DISCLAIMER,
     '<h2>1. Acceptance of Terms</h2>',
