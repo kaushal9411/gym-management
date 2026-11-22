@@ -5,19 +5,31 @@ import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/tenant_features.dart';
+import '../../../core/utils/tenant_features_context.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../manager/presentation/widgets/member_detail_anim.dart';
 import '../../team/presentation/widgets/team_ui.dart';
 import 'settings_ui.dart';
 
 class _Entry {
-  const _Entry(this.icon, this.title, this.subtitle, this.route, this.color);
+  const _Entry(
+    this.icon,
+    this.title,
+    this.subtitle,
+    this.route,
+    this.color, {
+    this.featureFlag,
+  });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final String route;
   final Color color;
+
+  /// Card shown only while this module is on for the gym.
+  final String? featureFlag;
 }
 
 /// The six pages of web's Gym Settings (its tab bar), plus this app's
@@ -64,6 +76,7 @@ const _entries = <_Entry>[
     'Bring your own AI provider key',
     AppRoutes.aiSettings,
     TeamColors.violet,
+    featureFlag: Feature.aiCoach,
   ),
   _Entry(
     Icons.devices_rounded,
@@ -85,6 +98,12 @@ class GymSettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final access = SettingsAccess.of(context);
+    // Cards of a module the gym has switched off (AI assistant -> ai_coach)
+    // are not listed — they would only dead-end at a 403.
+    final entries = [
+      for (final e in _entries)
+        if (context.featureOn(e.featureFlag)) e,
+    ];
     final top = MediaQuery.of(context).padding.top;
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -126,12 +145,12 @@ class GymSettingsScreen extends StatelessWidget {
                                 spacing: gap,
                                 runSpacing: gap,
                                 children: [
-                                  for (var i = 0; i < _entries.length; i++)
+                                  for (var i = 0; i < entries.length; i++)
                                     SizedBox(
                                       width: w,
                                       child: FadeUp(
                                         index: i,
-                                        child: _HubCard(entry: _entries[i]),
+                                        child: _HubCard(entry: entries[i]),
                                       ),
                                     ),
                                 ],

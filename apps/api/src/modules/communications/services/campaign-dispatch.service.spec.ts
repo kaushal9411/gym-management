@@ -74,6 +74,8 @@ vi.mock('../../../infrastructure/database/tenant-scoped-client', () => {
   return { getTenantScopedClient: () => db };
 });
 
+// Feature flags are covered in scheduler/handlers/feature-flags.spec.ts; here the notifications module is simply on.
+vi.mock('../../tenants/utils/module-enabled.util', () => ({ isModuleEnabled: async () => true }));
 vi.mock('../../../infrastructure/mail/branding', () => ({ loadEmailBranding: async () => ({ tenantName: 'Kaushal Fitness' }) }));
 vi.mock('../../../infrastructure/queue/communications.queue', () => ({
   enqueueCampaignBatch: vi.fn(async (_t: string, id: string) => void state.batches.push(id)),

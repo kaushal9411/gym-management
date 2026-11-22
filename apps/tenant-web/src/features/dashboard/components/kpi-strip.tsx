@@ -8,8 +8,9 @@ import { CalendarClock, CircleDollarSign, HandCoins, TrendingDown, TrendingUp, U
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { type Accent, CountUp, IconChip, ProgressBar, accentVar, tint } from '@/features/members/components/detail/detail-ui';
-import { useAttendanceTrends, useKpis, useNewMemberGrowth, useRevenueTrends } from '@/features/reports/hooks/use-reports';
+import { useAttendanceTrends, useNewMemberGrowth, useRevenueTrends } from '@/features/reports/hooks/use-reports';
 import { useCurrencySymbol } from '@/lib/currency';
+import { useDashboardModules } from '../hooks/use-dashboard-modules';
 import { useDashboardRange } from '../hooks/use-dashboard-range';
 import { DashboardCardDetailModal, type DashboardStatKind } from './dashboard-detail-modal';
 
@@ -37,6 +38,20 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
   );
 }
 
+/** Static class names (Tailwind must see them): a tile's width on `lg` is 12 / (tiles in its row). */
+const LG_SPAN: Record<number, string> = { 1: 'lg:col-span-12', 2: 'lg:col-span-6', 3: 'lg:col-span-4', 4: 'lg:col-span-3' };
+
+/** Splits `count` tiles into balanced rows of at most 4, so hiding tiles for disabled modules never leaves a hole in the last row. */
+function lgSpans(count: number): string[] {
+  const rows = Math.max(1, Math.ceil(count / 4));
+  const spans: string[] = [];
+  for (let r = 0; r < rows; r++) {
+    const size = Math.floor(count / rows) + (r < count % rows ? 1 : 0);
+    for (let i = 0; i < size; i++) spans.push(LG_SPAN[size] ?? 'lg:col-span-3');
+  }
+  return spans;
+}
+
 interface Tile {
   key: string;
   label: string;
@@ -57,15 +72,18 @@ export function KpiStrip() {
   const { currentBranchId } = useCurrentBranch();
   const branchId = currentBranchId ?? undefined;
   const { dateFrom, dateTo } = useDashboardRange();
-  const kpis = useKpis(branchId);
-  const revenue = useRevenueTrends(dateFrom, dateTo, branchId);
-  const attendance = useAttendanceTrends(dateFrom, dateTo, branchId);
-  const newMembers = useNewMemberGrowth(dateFrom, dateTo, branchId);
+  const { has, kpis: d, kpisEnabled } = useDashboardModules();
+  // Sparklines come from /analytics/* (the `reports` module) and only for the modules whose tile shows them.
+  const trends = has('reports') && hasPermission('analytics:view');
+  const revenue = useRevenueTrends(dateFrom, dateTo, branchId, trends && kpisEnabled && (has('income') || has('expenses')));
+  const attendance = useAttendanceTrends(dateFrom, dateTo, branchId, trends && kpisEnabled && has('attendance'));
+  const newMembers = useNewMemberGrowth(dateFrom, dateTo, branchId, trends && kpisEnabled);
   const [openStat, setOpenStat] = React.useState<DashboardStatKind | null>(null);
 
-  if (!hasPermission('reports:view')) return null;
+  // The KPI endpoint belongs to the `dashboard` module (and `reports:view`).
+  if (!kpisEnabled) return null;
 
-  const d = kpis.data;
+
   const income = Number(d?.monthlyRevenue ?? 0);
   const expenses = Number(d?.monthlyExpenses ?? 0);
   const tail = <T,>(arr: T[] | undefined) => (arr ?? []).slice(-14);
@@ -73,7 +91,7 @@ export function KpiStrip() {
   const expenseSeries = tail(revenue.data).map((p) => p.expenses);
   const activeShare = d && d.totalMembers > 0 ? (d.activeMembers / d.totalMembers) * 100 : 0;
 
-  const tiles: Tile[] = [
+  const allTiles: Array<Tile | null> = [
     {
       key: 'active', label: 'Active members', icon: Users, accent: 'primary', value: d?.activeMembers ?? 0, tag: `of ${d?.totalMembers ?? 0}`, stat: 'active-members',
       footer: <ProgressBar className="mt-4" percent={activeShare} accent="primary" />,
@@ -82,34 +100,36 @@ export function KpiStrip() {
       key: 'new', label: 'New this month', icon: UserPlus, accent: 'violet', value: d?.newMembersThisMonth ?? 0, stat: 'new-registrations',
       footer: <Sparkline values={tail(newMembers.data).map((p) => p.value)} color={accentVar('violet')} />,
     },
-    {
+    !has('attendance') ? null : {
       key: 'checkins', label: "Today's check-ins", icon: UserCheck, accent: 'aqua', value: d?.todaysAttendance ?? 0, stat: 'attendance',
       footer: <Sparkline values={tail(attendance.data).map((p) => p.value)} color={accentVar('aqua')} />,
     },
     {
-      key: 'expiring', label: 'Expiring in 30 days', icon: CalendarClock, accent: 'warning', value: d?.expiringMemberships ?? 0, tag: 'renew soon', stat: 'expiring-memberships',
+      key: 'expiring', label: 'Expiring in 30 days', icon: CalendarClock, accent: 'warning', value: d?.expiringMemberships ?? 0, tag: 'renew soon', stat: has('reports') ? 'expiring-memberships' : undefined,
       footer: <ProgressBar className="mt-4" percent={d && d.activeMembers > 0 ? (d.expiringMemberships / d.activeMembers) * 100 : 0} accent="warning" />,
     },
-    {
+    !has('income') ? null : {
       key: 'income', label: 'Monthly income', icon: HandCoins, accent: 'success', value: income, money: true, stat: 'revenue-summary',
       footer: <Sparkline values={incomeSeries} color={accentVar('success')} />,
     },
-    {
+    !has('expenses') ? null : {
       key: 'expenses', label: 'Monthly expenses', icon: TrendingDown, accent: 'destructive', value: expenses, money: true, href: '/expenses',
       footer: <Sparkline values={expenseSeries} color={accentVar('destructive')} />,
     },
-    {
+    !(has('income') && has('expenses')) ? null : {
       key: 'net', label: 'Net profit', icon: income - expenses >= 0 ? TrendingUp : TrendingDown, accent: income - expenses >= 0 ? 'primary' : 'destructive', value: income - expenses, money: true,
       footer: <Sparkline values={incomeSeries.map((v, i) => v - (expenseSeries[i] ?? 0))} color={accentVar('primary')} />,
     },
-    {
+    !has('payments') ? null : {
       key: 'due', label: 'Outstanding', icon: CircleDollarSign, accent: 'destructive', value: Number(d?.outstandingPayments ?? 0), money: true, stat: 'pending-payments',
     },
   ];
+  const tiles = allTiles.filter((t): t is Tile => t !== null);
+  const spans = lgSpans(tiles.length);
 
   return (
     <>
-      <section aria-label="Key figures" className="grid grid-cols-2 gap-3.5 lg:grid-cols-4">
+      <section aria-label="Key figures" className="grid grid-cols-2 gap-3.5 lg:grid-cols-12">
         {tiles.map((tile, i) => {
           const clickable = tile.stat || tile.href;
           return (
@@ -129,7 +149,7 @@ export function KpiStrip() {
                   else if (tile.href) router.push(tile.href);
                 }
               }}
-              className={`rounded-2xl border p-4 shadow-xs ${clickable ? 'cursor-pointer focus-visible:outline-2 focus-visible:outline-ring' : ''}`}
+              className={`rounded-2xl border p-4 shadow-xs ${spans[i]} ${tiles.length % 2 === 1 && i === tiles.length - 1 ? 'col-span-2' : ''} ${clickable ? 'cursor-pointer focus-visible:outline-2 focus-visible:outline-ring' : ''}`}
               style={{ backgroundImage: `linear-gradient(160deg, ${tint(tile.accent, 13)}, transparent 72%)`, borderColor: tint(tile.accent, 24) }}
             >
               <div className="flex items-center justify-between gap-2">

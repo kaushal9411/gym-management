@@ -7,13 +7,19 @@ import '../storage/secure_storage.dart';
 import 'auth_event_bus.dart';
 import 'api_exception.dart';
 import 'maintenance_event_bus.dart';
+import 'module_event_bus.dart';
 
 /// One shared Dio instance for the whole app. Attaches the tenant + auth
 /// headers every request needs and transparently retries a single 401 with
 /// a refreshed access token — everything downstream (repositories) just
 /// awaits a normal response or catches a normal [DioException].
 class DioClient {
-  DioClient(this._storage, this._authEventBus, [this._maintenanceBus]) {
+  DioClient(
+    this._storage,
+    this._authEventBus, [
+    this._maintenanceBus,
+    this._moduleBus,
+  ]) {
     dio = Dio(
       BaseOptions(
         baseUrl: Env.apiBaseUrl,
@@ -33,6 +39,7 @@ class DioClient {
   final SecureStorage _storage;
   final AuthEventBus _authEventBus;
   final MaintenanceEventBus? _maintenanceBus;
+  final ModuleEventBus? _moduleBus;
 
   Completer<bool>? _refreshInFlight;
 
@@ -72,6 +79,17 @@ class DioClient {
         handler.next(err);
         return;
       }
+    }
+
+    // A switched-off module answers 403 "This module is currently
+    // unavailable.": tell the session so it re-reads the gym's feature flags
+    // (the UI then hides the module). The error itself passes on untouched.
+    if (err.response?.statusCode == 403 &&
+        ApiException.fromResponseData(err.response?.data, 403)
+            .isModuleUnavailable) {
+      _moduleBus?.notifyModuleUnavailable();
+      handler.next(err);
+      return;
     }
 
     final isUnauthorized = err.response?.statusCode == 401;

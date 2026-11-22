@@ -13,13 +13,20 @@ import { COMM_ACCENT } from '@/features/notifications/constants';
 import { useDeleteNotification, useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/features/notifications/hooks/use-notifications';
 import { notificationPanelClosed, notificationPanelToggled } from '@/features/notifications/store/notification-slice';
 import { SegmentedTabs } from '@/features/reports/components/ui';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 
 const PAGE = 20;
 const TONE = 'var(--chart-7)';
 
-/** Notification Center: header bell + right Drawer. Unread/All are server params (`unreadOnly`), counts come from the list response. */
+/** Notification Center: header bell + right Drawer. Renders nothing (and never polls) while the `notifications` module is disabled. */
 export function NotificationPanel() {
+  const enabled = useTenant().featureFlags.includes('notifications');
+  return enabled ? <NotificationPanelContent /> : null;
+}
+
+/** Unread/All are server params (`unreadOnly`), counts come from the list response. */
+function NotificationPanelContent() {
   const dispatch = useAppDispatch();
   const open = useAppSelector((state) => state.notifications.panelOpen);
   const unreadCount = useAppSelector((state) => state.notifications.unreadCount);

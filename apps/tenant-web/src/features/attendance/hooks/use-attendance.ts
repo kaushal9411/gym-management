@@ -16,8 +16,8 @@ function useInvalidateAttendance() {
   return () => void queryClient.invalidateQueries({ queryKey: ['attendance'] });
 }
 
-export function useAttendanceList(params: ListAttendanceParams) {
-  return useQuery({ queryKey: ['attendance', 'list', params], queryFn: () => attendanceService.list(params) });
+export function useAttendanceList(params: ListAttendanceParams, enabled = true) {
+  return useQuery({ queryKey: ['attendance', 'list', params], queryFn: () => attendanceService.list(params), enabled });
 }
 
 export function useTodayAttendance(branchId?: string) {

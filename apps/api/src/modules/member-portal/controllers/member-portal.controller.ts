@@ -50,7 +50,7 @@ export class MemberPortalController {
   }
 
   async overview(req: Request, res: Response): Promise<void> {
-    sendSuccess(res, await overviewFor(req).getOverview(memberId(req)));
+    sendSuccess(res, await overviewFor(req).getOverview(memberId(req), new Date(), req.tenant!.featureFlags));
   }
 
   async plan(req: Request, res: Response): Promise<void> {

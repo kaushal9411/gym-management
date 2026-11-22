@@ -5,11 +5,9 @@ import * as React from 'react';
 import { useTenant } from '../hooks/use-tenant';
 
 /**
- * Plan-gated feature flags live on the tenant's subscription plan — a
- * concept the Subscriptions module (not yet built) will populate. Until
- * then this is an honest stub: it never grants access to a feature it
- * can't actually verify, matching the backend's own
- * `feature-access.middleware.ts` (same rationale documented there).
+ * Renders `children` only when the module `feature` is enabled for the tenant
+ * (`tenant.featureFlags` — plan modules AND platform kill switches already
+ * AND-ed by the API; an absent key means OFF), otherwise `fallback`.
  */
 export function RequireFeature({ feature, children, fallback = null }: {
   feature: string;
@@ -17,8 +15,7 @@ export function RequireFeature({ feature, children, fallback = null }: {
   fallback?: React.ReactNode;
 }) {
   const tenant = useTenant();
-  const features = (tenant as { features?: Record<string, boolean> }).features;
 
-  if (!features?.[feature]) return <>{fallback}</>;
+  if (!tenant.featureFlags.includes(feature)) return <>{fallback}</>;
   return <>{children}</>;
 }

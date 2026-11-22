@@ -7,11 +7,10 @@ import { CircleCheck, UserPlus, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCurrentUser } from '@/features/auth/hooks/use-current-user';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
-import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { CountUp } from '@/features/members/components/detail/detail-ui';
-import { useKpis } from '@/features/reports/hooks/use-reports';
 import { useTenant } from '@/features/tenant/tenant-provider';
 import { useCurrencySymbol } from '@/lib/currency';
+import { useDashboardModules } from '../hooks/use-dashboard-modules';
 import { DateRangeSelector } from './date-range-selector';
 
 function greeting(): string {
@@ -26,16 +25,16 @@ export function DashboardHero() {
   const tenant = useTenant();
   const symbol = useCurrencySymbol();
   const { hasPermission } = usePermissions();
-  const { currentBranchId } = useCurrentBranch();
-  const kpis = useKpis(currentBranchId ?? undefined).data;
+  const { has, kpis, kpisEnabled } = useDashboardModules();
   const bannerUrl = tenant.branding.dashboardBannerUrl;
-  const canSeeKpis = hasPermission('reports:view');
+  // KPI cards need the dashboard endpoint; each card also needs the module it counts (no "0" for a module that is switched off).
+  const canSeeKpis = kpisEnabled;
 
   const today = [
-    { label: 'Check-ins today', value: kpis?.todaysAttendance ?? 0, tone: 'var(--chart-3)', prefix: '' },
+    has('attendance') ? { label: 'Check-ins today', value: kpis?.todaysAttendance ?? 0, tone: 'var(--chart-3)', prefix: '' } : null,
     { label: 'Expiring in 30 days', value: kpis?.expiringMemberships ?? 0, tone: 'var(--warning)', prefix: '' },
-    { label: 'Due now', value: Math.round(Number(kpis?.outstandingPayments ?? 0)), tone: 'var(--destructive)', prefix: symbol },
-  ];
+    has('payments') ? { label: 'Due now', value: Math.round(Number(kpis?.outstandingPayments ?? 0)), tone: 'var(--destructive)', prefix: symbol } : null,
+  ].filter((t): t is { label: string; value: number; tone: string; prefix: string } => t !== null);
 
   return (
     <motion.section
@@ -79,14 +78,14 @@ export function DashboardHero() {
               </Link>
             </Button>
           ) : null}
-          {hasPermission('finance:view') ? (
+          {has('payments') && hasPermission('finance:view') ? (
             <Button asChild size="sm" variant="secondary" className="border border-white/30 bg-white/15 text-white hover:bg-white/25">
               <Link href="/payments">
                 <Wallet className="size-4" /> Record payment
               </Link>
             </Button>
           ) : null}
-          {hasPermission('attendance:view') ? (
+          {has('attendance') && hasPermission('attendance:view') ? (
             <Button asChild size="sm" variant="secondary" className="border border-white/30 bg-white/15 text-white hover:bg-white/25">
               <Link href="/attendance">
                 <CircleCheck className="size-4" /> Check in
@@ -97,7 +96,7 @@ export function DashboardHero() {
       </div>
 
       {canSeeKpis ? (
-        <div className="relative grid grid-cols-3 gap-2.5" aria-label="Today at a glance">
+        <div className="relative grid gap-2.5" style={{ gridTemplateColumns: `repeat(${today.length}, minmax(0, 1fr))` }} aria-label="Today at a glance">
           {today.map((t, i) => (
             <motion.div
               key={t.label}

@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 
+import { useFeatureFlagSet } from '@/features/tenant/use-feature-flag';
 import { localDateKey } from '../lib/format';
 import type { MemberOverview, MemberPortalAttendanceItem, MemberPortalBooking, MemberPortalDiet, MemberPortalInvoice, MemberPortalProfile, MemberPortalWorkout } from '../services/member-portal.service';
 import { useMemberAttendance, useMemberBookings, useMemberDiet, useMemberInvoices, useMemberOverview, useMemberProfile, useMemberWorkout } from './use-member-portal';
@@ -102,13 +103,17 @@ export function buildFallbackOverview(args: {
  * Also returns the raw records the detail modal needs.
  */
 export function useDashboardData() {
+  // Module kill switches: `tenant.featureFlags` is the source of truth; `overview.disabledModules` (API) can only hide more.
+  // Each per-resource query below only runs while its module is on, so nothing fires a request the API would 403.
   const overviewQ = useMemberOverview();
+  const flags = useFeatureFlagSet(overviewQ.data?.disabledModules);
+  const has = React.useCallback((flag: string) => flags.has(flag), [flags]);
   const profileQ = useMemberProfile();
-  const attendanceQ = useMemberAttendance(1, 90);
-  const workoutQ = useMemberWorkout();
-  const dietQ = useMemberDiet();
-  const invoicesQ = useMemberInvoices(1, 20);
-  const bookingsQ = useMemberBookings();
+  const attendanceQ = useMemberAttendance(1, 90, has('attendance'));
+  const workoutQ = useMemberWorkout(has('workout_plans'));
+  const dietQ = useMemberDiet(has('diet_plans'));
+  const invoicesQ = useMemberInvoices(1, 20, has('payments'));
+  const bookingsQ = useMemberBookings(has('live_classes'));
 
   const profile = profileQ.data;
   const fallback = React.useMemo(
@@ -121,6 +126,8 @@ export function useDashboardData() {
   const overview = overviewQ.data ?? fallback;
   return {
     overview,
+    /** `true` when the module is on for this gym (tenant flag) and not reported disabled by `/portal/overview`. */
+    has,
     profile,
     usingFallback: !overviewQ.data && Boolean(fallback),
     loading: profileQ.isLoading || (overviewQ.isLoading && !overviewQ.isError),

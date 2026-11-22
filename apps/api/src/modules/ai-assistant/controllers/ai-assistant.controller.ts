@@ -6,7 +6,7 @@ import { logger } from '../../../core/logging/logger';
 import { actorFrom } from '../../authentication/utils/actor.util';
 import type { AiActionProposal } from '../constants/action-types';
 import { getEffectiveAiConfig } from '../providers/factory';
-import { executeAiAction } from '../services/ai-actions.service';
+import { executeAiActionDetailed } from '../services/ai-actions.service';
 import { AiChatService } from '../services/ai-chat.service';
 import { AiTenantSettingsService } from '../services/ai-tenant-settings.service';
 
@@ -120,10 +120,17 @@ export class AiAssistantController {
     const proposal = message.actionPayload as unknown as AiActionProposal;
 
     try {
-      const resultSummary = await executeAiAction(req.tenant!.id, actor, proposal);
+      const outcome = await executeAiActionDetailed(req.tenant!.id, actor, proposal);
+      if (outcome.status === 'refused') {
+        // The action's module is switched off for this gym: nothing ran, so the proposal is closed as cancelled (not "confirmed").
+        await service.markActionStatus(message.id, 'CANCELLED');
+        await service.appendSystemNote(req.params.id!, outcome.message);
+        sendSuccess(res, { result: outcome.message }, 'Action not performed.');
+        return;
+      }
       await service.markActionStatus(message.id, 'CONFIRMED');
-      await service.appendSystemNote(req.params.id!, resultSummary);
-      sendSuccess(res, { result: resultSummary }, 'Action completed.');
+      await service.appendSystemNote(req.params.id!, outcome.message);
+      sendSuccess(res, { result: outcome.message }, 'Action completed.');
     } catch (error) {
       await service.appendSystemNote(req.params.id!, `Action failed: ${(error as Error).message}`);
       throw error;

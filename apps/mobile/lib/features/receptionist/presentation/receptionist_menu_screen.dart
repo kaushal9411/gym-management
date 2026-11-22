@@ -7,6 +7,7 @@ import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/menu_entry.dart';
+import '../../hr/presentation/hr_menu.dart';
 import '../../../shared/widgets/staff_logout_dialog.dart';
 
 /// Section order mirrors web's `NAV_ITEMS` macro order (People/Programs/
@@ -50,6 +51,7 @@ const _sections = <String, List<MenuEntry>>{
       featureFlag: 'branches',
     ),
   ],
+  'HR': hrMenuEntries,
   'Programs': [
     MenuEntry(
       icon: Icons.card_membership_outlined,
@@ -141,6 +143,7 @@ const _sections = <String, List<MenuEntry>>{
       title: 'Notifications',
       subtitle: 'Unread alerts',
       route: AppRoutes.notifications,
+      featureFlag: 'notifications',
     ),
     MenuEntry(
       icon: Icons.forum_outlined,

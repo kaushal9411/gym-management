@@ -37,6 +37,9 @@ function addDaysStr(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Parts of the finance summary that belong to a module of their own (the route itself is gated on `payments`). */
+const FINANCE_MODULES = ['income', 'expenses', 'payments'] as const;
+
 export class FinanceDashboardService {
   private readonly db: TenantScopedPrisma;
   private readonly payments: MemberPaymentRepository;
@@ -50,7 +53,10 @@ export class FinanceDashboardService {
     this.expenses = new ExpenseRepository(this.db);
   }
 
-  async getSummary(branchId?: string): Promise<FinanceDashboardDto> {
+  /** `enabledModules` = tenant `featureFlags`; omitted = everything on. Disabled parts are not queried and come back zeroed. */
+  async getSummary(branchId?: string, enabledModules?: readonly string[]): Promise<FinanceDashboardDto> {
+    const on = (key: string): boolean => !enabledModules || enabledModules.includes(key);
+    const disabledModules = FINANCE_MODULES.filter((k) => !on(k));
     const todayStr = businessDate();
     const today = new Date(`${todayStr}T00:00:00.000Z`);
     const todayEnd = new Date(`${todayStr}T23:59:59.999Z`);
@@ -58,11 +64,11 @@ export class FinanceDashboardService {
     const monthStart = new Date(`${monthStartStr}T00:00:00.000Z`);
 
     const [todayIncome, monthlyIncome, monthlyExpenses, outstanding, recentPayments, trendFrom] = await Promise.all([
-      this.income.sumForDateRange(this.tenantId, today, todayEnd, branchId),
-      this.income.sumForDateRange(this.tenantId, monthStart, todayEnd, branchId),
-      this.expenses.sumForDateRange(this.tenantId, monthStart, todayEnd, branchId),
-      this.payments.sumOutstanding(this.tenantId, branchId),
-      this.payments.recent(this.tenantId, 10, branchId),
+      on('income') ? this.income.sumForDateRange(this.tenantId, today, todayEnd, branchId) : Promise.resolve(0),
+      on('income') ? this.income.sumForDateRange(this.tenantId, monthStart, todayEnd, branchId) : Promise.resolve(0),
+      on('expenses') ? this.expenses.sumForDateRange(this.tenantId, monthStart, todayEnd, branchId) : Promise.resolve(0),
+      on('payments') ? this.payments.sumOutstanding(this.tenantId, branchId) : Promise.resolve({ total: 0, count: 0 }),
+      on('payments') ? this.payments.recent(this.tenantId, 10, branchId) : Promise.resolve([]),
       Promise.resolve(addDaysStr(todayStr, -29)),
     ]);
 
@@ -72,8 +78,8 @@ export class FinanceDashboardService {
     );
     const trendFromDate = new Date(`${trendFrom}T00:00:00.000Z`);
     const [incomeDaily, expenseDaily] = await Promise.all([
-      this.income.dailyTotalsForRange(this.tenantId, trendFromDate, todayEnd, branchId),
-      this.expenses.dailyTotalsForRange(this.tenantId, trendFromDate, todayEnd, branchId),
+      on('income') ? this.income.dailyTotalsForRange(this.tenantId, trendFromDate, todayEnd, branchId) : Promise.resolve([]),
+      on('expenses') ? this.expenses.dailyTotalsForRange(this.tenantId, trendFromDate, todayEnd, branchId) : Promise.resolve([]),
     ]);
     const incomeByDate = new Map(incomeDaily.map((d) => [d.date.toISOString().slice(0, 10), d.total]));
     const expenseByDate = new Map(expenseDaily.map((d) => [d.date.toISOString().slice(0, 10), d.total]));
@@ -95,6 +101,7 @@ export class FinanceDashboardService {
       outstandingInvoiceCount: outstanding.count,
       recentPayments: recentPayments.map((row) => toListItem(row, refunded.get(row.id) ?? 0)),
       revenueTrend,
+      disabledModules,
     };
   }
 }

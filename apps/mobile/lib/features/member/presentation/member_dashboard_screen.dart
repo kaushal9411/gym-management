@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +12,8 @@ import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/tenant_features.dart';
+import '../../../core/utils/tenant_features_context.dart';
 import '../../../models/body_measurement.dart';
 import '../../../models/gym_info.dart';
 import '../../../models/member_invoice.dart';
@@ -51,13 +55,21 @@ import 'widgets/member_plan_benefits.dart';
 /// member's current plan and every benefit it includes, between the tiles and
 /// the cards; it loads on its own and only that card degrades on failure.
 ///
+/// **Feature flags:** every module-backed piece is shown only while the gym has
+/// that module on (`tenant.featureFlags`, plus the overview's `disabledModules`
+/// when the server sends it): the visit tiles / hero stats / Attendance card ->
+/// `attendance`, Workout progress tile + card -> `workout_plans`, Diet today ->
+/// `diet_plans`, Book class + Upcoming classes -> `live_classes`, Outstanding +
+/// Recent invoices + Renew -> `payments`, the bell -> `notifications`.
+///
 /// Dropped vs web: the "My data" card links to the existing export screen
 /// instead of downloading inline; the hero does not extend behind the status
 /// bar (the shell's SafeArea owns it); chart hover tooltips (long-press).
 class MemberDashboardScreen extends StatefulWidget {
   const MemberDashboardScreen({required this.onQuickAction, super.key});
 
-  /// Jumps the shell to the Workout (1) / Diet (2) / Classes (3) tab.
+  /// Jumps the shell to the Workout (1) / Diet (2) / Classes (3) tab — a
+  /// position in the shell's canonical tab order, whatever tabs are visible.
   final ValueChanged<int> onQuickAction;
 
   @override
@@ -100,6 +112,9 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
       _planEpoch++;
     });
     final repo = getIt<MemberPortalRepository>();
+    final tenant = context.readTenant;
+    bool allowed(String flag) =>
+        tenant == null || tenantAllows(tenant, flag: flag);
     // Optional pieces start now and fill their cards when they land.
     _tolerant(repo.measurements()).then((m) {
       if (mounted) {
@@ -115,15 +130,29 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
     try {
       final overviewF = repo.overview();
       final profileF = repo.me();
-      final visitsF = _tolerant(repo.attendance(limit: 60));
-      final workoutF = _tolerant(repo.workout());
-      final invoicesF = _tolerant(repo.invoices(limit: 20));
+      // Only ask for what the gym's modules allow (a switched-off module
+      // would answer 403 and trigger a flag refresh for nothing).
+      final visitsF = allowed(Feature.attendance)
+          ? _tolerant(repo.attendance(limit: 60))
+          : Future.value(null);
+      final workoutF = allowed(Feature.workoutPlans)
+          ? _tolerant(repo.workout())
+          : Future.value(null);
+      final invoicesF = allowed(Feature.payments)
+          ? _tolerant(repo.invoices(limit: 20))
+          : Future.value(null);
       final overview = await overviewF;
       final profile = await profileF;
       final visits = await visitsF;
       final workout = await workoutF;
       final invoices = await invoicesF;
       if (!mounted) return;
+      // The server dropped a module our flags still list as on: the flags are
+      // stale, re-read them (the rebuild then hides it).
+      if (tenant != null &&
+          overview.disabledModules.any(tenant.featureFlags.contains)) {
+        unawaited(context.read<SessionCubit>().refreshTenant());
+      }
       setState(() {
         _overview = overview;
         _profile = profile;
@@ -254,6 +283,17 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
     final displayName = (sessionMember?.name.isNotEmpty ?? false)
         ? sessionMember!.name
         : o.member.name;
+    // Module gates: the tenant's flags (source of truth) AND the server's own
+    // `disabledModules` hint. No tenant to judge by (isolated tests) = all on.
+    final tenant = context.watchTenant;
+    bool on(String flag) =>
+        (tenant == null || tenantAllows(tenant, flag: flag)) &&
+        !o.disabledModules.contains(flag);
+    final attendanceOn = on(Feature.attendance);
+    final workoutOn = on(Feature.workoutPlans);
+    final dietOn = on(Feature.dietPlans);
+    final classesOn = on(Feature.liveClasses);
+    final paymentsOn = on(Feature.payments);
 
     return RefreshIndicator(
       color: AppColors.memberB,
@@ -271,6 +311,9 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
             hasQr: (_profile?.qrCodeImageUrl ?? '').isNotEmpty,
             onRenew: _renew,
             onBook: () => widget.onQuickAction(3),
+            showVisitStats: attendanceOn,
+            showBook: classesOn,
+            showRenew: paymentsOn,
             onQr: _showQr,
             onProfile: () => context.push(AppRoutes.memberProfile),
           ),
@@ -280,7 +323,13 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _tiles(o),
+                  _tiles(
+                    o,
+                    attendance: attendanceOn,
+                    workout: workoutOn,
+                    diet: dietOn,
+                    payments: paymentsOn,
+                  ),
                   const SizedBox(height: 14),
                   if (o.membership != null) ...[
                     MemberPlanBenefitsSection(reloadToken: _planEpoch),
@@ -288,35 +337,39 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
                   ],
                   AdaptiveColumns(
                     fullWidth: [
-                      StaggeredReveal(
-                        index: 1,
-                        child: MemberAttendanceCard(
-                          attendance: o.attendance,
-                          onHistory: () =>
-                              context.push(AppRoutes.memberAttendance),
+                      if (attendanceOn)
+                        StaggeredReveal(
+                          index: 1,
+                          child: MemberAttendanceCard(
+                            attendance: o.attendance,
+                            onHistory: () =>
+                                context.push(AppRoutes.memberAttendance),
+                          ),
                         ),
-                      ),
                     ],
                     children: [
-                      MemberClassesCard(
-                        classes: o.upcomingClasses,
-                        onBook: () => widget.onQuickAction(3),
-                      ),
-                      MemberWorkoutCard(
-                        workout: o.workout,
-                        onOpen: () => widget.onQuickAction(1),
-                      ),
+                      if (classesOn)
+                        MemberClassesCard(
+                          classes: o.upcomingClasses,
+                          onBook: () => widget.onQuickAction(3),
+                        ),
+                      if (workoutOn)
+                        MemberWorkoutCard(
+                          workout: o.workout,
+                          onOpen: () => widget.onQuickAction(1),
+                        ),
                       MemberBodyCard(
                         measurements: _measurements,
                         loading: _measurementsLoading,
                         onAll: () => context.push(AppRoutes.memberMeasurements),
                       ),
-                      MemberBillingCard(
-                        invoices: _invoices,
-                        billing: o.billing,
-                        onAll: () => context.push(AppRoutes.memberInvoices),
-                        onPay: _pay,
-                      ),
+                      if (paymentsOn)
+                        MemberBillingCard(
+                          invoices: _invoices,
+                          billing: o.billing,
+                          onAll: () => context.push(AppRoutes.memberInvoices),
+                          onPay: _pay,
+                        ),
                       MemberGymCard(
                         overview: o,
                         gym: _gym,
@@ -337,7 +390,13 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
     );
   }
 
-  Widget _tiles(MemberOverview o) {
+  Widget _tiles(
+    MemberOverview o, {
+    required bool attendance,
+    required bool workout,
+    required bool diet,
+    required bool payments,
+  }) {
     final m = o.membership;
     final a = o.attendance;
     final w = o.workout;
@@ -369,46 +428,49 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
           progress: m == null || m.totalDays <= 0 ? null : m.remainingFraction,
           onTap: () => _openDetail(MemberDashboardStatKind.membership),
         ),
-        MemberStatTile(
-          label: 'Visits this month',
-          icon: Icons.login_rounded,
-          color: TeamColors.sky,
-          value: AnimatedNumber(
-            value: a.thisMonthVisits.toDouble(),
-            format: count,
+        if (attendance)
+          MemberStatTile(
+            label: 'Visits this month',
+            icon: Icons.login_rounded,
+            color: TeamColors.sky,
+            value: AnimatedNumber(
+              value: a.thisMonthVisits.toDouble(),
+              format: count,
+            ),
+            hint: 'vs ${a.previousMonthVisits} last month',
+            delta: a.deltaPercent,
+            onTap: () => _openDetail(MemberDashboardStatKind.attendance),
           ),
-          hint: 'vs ${a.previousMonthVisits} last month',
-          delta: a.deltaPercent,
-          onTap: () => _openDetail(MemberDashboardStatKind.attendance),
-        ),
-        MemberStatTile(
-          label: 'Current streak',
-          icon: Icons.local_fire_department_rounded,
-          color: const Color(0xFFF97316),
-          value: AnimatedNumber(
-            value: a.currentStreakDays.toDouble(),
-            format: (v) => '${v.round()}d',
+        if (attendance)
+          MemberStatTile(
+            label: 'Current streak',
+            icon: Icons.local_fire_department_rounded,
+            color: const Color(0xFFF97316),
+            value: AnimatedNumber(
+              value: a.currentStreakDays.toDouble(),
+              format: (v) => '${v.round()}d',
+            ),
+            hint:
+                'Best ${a.bestStreakDays} ${a.bestStreakDays == 1 ? 'day' : 'days'}',
           ),
-          hint:
-              'Best ${a.bestStreakDays} ${a.bestStreakDays == 1 ? 'day' : 'days'}',
-        ),
-        MemberStatTile(
-          label: 'Workout progress',
-          icon: Icons.fitness_center_rounded,
-          color: const Color(0xFFF97316),
-          value: w == null
-              ? const Text('—')
-              : AnimatedNumber(
-                  value: w.progressPercent.toDouble(),
-                  format: (v) => '${v.round()}%',
-                ),
-          hint: w == null
-              ? 'No plan assigned'
-              : '${w.completedExercises}/${w.totalExercises} exercises',
-          progress: w == null ? null : w.progressPercent / 100,
-          onTap: () => _openDetail(MemberDashboardStatKind.workout),
-        ),
-        if (d != null)
+        if (workout)
+          MemberStatTile(
+            label: 'Workout progress',
+            icon: Icons.fitness_center_rounded,
+            color: const Color(0xFFF97316),
+            value: w == null
+                ? const Text('—')
+                : AnimatedNumber(
+                    value: w.progressPercent.toDouble(),
+                    format: (v) => '${v.round()}%',
+                  ),
+            hint: w == null
+                ? 'No plan assigned'
+                : '${w.completedExercises}/${w.totalExercises} exercises',
+            progress: w == null ? null : w.progressPercent / 100,
+            onTap: () => _openDetail(MemberDashboardStatKind.workout),
+          ),
+        if (diet && d != null)
           MemberStatTile(
             label: 'Diet today',
             icon: Icons.restaurant_rounded,
@@ -421,7 +483,7 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
                     : d.planName,
             onTap: () => widget.onQuickAction(2),
           )
-        else
+        else if (attendance)
           MemberStatTile(
             label: 'Total visits',
             icon: Icons.login_rounded,
@@ -433,20 +495,21 @@ class _MemberDashboardScreenState extends State<MemberDashboardScreen> {
             hint: 'All time',
             onTap: () => _openDetail(MemberDashboardStatKind.attendance),
           ),
-        MemberStatTile(
-          label: 'Outstanding',
-          icon: Icons.account_balance_wallet_outlined,
-          color: due > 0 ? TeamColors.amber : TeamColors.green,
-          value: due > 0
-              ? AnimatedNumber(value: due, format: memberMoney)
-              : const Text('All paid'),
-          hint: due > 0
-              ? '${o.billing.outstandingInvoiceCount} '
-                  '${o.billing.outstandingInvoiceCount == 1 ? 'invoice' : 'invoices'}'
-                  '${o.billing.nextDueDate != null ? ' · due ${_short(o.billing.nextDueDate!)}' : ''}'
-              : 'Nothing due',
-          onTap: () => _openDetail(MemberDashboardStatKind.outstanding),
-        ),
+        if (payments)
+          MemberStatTile(
+            label: 'Outstanding',
+            icon: Icons.account_balance_wallet_outlined,
+            color: due > 0 ? TeamColors.amber : TeamColors.green,
+            value: due > 0
+                ? AnimatedNumber(value: due, format: memberMoney)
+                : const Text('All paid'),
+            hint: due > 0
+                ? '${o.billing.outstandingInvoiceCount} '
+                    '${o.billing.outstandingInvoiceCount == 1 ? 'invoice' : 'invoices'}'
+                    '${o.billing.nextDueDate != null ? ' · due ${_short(o.billing.nextDueDate!)}' : ''}'
+                : 'Nothing due',
+            onTap: () => _openDetail(MemberDashboardStatKind.outstanding),
+          ),
       ],
     );
   }

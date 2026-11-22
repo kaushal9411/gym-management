@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../bloc/session/session_cubit.dart';
@@ -8,6 +7,7 @@ import '../../features/attendance/presentation/attendance_history_screen.dart';
 import '../../features/attendance/presentation/attendance_today_screen.dart';
 import '../../features/announcements/presentation/schedule_announcement_screen.dart';
 import '../../features/announcements/presentation/announcements_screen.dart';
+import '../../features/auth/presentation/auth_widgets.dart' show authTransitionPage;
 import '../../features/auth/presentation/forgot_password_screen.dart';
 import '../../features/auth/presentation/member_reset_password_screen.dart';
 import '../../features/auth/presentation/login_screen.dart';
@@ -50,6 +50,17 @@ import '../../features/finance/presentation/payment_detail_screen.dart';
 import '../../features/finance/presentation/payments_screen.dart';
 import '../../features/finance/presentation/record_payment_screen.dart';
 import '../../features/home/presentation/home_router_screen.dart';
+import '../../features/hr/presentation/apply_leave_screen.dart';
+import '../../features/hr/presentation/approvals_screen.dart';
+import '../../features/hr/presentation/employee_detail_screen.dart';
+import '../../features/hr/presentation/employees_screen.dart';
+import '../../features/hr/presentation/hr_inbox_screen.dart';
+import '../../features/hr/presentation/hr_overview_screen.dart';
+import '../../features/hr/presentation/payroll_screens.dart';
+import '../../features/hr/presentation/team_attendance_screen.dart';
+import '../../features/hr/presentation/my_hr_screen.dart';
+import '../../features/hr/presentation/my_leaves_screen.dart';
+import '../../features/hr/presentation/my_payslips_screen.dart';
 import '../../features/manager/presentation/member_detail_screen.dart';
 import '../../features/member/presentation/member_attendance_screen.dart';
 import '../../features/member/presentation/member_class_booked_screen.dart';
@@ -182,8 +193,10 @@ import '../../models/membership_plan.dart';
 import '../../models/notification_template.dart';
 import '../../models/staff_member.dart';
 import '../../models/tenant_role.dart';
+import '../utils/tenant_features.dart';
 import 'app_routes.dart';
 import 'go_router_refresh_stream.dart';
+import 'route_feature_rules.dart';
 
 /// Paths reachable while signed out — anything else redirects here-or-home
 /// depending on session state.
@@ -219,7 +232,14 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         return AppRoutes.login;
       }
       // Authenticated (staff or member) — keep out of the signed-out flow.
-      return _signedOutPaths.contains(path) ? AppRoutes.home : null;
+      if (_signedOutPaths.contains(path)) return AppRoutes.home;
+      // A feature route whose module the gym has switched off (typed link,
+      // stale back-stack entry, flags refreshed while it was open) goes home.
+      final tenant = tenantOfSession(session);
+      if (tenant != null && routeBlockedByFeatures(path, tenant)) {
+        return AppRoutes.home;
+      }
+      return null;
     },
     routes: [
       GoRoute(
@@ -228,26 +248,8 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       ),
       GoRoute(
         path: AppRoutes.login,
-        pageBuilder: (context, state) => CustomTransitionPage<void>(
-          key: state.pageKey,
-          child: const LoginScreen(),
-          transitionDuration: const Duration(milliseconds: 520),
-          reverseTransitionDuration: const Duration(milliseconds: 320),
-          transitionsBuilder: (context, animation, secondary, child) {
-            final curved = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutCubic,
-              reverseCurve: Curves.easeInCubic,
-            );
-            return FadeTransition(
-              opacity: curved,
-              child: ScaleTransition(
-                scale: Tween(begin: 0.97, end: 1.0).animate(curved),
-                child: child,
-              ),
-            );
-          },
-        ),
+        pageBuilder: (context, state) =>
+            authTransitionPage(state, const LoginScreen()),
       ),
       GoRoute(
         path: AppRoutes.otp,
@@ -261,22 +263,27 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       ),
       GoRoute(
         path: AppRoutes.phoneLogin,
-        builder: (context, state) =>
-            PhoneLoginScreen(args: state.extra as PhoneLoginScreenArgs),
+        pageBuilder: (context, state) =>
+            authTransitionPage(state, const PhoneLoginScreen()),
       ),
       GoRoute(
         path: AppRoutes.phoneOtp,
-        builder: (context, state) =>
-            PhoneOtpScreen(args: state.extra as PhoneOtpScreenArgs),
+        pageBuilder: (context, state) => authTransitionPage(
+          state,
+          PhoneOtpScreen(args: state.extra as PhoneOtpScreenArgs),
+        ),
       ),
       GoRoute(
         path: AppRoutes.forgotPassword,
-        builder: (context, state) =>
-            ForgotPasswordScreen(args: state.extra as ForgotPasswordScreenArgs),
+        pageBuilder: (context, state) => authTransitionPage(
+          state,
+          ForgotPasswordScreen(args: state.extra as ForgotPasswordScreenArgs),
+        ),
       ),
       GoRoute(
         path: AppRoutes.memberResetPassword,
-        builder: (context, state) => const MemberResetPasswordScreen(),
+        pageBuilder: (context, state) =>
+            authTransitionPage(state, const MemberResetPasswordScreen()),
       ),
       GoRoute(
         path: AppRoutes.home,
@@ -575,6 +582,65 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       GoRoute(
         path: AppRoutes.leadFollowUps,
         builder: (context, state) => const LeadFollowUpsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.hrMe,
+        builder: (context, state) => const MyHrScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.hrApplyLeave,
+        builder: (context, state) => ApplyLeaveScreen(
+          args: state.extra is HrApplyLeaveArgs
+              ? state.extra! as HrApplyLeaveArgs
+              : const HrApplyLeaveArgs(),
+        ),
+      ),
+      GoRoute(
+        path: AppRoutes.hrMyLeaves,
+        builder: (context, state) => const MyLeavesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.hrPayslips,
+        builder: (context, state) => const MyPayslipsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.hrPayslipDetail,
+        builder: (context, state) =>
+            PayslipDetailScreen(args: state.extra! as HrPayslipArgs),
+      ),
+      GoRoute(
+        path: AppRoutes.hrInbox,
+        builder: (context, state) => const HrInboxScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.hrOverview,
+        builder: (context, state) => const HrOverviewScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.hrApprovals,
+        builder: (context, state) => const ApprovalsScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.hrTeamAttendance,
+        builder: (context, state) => const TeamAttendanceScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.hrEmployees,
+        builder: (context, state) => const EmployeesScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.hrEmployeeDetail,
+        builder: (context, state) =>
+            EmployeeDetailScreen(args: state.extra! as HrEmployeeArgs),
+      ),
+      GoRoute(
+        path: AppRoutes.hrPayroll,
+        builder: (context, state) => const PayrollScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.hrPayrollRun,
+        builder: (context, state) =>
+            PayrollRunScreen(args: state.extra! as HrPayrollRunArgs),
       ),
       GoRoute(
         path: AppRoutes.support,

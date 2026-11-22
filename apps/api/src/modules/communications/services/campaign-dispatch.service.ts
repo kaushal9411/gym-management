@@ -2,6 +2,7 @@ import { logger } from '../../../core/logging/logger';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { loadEmailBranding } from '../../../infrastructure/mail/branding';
 import { enqueueCampaignBatch } from '../../../infrastructure/queue/communications.queue';
+import { isModuleEnabled } from '../../tenants/utils/module-enabled.util';
 import { BATCH_SIZE, MAX_RECIPIENTS, QUIET_HOLD_CHANNELS } from '../constants/limits';
 import { AudienceRepository } from '../repositories/audience.repository';
 import { CampaignRepository, type RecipientSeed } from '../repositories/campaign.repository';
@@ -16,6 +17,16 @@ import { specFromRow } from './campaign.service';
 import { sendToMember } from './channel-sender.service';
 import { finalizeCampaignRecipient, finishCampaignIfDone, syncCampaignCounters } from './recipient-finalizer.service';
 
+/**
+ * Campaigns are a `notifications` feature: a gym with that module switched off sends nothing, even for a campaign that was
+ * already enqueued/SENDING (the campaign stays SENDING and resumes via the minute sweeper once the module is back on).
+ */
+async function campaignsAllowed(tenantId: string): Promise<boolean> {
+  const allowed = await isModuleEnabled(tenantId, 'notifications');
+  if (!allowed) logger.debug('Skipping campaign job: notifications module disabled', { tenantId });
+  return allowed;
+}
+
 /** Marks a SENDING campaign as failed before any message exists (audience vanished / too large). */
 async function failCampaign(tenantId: string, campaignId: string, reason: string): Promise<void> {
   const repo = new CampaignRepository(getTenantScopedClient(tenantId));
@@ -27,6 +38,7 @@ async function failCampaign(tenantId: string, campaignId: string, reason: string
  * (idempotent - unique constraint + skipDuplicates, so a retried job is harmless), then kick off the first batch.
  */
 export async function startCampaign(tenantId: string, campaignId: string): Promise<void> {
+  if (!(await campaignsAllowed(tenantId))) return;
   const db = getTenantScopedClient(tenantId);
   const repo = new CampaignRepository(db);
   const campaign = await repo.findById(tenantId, campaignId);
@@ -69,6 +81,7 @@ export async function startCampaign(tenantId: string, campaignId: string): Promi
  * claimed-but-never-finished rows after 30 minutes). Chains itself while more messages are ready.
  */
 export async function runCampaignBatch(tenantId: string, campaignId: string): Promise<void> {
+  if (!(await campaignsAllowed(tenantId))) return;
   const db = getTenantScopedClient(tenantId);
   const repo = new CampaignRepository(db);
   const campaign = await repo.findById(tenantId, campaignId);

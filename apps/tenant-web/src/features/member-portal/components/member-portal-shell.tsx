@@ -3,9 +3,11 @@
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
 
+import { useFeatureEnabled } from '@/features/tenant/use-feature-flag';
 import { useMemberAuth, useMemberLogout } from '../hooks/use-member-auth';
 import { useMemberProfile, useMemberUnreadCount } from '../hooks/use-member-portal';
 import { BottomTabBar } from './shell/bottom-tab-bar';
+import { PortalFeatureGate } from './shell/portal-feature-gate';
 import { PortalPage } from './shell/portal-page';
 import { SideRail } from './shell/side-rail';
 import { TopBar } from './shell/top-bar';
@@ -23,7 +25,8 @@ export function MemberPortalShell({ children }: { children: React.ReactNode }) {
   const { member } = useMemberAuth();
   const logout = useMemberLogout();
   const { data: profile } = useMemberProfile();
-  const unread = useMemberUnreadCount();
+  // The unread badge polls /portal/notifications, which the API 403s while the notifications module is off.
+  const unread = useMemberUnreadCount(useFeatureEnabled('notifications'));
   const shared = {
     name: profile?.name ?? member?.name,
     memberId: member?.memberId,
@@ -40,7 +43,9 @@ export function MemberPortalShell({ children }: { children: React.ReactNode }) {
         <TopBar {...shared} />
         <main className="flex-1 overflow-x-clip bg-muted/20 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-10">
           <div className="w-full px-2.5 py-4 md:py-6">
-            <PortalPage>{children}</PortalPage>
+            <PortalPage>
+              <PortalFeatureGate pathname={pathname}>{children}</PortalFeatureGate>
+            </PortalPage>
           </div>
         </main>
       </div>

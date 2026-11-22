@@ -14,7 +14,9 @@ const asyncHandler =
   };
 
 dashboardRouter.use(authenticateMiddleware);
-dashboardRouter.use(requireModuleEnabled('reports'));
+// Gated on `dashboard` (a guarded plan module no admin can disable), NOT `reports`: the owner dashboard is its own module.
+// `requirePermission('reports:view')` below is unchanged. Cross-module KPIs honour their own flags (see DashboardService).
+dashboardRouter.use(requireModuleEnabled('dashboard'));
 
 /** @openapi { "/reports/dashboard/summary": { get: { tags: [Reports], summary: "Full dashboard: all KPIs + recent activity feed", security: [{bearerAuth: []}], responses: { 200: { description: Dashboard summary } } } } } */
 dashboardRouter.get('/summary', requirePermission('reports:view'), asyncHandler(dashboardController.getSummary.bind(dashboardController)));

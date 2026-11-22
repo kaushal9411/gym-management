@@ -8,6 +8,7 @@ import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/menu_entry.dart';
+import '../../hr/presentation/hr_menu.dart';
 import '../../../shared/widgets/staff_logout_dialog.dart';
 
 /// Section order mirrors web's `NAV_ITEMS` macro order (People/Programs/
@@ -73,6 +74,7 @@ Map<String, List<MenuEntry>> _sections(String appName) =>
           featureFlag: 'branches',
         ),
       ],
+      'HR': hrMenuEntries,
       'Programs': [
         MenuEntry(
           icon: Icons.history_rounded,
@@ -121,6 +123,8 @@ Map<String, List<MenuEntry>> _sections(String appName) =>
           subtitle: 'Revenue vs expenses',
           route: AppRoutes.finance,
           permissions: ['finance:view'],
+          // Revenue vs expenses: on while any of its three modules is.
+          featureFlagsAny: ['payments', 'income', 'expenses'],
         ),
         MenuEntry(
           icon: Icons.credit_card_outlined,
@@ -146,6 +150,7 @@ Map<String, List<MenuEntry>> _sections(String appName) =>
           title: 'Notifications',
           subtitle: 'Unread alerts',
           route: AppRoutes.notifications,
+          featureFlag: 'notifications',
         ),
         MenuEntry(
           icon: Icons.forum_outlined,

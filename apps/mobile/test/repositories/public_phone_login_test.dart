@@ -4,9 +4,8 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gym_saas_mobile/core/storage/secure_storage.dart';
+import 'package:gym_saas_mobile/models/phone_login_result.dart';
 import 'package:gym_saas_mobile/models/staff_login_result.dart';
-import 'package:gym_saas_mobile/repositories/auth_repository.dart';
-import 'package:gym_saas_mobile/repositories/member_auth_repository.dart';
 import 'package:gym_saas_mobile/repositories/public_tenant_repository.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -59,6 +58,8 @@ const _userJson = {
 void main() {
   late _Storage storage;
 
+  setUpAll(() => registerFallbackValue(ActorType.staff));
+
   setUp(() {
     storage = _Storage();
     when(() => storage.saveTenantSlug(any())).thenAnswer((_) async {});
@@ -72,33 +73,41 @@ void main() {
     when(() => storage.saveMemberProfile(any())).thenAnswer((_) async {});
   });
 
-  setUpAll(() => registerFallbackValue(ActorType.staff));
-
   Dio dioWith(_Adapter a) =>
       Dio(BaseOptions(baseUrl: 'http://x/api'))..httpClientAdapter = a;
 
-  test('staff verify posts to the public endpoint; slug is saved BEFORE tokens',
+  const tokens = {
+    'accessToken': 'a',
+    'accessTokenExpiresAt': 'x',
+    'refreshToken': 'r',
+  };
+
+  const memberJson = {
+    'id': 'm1',
+    'memberId': 'MEM-0007',
+    'name': 'Mia',
+    'status': 'ACTIVE',
+  };
+
+  test('staff verify: no actorType sent, slug saved BEFORE staff tokens',
       () async {
     final adapter = _Adapter(
       _envelope({
         'user': _userJson,
-        'accessToken': 'a',
-        'accessTokenExpiresAt': 'x',
-        'refreshToken': 'r',
+        ...tokens,
         'tenantSlug': 'alpha-fit',
+        'actorType': 'staff',
       }),
     );
-    final repo = AuthRepository(dioWith(adapter), storage);
+    final repo = PublicTenantRepository(dioWith(adapter), storage);
 
-    final out = await repo.verifyPublicPhoneOtp(phone: '98', code: '123456');
+    final out = await repo.verifyPhoneOtp(phone: '98', code: '123456');
 
     expect(adapter.last!.path, '/public/auth/phone-login/verify-otp');
-    expect(
-      adapter.lastData,
-      {'actorType': 'staff', 'phone': '98', 'code': '123456'},
-    );
+    expect(adapter.lastData, {'phone': '98', 'code': '123456'});
+    expect(out, isA<PhoneLoginStaff>());
     expect(out.tenantSlug, 'alpha-fit');
-    expect(out.result, isA<StaffLoginSuccess>());
+    expect((out as PhoneLoginStaff).result, isA<StaffLoginSuccess>());
     verifyInOrder([
       () => storage.saveTenantSlug('alpha-fit'),
       () => storage.saveSession(
@@ -107,6 +116,7 @@ void main() {
             refreshToken: 'r',
           ),
     ]);
+    verifyNever(() => storage.saveMemberProfile(any()));
   });
 
   test('staff challenge: slug saved, no tokens persisted', () async {
@@ -117,13 +127,15 @@ void main() {
         'purpose': 'login',
         'expiresInSeconds': 300,
         'tenantSlug': 'alpha-fit',
+        'actorType': 'staff',
       }),
     );
-    final repo = AuthRepository(dioWith(adapter), storage);
+    final repo = PublicTenantRepository(dioWith(adapter), storage);
 
-    final out = await repo.verifyPublicPhoneOtp(phone: '98', code: '123456');
+    final out = await repo.verifyPhoneOtp(phone: '98', code: '123456');
 
-    expect(out.result, isA<StaffOtpRequired>());
+    expect(out, isA<PhoneLoginStaff>());
+    expect((out as PhoneLoginStaff).result, isA<StaffOtpRequired>());
     expect(out.tenantSlug, 'alpha-fit');
     verify(() => storage.saveTenantSlug('alpha-fit')).called(1);
     verifyNever(
@@ -135,28 +147,23 @@ void main() {
     );
   });
 
-  test('member verify: slug saved BEFORE tokens, actorType member', () async {
+  test('member verify: actorType member, slug saved BEFORE member tokens',
+      () async {
     final adapter = _Adapter(
       _envelope({
-        'member': {
-          'id': 'm1',
-          'memberId': 'MEM-0007',
-          'name': 'Mia',
-          'status': 'ACTIVE',
-        },
-        'accessToken': 'a',
-        'accessTokenExpiresAt': 'x',
-        'refreshToken': 'r',
+        'member': memberJson,
+        ...tokens,
         'tenantSlug': 'beta-gym',
+        'actorType': 'member',
       }),
     );
-    final repo = MemberAuthRepository(dioWith(adapter), storage);
+    final repo = PublicTenantRepository(dioWith(adapter), storage);
 
-    final out = await repo.verifyPublicPhoneOtp(phone: '98', code: '123456');
+    final out = await repo.verifyPhoneOtp(phone: '98', code: '123456');
 
-    expect(adapter.last!.path, '/public/auth/phone-login/verify-otp');
-    expect(adapter.lastData, containsPair('actorType', 'member'));
+    expect(out, isA<PhoneLoginMember>());
     expect(out.tenantSlug, 'beta-gym');
+    expect((out as PhoneLoginMember).result.member.memberId, 'MEM-0007');
     verifyInOrder([
       () => storage.saveTenantSlug('beta-gym'),
       () => storage.saveSession(
@@ -164,7 +171,24 @@ void main() {
             accessToken: 'a',
             refreshToken: 'r',
           ),
+      () => storage.saveMemberProfile(any()),
     ]);
+  });
+
+  test('an older API without actorType still resolves a member by its payload',
+      () async {
+    final adapter = _Adapter(
+      _envelope({
+        'member': memberJson,
+        ...tokens,
+        'tenantSlug': 'beta-gym',
+      }),
+    );
+    final repo = PublicTenantRepository(dioWith(adapter), storage);
+
+    final out = await repo.verifyPhoneOtp(phone: '98', code: '123456');
+
+    expect(out, isA<PhoneLoginMember>());
   });
 
   test('public forgot-password / request-otp bodies', () async {
@@ -175,8 +199,8 @@ void main() {
     expect(adapter.last!.path, '/public/auth/forgot-password');
     expect(adapter.lastData, {'identifier': 'MEM-0007'});
 
-    await repo.requestPhoneOtp(actorType: ActorType.member, phone: '98');
+    await repo.requestPhoneOtp(phone: '98');
     expect(adapter.last!.path, '/public/auth/phone-login/request-otp');
-    expect(adapter.lastData, {'actorType': 'member', 'phone': '98'});
+    expect(adapter.lastData, {'phone': '98'});
   });
 }

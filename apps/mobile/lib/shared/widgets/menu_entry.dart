@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/utils/tenant_features.dart';
 import '../../models/tenant_branding.dart';
 import '../../models/user_profile.dart';
 import '../../core/theme/app_colors.dart';
@@ -16,9 +17,10 @@ import '../../core/theme/app_text_styles.dart';
 /// signed-in user can actually do or what the tenant's plan includes.
 ///
 /// Left `null`/empty when there's no clean web equivalent to mirror (e.g.
-/// Global Search, Notifications) — deliberately not gated on a guessed
-/// permission key, since hiding a real capability behind a wrong key is
-/// worse than leaving it always-visible.
+/// Global Search) — deliberately not gated on a guessed permission key, since
+/// hiding a real capability behind a wrong key is worse than leaving it
+/// always-visible. (The Notifications feed has no permission key but IS gated
+/// on the `notifications` module, like web.)
 class MenuEntry {
   const MenuEntry({
     required this.icon,
@@ -27,6 +29,7 @@ class MenuEntry {
     required this.route,
     this.permissions = const [],
     this.featureFlag,
+    this.featureFlagsAny = const [],
   });
 
   final IconData icon;
@@ -36,14 +39,21 @@ class MenuEntry {
   final List<String> permissions;
   final String? featureFlag;
 
+  /// "Any of" gate: shown while at least one of these modules is on (e.g. the
+  /// Finance tile = payments / income / expenses). Combines with [featureFlag]
+  /// (both must hold) when both are set.
+  final List<String> featureFlagsAny;
+
+  /// The module gate alone (no permissions) — what the member menu uses, since
+  /// the member plane has no permission keys.
+  bool visibleForTenant(TenantBranding tenant) =>
+      tenantAllows(tenant, flag: featureFlag, anyOf: featureFlagsAny);
+
   bool visibleFor(UserProfile user, TenantBranding tenant) {
     if (permissions.isNotEmpty && !user.hasAnyPermission(permissions)) {
       return false;
     }
-    if (featureFlag != null && !tenant.featureFlags.contains(featureFlag)) {
-      return false;
-    }
-    return true;
+    return visibleForTenant(tenant);
   }
 }
 

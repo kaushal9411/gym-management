@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -50,9 +51,10 @@ export function SidebarNav({ collapsed, onNavigate }: SidebarNavProps) {
             {group.items.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
               const Icon = item.icon;
+              const open = !collapsed && isActive && !!item.children?.length;
               return (
+                <React.Fragment key={item.key}>
                 <Link
-                  key={item.key}
                   href={item.href}
                   onClick={onNavigate}
                   title={collapsed ? item.label : undefined}
@@ -79,6 +81,31 @@ export function SidebarNav({ collapsed, onNavigate }: SidebarNavProps) {
                   />
                   {!collapsed && <span className="truncate">{item.label}</span>}
                 </Link>
+                {open ? (
+                  <ul className="ml-5 mb-1 mt-0.5 flex flex-col gap-0.5 border-l pl-2" aria-label={`${item.label} sections`}>
+                    {item.children!.map((child) => {
+                      const childActive = child.href === item.href ? pathname === child.href : pathname === child.href || pathname.startsWith(`${child.href}/`);
+                      const ChildIcon = child.icon;
+                      return (
+                        <li key={child.key}>
+                          <Link
+                            href={child.href}
+                            onClick={onNavigate}
+                            aria-current={childActive ? 'page' : undefined}
+                            className={cn(
+                              'flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors',
+                              childActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                            )}
+                          >
+                            <ChildIcon className="size-3.5 shrink-0" aria-hidden />
+                            <span className="truncate">{child.label}</span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
+                </React.Fragment>
               );
             })}
           </div>

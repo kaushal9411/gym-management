@@ -9,6 +9,7 @@ import {
   notifyNewMemberRegistration,
   welcomeSentCacheKey,
 } from '../../tenant-notifications/services/notification-trigger.service';
+import { moduleGate } from '../../tenants/utils/module-enabled.util';
 import type { JobHandler } from '../types';
 
 /**
@@ -34,10 +35,18 @@ export const sendScheduledNotifications: JobHandler = async () => {
   return { scanned: due.length, sent };
 };
 
-/** Migrated from the old `tenant-announcement-scheduler.jobs.ts` module-local BullMQ registration — same publish/expire logic, now triggered by this module's registry instead of its own `repeat`. */
+/**
+ * Migrated from the old `tenant-announcement-scheduler.jobs.ts` module-local BullMQ registration — same publish/expire logic, now triggered by this module's registry instead of its own `repeat`.
+ * Announcements of gyms with the `notifications` module switched off are skipped per tenant (neither published nor expired; they are picked up by a later sweep once the module is back on).
+ */
 export const sendScheduledAnnouncements: JobHandler = async () => {
+  const notificationsEnabled = moduleGate('notifications', 'send-scheduled-announcements');
   const due = await TenantAnnouncementRepository.findDuePublications(prisma, new Date());
+  let published = 0;
   for (const announcement of due) {
+    // eslint-disable-next-line no-await-in-loop -- memoised per tenant, one flag read per gym per run
+    if (!(await notificationsEnabled(announcement.tenantId))) continue;
+    published += 1;
     const now = new Date();
     // eslint-disable-next-line no-await-in-loop -- sequential across a small, infrequent (hourly) batch; no throughput requirement justifies parallelizing
     await prisma.tenantAnnouncement.update({ where: { id: announcement.id }, data: { status: 'PUBLISHED', publishAt: null, publishedAt: now } });
@@ -51,12 +60,16 @@ export const sendScheduledAnnouncements: JobHandler = async () => {
   }
 
   const expiring = await TenantAnnouncementRepository.findDueExpirations(prisma, new Date());
+  let expired = 0;
   for (const announcement of expiring) {
+    // eslint-disable-next-line no-await-in-loop -- memoised per tenant
+    if (!(await notificationsEnabled(announcement.tenantId))) continue;
     // eslint-disable-next-line no-await-in-loop -- see above
     await prisma.tenantAnnouncement.update({ where: { id: announcement.id }, data: { status: 'EXPIRED' } });
+    expired += 1;
   }
 
-  return { published: due.length, expired: expiring.length };
+  return { published, expired, skipped: due.length - published + (expiring.length - expired) };
 };
 
 function stripHtml(html: string): string {

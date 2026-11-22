@@ -47,6 +47,16 @@ class ApiException implements Exception {
   bool get isMaintenance =>
       statusCode == 503 && code == ApiException.maintenanceCode;
 
+  /// True when the API refused because a module is switched off for the gym
+  /// (HTTP 403 "This module is currently unavailable."): the cue to re-read
+  /// the gym's feature flags. Not an auth failure.
+  bool get isModuleUnavailable =>
+      statusCode == 403 && message == moduleUnavailableMessage;
+
+  /// The API's message for a switched-off module.
+  static const moduleUnavailableMessage =
+      'This module is currently unavailable.';
+
   /// True for connectivity failures (no response reached the server at all).
   factory ApiException.network() => const ApiException(
         message:

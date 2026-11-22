@@ -7,19 +7,24 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { type Accent, PanelCard, ProgressBar, accentVar, formatMoney, tint } from '@/features/members/components/detail/detail-ui';
-import { isPaginated, useBranchComparison, useKpis, usePaymentCollection, useReportData } from '@/features/reports/hooks/use-reports';
+import { isPaginated, useBranchComparison, usePaymentCollection, useReportData } from '@/features/reports/hooks/use-reports';
 import { useTenant } from '@/features/tenant/tenant-provider';
 import { useCurrencySymbol } from '@/lib/currency';
+import { useDashboardModules, useDashboardPanels } from '../hooks/use-dashboard-modules';
 import { useDashboardRange } from '../hooks/use-dashboard-range';
 
 const BRANCH_TONES: Accent[] = ['primary', 'violet', 'aqua', 'warning', 'success'];
 
 export function BranchPanel() {
   const symbol = useCurrencySymbol();
-  const { hasPermission } = usePermissions();
+  const panels = useDashboardPanels();
+  const { has } = useDashboardModules();
   const { currentBranchId } = useCurrentBranch();
-  const comparison = useBranchComparison(currentBranchId ?? undefined);
-  if (!hasPermission('analytics:view')) return null;
+  const comparison = useBranchComparison(currentBranchId ?? undefined, undefined, undefined, panels.branch);
+  if (!panels.branch) return null;
+  // Revenue is summed from income rows and visits from attendance, so each is hidden with its module (no "0" for an off module).
+  const showRevenue = has('income');
+  const showVisits = has('attendance');
 
   const rows = comparison.data ?? [];
   const maxRevenue = Math.max(...rows.map((r) => r.revenue), 1);
@@ -37,11 +42,15 @@ export function BranchPanel() {
               <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
                 <b className="font-semibold">{r.branch}</b>
                 <span className="text-xs tabular-nums text-muted-foreground">
-                  {r.members} members · {r.attendance} visits
+                  {r.members} members{showVisits ? ` · ${r.attendance} visits` : ''}
                 </span>
               </div>
-              <ProgressBar percent={(r.revenue / maxRevenue) * 100} accent={BRANCH_TONES[i % BRANCH_TONES.length]!} />
-              <p className="text-right text-xs tabular-nums text-muted-foreground">Revenue {formatMoney(symbol, r.revenue)}</p>
+              {showRevenue ? (
+                <>
+                  <ProgressBar percent={(r.revenue / maxRevenue) * 100} accent={BRANCH_TONES[i % BRANCH_TONES.length]!} />
+                  <p className="text-right text-xs tabular-nums text-muted-foreground">Revenue {formatMoney(symbol, r.revenue)}</p>
+                </>
+              ) : null}
             </div>
           ))}
         </div>
@@ -57,27 +66,31 @@ interface TrainerRow {
 }
 
 export function StaffPanel() {
+  const panels = useDashboardPanels();
   const { hasPermission } = usePermissions();
+  const { has, kpis, kpisEnabled } = useDashboardModules();
   const { currentBranchId } = useCurrentBranch();
-  const kpis = useKpis(currentBranchId ?? undefined).data;
-  const trainers = useReportData<TrainerRow>('trainer-performance', { limit: 4, branchId: currentBranchId ?? undefined });
-  if (!hasPermission('reports:view')) return null;
+  const trainersEnabled = has('reports') && hasPermission('reports:view'); // /reports/<type>: `reports` module + reports:view
+  const trainers = useReportData<TrainerRow>('trainer-performance', { limit: 4, branchId: currentBranchId ?? undefined }, trainersEnabled);
+  if (!panels.staff) return null;
 
   const rows = isPaginated(trainers.data) ? trainers.data.items : ((trainers.data as TrainerRow[] | undefined) ?? []);
 
   return (
     <PanelCard icon={BadgeCheck} accent="violet" title="Staff" delay={0.74}>
-      <div className="grid grid-cols-2 gap-2.5">
-        {[
-          { v: kpis?.totalStaff ?? 0, l: 'Total staff', c: 'violet' as const },
-          { v: kpis?.activeTrainers ?? 0, l: 'Active trainers', c: 'aqua' as const },
-        ].map((t) => (
-          <div key={t.l} className="rounded-xl border p-3" style={{ backgroundColor: tint(t.c, 9), borderColor: tint(t.c, 20) }}>
-            <b className="block text-2xl font-extrabold tabular-nums">{t.v}</b>
-            <span className="text-xs text-muted-foreground">{t.l}</span>
-          </div>
-        ))}
-      </div>
+      {kpisEnabled ? (
+        <div className="grid grid-cols-2 gap-2.5">
+          {[
+            { v: kpis?.totalStaff ?? 0, l: 'Total staff', c: 'violet' as const },
+            { v: kpis?.activeTrainers ?? 0, l: 'Active trainers', c: 'aqua' as const },
+          ].map((t) => (
+            <div key={t.l} className="rounded-xl border p-3" style={{ backgroundColor: tint(t.c, 9), borderColor: tint(t.c, 20) }}>
+              <b className="block text-2xl font-extrabold tabular-nums">{t.v}</b>
+              <span className="text-xs text-muted-foreground">{t.l}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
       {rows.length > 0 ? (
         <div>
           <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Trainer load</p>
@@ -119,12 +132,15 @@ function Ring({ percent, label, accent }: { percent: number; label: string; acce
 }
 
 export function HealthPanel() {
+  const panels = useDashboardPanels();
   const { hasPermission } = usePermissions();
+  const { has, kpis, kpisEnabled } = useDashboardModules();
   const { currentBranchId } = useCurrentBranch();
   const { dateFrom, dateTo } = useDashboardRange();
-  const kpis = useKpis(currentBranchId ?? undefined).data;
-  const collection = usePaymentCollection(dateFrom, dateTo, currentBranchId ?? undefined);
-  if (!hasPermission('reports:view')) return null;
+  // Collection ring = /analytics/payment-collection (`reports` + `payments`); membership ring = dashboard KPIs (`dashboard`).
+  const showCollection = has('reports') && hasPermission('analytics:view') && has('payments');
+  const collection = usePaymentCollection(dateFrom, dateTo, currentBranchId ?? undefined, showCollection);
+  if (!panels.health) return null;
 
   // `usePaymentCollection` reuses the revenue shape: `income` = collected, `expenses` = invoiced.
   const collected = (collection.data ?? []).reduce((s, p) => s + p.income, 0);
@@ -133,10 +149,10 @@ export function HealthPanel() {
   const activeShare = kpis && kpis.totalMembers > 0 ? (kpis.activeMembers / kpis.totalMembers) * 100 : 0;
 
   return (
-    <PanelCard icon={Star} accent="success" title="Collection & membership health" delay={0.8}>
-      <div className="grid grid-cols-2 gap-3">
-        <Ring percent={rate} label="Invoiced amount collected" accent="success" />
-        <Ring percent={activeShare} label="Members active" accent="primary" />
+    <PanelCard icon={Star} accent="success" title={showCollection ? 'Collection & membership health' : 'Membership health'} delay={0.8}>
+      <div className={`grid gap-3 ${showCollection && kpisEnabled ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        {showCollection ? <Ring percent={rate} label="Invoiced amount collected" accent="success" /> : null}
+        {kpisEnabled ? <Ring percent={activeShare} label="Members active" accent="primary" /> : null}
       </div>
     </PanelCard>
   );
@@ -144,8 +160,7 @@ export function HealthPanel() {
 
 export function PlanPanel() {
   const tenant = useTenant();
-  const { currentBranchId } = useCurrentBranch();
-  const kpis = useKpis(currentBranchId ?? undefined).data;
+  const { kpis, kpisEnabled } = useDashboardModules();
   const sub = tenant.subscription;
   const trialEnds = sub?.trialEndsAt ? new Date(sub.trialEndsAt) : null;
   const daysLeft = trialEnds ? Math.max(0, Math.ceil((trialEnds.getTime() - Date.now()) / 86_400_000)) : null;
@@ -163,8 +178,12 @@ export function PlanPanel() {
             <dd className="text-right font-semibold tabular-nums">{trialEnds.toLocaleDateString()}</dd>
           </>
         ) : null}
-        <dt className="text-muted-foreground">Active branches</dt>
-        <dd className="text-right font-semibold tabular-nums">{kpis?.activeBranches ?? '—'}</dd>
+        {kpisEnabled ? (
+          <>
+            <dt className="text-muted-foreground">Active branches</dt>
+            <dd className="text-right font-semibold tabular-nums">{kpis?.activeBranches ?? '—'}</dd>
+          </>
+        ) : null}
         <dt className="text-muted-foreground">Currency</dt>
         <dd className="text-right font-semibold">{tenant.currency}</dd>
       </dl>

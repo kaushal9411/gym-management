@@ -4,6 +4,7 @@ import { cache } from '../../../infrastructure/cache/redis';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { formatMoney } from '../../../infrastructure/mail/templates/base-layout';
 import { paymentDueReminderEmail, paymentOverdueReminderEmail } from '../../../infrastructure/mail/templates/member-templates';
+import { moduleGate } from '../../tenants/utils/module-enabled.util';
 import { AUTOMATION_RULES } from '../constants/automation-rules';
 import {
   AFTER_LOOKBACK_DAYS,
@@ -26,6 +27,12 @@ import { EngineCache } from './automation-engine.service';
  * these scan with the raw `prisma` client (a platform-level job; dev superuser bypasses RLS - see BACKEND-GUIDE) and then
  * act per tenant through `AutomationEngine`, which reads the tenant's rule (enabled / timings / channels / text) and
  * enforces the dedupe ledger, opt-out rules, the channel gate and the delivery log.
+ *
+ * Feature flags: every sweep first asks `moduleGate(<flag>)` per tenant and skips a gym whose module is switched off
+ * (memoised per run; fails open - see `tenants/utils/module-enabled.util.ts`). Which flag governs which rule:
+ *   MEMBERSHIP_EXPIRING / MEMBERSHIP_EXPIRED / BIRTHDAY -> `notifications` (they are member notifications, not membership features)
+ *   INVOICE_DUE_SOON / PAYMENT_OVERDUE / PAYMENT_FAILED -> `payments` (tenant-facing member invoice reminders; platform subscription billing is NOT a tenant flag)
+ *   CLASS_REMINDER -> `live_classes`;  WE_MISS_YOU -> `attendance`
  */
 
 export interface SweepResult extends Record<string, unknown> {
@@ -65,12 +72,15 @@ const dayString = (d: Date): string => d.toISOString().slice(0, 10);
 export async function sweepMembershipExpiring(): Promise<SweepResult> {
   const result = newResult();
   const engines = new EngineCache();
+  const enabled = moduleGate('notifications', 'membership-renewal-reminder');
   const today = utcDayStart(new Date());
   const memberships = await prisma.membership.findMany({
     where: { status: 'ACTIVE', endDate: { gte: today, lte: addDays(today, await globalMaxOffset('MEMBERSHIP_EXPIRING')) } },
     select: { id: true, tenantId: true, memberId: true, endDate: true, plan: { select: { name: true } } },
   });
   for (const m of memberships) {
+    // eslint-disable-next-line no-await-in-loop -- memoised per tenant, one flag read per gym per run
+    if (!(await enabled(m.tenantId))) continue;
     result.scanned += 1;
     const engine = engines.for(m.tenantId);
     // eslint-disable-next-line no-await-in-loop -- sequential across a daily batch; the per-tenant rule is cached after the first read
@@ -105,6 +115,7 @@ export async function sweepMembershipExpiring(): Promise<SweepResult> {
 export async function sweepMembershipExpired(): Promise<SweepResult> {
   const result = newResult();
   const engines = new EngineCache();
+  const enabled = moduleGate('notifications', 'membership-expired-notification');
   const today = utcDayStart(new Date());
   const window = (await globalMaxOffset('MEMBERSHIP_EXPIRED')) + AFTER_LOOKBACK_DAYS;
   const memberships = await prisma.membership.findMany({
@@ -112,6 +123,8 @@ export async function sweepMembershipExpired(): Promise<SweepResult> {
     select: { id: true, tenantId: true, memberId: true, endDate: true, plan: { select: { name: true } } },
   });
   for (const m of memberships) {
+    // eslint-disable-next-line no-await-in-loop -- memoised per tenant, one flag read per gym per run
+    if (!(await enabled(m.tenantId))) continue;
     result.scanned += 1;
     const engine = engines.for(m.tenantId);
     // eslint-disable-next-line no-await-in-loop -- sequential daily batch
@@ -144,6 +157,7 @@ export async function sweepMembershipExpired(): Promise<SweepResult> {
 export async function sweepInvoiceDueSoon(): Promise<SweepResult> {
   const result = newResult();
   const engines = new EngineCache();
+  const enabled = moduleGate('payments', 'payment-reminder');
   const today = utcDayStart(new Date());
   const invoices = await prisma.memberInvoice.findMany({
     where: { status: { in: ['UNPAID', 'PARTIALLY_PAID'] }, dueDate: { gte: today, lte: addDays(today, await globalMaxOffset('INVOICE_DUE_SOON')) } },
@@ -160,6 +174,8 @@ export async function sweepInvoiceDueSoon(): Promise<SweepResult> {
     },
   });
   for (const inv of invoices) {
+    // eslint-disable-next-line no-await-in-loop -- memoised per tenant, one flag read per gym per run
+    if (!(await enabled(inv.tenantId))) continue;
     result.scanned += 1;
     const engine = engines.for(inv.tenantId);
     // eslint-disable-next-line no-await-in-loop -- sequential daily batch
@@ -194,6 +210,7 @@ export async function sweepInvoiceDueSoon(): Promise<SweepResult> {
 export async function sweepPaymentOverdue(): Promise<SweepResult> {
   const result = newResult();
   const engines = new EngineCache();
+  const enabled = moduleGate('payments', 'outstanding-payment-reminder');
   const today = utcDayStart(new Date());
   const window = (await globalMaxOffset('PAYMENT_OVERDUE')) + AFTER_LOOKBACK_DAYS;
   const invoices = await prisma.memberInvoice.findMany({
@@ -211,6 +228,8 @@ export async function sweepPaymentOverdue(): Promise<SweepResult> {
     },
   });
   for (const inv of invoices) {
+    // eslint-disable-next-line no-await-in-loop -- memoised per tenant, one flag read per gym per run
+    if (!(await enabled(inv.tenantId))) continue;
     result.scanned += 1;
     const engine = engines.for(inv.tenantId);
     // eslint-disable-next-line no-await-in-loop -- sequential daily batch
@@ -241,12 +260,15 @@ const FAILED_PAYMENT_WINDOW_DAYS = 14;
 export async function sweepPaymentFailed(): Promise<SweepResult> {
   const result = newResult();
   const engines = new EngineCache();
+  const enabled = moduleGate('payments', 'failed-payment-retry');
   const today = utcDayStart(new Date());
   const payments = await prisma.memberPayment.findMany({
     where: { status: 'FAILED', createdAt: { gte: addDays(today, -FAILED_PAYMENT_WINDOW_DAYS) } },
     select: { id: true, tenantId: true, memberId: true, finalAmount: true, createdAt: true },
   });
   for (const p of payments) {
+    // eslint-disable-next-line no-await-in-loop -- memoised per tenant, one flag read per gym per run
+    if (!(await enabled(p.tenantId))) continue;
     result.scanned += 1;
     const engine = engines.for(p.tenantId);
     // eslint-disable-next-line no-await-in-loop -- sequential daily batch
@@ -273,6 +295,7 @@ export async function sweepPaymentFailed(): Promise<SweepResult> {
 export async function sweepBirthdays(): Promise<SweepResult> {
   const result = newResult();
   const engines = new EngineCache();
+  const enabled = moduleGate('notifications', 'birthday-wishes');
   const today = utcDayStart(new Date());
   const members = await prisma.member.findMany({
     where: { dateOfBirth: { not: null }, deletedAt: null, status: { not: 'INACTIVE' } },
@@ -280,6 +303,8 @@ export async function sweepBirthdays(): Promise<SweepResult> {
   });
   for (const m of members) {
     if (!m.dateOfBirth || !matchesBirthday(m.dateOfBirth, today)) continue;
+    // eslint-disable-next-line no-await-in-loop -- memoised per tenant, one flag read per gym per run
+    if (!(await enabled(m.tenantId))) continue;
     result.scanned += 1;
     const engine = engines.for(m.tenantId);
     // eslint-disable-next-line no-await-in-loop -- sequential daily batch
@@ -316,6 +341,7 @@ export function sessionStart(sessionDate: Date, startTime: string, timezone: str
 export async function sweepClassReminders(): Promise<SweepResult> {
   const result = newResult();
   const engines = new EngineCache();
+  const enabled = moduleGate('live_classes', 'class-reminders');
   const now = new Date();
   const today = utcDayStart(now);
   const maxHours = await globalMaxOffset('CLASS_REMINDER');
@@ -336,6 +362,8 @@ export async function sweepClassReminders(): Promise<SweepResult> {
     },
   });
   for (const s of sessions) {
+    // eslint-disable-next-line no-await-in-loop -- memoised per tenant, one flag read per gym per run
+    if (!(await enabled(s.tenantId))) continue;
     const hoursUntil = (sessionStart(s.sessionDate, s.startTime, s.branch.timezone).getTime() - now.getTime()) / HOUR_MS;
     const engine = engines.for(s.tenantId);
     // eslint-disable-next-line no-await-in-loop -- sequential 15-minute batch
@@ -369,7 +397,10 @@ export async function sweepWeMissYou(): Promise<SweepResult> {
   // Off by default: only gyms that saved the rule as enabled are scanned.
   const rules = await prisma.notificationAutomationRule.findMany({ where: { key: 'WE_MISS_YOU', enabled: true }, select: { tenantId: true } });
   const engines = new EngineCache();
+  const enabled = moduleGate('attendance', 'we-miss-you');
   for (const { tenantId } of rules) {
+    // eslint-disable-next-line no-await-in-loop -- memoised per tenant
+    if (!(await enabled(tenantId))) continue;
     const engine = engines.for(tenantId);
     // eslint-disable-next-line no-await-in-loop -- sequential per opted-in gym
     const rule = await engine.rule('WE_MISS_YOU');

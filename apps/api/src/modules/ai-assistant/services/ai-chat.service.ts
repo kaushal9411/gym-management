@@ -5,7 +5,8 @@ import { logger } from '../../../core/logging/logger';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import type { IamActor } from '../../authentication/utils/actor.util';
 import { permissionEngine } from '../../permissions/services/permission-engine.service';
-import { extractActionProposal, type AiActionProposal } from '../constants/action-types';
+import { getEnabledModules } from '../../tenants/utils/module-enabled.util';
+import { availableActionTypes, extractActionProposal, type AiActionProposal } from '../constants/action-types';
 import { buildSystemPrompt } from '../constants/system-prompt';
 import type { AiErrorCode } from '../providers/error-classification';
 import { getAiProvider, getEffectiveAiConfig } from '../providers/factory';
@@ -120,9 +121,11 @@ export class AiChatService {
     const history = await this.messages.listForConversation(conversationId);
     const permissions = await permissionEngine.getEffectivePermissions(this.tenantId, actor.userId);
     const contextBlock = await buildTenantContext(this.tenantId, tenantName, permissions);
+    // Only offer the actions whose module the gym has enabled (a disabled module's action is never proposed; confirm re-checks).
+    const availableActions = availableActionTypes((await getEnabledModules(this.tenantId)).has);
 
     const chatMessages: AiChatMessage[] = [
-      { role: 'system', content: buildSystemPrompt(tenantName, contextBlock) },
+      { role: 'system', content: buildSystemPrompt(tenantName, contextBlock, availableActions) },
       ...history.slice(-MAX_HISTORY_MESSAGES).map((m): AiChatMessage => ({ role: m.role.toLowerCase() as 'user' | 'assistant', content: m.content })),
     ];
 

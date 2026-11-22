@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:gym_saas_mobile/features/auth/presentation/login_screen.dart';
-import 'package:gym_saas_mobile/shared/widgets/role_toggle.dart';
 
 Future<void> _pump(WidgetTester tester) async {
   tester.view.physicalSize = const Size(1080, 2200);
@@ -28,7 +27,8 @@ void main() {
     testWidgets('has a single identifier field and no Staff/Member toggle',
         (tester) async {
       await _pump(tester);
-      expect(find.byType(RoleToggle), findsNothing);
+      expect(find.text('Staff'), findsNothing);
+      expect(find.text('Member'), findsNothing);
       expect(find.text('EMAIL OR MEMBER ID'), findsOneWidget);
       expect(find.text('PASSWORD'), findsOneWidget);
       expect(find.byType(TextField), findsNWidgets(2));

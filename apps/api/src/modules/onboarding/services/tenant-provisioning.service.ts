@@ -15,6 +15,7 @@ import { SessionRepository } from '../../authentication/repositories/session.rep
 import { UserRepository } from '../../authentication/repositories/user.repository';
 import { SystemRole } from '../../authentication/types/auth.types';
 import type { DeviceInfo } from '../../authentication/types/auth.types';
+import { HrConfigService } from '../../hr/services/hr-config.service';
 import { InvoiceService } from '../../invoice/services/invoice.service';
 import { tenantRepository } from '../../tenants/repository/tenant.repository';
 import { tenantService } from '../../tenants/service/tenant.service';
@@ -152,6 +153,9 @@ export class TenantProvisioningService {
           data: { tenantId, metric, value: metric === 'branches' ? 1 : 0 },
         });
       }
+
+      // HR Management (Prompt 182): policy row + default leave types + default shift for the new gym.
+      await new HrConfigService(tenantId).ensureDefaults();
 
       const currentPeriodEnd = trialEndsAt ?? addBillingPeriod(now, session.billingCycle);
       const subscription = await db.subscription.create({

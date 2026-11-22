@@ -69,10 +69,17 @@ class _MemberClassesScreenState extends State<MemberClassesScreen> {
     final weekStart = _weekStart;
     try {
       final repo = getIt<MemberPortalRepository>();
-      final (sessions, bookings) = await (
-        repo.classes(dateFrom: weekStart, dateTo: addDays(weekStart, 6)),
-        repo.myBookings(),
-      ).wait;
+      // Not a record `.wait`: when both calls fail that throws a
+      // ParallelWaitError, which hid the server's own message (e.g. "This
+      // module is currently unavailable."). Await them one by one instead;
+      // `ignore()` keeps the second one's failure from going unhandled when
+      // the first already threw.
+      final weekEnd = addDays(weekStart, 6);
+      final sessionsF = repo.classes(dateFrom: weekStart, dateTo: weekEnd)
+        ..ignore();
+      final bookingsF = repo.myBookings()..ignore();
+      final sessions = await sessionsF;
+      final bookings = await bookingsF;
       if (!mounted || weekStart != _weekStart) return;
       setState(() {
         _sessions = sessions;

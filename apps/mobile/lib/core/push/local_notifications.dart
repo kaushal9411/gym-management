@@ -2,6 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../routing/hr_notification_routes.dart';
 import '../storage/secure_storage.dart';
 
 const _defaultAppName = 'FitCloud';
@@ -105,5 +106,8 @@ Future<void> showPushNotification(RemoteMessage message) async {
         playSound: true,
       ),
     ),
+    // HR pushes carry `hr:<hrType>` so a tap can deep-link (see
+    // hr_notification_routes.dart); anything else opens the notification list.
+    payload: pushTapPayload(message.data),
   );
 }

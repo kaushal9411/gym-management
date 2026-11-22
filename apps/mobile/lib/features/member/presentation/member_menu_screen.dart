@@ -9,6 +9,7 @@ import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/tenant_features.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/menu_entry.dart';
 import '../../../shared/widgets/slide_drawer_scaffold.dart';
@@ -19,24 +20,28 @@ const _entries = [
     title: 'My Attendance',
     subtitle: 'Visit history',
     route: AppRoutes.memberAttendance,
+    featureFlag: 'attendance',
   ),
   MenuEntry(
     icon: Icons.notifications_none_rounded,
     title: 'Notifications',
     subtitle: 'Membership, payments, and gym updates',
     route: AppRoutes.memberNotifications,
+    featureFlag: 'notifications',
   ),
   MenuEntry(
     icon: Icons.receipt_long_outlined,
     title: 'Invoices',
     subtitle: 'Payment history',
     route: AppRoutes.memberInvoices,
+    featureFlag: 'payments',
   ),
   MenuEntry(
     icon: Icons.payments_outlined,
     title: 'Payments',
     subtitle: 'Receipts and refunds',
     route: AppRoutes.memberPayments,
+    featureFlag: 'payments',
   ),
   MenuEntry(
     icon: Icons.straighten_outlined,
@@ -82,13 +87,20 @@ class MemberMenuScreen extends StatelessWidget {
     final photoUrl = session is SessionAuthenticatedMember
         ? session.member.profilePhotoUrl
         : null;
+    // Entries of a module the gym has switched off are not listed (the member
+    // plane has no permission keys, so the module gate is the only filter).
+    final tenant = tenantOfSession(session);
+    final entries = [
+      for (final e in _entries)
+        if (tenant == null || e.visibleForTenant(tenant)) e,
+    ];
 
     return AppDrawer(
       role: AppRole.member,
       avatarUrl: photoUrl,
       name: name,
       subtitle: 'Member',
-      sections: const {'': _entries},
+      sections: {'': entries},
       onHeaderTap: () {
         SlideDrawerController.of(context)?.close();
         context.push(AppRoutes.memberProfile);

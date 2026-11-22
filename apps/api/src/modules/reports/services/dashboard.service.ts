@@ -4,6 +4,17 @@ import type { DashboardSummaryDto, KpiMetricsDto, RecentActivityDto } from '../d
 import { resolveBranchScope } from '../utils/branch-scope.util';
 import { addDaysStr, todayStr } from '../utils/date-range.util';
 
+/**
+ * Dashboard figures that come from ONE gated module each. `enabledModules` (the tenant's resolved `featureFlags`) decides
+ * which are computed; a disabled one is skipped (no query) and reported as zero / dropped, and its key is listed in
+ * `disabledModules`. Zero (not null) because web types and the Dart models hard-cast these fields.
+ */
+const KPI_MODULES = ['attendance', 'income', 'expenses', 'payments'] as const;
+
+export function disabledKpiModules(enabledModules?: readonly string[]): string[] {
+  return KPI_MODULES.filter((k) => enabledModules && !enabledModules.includes(k));
+}
+
 export class DashboardService {
   private readonly db: TenantScopedPrisma;
 
@@ -11,8 +22,10 @@ export class DashboardService {
     this.db = getTenantScopedClient(tenantId);
   }
 
-  async getKpis(userId: string, requestedBranchId?: string): Promise<KpiMetricsDto> {
+  async getKpis(userId: string, requestedBranchId?: string, enabledModules?: readonly string[]): Promise<KpiMetricsDto> {
     const branchId = await resolveBranchScope(this.tenantId, userId, requestedBranchId);
+    const on = (key: string): boolean => !enabledModules || enabledModules.includes(key);
+    const NO_SUM = { _sum: { amount: null } };
 
     const todayIso = todayStr();
     const today = new Date(`${todayIso}T00:00:00.000Z`);
@@ -41,13 +54,15 @@ export class DashboardService {
       this.db.membership.count({
         where: { tenantId: this.tenantId, status: 'ACTIVE', endDate: { gte: today, lte: expiringWindowEnd }, member: { branchId } },
       }),
-      this.db.attendance.count({ where: { tenantId: this.tenantId, deletedAt: null, branchId, attendanceDate: today } }),
-      this.db.income.aggregate({ where: { tenantId: this.tenantId, deletedAt: null, branchId, incomeDate: { gte: monthStart, lte: todayEnd } }, _sum: { amount: true } }),
-      this.db.expense.aggregate({ where: { tenantId: this.tenantId, deletedAt: null, branchId, expenseDate: { gte: monthStart, lte: todayEnd } }, _sum: { amount: true } }),
-      this.db.memberInvoice.aggregate({
-        where: { tenantId: this.tenantId, branchId, status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] } },
-        _sum: { totalAmount: true },
-      }),
+      on('attendance') ? this.db.attendance.count({ where: { tenantId: this.tenantId, deletedAt: null, branchId, attendanceDate: today } }) : Promise.resolve(0),
+      on('income') ? this.db.income.aggregate({ where: { tenantId: this.tenantId, deletedAt: null, branchId, incomeDate: { gte: monthStart, lte: todayEnd } }, _sum: { amount: true } }) : Promise.resolve(NO_SUM),
+      on('expenses') ? this.db.expense.aggregate({ where: { tenantId: this.tenantId, deletedAt: null, branchId, expenseDate: { gte: monthStart, lte: todayEnd } }, _sum: { amount: true } }) : Promise.resolve(NO_SUM),
+      on('payments')
+        ? this.db.memberInvoice.aggregate({
+            where: { tenantId: this.tenantId, branchId, status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] } },
+            _sum: { totalAmount: true },
+          })
+        : Promise.resolve({ _sum: { totalAmount: null } }),
       this.db.user.count({ where: { tenantId: this.tenantId, deletedAt: null, userRoles: { some: { role: { name: { in: [...STAFF_ROLE_NAMES] } } } } } }),
       this.db.user.count({
         where: { tenantId: this.tenantId, deletedAt: null, status: 'ACTIVE', userRoles: { some: { role: { name: 'TRAINER' } } } },
@@ -68,25 +83,37 @@ export class DashboardService {
       totalStaff,
       activeTrainers,
       activeBranches,
+      disabledModules: disabledKpiModules(enabledModules),
     };
   }
 
-  async getRecentActivities(userId: string, requestedBranchId?: string, limit = 10): Promise<RecentActivityDto[]> {
+  /** PAYMENT items need `payments`, CHECK_IN items need `attendance`; a disabled module's items are dropped (and not queried). */
+  async getRecentActivities(
+    userId: string,
+    requestedBranchId?: string,
+    limit = 10,
+    enabledModules?: readonly string[],
+  ): Promise<RecentActivityDto[]> {
     const branchId = await resolveBranchScope(this.tenantId, userId, requestedBranchId);
+    const on = (key: string): boolean => !enabledModules || enabledModules.includes(key);
 
     const [payments, checkIns, newMembers] = await Promise.all([
-      this.db.memberPayment.findMany({
-        where: { tenantId: this.tenantId, branchId },
-        include: { member: { select: { firstName: true, lastName: true } } },
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-      }),
-      this.db.attendance.findMany({
-        where: { tenantId: this.tenantId, deletedAt: null, branchId },
-        include: { member: { select: { firstName: true, lastName: true } } },
-        orderBy: { checkInTime: 'desc' },
-        take: limit,
-      }),
+      on('payments')
+        ? this.db.memberPayment.findMany({
+            where: { tenantId: this.tenantId, branchId },
+            include: { member: { select: { firstName: true, lastName: true } } },
+            orderBy: { createdAt: 'desc' },
+            take: limit,
+          })
+        : Promise.resolve([]),
+      on('attendance')
+        ? this.db.attendance.findMany({
+            where: { tenantId: this.tenantId, deletedAt: null, branchId },
+            include: { member: { select: { firstName: true, lastName: true } } },
+            orderBy: { checkInTime: 'desc' },
+            take: limit,
+          })
+        : Promise.resolve([]),
       this.db.member.findMany({
         where: { tenantId: this.tenantId, deletedAt: null, branchId },
         orderBy: { createdAt: 'desc' },
@@ -124,8 +151,11 @@ export class DashboardService {
     return activities.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, limit);
   }
 
-  async getSummary(userId: string, branchId?: string): Promise<DashboardSummaryDto> {
-    const [kpis, recentActivities] = await Promise.all([this.getKpis(userId, branchId), this.getRecentActivities(userId, branchId, 10)]);
-    return { kpis, recentActivities };
+  async getSummary(userId: string, branchId?: string, enabledModules?: readonly string[]): Promise<DashboardSummaryDto> {
+    const [kpis, recentActivities] = await Promise.all([
+      this.getKpis(userId, branchId, enabledModules),
+      this.getRecentActivities(userId, branchId, 10, enabledModules),
+    ]);
+    return { kpis, recentActivities, disabledModules: kpis.disabledModules };
   }
 }

@@ -11,6 +11,8 @@ export interface KpiMetrics {
   totalStaff: number;
   activeTrainers: number;
   activeBranches: number;
+  /** Platform module keys the API zeroed/omitted in this payload (additive; the tenant's `featureFlags` stay the source of truth). */
+  disabledModules?: string[];
 }
 
 export interface RecentActivity {

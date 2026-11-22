@@ -58,7 +58,7 @@ export function AppProviders({ tenant, children }: { tenant: Tenant; children: R
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             <ThemeStoreSync />
             <TenantProvider tenant={tenant}>
-              <TenantStoreSync tenant={tenant} />
+              <TenantStoreSync />
               <AuthProvider>
                 <RealtimeProvider>
                   <TooltipProvider delayDuration={200}>

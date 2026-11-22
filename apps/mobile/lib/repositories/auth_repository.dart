@@ -72,34 +72,6 @@ class AuthRepository {
     }
   }
 
-  // ── Phone-number login (OTP, delivered by email for now) ───────────────
-
-  /// `POST /public/auth/phone-login/verify-otp` (`actorType: staff`) — no
-  /// gym is known yet: the server finds it from the phone number and returns
-  /// its `tenantSlug` alongside the usual [StaffLoginResult]. The slug is
-  /// saved BEFORE the tokens so the Dio interceptor already sends
-  /// `X-Tenant-Slug` for everything after. The code is requested (and
-  /// re-requested) via [PublicTenantRepository.requestPhoneOtp].
-  Future<({StaffLoginResult result, String tenantSlug})> verifyPublicPhoneOtp({
-    required String phone,
-    required String code,
-  }) async {
-    try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/public/auth/phone-login/verify-otp',
-        data: {'actorType': 'staff', 'phone': phone, 'code': code},
-      );
-      final data = response.data!['data'] as Map<String, dynamic>;
-      final tenantSlug = data['tenantSlug'] as String;
-      final result = StaffLoginResult.fromJson(data);
-      await _storage.saveTenantSlug(tenantSlug);
-      if (result is StaffLoginSuccess) await _persist(result);
-      return (result: result, tenantSlug: tenantSlug);
-    } on DioException catch (e) {
-      throw _mapError(e);
-    }
-  }
-
   Future<MfaSetupChallenge> mfaSetupBegin({required String setupToken}) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(

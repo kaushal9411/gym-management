@@ -8,8 +8,15 @@ import { permissionEngine } from '../../permissions/services/permission-engine.s
 import type { ReportType } from '../../reports/dto/reports.dto';
 import { ReportExportService } from '../../reports/services/report-export.service';
 import { tenantNotificationService } from '../../tenant-notifications/services/tenant-notification.service';
+import { isModuleEnabled } from '../../tenants/utils/module-enabled.util';
 import { WorkoutPlanService } from '../../workouts/services/workout-plan.service';
-import { ACTION_PERMISSIONS, type AiActionProposal } from '../constants/action-types';
+import { ACTION_MODULES, ACTION_PERMISSIONS, MODULE_LABELS, type AiActionProposal } from '../constants/action-types';
+
+export interface AiActionOutcome {
+  /** `refused` = the action's module is switched off for this gym; nothing ran. */
+  status: 'executed' | 'refused';
+  message: string;
+}
 
 /**
  * Executes a previously-proposed AI action — the ONLY place any of these 6
@@ -19,11 +26,30 @@ import { ACTION_PERMISSIONS, type AiActionProposal } from '../constants/action-t
  * Every action re-checks the confirming user's permission for the matching
  * REAL domain permission (not a generic "AI actions" one) — the same
  * permission the equivalent manual UI action already requires.
+ *
+ * Feature flags: an action whose module the tenant has switched off (`ACTION_MODULES`) is REFUSED - nothing runs and the
+ * outcome is a clear "<Feature> is disabled for this gym." message (a tool-result, not a 500). The check mirrors
+ * `requireModuleEnabled` on the REST routes the same operations go through, and fails open if the flags cannot be read.
  */
-export async function executeAiAction(tenantId: string, actor: IamActor, proposal: AiActionProposal): Promise<string> {
+export async function executeAiActionDetailed(tenantId: string, actor: IamActor, proposal: AiActionProposal): Promise<AiActionOutcome> {
   const requiredPermission = ACTION_PERMISSIONS[proposal.type];
   const allowed = await permissionEngine.hasPermission(tenantId, actor.userId, requiredPermission);
   if (!allowed) throw new ForbiddenError(`You don't have permission to ${proposal.type.replace(/_/g, ' ')} (missing "${requiredPermission}").`);
+
+  const module = ACTION_MODULES[proposal.type];
+  if (module && !(await isModuleEnabled(tenantId, module))) {
+    return { status: 'refused', message: `${MODULE_LABELS[module]} is disabled for this gym.` };
+  }
+
+  return { status: 'executed', message: await runAction(tenantId, actor, proposal) };
+}
+
+/** Back-compat wrapper: the result text only (a refusal is returned as its message, never thrown). */
+export async function executeAiAction(tenantId: string, actor: IamActor, proposal: AiActionProposal): Promise<string> {
+  return (await executeAiActionDetailed(tenantId, actor, proposal)).message;
+}
+
+async function runAction(tenantId: string, actor: IamActor, proposal: AiActionProposal): Promise<string> {
 
   switch (proposal.type) {
     case 'create_member': {

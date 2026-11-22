@@ -53,6 +53,7 @@ import { memberInvoiceRouter } from '../../modules/finance/routes/member-invoice
 import { memberPaymentRouter } from '../../modules/finance/routes/member-payment.routes';
 import { razorpayWebhookRouter } from '../../modules/finance/routes/razorpay-webhook.routes';
 import { gymDiscoveryRouter } from '../../modules/gym-discovery/routes/gym-discovery.routes';
+import { hrRouter } from '../../modules/hr/routes/hr.routes';
 import { invitationRouter } from '../../modules/invitations/routes/invitation.routes';
 import { invoiceRouter } from '../../modules/invoice/routes/invoice.routes';
 import { leadRouter } from '../../modules/leads/routes/lead.routes';
@@ -183,6 +184,8 @@ v1Router.use('/invoices', memberInvoiceRouter);
 v1Router.use('/income', incomeRouter);
 v1Router.use('/expenses', expenseRouter);
 v1Router.use('/finance', financeDashboardRouter);
+// HR Management (Prompt 182) - employees, attendance, leave, payroll; /hr/me/* is self-service.
+v1Router.use('/hr', hrRouter);
 // Reports & Analytics (Prompt 20) — /reports/dashboard and /reports/scheduled
 // must be mounted before the general /reports router so their sub-paths
 // aren't shadowed by it (see modules/reports/routes/reports.routes.ts).

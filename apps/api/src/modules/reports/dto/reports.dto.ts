@@ -37,6 +37,12 @@ export interface KpiMetricsDto {
   totalStaff: number;
   activeTrainers: number;
   activeBranches: number;
+  /**
+   * Module keys (subset of attendance | income | expenses | payments) that are switched off for this gym. Their KPI is
+   * returned as 0 / "0.00" (never null: web types and the Dart models hard-cast these fields) and not queried; UIs
+   * should hide the tile. `[]` when everything is on.
+   */
+  disabledModules: string[];
 }
 
 export interface RecentActivityDto {
@@ -49,7 +55,10 @@ export interface RecentActivityDto {
 
 export interface DashboardSummaryDto {
   kpis: KpiMetricsDto;
+  /** PAYMENT items are dropped without `payments`, CHECK_IN items without `attendance`. */
   recentActivities: RecentActivityDto[];
+  /** Same list as `kpis.disabledModules`. */
+  disabledModules: string[];
 }
 
 // ── Reports ──────────────────────────────────────────────────────────────

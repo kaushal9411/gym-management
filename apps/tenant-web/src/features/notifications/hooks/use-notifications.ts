@@ -3,17 +3,22 @@
 import * as React from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { useAppDispatch } from '@/store/hooks';
 import { notificationService } from '../services/notification.service';
 import { unreadCountSet } from '../store/notification-slice';
 import type { CreateNotificationInput, MessageLogListParams, NotificationListParams, NotificationStatsParams, NotificationTemplateType, UpdateNotificationTemplateInput } from '../types';
 
-export function useNotifications(params: NotificationListParams = {}) {
+/** `options.enabled` additionally turns the query (and its 60 s poll) off; it is ALWAYS off when the `notifications` module is disabled for the tenant (the API 403s every call). */
+export function useNotifications(params: NotificationListParams = {}, options: { enabled?: boolean } = {}) {
   const dispatch = useAppDispatch();
+  const moduleEnabled = useTenant().featureFlags.includes('notifications');
+  const enabled = moduleEnabled && (options.enabled ?? true);
   const query = useQuery({
     queryKey: ['notifications', params],
     queryFn: () => notificationService.list(params),
-    refetchInterval: 60_000,
+    enabled,
+    refetchInterval: enabled ? 60_000 : false,
     // Server-side category/search/unread filters change the key; keep the old rows on screen meanwhile.
     placeholderData: keepPreviousData,
   });

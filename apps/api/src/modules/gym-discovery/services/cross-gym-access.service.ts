@@ -5,7 +5,7 @@ import { prisma } from '../../../infrastructure/database/prisma';
 import { buildAuthModule } from '../../authentication/utils/auth-module.factory';
 import { MemberAuthService } from '../../member-auth/services/member-auth.service';
 import { hashPhone } from '../../members/utils/member-pii.util';
-import type { Actor } from '../validators/gym-discovery.validators';
+import type { Actor, PhoneActor } from '../validators/gym-discovery.validators';
 
 /** Same statuses `TenantRepository.listActive` / `discoverGyms` treat as "a login could succeed here". */
 const LOGIN_ELIGIBLE_STATUSES = ['ACTIVE', 'TRIAL', 'PAST_DUE'];
@@ -26,6 +26,9 @@ interface DeviceInfo {
   ipAddress?: string;
   userAgent?: string;
 }
+
+/** Which credential planes a phone request covers, in the order they are tried. */
+const planesFor = (actorType: PhoneActor): Actor[] => (actorType === 'any' ? ['staff', 'member'] : [actorType]);
 
 const eligible = (t: TenantLite) => t.deletedAt === null && !t.maintenanceMode && LOGIN_ELIGIBLE_STATUSES.includes(t.status);
 
@@ -55,37 +58,48 @@ export class CrossGymAccessService {
     }
   }
 
-  /** Emails a one-time code per matching gym account (each gym issues its own, as before). */
-  async requestPhoneOtp(phone: string, actorType: Actor): Promise<void> {
-    const tenants = actorType === 'staff' ? await this.staffTenantsByPhone(phone) : await this.memberTenantsByPhone(phone);
-    for (const t of tenants) {
-      try {
-        if (actorType === 'staff') await buildAuthModule(t.id).requestPhoneLoginOtp(phone);
-        else await new MemberAuthService(t.id).requestPhoneLoginOtp(phone);
-      } catch (error) {
-        authLogger.warn('Cross-gym phone OTP request failed for one tenant', { tenantId: t.id, error: (error as Error).message });
+  /**
+   * Emails a one-time code per matching gym account (each gym issues its own,
+   * as before). `any` (the default) covers BOTH planes — a phone number cannot
+   * say whether it is staff or a member — and still answers the same generic
+   * way when nothing matches.
+   */
+  async requestPhoneOtp(phone: string, actorType: PhoneActor = 'any'): Promise<void> {
+    for (const plane of planesFor(actorType)) {
+      const tenants = plane === 'staff' ? await this.staffTenantsByPhone(phone) : await this.memberTenantsByPhone(phone);
+      for (const t of tenants) {
+        try {
+          if (plane === 'staff') await buildAuthModule(t.id).requestPhoneLoginOtp(phone);
+          else await new MemberAuthService(t.id).requestPhoneLoginOtp(phone);
+        } catch (error) {
+          authLogger.warn('Cross-gym phone OTP request failed for one tenant', { tenantId: t.id, plane, error: (error as Error).message });
+        }
       }
     }
   }
 
   /**
    * Tries the code against each matching gym; the gym whose code it is logs the
-   * person in. Returns that gym's normal login result plus `tenantSlug`, so the
-   * app can load the gym's branding/plan and show only that gym's data.
+   * person in. `any` (the default) tries the staff plane first, then the member
+   * plane. Returns that gym's normal login result plus `tenantSlug` and the
+   * `actorType` (`staff` | `member`) that matched, so the app can build the right
+   * session and load the gym's branding/plan.
    */
-  async verifyPhoneOtp(phone: string, actorType: Actor, code: string, device: DeviceInfo) {
-    const tenants = actorType === 'staff' ? await this.staffTenantsByPhone(phone) : await this.memberTenantsByPhone(phone);
+  async verifyPhoneOtp(phone: string, actorType: PhoneActor, code: string, device: DeviceInfo) {
     let expired = false;
-    for (const t of tenants) {
-      try {
-        const result =
-          actorType === 'staff'
-            ? await buildAuthModule(t.id).verifyPhoneLoginOtp(phone, code, device)
-            : await new MemberAuthService(t.id).verifyPhoneLoginOtp(phone, code, device);
-        return { ...result, tenantSlug: t.slug };
-      } catch (error) {
-        if (error instanceof AppError && error.code === ErrorCode.OTP_EXPIRED) expired = true;
-        // A locked/suspended account in one gym is that gym's answer; keep trying the others.
+    for (const plane of planesFor(actorType)) {
+      const tenants = plane === 'staff' ? await this.staffTenantsByPhone(phone) : await this.memberTenantsByPhone(phone);
+      for (const t of tenants) {
+        try {
+          const result =
+            plane === 'staff'
+              ? await buildAuthModule(t.id).verifyPhoneLoginOtp(phone, code, device)
+              : await new MemberAuthService(t.id).verifyPhoneLoginOtp(phone, code, device);
+          return { ...result, tenantSlug: t.slug, actorType: plane };
+        } catch (error) {
+          if (error instanceof AppError && error.code === ErrorCode.OTP_EXPIRED) expired = true;
+          // A locked/suspended account in one gym is that gym's answer; keep trying the others.
+        }
       }
     }
     if (expired) throw new AppError(ErrorCode.OTP_EXPIRED, 'This code has expired. Request a new one.', 401);

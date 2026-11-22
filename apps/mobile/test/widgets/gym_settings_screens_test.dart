@@ -58,6 +58,7 @@ const _tenant = TenantBranding(
   status: 'ACTIVE',
   maintenanceMode: false,
   primaryColor: '',
+  featureFlags: ['ai_coach'],
 );
 
 UserProfile _user(List<String> perms) => UserProfile(
@@ -279,13 +280,14 @@ void main() {
     Widget child,
     List<String> perms, {
     Size size = const Size(360, 740),
+    TenantBranding tenant = _tenant,
   }) async {
     t.view.physicalSize = size * 2;
     t.view.devicePixelRatio = 2;
     addTearDown(t.view.reset);
     final session = _Session();
     when(() => session.state)
-        .thenReturn(SessionAuthenticatedStaff(_user(perms), _tenant));
+        .thenReturn(SessionAuthenticatedStaff(_user(perms), tenant));
     await t.pumpWidget(
       BlocProvider<SessionCubit>.value(
         value: session,
@@ -327,6 +329,30 @@ void main() {
         await show(t, find.text(title));
         expect(find.text(title), findsWidgets, reason: title);
       }
+    });
+
+    testWidgets('the AI assistant card is hidden when ai_coach is off',
+        (t) async {
+      await pump(
+        t,
+        const GymSettingsScreen(),
+        _read,
+        tenant: const TenantBranding(
+          slug: 't',
+          name: 'T',
+          status: 'ACTIVE',
+          maintenanceMode: false,
+          primaryColor: '',
+          featureFlags: ['notifications'],
+        ),
+      );
+      await settle(t);
+      expect(t.takeException(), isNull);
+      expect(find.text('AI assistant'), findsNothing);
+      // The other cards are untouched.
+      expect(find.text('Gym profile'), findsOneWidget);
+      await show(t, find.text('Sessions'));
+      expect(find.text('Sessions'), findsWidgets);
     });
 
     testWidgets('without settings:read: message and no requests', (t) async {

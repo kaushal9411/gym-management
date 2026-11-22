@@ -215,6 +215,15 @@ const PERMISSIONS: Array<{ key: string; description: string }> = [
   { key: 'leads:convert', description: 'Convert a lead into a member' },
   { key: 'leads:assign', description: 'Assign or reassign a lead to a staff member' },
   { key: 'leads:export', description: 'Export leads as CSV' },
+  // HR Management (Prompt 182)
+  { key: 'hr:view', description: 'View the HR overview, employees, all-staff attendance, leave types, holidays, shifts and policy' },
+  { key: 'hr:attendance_manage', description: "Mark, edit or clear any employee's attendance" },
+  { key: 'hr:leave_manage', description: 'See all leave requests; approve, reject, cancel or apply leave on behalf; manage leave types, holidays and balances' },
+  { key: 'hr:payroll_manage', description: 'Pay structures, payroll runs, payslips and marking salary paid' },
+  { key: 'hr:settings_manage', description: 'Manage shifts, shift assignment and the HR policy' },
+  { key: 'hr:self_attendance', description: 'Check in/out and view own attendance' },
+  { key: 'hr:self_leave', description: 'Apply for and cancel own leave, view own leave balances' },
+  { key: 'hr:self_payslip', description: 'View own payslips' },
 ];
 
 const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
@@ -252,6 +261,8 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'classes:view', 'classes:create', 'classes:update', 'classes:delete', 'classes:restore', 'bookings:manage',
     'measurements:view', 'measurements:create', 'measurements:update', 'measurements:delete',
     'leads:view', 'leads:create', 'leads:update', 'leads:delete', 'leads:convert', 'leads:assign', 'leads:export',
+    // HR: managers run day-to-day HR; payroll (salary) stays Owner-only unless granted.
+    'hr:view', 'hr:attendance_manage', 'hr:leave_manage', 'hr:settings_manage', 'hr:self_attendance', 'hr:self_leave', 'hr:self_payslip',
   ],
   TRAINER: [
     'members:read', 'attendance:create', 'attendance:read',
@@ -286,6 +297,8 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     // of coaching; deleting a mistaken entry stays a Manager decision, same
     // tightening pattern as workouts/diets delete.
     'measurements:view', 'measurements:create', 'measurements:update',
+    // HR self-service only.
+    'hr:self_attendance', 'hr:self_leave', 'hr:self_payslip',
   ],
   RECEPTIONIST: [
     'members:manage', 'members:read',
@@ -324,6 +337,8 @@ const ROLE_PERMISSIONS: Record<string, string[] | '*'> = {
     'classes:view', 'bookings:manage',
     // Front-desk handles enquiries day-to-day; deleting, assigning and exporting leads stay Manager-only.
     'leads:view', 'leads:create', 'leads:update', 'leads:convert',
+    // HR self-service only.
+    'hr:self_attendance', 'hr:self_leave', 'hr:self_payslip',
   ],
   MEMBER: ['profile:read', 'profile:update', 'bookings:create', 'bookings:read', 'payments:read', 'chat:use', 'support:view', 'support:create'],
 };

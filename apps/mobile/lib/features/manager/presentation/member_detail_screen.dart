@@ -12,6 +12,8 @@ import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/tenant_features.dart';
+import '../../../core/utils/tenant_features_context.dart';
 import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/app_currency.dart';
@@ -1058,6 +1060,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
     ]);
   }
 
+  /// Is the gym's [flag] module on? Cards/tiles of a switched-off module are
+  /// hidden outright — their endpoints answer 403, which would otherwise render
+  /// as a misleading empty state ("no active plan", zero visits).
+  bool _on(String flag) => context.featureOn(flag);
+
   Widget _buildContent(GymMember member) {
     final deleted = member.deletedAt != null;
     final top = MediaQuery.of(context).padding.top + kToolbarHeight - 8;
@@ -1105,9 +1112,11 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
           _buildPlanIncludesCard(member),
           _buildUsageCard(member),
           _buildGuestCard(member),
-          _buildPaymentsCard(member),
-          _buildCalendarCard(),
-          _buildAttendanceCard(),
+          if (_on(Feature.payments)) _buildPaymentsCard(member),
+          if (_on(Feature.attendance)) ...[
+            _buildCalendarCard(),
+            _buildAttendanceCard(),
+          ],
         ]);
       case 1:
         return _gapped([
@@ -1161,8 +1170,8 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
         ]);
       case 2:
         return _gapped([
-          _buildWorkoutCard(),
-          _buildDietCard(),
+          if (_on(Feature.workoutPlans)) _buildWorkoutCard(),
+          if (_on(Feature.dietPlans)) _buildDietCard(),
           _buildMeasurementsCard(),
         ]);
       case 3:
@@ -1801,7 +1810,7 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
               ),
             ],
           ),
-          if (owing && !deleted) ...[
+          if (owing && !deleted && _on(Feature.payments)) ...[
             const SizedBox(height: 12),
             ShimmerButton(
               colors: const [Color(0xFFE11D48), Color(0xFFC026D3)],
@@ -2076,53 +2085,58 @@ class _MemberDetailScreenState extends State<MemberDetailScreen> {
       crossAxisSpacing: 9,
       childAspectRatio: 1.0,
       children: [
-        _summaryTile(
-          index: 0,
-          icon: Icons.calendar_today_rounded,
-          color: _kIndigo,
-          color2: AppColors.staffB,
-          number: monthVisits,
-          label: 'Visits · ${months[now.month - 1]}',
-          onTap: _openVisitsSheet,
-        ),
-        _summaryTile(
-          index: 1,
-          icon: Icons.local_fire_department_rounded,
-          color: AppColors.staffB,
-          color2: const Color(0xFFC026D3),
-          number: _attendanceTotal,
-          label: 'Total visits',
-          onTap: _openVisitsSheet,
-        ),
-        _summaryTile(
-          index: 2,
-          icon: Icons.schedule_rounded,
-          color: AppColors.memberB,
-          color2: const Color(0xFF22D3EE),
-          text: _lastVisitLabel(),
-          label: 'Last visit',
-          onTap: _openVisitsSheet,
-        ),
-        _summaryTile(
-          index: 3,
-          icon: Icons.account_balance_wallet_rounded,
-          color: AppColors.success,
-          color2: AppColors.memberB,
-          number: _totalPaid.round(),
-          prefix: AppCurrency.symbol,
-          label: 'Total paid',
-          onTap: _openPaymentsSheet,
-        ),
-        _summaryTile(
-          index: 4,
-          icon: Icons.currency_rupee_rounded,
-          color: owing ? AppColors.danger : AppColors.success,
-          color2: owing ? const Color(0xFFF97316) : AppColors.memberB,
-          number: member.outstandingAmount.round(),
-          prefix: AppCurrency.symbol,
-          label: 'Due now',
-          onTap: _openPaymentsSheet,
-        ),
+        if (_on(Feature.attendance))
+          _summaryTile(
+            index: 0,
+            icon: Icons.calendar_today_rounded,
+            color: _kIndigo,
+            color2: AppColors.staffB,
+            number: monthVisits,
+            label: 'Visits · ${months[now.month - 1]}',
+            onTap: _openVisitsSheet,
+          ),
+        if (_on(Feature.attendance))
+          _summaryTile(
+            index: 1,
+            icon: Icons.local_fire_department_rounded,
+            color: AppColors.staffB,
+            color2: const Color(0xFFC026D3),
+            number: _attendanceTotal,
+            label: 'Total visits',
+            onTap: _openVisitsSheet,
+          ),
+        if (_on(Feature.attendance))
+          _summaryTile(
+            index: 2,
+            icon: Icons.schedule_rounded,
+            color: AppColors.memberB,
+            color2: const Color(0xFF22D3EE),
+            text: _lastVisitLabel(),
+            label: 'Last visit',
+            onTap: _openVisitsSheet,
+          ),
+        if (_on(Feature.payments))
+          _summaryTile(
+            index: 3,
+            icon: Icons.account_balance_wallet_rounded,
+            color: AppColors.success,
+            color2: AppColors.memberB,
+            number: _totalPaid.round(),
+            prefix: AppCurrency.symbol,
+            label: 'Total paid',
+            onTap: _openPaymentsSheet,
+          ),
+        if (_on(Feature.payments))
+          _summaryTile(
+            index: 4,
+            icon: Icons.currency_rupee_rounded,
+            color: owing ? AppColors.danger : AppColors.success,
+            color2: owing ? const Color(0xFFF97316) : AppColors.memberB,
+            number: member.outstandingAmount.round(),
+            prefix: AppCurrency.symbol,
+            label: 'Due now',
+            onTap: _openPaymentsSheet,
+          ),
         _summaryTile(
           index: 5,
           icon: Icons.hourglass_bottom_rounded,

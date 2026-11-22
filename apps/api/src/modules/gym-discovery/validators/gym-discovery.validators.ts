@@ -24,13 +24,23 @@ export const crossGymForgotPasswordSchema = z.object({
   identifier: z.string().trim().min(1, 'Required').max(255),
 });
 
+/**
+ * `actorType` is optional on the phone endpoints: a phone number cannot say
+ * whether it belongs to staff or a member, so the default `'any'` makes the
+ * server search BOTH planes. `'staff'` / `'member'` are still accepted (older
+ * clients) and restrict the search to that plane.
+ */
+export const phoneActorSchema = z.enum(['staff', 'member', 'any']).default('any');
+
+export type PhoneActor = z.infer<typeof phoneActorSchema>;
+
 export const crossGymPhoneRequestSchema = z.object({
-  actorType: z.enum(['staff', 'member']),
+  actorType: phoneActorSchema,
   phone: otpPhone,
 });
 
 export const crossGymPhoneVerifySchema = z.object({
-  actorType: z.enum(['staff', 'member']),
+  actorType: phoneActorSchema,
   phone: otpPhone,
   code: z.string().length(6).regex(/^\d+$/, 'Digits only'),
 });

@@ -4,8 +4,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/network/api_exception.dart';
 import '../../core/network/auth_event_bus.dart';
+import '../../core/network/module_event_bus.dart';
 import '../../core/push/push_notification_service.dart';
 import '../../core/storage/secure_storage.dart';
+import '../../core/utils/tenant_features.dart';
 import '../../core/utils/app_currency.dart';
 import '../../models/member_profile.dart';
 import '../../models/tenant_branding.dart';
@@ -26,14 +28,24 @@ class SessionCubit extends Cubit<SessionState> {
     required SecureStorage storage,
     required AuthEventBus authEventBus,
     required PushNotificationService pushNotificationService,
+    ModuleEventBus? moduleEventBus,
+    Duration moduleRefreshDebounce = const Duration(milliseconds: 800),
   })  : _authRepository = authRepository,
         _memberAuthRepository = memberAuthRepository,
         _publicTenantRepository = publicTenantRepository,
         _storage = storage,
         _pushNotificationService = pushNotificationService,
+        _moduleRefreshDebounce = moduleRefreshDebounce,
         super(const SessionUnknown()) {
     _forcedLogoutSub =
         authEventBus.onForcedLogout.listen((_) => _handleForcedLogout());
+    // A 403 "This module is currently unavailable." means a flag the app still
+    // holds as on was switched off: re-read the flags. A burst of 403s (every
+    // card of a dashboard failing at once) is debounced into ONE refresh.
+    _moduleSub = moduleEventBus?.onModuleUnavailable.listen((_) {
+      _moduleDebounce?.cancel();
+      _moduleDebounce = Timer(_moduleRefreshDebounce, () => refreshTenant());
+    });
   }
 
   final AuthRepository _authRepository;
@@ -42,6 +54,11 @@ class SessionCubit extends Cubit<SessionState> {
   final SecureStorage _storage;
   final PushNotificationService _pushNotificationService;
   late final StreamSubscription<void> _forcedLogoutSub;
+  StreamSubscription<void>? _moduleSub;
+  Timer? _moduleDebounce;
+  final Duration _moduleRefreshDebounce;
+  bool _refreshingTenant = false;
+  DateTime? _lastTenantRefresh;
 
   Future<void> restore() async {
     final actorType = await _storage.readActorType();
@@ -105,6 +122,46 @@ class SessionCubit extends Cubit<SessionState> {
     emit(SessionAuthenticatedStaff(user, current.tenant));
   }
 
+  /// Re-resolves the signed-in gym (`GET /public/tenants/resolve`, public, so
+  /// it also answers during maintenance) and emits a NEW authenticated state
+  /// ONLY when the tenant differs — in practice its `featureFlags`: a module the
+  /// owner or platform switched off (or back on) while the app stayed open.
+  /// The same user/member is kept; nothing is emitted for an unchanged gym, and
+  /// a failed lookup is ignored (the next resume/403 tries again).
+  ///
+  /// [minInterval] skips the call when the last attempt was more recent (the
+  /// app-resume caller passes ~60 s; the 403 path passes none).
+  Future<void> refreshTenant({Duration? minInterval}) async {
+    final start = tenantOfSession(state);
+    if (start == null || _refreshingTenant) return;
+    final last = _lastTenantRefresh;
+    if (minInterval != null &&
+        last != null &&
+        DateTime.now().difference(last) < minInterval) {
+      return;
+    }
+    _refreshingTenant = true;
+    _lastTenantRefresh = DateTime.now();
+    try {
+      final slug = await _storage.readTenantSlug() ?? start.slug;
+      final fresh = await _publicTenantRepository.resolve(slug);
+      // Re-read the state: the user may have signed out (or changed) while the
+      // lookup was in flight.
+      final now = state;
+      final latest = tenantOfSession(now);
+      if (latest == null || fresh == latest) return;
+      if (now is SessionAuthenticatedStaff) {
+        emit(SessionAuthenticatedStaff(now.user, fresh));
+      } else if (now is SessionAuthenticatedMember) {
+        emit(SessionAuthenticatedMember(now.member, fresh));
+      }
+    } catch (_) {
+      // Best-effort: keep the flags we have.
+    } finally {
+      _refreshingTenant = false;
+    }
+  }
+
   void memberSignedIn(MemberProfile member, TenantBranding tenant) {
     emit(SessionAuthenticatedMember(member, tenant));
     unawaited(_pushNotificationService.registerForSession(ActorType.member));
@@ -163,6 +220,8 @@ class SessionCubit extends Cubit<SessionState> {
   @override
   Future<void> close() {
     _forcedLogoutSub.cancel();
+    _moduleSub?.cancel();
+    _moduleDebounce?.cancel();
     return super.close();
   }
 }

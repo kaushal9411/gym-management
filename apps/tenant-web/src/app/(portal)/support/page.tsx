@@ -82,7 +82,7 @@ export default function SupportPage() {
       <HelpCentre />
 
       {!hasTickets ? (
-        <EmptyState icon={LifeBuoy} title="Not on your plan" description="Upgrade your subscription to unlock support tickets." />
+        <EmptyState icon={LifeBuoy} title="Support tickets are currently unavailable" description="Ticket support is switched off for your gym right now. The help centre above is still available." />
       ) : !canView ? (
         <EmptyState icon={LifeBuoy} title="No access" description="You don't have permission to view support tickets." />
       ) : (

@@ -12,6 +12,7 @@ import '../../bloc/platform/platform_config_cubit.dart';
 import '../../bloc/reports/reports_overview_cubit.dart';
 import '../../bloc/session/session_cubit.dart';
 import '../export/export_sink.dart';
+import '../utils/tenant_features.dart';
 import '../../repositories/analytics_repository.dart';
 import '../../repositories/announcement_repository.dart';
 import '../../repositories/attendance_repository.dart';
@@ -28,6 +29,7 @@ import '../../repositories/expense_repository.dart';
 import '../../repositories/finance_repository.dart';
 import '../../repositories/food_repository.dart';
 import '../../repositories/group_class_repository.dart';
+import '../../repositories/hr_repository.dart';
 import '../../repositories/gym_settings_repository.dart';
 import '../../repositories/iam_user_repository.dart';
 import '../../repositories/income_repository.dart';
@@ -53,6 +55,7 @@ import '../../repositories/tenant_role_repository.dart';
 import '../../repositories/workout_plan_repository.dart';
 import '../network/auth_event_bus.dart';
 import '../network/maintenance_event_bus.dart';
+import '../network/module_event_bus.dart';
 import '../network/dio_client.dart';
 import '../push/push_notification_service.dart';
 import '../storage/secure_storage.dart';
@@ -73,8 +76,15 @@ void setupServiceLocator() {
   );
   getIt.registerLazySingleton<ThemeCubit>(() => ThemeCubit(getIt()));
 
+  getIt.registerLazySingleton<ModuleEventBus>(() => ModuleEventBus());
+
   getIt.registerLazySingleton<DioClient>(
-    () => DioClient(getIt(), getIt(), getIt<MaintenanceEventBus>()),
+    () => DioClient(
+      getIt(),
+      getIt(),
+      getIt<MaintenanceEventBus>(),
+      getIt<ModuleEventBus>(),
+    ),
   );
   getIt.registerLazySingleton<Dio>(() => getIt<DioClient>().dio);
 
@@ -138,6 +148,7 @@ void setupServiceLocator() {
     () => AnnouncementRepository(getIt()),
   );
   getIt.registerLazySingleton<LeadRepository>(() => LeadRepository(getIt()));
+  getIt.registerLazySingleton<HrRepository>(() => HrRepository(getIt()));
   getIt.registerLazySingleton<SupportTicketRepository>(
     () => SupportTicketRepository(getIt()),
   );
@@ -196,7 +207,13 @@ void setupServiceLocator() {
     () => DeviceTokenRepository(getIt()),
   );
   getIt.registerLazySingleton<PushNotificationService>(
-    () => PushNotificationService(getIt(), getIt()),
+    () => PushNotificationService(
+      getIt(),
+      getIt(),
+      // Lazy: resolved at tap time, long after SessionCubit exists (it
+      // depends on this service, so it cannot be injected eagerly).
+      () => tenantOfSession(getIt<SessionCubit>().state),
+    ),
   );
 
   // Screen-scoped cubits — a fresh instance per screen, not app-wide state.
@@ -233,6 +250,7 @@ void setupServiceLocator() {
       storage: getIt(),
       authEventBus: getIt(),
       pushNotificationService: getIt(),
+      moduleEventBus: getIt(),
     ),
   );
 

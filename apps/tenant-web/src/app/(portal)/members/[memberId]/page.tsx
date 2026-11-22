@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { AttendanceMethodBadge, AttendanceStatusBadge } from '@/features/attendance/components/attendance-badges';
 import { toAttendanceError, useMemberAttendance, useManualCheckIn, useManualCheckOut } from '@/features/attendance/hooks/use-attendance';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useFeatureFlagSet } from '@/features/tenant/use-feature-flag';
 import { AvatarUpload } from '@/features/iam/components/avatar-upload';
 import { UnsavedChangesBar } from '@/features/gym-settings/components/unsaved-changes-bar';
 import { BranchSelect } from '@/features/members/components/branch-select';
@@ -172,6 +173,10 @@ const notesTextareaClassName =
 export default function MemberDetailPage() {
   const params = useParams<{ memberId: string }>();
   const { hasPermission } = usePermissions();
+  // Module kill switches: a block whose module is off is not rendered, so it fires no request.
+  const flags = useFeatureFlagSet();
+  const attendanceOn = flags.has('attendance');
+  const paymentsOn = flags.has('payments');
   const memberId = params.memberId;
 
   const member = useMemberDetail(memberId);
@@ -189,7 +194,7 @@ export default function MemberDetailPage() {
   const sendPortalPasswordReset = useSendPortalPasswordReset();
   const gdprExport = useGdprExport();
   const eraseGdprData = useEraseGdprData();
-  const memberAttendance = useMemberAttendance(memberId, 1, 5);
+  const memberAttendance = useMemberAttendance(attendanceOn ? memberId : null, 1, 5);
   const manualCheckIn = useManualCheckIn();
   const manualCheckOut = useManualCheckOut();
   const logGuestVisit = useLogGuestVisit();
@@ -205,10 +210,10 @@ export default function MemberDetailPage() {
   const canRenew = hasPermission('memberships:renew');
   const canUpgrade = hasPermission('memberships:upgrade');
   const canFreeze = hasPermission('memberships:freeze');
-  const canCheckIn = hasPermission('attendance:checkin');
-  const canCheckOut = hasPermission('attendance:checkout');
+  const canCheckIn = attendanceOn && hasPermission('attendance:checkin');
+  const canCheckOut = attendanceOn && hasPermission('attendance:checkout');
   const canEraseData = hasPermission('members:erase-data');
-  const canSendLink = hasPermission('finance:payment-create');
+  const canSendLink = paymentsOn && hasPermission('finance:payment-create');
 
   const [form, setForm] = React.useState<FormState | null>(null);
   const [confirmStatusAction, setConfirmStatusAction] = React.useState<StatusActionKind | null>(null);
@@ -1023,26 +1028,28 @@ export default function MemberDetailPage() {
       </Card>
 
 
-      <MemberWorkoutCard memberId={memberId} />
+      {flags.has('workout_plans') ? <MemberWorkoutCard memberId={memberId} /> : null}
 
-      <MemberDietCard memberId={memberId} />
+      {flags.has('diet_plans') ? <MemberDietCard memberId={memberId} /> : null}
 
       <MemberMeasurementsCard memberId={memberId} />
 
         </div>
 
         <div className="order-1 space-y-5 lg:order-none lg:col-start-2 lg:row-start-1 xl:col-start-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto lg:pb-2 [scrollbar-width:thin]">
-          <MemberAttendancePanel
-            memberId={memberId}
-            eligible={data.canCheckIn}
-            canCheckIn={canCheckIn}
-            canCheckOut={canCheckOut}
-            checkInPending={manualCheckIn.isPending}
-            checkOutPending={manualCheckOut.isPending}
-            onCheckIn={handleQuickCheckIn}
-            onCheckOut={handleQuickCheckOut}
-          />
-          <MemberPaymentPanel data={data} canSendLink={canSendLink} onSendLink={() => setConfirmLink(true)} />
+          {attendanceOn ? (
+            <MemberAttendancePanel
+              memberId={memberId}
+              eligible={data.canCheckIn}
+              canCheckIn={canCheckIn}
+              canCheckOut={canCheckOut}
+              checkInPending={manualCheckIn.isPending}
+              checkOutPending={manualCheckOut.isPending}
+              onCheckIn={handleQuickCheckIn}
+              onCheckOut={handleQuickCheckOut}
+            />
+          ) : null}
+          {paymentsOn ? <MemberPaymentPanel data={data} canSendLink={canSendLink} onSendLink={() => setConfirmLink(true)} /> : null}
           <MemberGuestPanel
             data={data}
             canLog={canUpdate}

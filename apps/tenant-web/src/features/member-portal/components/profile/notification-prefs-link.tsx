@@ -2,11 +2,14 @@
 
 import { Bell } from 'lucide-react';
 
+import { useFeatureEnabled } from '@/features/tenant/use-feature-flag';
 import { MEMBER_PORTAL_ROUTES } from '../../constants';
 import { ListRow, PortalList, SectionCard } from '../kit';
 
 /** Profile entry point to the promotional opt-out page. */
 export function NotificationPrefsLink() {
+  // The preferences page + API belong to the notifications module.
+  if (!useFeatureEnabled('notifications')) return null;
   return (
     <SectionCard title="Notifications" subtitle="Promotions by push, email, SMS and WhatsApp" icon={Bell} tone="info" flush>
       <PortalList>

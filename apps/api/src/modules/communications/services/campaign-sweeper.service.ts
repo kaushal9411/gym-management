@@ -1,6 +1,7 @@
 import { logger } from '../../../core/logging/logger';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { enqueueCampaignBatch, enqueueCampaignStart } from '../../../infrastructure/queue/communications.queue';
+import { moduleGate } from '../../tenants/utils/module-enabled.util';
 import { DISPATCH_STALE_MINUTES } from '../constants/limits';
 
 import { finalizeCampaignRecipient, finishCampaignIfDone } from './recipient-finalizer.service';
@@ -20,13 +21,19 @@ export interface DispatchSweepResult extends Record<string, unknown> {
  *  3. restart a SENDING campaign whose `start` job never produced any rows (crash between create and enqueue);
  *  4. close SENDING campaigns with nothing left in flight;
  *  5. fail messages handed to a channel queue but never confirmed within 30 minutes.
+ *
+ * Gyms with the `notifications` module switched off are skipped per tenant in steps 1-4 (a campaign that was already SENDING simply
+ * pauses and carries on once the module is back on). Step 5 only FAILS stale rows - it never sends - so it stays unguarded.
  */
 export async function runCommunicationsDispatch(now = new Date()): Promise<DispatchSweepResult> {
   const result: DispatchSweepResult = { started: 0, released: 0, restarted: 0, closed: 0, timedOut: 0 };
   const minuteSlot = String(Math.floor(now.getTime() / 60_000));
+  const notificationsEnabled = moduleGate('notifications', 'communications-dispatch');
 
   const due = await prisma.notificationCampaign.findMany({ where: { status: 'SCHEDULED', scheduledAt: { lte: now } }, select: { id: true, tenantId: true }, take: 100 });
   for (const campaign of due) {
+    // eslint-disable-next-line no-await-in-loop -- memoised per tenant
+    if (!(await notificationsEnabled(campaign.tenantId))) continue;
     // eslint-disable-next-line no-await-in-loop -- small per-minute batch
     const claimed = await prisma.notificationCampaign.updateMany({ where: { id: campaign.id, status: 'SCHEDULED' }, data: { status: 'SENDING', startedAt: now } });
     if (claimed.count === 1) {
@@ -38,6 +45,8 @@ export async function runCommunicationsDispatch(now = new Date()): Promise<Dispa
 
   const sending = await prisma.notificationCampaign.findMany({ where: { status: 'SENDING' }, select: { id: true, tenantId: true, startedAt: true }, take: 500 });
   for (const campaign of sending) {
+    // eslint-disable-next-line no-await-in-loop -- memoised per tenant
+    if (!(await notificationsEnabled(campaign.tenantId))) continue;
     // eslint-disable-next-line no-await-in-loop -- small per-minute batch
     const [rows, ready, queued] = await Promise.all([
       prisma.notificationCampaignRecipient.count({ where: { campaignId: campaign.id } }),

@@ -6,10 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatRelativeTime } from '@/lib/format-relative-time';
+import { useDashboardPanels } from '../hooks/use-dashboard-modules';
 import { useAnnouncements } from '../hooks/use-announcements';
 
 export function AnnouncementsWidget() {
-  const { data, isLoading } = useAnnouncements();
+  const panels = useDashboardPanels();
+  const { data, isLoading } = useAnnouncements(panels.announcements);
+  if (!panels.announcements) return null;
   const items = data ?? [];
 
   return (

@@ -2,16 +2,12 @@
 
 import { Users } from 'lucide-react';
 
-import { usePermissions } from '@/features/auth/hooks/use-permissions';
-import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { PanelCard, ProgressBar, tint } from '@/features/members/components/detail/detail-ui';
-import { useKpis } from '@/features/reports/hooks/use-reports';
+import { useDashboardModules } from '../hooks/use-dashboard-modules';
 
 export function MembersPanel() {
-  const { hasPermission } = usePermissions();
-  const { currentBranchId } = useCurrentBranch();
-  const d = useKpis(currentBranchId ?? undefined).data;
-  if (!hasPermission('reports:view')) return null;
+  const { kpis: d, kpisEnabled } = useDashboardModules();
+  if (!kpisEnabled) return null;
 
   const total = d?.totalMembers ?? 0;
   const expiring = Math.min(d?.expiringMemberships ?? 0, d?.activeMembers ?? 0);

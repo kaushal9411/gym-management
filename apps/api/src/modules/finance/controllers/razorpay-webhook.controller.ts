@@ -3,8 +3,10 @@ import type { Request, Response } from 'express';
 import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { sendSuccess } from '../../../core/http/response';
+import { logger } from '../../../core/logging/logger';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { AdminTenantBillingService } from '../../admin-tenants/services/admin-tenant-billing.service';
+import { tenantService } from '../../tenants/service/tenant.service';
 import { MemberPaymentService } from '../services/member-payment.service';
 import { verifyWebhookSignature } from '../services/razorpay-gateway.service';
 
@@ -79,6 +81,23 @@ export class RazorpayWebhookController {
     } else if (notes.memberPaymentId) {
       const payment = await prisma.memberPayment.findUnique({ where: { id: notes.memberPaymentId } });
       if (payment) {
+        // Member-money flows are the tenant's `payments` module (plan AND platform kill switch). With it off nothing is
+        // recorded (no SUCCESS/FAILED flip, no income row, no receipt/notification) - the payment stays PENDING and the
+        // delivery is acknowledged with 200 so Razorpay does not retry forever. The money WAS taken by Razorpay, so this is
+        // logged loudly with everything needed to reconcile it by hand. (Platform billing above is not this module.)
+        const tenant = await tenantService.resolveById(payment.tenantId);
+        if (tenant && !tenant.featureFlags.includes('payments')) {
+          logger.warn('razorpay payment-link webhook for a tenant with the payments module disabled; NOT recorded', {
+            tenantId: payment.tenantId,
+            memberPaymentId: payment.id,
+            paymentLinkId: linkEntity.id,
+            razorpayPaymentId: razorpayPaymentId ?? null,
+            event,
+            outcome,
+          });
+          sendSuccess(res, { received: true, recorded: false, reason: 'payments_module_disabled' });
+          return;
+        }
         await new MemberPaymentService(payment.tenantId).applyWebhookOutcome(payment.id, outcome, razorpayPaymentId);
       }
     }

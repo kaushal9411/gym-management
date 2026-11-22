@@ -13,7 +13,7 @@ import { ProgressRing } from '../kit/progress-ring';
 import { SheetModal } from '../kit/sheet-modal';
 
 /** Dashboard hero: greeting, plan + status chips, days-left ring, quick actions (Renew / Book class / My QR). */
-export function DashboardHero({ overview, qrUrl }: { overview: MemberOverview; qrUrl: string | null }) {
+export function DashboardHero({ overview, qrUrl, has }: { overview: MemberOverview; qrUrl: string | null; has: (flag: string) => boolean }) {
   const [qrOpen, setQrOpen] = React.useState(false);
   const { member, membership, attendance } = overview;
   const first = member.name.split(' ')[0] ?? member.name;
@@ -55,18 +55,23 @@ export function DashboardHero({ overview, qrUrl }: { overview: MemberOverview; q
         }
         aside={aside}
         stats={[
-          { label: 'Total visits', value: attendance.totalVisits },
-          { label: 'Streak', value: attendance.currentStreakDays },
-          { label: 'This month', value: attendance.thisMonth.visits },
+          { label: 'Total visits', value: attendance.totalVisits, hidden: !has('attendance') },
+          { label: 'Streak', value: attendance.currentStreakDays, hidden: !has('attendance') },
+          { label: 'This month', value: attendance.thisMonth.visits, hidden: !has('attendance') },
         ]}
         actions={
           <>
-            <Link href={MEMBER_PORTAL_ROUTES.renew} className={heroActionClass(urgent ? 'solid' : 'ghost')}>
-              <CreditCard className="size-4" /> Renew
-            </Link>
-            <Link href={MEMBER_PORTAL_ROUTES.classes} className={heroActionClass('ghost')}>
-              <CalendarRange className="size-4" /> Book class
-            </Link>
+            {/* Renewal checkout is a payments endpoint; class booking is live_classes. */}
+            {has('payments') ? (
+              <Link href={MEMBER_PORTAL_ROUTES.renew} className={heroActionClass(urgent ? 'solid' : 'ghost')}>
+                <CreditCard className="size-4" /> Renew
+              </Link>
+            ) : null}
+            {has('live_classes') ? (
+              <Link href={MEMBER_PORTAL_ROUTES.classes} className={heroActionClass('ghost')}>
+                <CalendarRange className="size-4" /> Book class
+              </Link>
+            ) : null}
             {qrUrl ? (
               <HeroAction onClick={() => setQrOpen(true)}>
                 <QrCode className="size-4" /> My QR

@@ -12,7 +12,8 @@ import { TenantLogo } from '@/features/tenant/components/tenant-logo';
 import { useTenant } from '@/features/tenant/tenant-provider';
 import { cn } from '@/lib/utils';
 import { initials } from '../../lib/format';
-import { isNavActive, PORTAL_NAV, PORTAL_NAV_GROUPS } from '../../lib/nav';
+import { usePortalNav } from '../../hooks/use-portal-nav';
+import { isNavActive, PORTAL_NAV_GROUPS } from '../../lib/nav';
 import { toneChipStyle } from '../kit/tones';
 import { NavBadge } from './nav-badge';
 
@@ -20,6 +21,7 @@ import { NavBadge } from './nav-badge';
 export function SideRail({ pathname, name, memberId, photoUrl, unread, onLogout, loggingOut }: { pathname: string; name?: string; memberId?: string; photoUrl?: string | null; unread: number; onLogout: () => void; loggingOut: boolean }) {
   const tenant = useTenant();
   const indicatorId = React.useId();
+  const nav = usePortalNav();
   return (
     <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r bg-background md:flex">
       <div className="relative flex h-16 items-center gap-2.5 overflow-hidden border-b px-4">
@@ -29,7 +31,7 @@ export function SideRail({ pathname, name, memberId, photoUrl, unread, onLogout,
       </div>
       <nav aria-label="Member portal" className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
         {PORTAL_NAV_GROUPS.map((group) => {
-          const items = PORTAL_NAV.filter((i) => i.group === group);
+          const items = nav.filter((i) => i.group === group);
           if (!items.length) return null;
           return (
             <div key={group}>

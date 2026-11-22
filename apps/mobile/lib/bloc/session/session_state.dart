@@ -31,8 +31,11 @@ class SessionAuthenticatedStaff extends SessionState {
   final UserProfile user;
   final TenantBranding tenant;
 
+  /// `tenant` is compared by value (slug, branding, maintenance and the
+  /// enabled-module `featureFlags`), so a flag refresh that changes the modules
+  /// is a NEW state and rebuilds the shells/menus — it is never de-duplicated.
   @override
-  List<Object?> get props => [user.id, tenant.slug];
+  List<Object?> get props => [user.id, tenant];
 }
 
 class SessionAuthenticatedMember extends SessionState {
@@ -43,5 +46,5 @@ class SessionAuthenticatedMember extends SessionState {
 
   @override
   List<Object?> get props =>
-      [member.id, member.name, member.profilePhotoUrl, tenant.slug];
+      [member.id, member.name, member.profilePhotoUrl, tenant];
 }

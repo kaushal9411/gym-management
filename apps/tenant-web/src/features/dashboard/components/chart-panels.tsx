@@ -5,11 +5,11 @@ import { Activity, UserPlus, Wallet } from 'lucide-react';
 
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { PanelCard, formatMoney, tint } from '@/features/members/components/detail/detail-ui';
 import { useAttendanceTrends, useNewMemberGrowth, useRevenueTrends } from '@/features/reports/hooks/use-reports';
 import { useCurrencySymbol } from '@/lib/currency';
+import { useDashboardPanels } from '../hooks/use-dashboard-modules';
 import { useDashboardRange } from '../hooks/use-dashboard-range';
 
 const AXIS_TICK = { fill: 'var(--muted-foreground)', fontSize: 12 };
@@ -65,11 +65,11 @@ function SumTile({ value, label, color }: { value: string; label: string; color:
 /** Income vs expenses for the selected range, with totals and net profit. */
 export function MoneyChartPanel() {
   const symbol = useCurrencySymbol();
-  const { hasPermission } = usePermissions();
+  const panels = useDashboardPanels();
   const { currentBranchId } = useCurrentBranch();
   const { dateFrom, dateTo } = useDashboardRange();
-  const revenue = useRevenueTrends(dateFrom, dateTo, currentBranchId ?? undefined);
-  if (!hasPermission('analytics:view')) return null;
+  const revenue = useRevenueTrends(dateFrom, dateTo, currentBranchId ?? undefined, panels.money);
+  if (!panels.money) return null;
 
   const data = (revenue.data ?? []).map((p) => ({ ...p, label: p.date.slice(5) }));
   const income = data.reduce((s, p) => s + p.income, 0);
@@ -117,11 +117,11 @@ export function MoneyChartPanel() {
 }
 
 export function AttendanceChartPanel() {
-  const { hasPermission } = usePermissions();
+  const panels = useDashboardPanels();
   const { currentBranchId } = useCurrentBranch();
   const { dateFrom, dateTo, days } = useDashboardRange();
-  const attendance = useAttendanceTrends(dateFrom, dateTo, currentBranchId ?? undefined);
-  if (!hasPermission('analytics:view')) return null;
+  const attendance = useAttendanceTrends(dateFrom, dateTo, currentBranchId ?? undefined, panels.attendance);
+  if (!panels.attendance) return null;
 
   const data = (attendance.data ?? []).map((p) => ({ ...p, label: p.date.slice(5) }));
   const total = data.reduce((s, p) => s + p.value, 0);
@@ -151,11 +151,11 @@ export function AttendanceChartPanel() {
 }
 
 export function NewMembersChartPanel() {
-  const { hasPermission } = usePermissions();
+  const panels = useDashboardPanels();
   const { currentBranchId } = useCurrentBranch();
   const { dateFrom, dateTo } = useDashboardRange();
-  const growth = useNewMemberGrowth(dateFrom, dateTo, currentBranchId ?? undefined);
-  if (!hasPermission('analytics:view')) return null;
+  const growth = useNewMemberGrowth(dateFrom, dateTo, currentBranchId ?? undefined, panels.newMembers);
+  if (!panels.newMembers) return null;
 
   const data = (growth.data ?? []).map((p) => ({ ...p, label: p.date.slice(5) }));
   const total = data.reduce((s, p) => s + p.value, 0);

@@ -3,6 +3,9 @@ import 'package:dio/dio.dart';
 import '../core/network/api_exception.dart';
 import '../core/network/maintenance_event_bus.dart';
 import '../core/storage/secure_storage.dart';
+import '../models/member_auth_success.dart';
+import '../models/phone_login_result.dart';
+import '../models/staff_login_result.dart';
 import '../models/tenant_branding.dart';
 import '../models/tenant_summary.dart';
 
@@ -117,17 +120,62 @@ class PublicTenantRepository {
   }
 
   /// `POST /public/auth/phone-login/request-otp` — also used for "resend"
-  /// (there is no public resend route). Generic 200 either way, so it never
-  /// reveals whether the number has an account.
-  Future<void> requestPhoneOtp({
-    required ActorType actorType,
-    required String phone,
-  }) async {
+  /// (there is no public resend route). No `actorType` is sent: a phone number
+  /// cannot say whether it is staff or a member, so the server looks in both
+  /// planes. Generic 200 either way, so it never reveals whether the number has
+  /// an account.
+  Future<void> requestPhoneOtp({required String phone}) async {
     try {
       await _dio.post<void>(
         '/public/auth/phone-login/request-otp',
-        data: {'actorType': actorType.name, 'phone': phone},
+        data: {'phone': phone},
       );
+    } on DioException catch (e) {
+      throw _mapError(e);
+    }
+  }
+
+  /// `POST /public/auth/phone-login/verify-otp` — no gym and no role is known
+  /// yet: the server finds both from the phone number and answers with the
+  /// plane that matched (`actorType`: `staff` | `member`), the gym
+  /// (`tenantSlug`) and that plane's normal login result. The slug is saved
+  /// BEFORE the tokens so the Dio interceptor already sends `X-Tenant-Slug`
+  /// for everything after; a staff 2FA / MFA-setup challenge persists no tokens.
+  Future<PhoneLoginResult> verifyPhoneOtp({
+    required String phone,
+    required String code,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/public/auth/phone-login/verify-otp',
+        data: {'phone': phone, 'code': code},
+      );
+      final data = response.data!['data'] as Map<String, dynamic>;
+      final tenantSlug = data['tenantSlug'] as String;
+      // An API older than the `actorType` field only ever answered a member
+      // with a `member` object, so fall back to that.
+      final isMember = (data['actorType'] as String?) == 'member' ||
+          (data['actorType'] == null && data['member'] != null);
+      await _storage.saveTenantSlug(tenantSlug);
+      if (isMember) {
+        final result = MemberAuthSuccess.fromJson(data);
+        await _storage.saveSession(
+          actorType: ActorType.member,
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+        );
+        await _storage.saveMemberProfile(result.member.toJson());
+        return PhoneLoginMember(result, tenantSlug);
+      }
+      final result = StaffLoginResult.fromJson(data);
+      if (result is StaffLoginSuccess) {
+        await _storage.saveSession(
+          actorType: ActorType.staff,
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+        );
+      }
+      return PhoneLoginStaff(result, tenantSlug);
     } on DioException catch (e) {
       throw _mapError(e);
     }

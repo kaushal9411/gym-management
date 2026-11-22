@@ -68,6 +68,13 @@ export interface MemberOverviewDto {
     }[];
   };
   notifications: { unread: number };
+  /**
+   * Platform module keys switched off for this gym (plan AND kill switch), a subset of
+   * attendance | workout_plans | diet_plans | payments | live_classes | notifications. Their sections are not computed:
+   * workout/diet are `null`; attendance/billing/classes/notifications stay present but zeroed (older clients keep
+   * parsing); membership.amountPaid is `null` without `payments`. `[]` when everything is on.
+   */
+  disabledModules: string[];
 }
 
 /** `GET /portal/plan` — the member's current plan and what it includes (null data when no membership exists). */

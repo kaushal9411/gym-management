@@ -40,6 +40,7 @@ void main() {
           status: 'ACTIVE',
           maintenanceMode: false,
           primaryColor: '',
+          featureFlags: ['attendance', 'payments', 'notifications'],
         ),
       ),
     );

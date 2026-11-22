@@ -38,6 +38,16 @@ const _tenant = TenantBranding(
   status: 'ACTIVE',
   maintenanceMode: false,
   primaryColor: '',
+  // Every module the dashboard gates on (see the flag tests in
+  // feature_flags_test.dart for the switched-off cases).
+  featureFlags: [
+    'attendance',
+    'workout_plans',
+    'diet_plans',
+    'live_classes',
+    'payments',
+    'notifications',
+  ],
 );
 
 MemberPortalProfile _profile({String? qr}) => MemberPortalProfile(
@@ -135,22 +145,24 @@ void main() {
   Future<List<int>> pump(
     WidgetTester t, {
     Size size = const Size(360, 740),
+    TenantBranding tenant = _tenant,
+    _Session? sessionOut,
   }) async {
     final taps = <int>[];
     t.view.physicalSize = size * 2;
     t.view.devicePixelRatio = 2;
     addTearDown(t.view.reset);
-    final session = _Session();
+    final session = sessionOut ?? _Session();
     when(() => session.state).thenReturn(
-      const SessionAuthenticatedMember(
-        MemberProfile(
+      SessionAuthenticatedMember(
+        const MemberProfile(
           id: 'm1',
           memberId: 'MEM-0001',
           name: 'Asha Rao',
           email: 'asha@x.test',
           status: 'ACTIVE',
         ),
-        _tenant,
+        tenant,
       ),
     );
     final router = GoRouter(
@@ -336,5 +348,122 @@ void main() {
     await pump(t, size: const Size(1500, 1300));
     await show(t, find.text('My data'));
     expect(t.takeException(), isNull);
+  });
+
+  // ── module flags: a switched-off module's tiles/cards/actions are gone ─────
+  group('feature flags', () {
+    const all = [
+      'attendance',
+      'workout_plans',
+      'diet_plans',
+      'live_classes',
+      'payments',
+      'notifications',
+    ];
+
+    TenantBranding without(String flag) => TenantBranding(
+          slug: 't',
+          name: 'T',
+          status: 'ACTIVE',
+          maintenanceMode: false,
+          primaryColor: '',
+          featureFlags: all.where((f) => f != flag).toList(),
+        );
+
+    // Tall enough that the lazy ListView builds every card.
+    const tall = Size(360, 6000);
+
+    testWidgets('attendance off: visit tiles, hero stats and card are gone',
+        (t) async {
+      await pump(t, size: tall, tenant: without('attendance'));
+      expect(t.takeException(), isNull);
+      for (final label in [
+        'Visits this month',
+        'Current streak',
+        'Total visits',
+        'Streak',
+        'This month',
+        'Attendance',
+      ]) {
+        expect(find.text(label), findsNothing, reason: label);
+      }
+      // Everything else is untouched.
+      for (final label in [
+        'Membership',
+        'Workout progress',
+        'Diet today',
+        'Outstanding',
+        'Upcoming classes',
+        'Recent invoices',
+      ]) {
+        expect(find.text(label), findsWidgets, reason: label);
+      }
+    });
+
+    testWidgets('workout_plans off: the Workout tile and card are gone',
+        (t) async {
+      await pump(t, size: tall, tenant: without('workout_plans'));
+      expect(find.text('Workout progress'), findsNothing);
+      expect(find.text('Workout'), findsNothing);
+      expect(find.text('Diet today'), findsOneWidget);
+      expect(find.text('Attendance'), findsWidgets);
+    });
+
+    testWidgets(
+        'diet_plans off: Diet today is gone and Total visits takes its place',
+        (t) async {
+      await pump(t, size: tall, tenant: without('diet_plans'));
+      expect(find.text('Diet today'), findsNothing);
+      // hero stat + the replacement tile
+      expect(find.text('Total visits'), findsNWidgets(2));
+    });
+
+    testWidgets('live_classes off: Book class and Upcoming classes are gone',
+        (t) async {
+      final taps = await pump(t, size: tall, tenant: without('live_classes'));
+      expect(find.text('Book class'), findsNothing);
+      expect(find.text('Upcoming classes'), findsNothing);
+      expect(find.text('Renew'), findsOneWidget);
+      expect(taps, isEmpty);
+    });
+
+    testWidgets('payments off: Outstanding, invoices and Renew are gone',
+        (t) async {
+      await pump(t, size: tall, tenant: without('payments'));
+      expect(find.text('Outstanding'), findsNothing);
+      expect(find.text('Recent invoices'), findsNothing);
+      expect(find.text('Renew'), findsNothing);
+      expect(find.text('Book class'), findsOneWidget);
+      // ...and the invoices request is not even made.
+      verifyNever(() => repo.invoices(limit: any(named: 'limit')));
+    });
+
+    testWidgets('notifications off: the bell is not shown, no unread poll',
+        (t) async {
+      await pump(t, size: tall, tenant: without('notifications'));
+      expect(find.byIcon(Icons.notifications_outlined), findsNothing);
+    });
+
+    testWidgets('all modules on: every entry point is back', (t) async {
+      await pump(t, size: tall);
+      expect(find.byIcon(Icons.notifications_outlined), findsOneWidget);
+      expect(find.text('Book class'), findsOneWidget);
+    });
+
+    testWidgets(
+        'server disabledModules hides a section and triggers a flag refresh',
+        (t) async {
+      final overview = fullFixture()..['disabledModules'] = ['diet_plans'];
+      when(() => repo.overview())
+          .thenAnswer((_) async => MemberOverview.fromJson(overview));
+      final session = _Session();
+      when(
+        () => session.refreshTenant(minInterval: any(named: 'minInterval')),
+      ).thenAnswer((_) async {});
+      await pump(t, size: tall, sessionOut: session);
+      expect(find.text('Diet today'), findsNothing);
+      // the tenant still lists diet_plans as on -> stale flags -> re-resolve
+      verify(() => session.refreshTenant()).called(1);
+    });
   });
 }

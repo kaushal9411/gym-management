@@ -4,33 +4,25 @@ import 'package:go_router/go_router.dart';
 import '../../../core/di/service_locator.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/routing/app_routes.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../repositories/public_tenant_repository.dart';
-import '../../../shared/widgets/app_button.dart';
-import '../../../shared/widgets/app_card.dart';
-import '../../../shared/widgets/app_labeled_field.dart';
-import '../../../shared/widgets/app_state_views.dart';
+import 'auth_widgets.dart';
 
 class ForgotPasswordScreenArgs {
-  const ForgotPasswordScreenArgs({
-    required this.role,
-    this.prefill,
-  });
+  const ForgotPasswordScreenArgs({this.prefill});
 
-  /// Only the starting look (colours/labels) while the field is empty — the
-  /// role afterwards follows what is typed.
-  final AppRole role;
+  /// Whatever was already typed on the login screen.
   final String? prefill;
 }
 
-/// Not a literal design frame (the login screens only link out to this),
-/// built with the same component vocabulary. No gym is asked for or resolved:
-/// the one field (work email or Member ID) goes to
-/// `POST /public/auth/forgot-password` and the server emails a reset link for
-/// every gym that identifier exists in — always succeeds without revealing
-/// whether the account exists, so the UI shows one generic confirmation
-/// regardless of the response.
+/// Same visual system as [LoginScreen] (`auth_widgets.dart`): aurora, glass
+/// card, one *Email or Member ID* field with the live role chip, shimmering
+/// "Send reset link" button, shake + haptic on a bad submit and an animated
+/// "Check your email" success state. No gym is asked for or resolved: the one
+/// identifier goes to `POST /public/auth/forgot-password` and the server emails
+/// a reset link for every gym that identifier exists in — it always succeeds
+/// without revealing whether the account exists, so the UI shows one generic
+/// confirmation regardless of the response.
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key, required this.args});
 
@@ -40,184 +32,233 @@ class ForgotPasswordScreen extends StatefulWidget {
   State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
+    with TickerProviderStateMixin {
   late final _controller =
       TextEditingController(text: widget.args.prefill ?? '');
+  final _focus = FocusNode();
+
+  late final AuthMotion _motion = AuthMotion(this);
+
   bool _loading = false;
   bool _sent = false;
-  String? _error;
 
-  /// One field for both: an email is staff, anything else a Member ID. An
-  /// empty field falls back to the role the login screen detected.
-  bool get _isStaff {
-    final t = _controller.text.trim();
-    if (t.isEmpty) return widget.args.role == AppRole.staff;
-    return t.contains('@');
-  }
+  /// Whether the identifier that was submitted was an email (staff) — decides
+  /// which confirmation copy is shown.
+  bool _sentToStaff = true;
+  String? _formError;
+  String? _fieldError;
 
-  AppRole get _role => _isStaff ? AppRole.staff : AppRole.member;
+  /// One field for both: an email is staff, anything else a Member ID.
+  AuthWho get _who => AuthWho.detect(_controller.text);
 
   @override
   void initState() {
     super.initState();
     _controller.addListener(() => setState(() {}));
+    _focus.addListener(() => setState(() {}));
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _motion.syncReducedMotion(context);
   }
 
   @override
   void dispose() {
+    _motion.dispose();
     _controller.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     final value = _controller.text.trim();
     if (value.isEmpty) {
-      setState(
-        () => _error =
-            _isStaff ? 'Enter your work email' : 'Enter your Member ID',
-      );
+      setState(() {
+        _formError = null;
+        _fieldError = 'Enter your email or Member ID';
+      });
+      _motion.failFeedback(context);
       return;
     }
+    FocusScope.of(context).unfocus();
     setState(() {
       _loading = true;
-      _error = null;
+      _formError = null;
+      _fieldError = null;
     });
     try {
       await getIt<PublicTenantRepository>().forgotPassword(identifier: value);
       if (!mounted) return;
-      setState(() => _sent = true);
+      setState(() {
+        _sentToStaff = value.contains('@');
+        _sent = true;
+      });
     } on ApiException catch (e) {
       if (!mounted) return;
       // Maintenance is not a form error — the app-wide Maintenance screen
       // takes over; show nothing here.
       if (e.isMaintenance) return;
-      setState(() => _error = e.message);
+      setState(() => _formError = e.message);
+      _motion.failFeedback(context);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
+  void _backToSignIn() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AppRoutes.login);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final role = _role;
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        elevation: 0,
-        title: const Text('Reset password'),
+    return AuthScene(
+      motion: _motion,
+      hero: AuthHero(
+        pulse: _motion.aurora,
+        title: 'Reset password',
+        subtitle: _sent
+            ? 'Your reset link is on its way'
+            : 'We\'ll email you a link to get back in',
+        icon: _sent ? Icons.mark_email_read_rounded : Icons.lock_reset_rounded,
       ),
-      body: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: _sent
-              ? _SentConfirmation(role: role, isStaff: _isStaff)
-              : _buildForm(role),
+      card: AuthGlassCard(
+        child: AnimatedSize(
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 320),
+            switchInCurve: Curves.easeOutCubic,
+            transitionBuilder: (child, anim) => FadeTransition(
+              opacity: anim,
+              child: ScaleTransition(
+                scale: Tween(begin: 0.96, end: 1.0).animate(anim),
+                child: child,
+              ),
+            ),
+            child: _sent ? _sentBody() : _formBody(),
+          ),
         ),
       ),
-    );
-  }
-
-  Widget _buildForm(AppRole role) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          Text(
-            _isStaff
-                ? 'We\'ll email you a link to reset your password.'
-                : 'We\'ll send a reset link for your portal account.',
-            style: AppText.body(color: AppColors.inkSoft),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 22),
-          AppCard(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              children: [
-                if (_error != null) ...[
-                  FormAlert(message: _error!),
-                  const SizedBox(height: 14),
-                ],
-                AppLabeledField(
-                  label: _isStaff ? 'Work email' : 'Member ID',
-                  hintText: _isStaff ? 'you@gym.com' : 'MEM-0001',
-                  controller: _controller,
-                  keyboardType: _isStaff
-                      ? TextInputType.emailAddress
-                      : TextInputType.text,
-                  textCapitalization: _isStaff
-                      ? TextCapitalization.none
-                      : TextCapitalization.characters,
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _submit(),
-                ),
-                const SizedBox(height: 16),
-                AppButton(
-                  label: 'Send reset link',
-                  role: role,
-                  loading: _loading,
-                  onPressed: _submit,
-                ),
-              ],
-            ),
-          ),
-        ],
+      footer: AuthFooter(
+        note: _sent
+            ? null
+            : 'Staff: your work email · Members: your Member ID.\n'
+                'We never say whether an account exists.',
       ),
     );
   }
-}
 
-class _SentConfirmation extends StatelessWidget {
-  const _SentConfirmation({required this.role, required this.isStaff});
-
-  final AppRole role;
-  final bool isStaff;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: AppColors.successSoft,
-              shape: BoxShape.circle,
+  Widget _formBody() {
+    final who = _who;
+    return Column(
+      key: const ValueKey('form'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AuthErrorSlot(message: _formError),
+        GlassField(
+          controller: _controller,
+          focusNode: _focus,
+          label: 'Email or Member ID',
+          hint: 'you@gym.com  ·  MEM-0001',
+          accent: who.accent,
+          errorText: _fieldError,
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.username],
+          onSubmitted: (_) => _submit(),
+          leading: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 260),
+            transitionBuilder: (child, anim) => ScaleTransition(
+              scale: anim,
+              child: FadeTransition(opacity: anim, child: child),
             ),
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.mark_email_read_outlined,
-              color: AppColors.success,
-              size: 28,
+            child: Icon(
+              who == AuthWho.staff
+                  ? Icons.alternate_email_rounded
+                  : who == AuthWho.member
+                      ? Icons.badge_outlined
+                      : Icons.person_outline_rounded,
+              key: ValueKey(who),
+              size: 20,
             ),
           ),
-          const SizedBox(height: 18),
-          Text(
-            'Check your email',
-            style: AppText.display(size: 20),
-            textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 10),
+        WhoChip(who: who),
+        const SizedBox(height: 20),
+        AuthButton(
+          label: 'Send reset link',
+          who: who,
+          loading: _loading,
+          shimmer: _motion.shimmer,
+          icon: Icons.send_rounded,
+          onPressed: _loading ? null : _submit,
+        ),
+        const SizedBox(height: 6),
+        Center(
+          child: AuthLinkButton(
+            label: 'Back to sign in',
+            icon: Icons.arrow_back_rounded,
+            onTap: _backToSignIn,
           ),
-          const SizedBox(height: 8),
-          Text(
-            isStaff
-                ? 'If an account exists for that email, a reset link is on its way.'
-                : 'If a portal account exists for that Member ID, a reset link has been sent.',
-            style: AppText.body(color: AppColors.inkFaint),
-            textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Widget _sentBody() {
+    return Column(
+      key: const ValueKey('sent'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 4),
+        const Center(child: AuthSuccessBadge()),
+        const SizedBox(height: 4),
+        Text(
+          'Check your email',
+          style: AppText.display(size: 22, color: Colors.white),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _sentToStaff
+              ? 'If an account exists for that email, a reset link is on its way.'
+              : 'If a portal account exists for that Member ID, a reset link has been sent.',
+          style: AppText.body(
+            size: 14,
+            color: Colors.white.withValues(alpha: 0.7),
+            weight: FontWeight.w600,
           ),
-          if (!isStaff) ...[
-            const SizedBox(height: 18),
-            TextButton(
-              onPressed: () => context.push(AppRoutes.memberResetPassword),
-              child: const Text('Have a reset code? Enter it here'),
+          textAlign: TextAlign.center,
+        ),
+        if (!_sentToStaff) ...[
+          const SizedBox(height: 10),
+          Center(
+            child: AuthLinkButton(
+              label: 'Have a reset code? Enter it here',
+              icon: Icons.password_rounded,
+              onTap: () => context.push(AppRoutes.memberResetPassword),
             ),
-          ],
+          ),
         ],
-      ),
+        const SizedBox(height: 14),
+        AuthButton(
+          label: 'Back to sign in',
+          who: AuthWho.unknown,
+          loading: false,
+          shimmer: _motion.shimmer,
+          icon: Icons.arrow_back_rounded,
+          onPressed: _backToSignIn,
+        ),
+      ],
     );
   }
 }

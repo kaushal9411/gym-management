@@ -7,13 +7,13 @@ import { Activity, Clock, CreditCard, Send, UserCheck, UserPlus, Wallet } from '
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import { useCurrentBranch } from '@/features/branch/hooks/use-branches';
 import { useInvoiceList } from '@/features/finance/hooks/use-finance';
 import { type Accent, PanelCard, accentVar, formatMoney, tint } from '@/features/members/components/detail/detail-ui';
 import { isPaginated, useRecentActivities, useReportData } from '@/features/reports/hooks/use-reports';
 import { useCurrencySymbol } from '@/lib/currency';
 import { formatRelativeTime } from '@/lib/format-relative-time';
+import { useDashboardModules, useDashboardPanels } from '../hooks/use-dashboard-modules';
 
 const AVATAR_TONES: Accent[] = ['primary', 'violet', 'aqua', 'warning', 'destructive', 'success'];
 
@@ -51,10 +51,10 @@ interface ExpiringRow {
 }
 
 export function ExpiringPanel() {
-  const { hasPermission } = usePermissions();
+  const panels = useDashboardPanels();
   const { currentBranchId } = useCurrentBranch();
-  const report = useReportData<ExpiringRow>('expiring-memberships', { limit: 6, branchId: currentBranchId ?? undefined });
-  if (!hasPermission('reports:view')) return null;
+  const report = useReportData<ExpiringRow>('expiring-memberships', { limit: 6, branchId: currentBranchId ?? undefined }, panels.expiring);
+  if (!panels.expiring) return null;
 
   const rows = isPaginated(report.data) ? report.data.items : ((report.data as ExpiringRow[] | undefined) ?? []);
 
@@ -91,12 +91,12 @@ export function ExpiringPanel() {
 
 export function OutstandingPanel() {
   const symbol = useCurrencySymbol();
-  const { hasPermission } = usePermissions();
+  const panels = useDashboardPanels();
   const { currentBranchId } = useCurrentBranch();
   const branchId = currentBranchId ?? undefined;
-  const unpaid = useInvoiceList({ page: 1, limit: 6, status: 'UNPAID', sortBy: 'dueDate', sortDir: 'asc', branchId });
-  const overdue = useInvoiceList({ page: 1, limit: 6, status: 'OVERDUE', sortBy: 'dueDate', sortDir: 'asc', branchId });
-  if (!hasPermission('finance:view')) return null;
+  const unpaid = useInvoiceList({ page: 1, limit: 6, status: 'UNPAID', sortBy: 'dueDate', sortDir: 'asc', branchId }, { enabled: panels.outstanding });
+  const overdue = useInvoiceList({ page: 1, limit: 6, status: 'OVERDUE', sortBy: 'dueDate', sortDir: 'asc', branchId }, { enabled: panels.outstanding });
+  if (!panels.outstanding) return null;
 
   const items = [...(overdue.data?.items ?? []), ...(unpaid.data?.items ?? [])].slice(0, 6);
   const total = items.reduce((s, i) => s + Number(i.totalAmount), 0);
@@ -146,11 +146,12 @@ const ACTIVITY_ICON = { PAYMENT: Wallet, CHECK_IN: UserCheck, NEW_MEMBER: UserPl
 const ACTIVITY_TONE: Record<keyof typeof ACTIVITY_ICON, Accent> = { PAYMENT: 'success', CHECK_IN: 'aqua', NEW_MEMBER: 'violet' };
 
 export function ActivityPanel() {
-  const { hasPermission } = usePermissions();
+  const { has, kpisEnabled } = useDashboardModules();
   const { currentBranchId } = useCurrentBranch();
-  const { data, isPending } = useRecentActivities(currentBranchId ?? undefined);
-  if (!hasPermission('reports:view')) return null;
-  const items = data ?? [];
+  const { data, isPending } = useRecentActivities(currentBranchId ?? undefined, kpisEnabled);
+  if (!kpisEnabled) return null;
+  // The API already omits entries of disabled modules; this also drops them if a stale response still carries some.
+  const items = (data ?? []).filter((a) => (a.type === 'PAYMENT' ? has('payments') : a.type === 'CHECK_IN' ? has('attendance') : true));
 
   return (
     <PanelCard icon={Activity} accent="primary" title="Live activity" delay={0.62}>

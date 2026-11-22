@@ -1,7 +1,9 @@
+import 'package:equatable/equatable.dart';
+
 /// Mirrors `ResolvedTenant` (`apps/api/.../tenants/interfaces/tenant.interface.ts`)
 /// as returned by `GET /public/tenants/resolve?slug=`. Only the fields the
 /// pre-login "Find your gym" / login screens actually use are modeled.
-class TenantBranding {
+class TenantBranding extends Equatable {
   const TenantBranding({
     required this.slug,
     required this.name,
@@ -30,6 +32,21 @@ class TenantBranding {
   /// the same way, so a tile a plan doesn't include doesn't dead-end at a
   /// 403 when tapped.
   final List<String> featureFlags;
+
+  /// Value equality over every field (flags compared order-insensitively), so
+  /// `SessionCubit.refreshTenant` can tell a real change from a re-fetch of the
+  /// same gym.
+  @override
+  List<Object?> get props => [
+        slug,
+        name,
+        status,
+        maintenanceMode,
+        primaryColor,
+        logoUrl,
+        maintenanceMessage,
+        ([...featureFlags]..sort()).join(','),
+      ];
 
   /// First two letters of each of the first two words — "Kaushal Fitness
   /// Studio" -> "KF" — used by [BrandMark.initials] when there's no logo.

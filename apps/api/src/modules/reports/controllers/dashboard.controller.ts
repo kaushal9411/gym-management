@@ -10,17 +10,17 @@ function serviceFor(req: Request): DashboardService {
 export class DashboardController {
   async getSummary(req: Request, res: Response): Promise<void> {
     const branchId = req.query.branchId as string | undefined;
-    sendSuccess(res, await serviceFor(req).getSummary(req.auth!.sub, branchId));
+    sendSuccess(res, await serviceFor(req).getSummary(req.auth!.sub, branchId, req.tenant!.featureFlags));
   }
 
   async getKpis(req: Request, res: Response): Promise<void> {
     const branchId = req.query.branchId as string | undefined;
-    sendSuccess(res, await serviceFor(req).getKpis(req.auth!.sub, branchId));
+    sendSuccess(res, await serviceFor(req).getKpis(req.auth!.sub, branchId, req.tenant!.featureFlags));
   }
 
   async getRecentActivities(req: Request, res: Response): Promise<void> {
     const branchId = req.query.branchId as string | undefined;
-    sendSuccess(res, await serviceFor(req).getRecentActivities(req.auth!.sub, branchId));
+    sendSuccess(res, await serviceFor(req).getRecentActivities(req.auth!.sub, branchId, 10, req.tenant!.featureFlags));
   }
 }
 

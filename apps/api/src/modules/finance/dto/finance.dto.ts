@@ -375,4 +375,11 @@ export interface FinanceDashboardDto {
   outstandingInvoiceCount: number;
   recentPayments: MemberPaymentListItemDto[];
   revenueTrend: { date: string; income: number; expenses: number }[];
+  /**
+   * Module keys (subset of income | expenses | payments) switched off for this gym. That part is zeroed / emptied (never
+   * null: web types and the Dart model hard-cast these fields): income off -> todayIncome/monthlyIncome "0.00" and trend
+   * income 0; expenses off -> monthlyExpenses "0.00" and trend expenses 0; payments off -> outstanding 0 and no
+   * recentPayments. `[]` when everything is on.
+   */
+  disabledModules: string[];
 }

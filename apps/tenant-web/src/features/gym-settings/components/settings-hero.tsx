@@ -7,16 +7,18 @@ import type { LucideIcon } from 'lucide-react';
 
 import { Skeleton } from '@/components/ui/skeleton';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
+import { useTenant } from '@/features/tenant/tenant-provider';
 import { ReportsHero, type ReportsHeroStat } from '@/features/reports/components/ui';
 import { useSetupProgress } from './setup-progress';
 
-const TABS: { value: string; label: string; href: string; icon: LucideIcon }[] = [
+/** `featureFlag`: tab only shown while that module is enabled for the tenant. */
+const TABS: { value: string; label: string; href: string; icon: LucideIcon; featureFlag?: string }[] = [
   { value: 'profile', label: 'Profile', href: '/gym-settings/profile', icon: Building2 },
   { value: 'business', label: 'Business', href: '/gym-settings/business', icon: SlidersHorizontal },
   { value: 'branding', label: 'Branding', href: '/gym-settings/branding', icon: Palette },
   { value: 'invoice', label: 'Invoice', href: '/gym-settings/invoice', icon: Receipt },
   { value: 'security', label: 'Security', href: '/gym-settings/security', icon: ShieldCheck },
-  { value: 'ai', label: 'AI', href: '/gym-settings/ai', icon: Bot },
+  { value: 'ai', label: 'AI', href: '/gym-settings/ai', icon: Bot, featureFlag: 'ai_coach' },
 ];
 
 /**
@@ -39,9 +41,11 @@ export function SettingsHero({
 }) {
   const pathname = usePathname();
   const { hasPermission } = usePermissions();
+  const { featureFlags } = useTenant();
+  const tabs = React.useMemo(() => TABS.filter((t) => !t.featureFlag || featureFlags.includes(t.featureFlag)), [featureFlags]);
   const canRead = hasPermission('settings:read');
   const progress = useSetupProgress();
-  const active = TABS.find((t) => pathname === t.href || pathname.startsWith(`${t.href}/`))?.value;
+  const active = tabs.find((t) => pathname === t.href || pathname.startsWith(`${t.href}/`))?.value;
 
   const setupStat: ReportsHeroStat | null = canRead
     ? { label: 'Setup complete', value: progress.loading ? <Skeleton className="h-7 w-16 bg-white/25" /> : progress.percent === null ? '-' : progress.percent, format: 'percent' }
@@ -57,7 +61,7 @@ export function SettingsHero({
       icon={icon}
       stats={allStats.length ? allStats : undefined}
       actions={actions}
-      tabs={canRead ? TABS : undefined}
+      tabs={canRead ? tabs : undefined}
       activeTab={active}
     />
   );

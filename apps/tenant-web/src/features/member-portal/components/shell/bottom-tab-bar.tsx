@@ -6,15 +6,17 @@ import { motion } from 'framer-motion';
 import { Ellipsis } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { isNavActive, PORTAL_NAV } from '../../lib/nav';
+import { usePortalNav } from '../../hooks/use-portal-nav';
+import { isNavActive } from '../../lib/nav';
 import { MoreSheet } from './more-sheet';
 
 /** Fixed phone bottom bar (<md): the `bar: true` nav items + "More" (opens `MoreSheet`). Safe-area padded; active tab has a shared-layout pill. */
 export function BottomTabBar({ pathname, unread }: { pathname: string; unread: number }) {
   const pillId = React.useId();
   const [moreOpen, setMoreOpen] = React.useState(false);
-  const barItems = PORTAL_NAV.filter((i) => i.bar);
-  const moreActive = !barItems.some((i) => isNavActive(i, pathname)) && PORTAL_NAV.some((i) => isNavActive(i, pathname));
+  const nav = usePortalNav();
+  const barItems = nav.filter((i) => i.bar);
+  const moreActive = !barItems.some((i) => isNavActive(i, pathname)) && nav.some((i) => isNavActive(i, pathname));
 
   const tabCls = 'relative flex min-h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors focus-visible:outline-none';
   const pill = (

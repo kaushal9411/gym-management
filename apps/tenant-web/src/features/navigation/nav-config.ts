@@ -25,6 +25,12 @@ import {
   Ruler,
   Fingerprint,
   Target,
+  BriefcaseBusiness,
+  LayoutGrid,
+  Wallet,
+  CalendarDays,
+  UserRound,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 export interface NavItem {
@@ -38,6 +44,17 @@ export interface NavItem {
   featureFlag?: string;
   /** Purely presentational sidebar grouping (section header) — never affects access/visibility logic. */
   section?: string;
+  /** Optional permission-filtered sub-links shown under the item while its section is open (sidebar only). */
+  children?: NavChild[];
+}
+
+export interface NavChild {
+  key: string;
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  /** Any-of when an array. Omit to inherit the parent's visibility. */
+  permission?: string | string[];
 }
 
 /**
@@ -68,6 +85,24 @@ export const NAV_ITEMS: NavItem[] = [
     permission: 'staff:view',
     featureFlag: 'staff',
     section: 'People',
+  },
+  {
+    // One top-level entry; sub-links are permission-filtered. Visible with ANY hr:* key (managers see the whole set, self-service staff only "My HR"). No featureFlag: HR is not a plan module.
+    key: 'hr',
+    label: 'HR',
+    href: '/hr',
+    icon: BriefcaseBusiness,
+    permission: ['hr:view', 'hr:attendance_manage', 'hr:leave_manage', 'hr:payroll_manage', 'hr:settings_manage', 'hr:self_attendance', 'hr:self_leave', 'hr:self_payslip'],
+    section: 'People',
+    children: [
+      { key: 'hr-overview', label: 'Overview', href: '/hr', icon: LayoutGrid, permission: 'hr:view' },
+      { key: 'hr-employees', label: 'Employees', href: '/hr/employees', icon: Contact, permission: 'hr:view' },
+      { key: 'hr-attendance', label: 'Attendance', href: '/hr/attendance', icon: CalendarCheck, permission: 'hr:view' },
+      { key: 'hr-leaves', label: 'Leaves', href: '/hr/leaves', icon: CalendarDays, permission: 'hr:leave_manage' },
+      { key: 'hr-payroll', label: 'Payroll', href: '/hr/payroll', icon: Wallet, permission: 'hr:payroll_manage' },
+      { key: 'hr-setup', label: 'Setup', href: '/hr/setup', icon: SlidersHorizontal, permission: 'hr:view' },
+      { key: 'hr-me', label: 'My HR', href: '/hr/me', icon: UserRound, permission: ['hr:self_attendance', 'hr:self_leave', 'hr:self_payslip'] },
+    ],
   },
   { key: 'branches', label: 'Branches', href: '/branches', icon: Building2, permission: 'branches:view', featureFlag: 'branches', section: 'People' },
   {

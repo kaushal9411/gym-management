@@ -5,6 +5,7 @@ import { CalendarClock, CalendarDays, CircleDollarSign, Flame, Hourglass, Wallet
 
 import { useAttendanceList, useMemberAttendance } from '@/features/attendance/hooks/use-attendance';
 import type { MemberDetail } from '@/features/members/types';
+import { useFeatureFlagSet } from '@/features/tenant/use-feature-flag';
 import { useCurrencySymbol } from '@/lib/currency';
 import { Accent, CountUp, IconChip, accentVar, tint } from './detail-ui';
 import { toIsoDate } from './date-utils';
@@ -26,36 +27,50 @@ function lastVisitLabel(iso: string | undefined): string {
   return `${days} days ago`;
 }
 
+/** Static class names (Tailwind must see them), keyed by how many tiles are visible. */
+const GRID_COLS: Record<number, string> = {
+  1: 'sm:grid-cols-1 xl:grid-cols-1',
+  2: 'sm:grid-cols-2 xl:grid-cols-2',
+  3: 'sm:grid-cols-3 xl:grid-cols-3',
+  4: 'sm:grid-cols-2 xl:grid-cols-4',
+  5: 'sm:grid-cols-3 xl:grid-cols-5',
+  6: 'sm:grid-cols-3 xl:grid-cols-6',
+};
+
 export function MemberStatTiles({ data }: { data: MemberDetail }) {
   const symbol = useCurrencySymbol();
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const month = useAttendanceList({ memberId: data.id, dateFrom: toIsoDate(monthStart), dateTo: toIsoDate(monthEnd), page: 1, limit: 1 });
-  const overall = useMemberAttendance(data.id, 1, 1);
+  const flags = useFeatureFlagSet();
+  const attendanceOn = flags.has('attendance');
+  const paymentsOn = flags.has('payments');
+  const month = useAttendanceList({ memberId: data.id, dateFrom: toIsoDate(monthStart), dateTo: toIsoDate(monthEnd), page: 1, limit: 1 }, attendanceOn);
+  const overall = useMemberAttendance(attendanceOn ? data.id : null, 1, 1);
   const { totalPaid, due } = useMemberMoney(data.id, data.outstandingAmount);
 
   const endDate = data.currentMembership ? new Date(data.currentMembership.endDate) : null;
   const daysLeft = endDate ? Math.max(0, Math.ceil((endDate.getTime() - now.getTime()) / 86_400_000)) : 0;
   const lastVisit = overall.data?.items[0]?.checkInTime;
 
-  const tiles: Tile[] = [
-    {
+  // Visit tiles come from /attendance and the money tiles from /payments: each group disappears with its module.
+  const allTiles: Array<Tile | null> = [
+    !attendanceOn ? null : {
       key: 'month',
       label: `Visits in ${now.toLocaleString(undefined, { month: 'short', year: 'numeric' })}`,
       icon: CalendarDays,
       accent: 'primary',
       value: <CountUp value={month.data?.total ?? 0} />,
     },
-    { key: 'total', label: 'Total visits', icon: Flame, accent: 'violet', value: <CountUp value={overall.data?.total ?? 0} /> },
-    {
+    !attendanceOn ? null : { key: 'total', label: 'Total visits', icon: Flame, accent: 'violet', value: <CountUp value={overall.data?.total ?? 0} /> },
+    !attendanceOn ? null : {
       key: 'last',
       label: lastVisit ? `Last visit · ${new Date(lastVisit).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Last visit',
       icon: CalendarClock,
       accent: 'aqua',
       value: <span className="text-xl">{lastVisitLabel(lastVisit)}</span>,
     },
-    {
+    !paymentsOn ? null : {
       key: 'paid',
       label: 'Total paid',
       icon: Wallet,
@@ -67,7 +82,7 @@ export function MemberStatTiles({ data }: { data: MemberDetail }) {
         </>
       ),
     },
-    {
+    !paymentsOn ? null : {
       key: 'due',
       label: 'Due now',
       icon: CircleDollarSign,
@@ -93,9 +108,12 @@ export function MemberStatTiles({ data }: { data: MemberDetail }) {
       ),
     },
   ];
+  const tiles = allTiles.filter((t): t is Tile => t !== null);
+  // Reflow so a smaller set of tiles still fills every row (6 -> 3/6 columns, 4 -> 2/4, 3 -> 3, 1 -> 1).
+  const cols = GRID_COLS[tiles.length] ?? GRID_COLS[6]!;
 
   return (
-    <section aria-label="Summary" className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+    <section aria-label="Summary" className={`grid grid-cols-2 gap-3 ${cols}`}>
       {tiles.map((tile, i) => (
         <motion.div
           key={tile.key}
@@ -103,7 +121,7 @@ export function MemberStatTiles({ data }: { data: MemberDetail }) {
           animate={{ opacity: 1, y: 0 }}
           whileHover={{ y: -3 }}
           transition={{ duration: 0.45, delay: 0.05 * i }}
-          className="rounded-2xl border p-4 shadow-xs"
+          className={`rounded-2xl border p-4 shadow-xs ${tiles.length % 2 === 1 && i === tiles.length - 1 ? 'col-span-2 sm:col-span-1' : ''}`}
           style={{
             backgroundImage: `linear-gradient(160deg, ${tint(tile.accent, 14)}, transparent 70%)`,
             borderColor: tint(tile.accent, 25),

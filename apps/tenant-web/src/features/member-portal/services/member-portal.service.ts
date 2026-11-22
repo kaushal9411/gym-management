@@ -520,6 +520,8 @@ export interface MemberOverview {
   billing: { outstanding: { value: string | number; invoiceCount: number }; nextDueDate: string | null; paidLast90Days: { value: string | number; count: number } };
   classes: { upcoming: { sessionId: string; name: string; date: string; startTime: string; endTime: string; trainerName: string | null; bookingStatus: string }[] };
   notifications: { unread: number };
+  /** Modules the API reports as switched off (attendance, workout_plans, diet_plans, payments, live_classes, notifications): their sections are zeroed/null, so the UI hides them instead of showing zeros. Absent on older servers. */
+  disabledModules?: string[];
 }
 
 /** `GET /portal/gym` - gym + the member's branch contact info (every field may be null: hide the element). */

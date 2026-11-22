@@ -64,11 +64,25 @@ class MemberHero extends StatelessWidget {
     required this.onBook,
     required this.onQr,
     required this.onProfile,
+    this.showVisitStats = true,
+    this.showBook = true,
+    this.showRenew = true,
     super.key,
   });
 
   /// The avatar opens My Profile (view and edit).
   final VoidCallback onProfile;
+
+  /// Total visits / Streak / This month — hidden when the gym's attendance
+  /// module is off.
+  final bool showVisitStats;
+
+  /// The "Book class" action — hidden when the live-classes module is off.
+  final bool showBook;
+
+  /// The "Renew" action (an online checkout) — hidden when the payments
+  /// module is off.
+  final bool showRenew;
 
   final MemberOverview overview;
   final String greeting;
@@ -85,6 +99,28 @@ class MemberHero extends StatelessWidget {
     final m = o.membership;
     final first = displayName.trim().split(RegExp(r'\s+')).first;
     final urgent = m == null || m.expired || m.daysLeft <= 14;
+    // Renew / Book class / My QR — each only while its module is on.
+    final actions = <Widget>[
+      if (showRenew)
+        MemberHeroButton(
+          icon: Icons.credit_card_rounded,
+          label: 'Renew',
+          solid: urgent,
+          onTap: onRenew,
+        ),
+      if (showBook)
+        MemberHeroButton(
+          icon: Icons.event_available_rounded,
+          label: 'Book class',
+          onTap: onBook,
+        ),
+      if (hasQr)
+        MemberHeroButton(
+          icon: Icons.qr_code_2_rounded,
+          label: 'My QR',
+          onTap: onQr,
+        ),
+    ];
     final subtitle = m == null
         ? 'No active membership yet'
         : m.expired
@@ -207,45 +243,27 @@ class MemberHero extends StatelessWidget {
                     ],
                   ],
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    _HeroStat('Total visits', o.attendance.totalVisits),
-                    _HeroStat('Streak', o.attendance.currentStreakDays),
-                    _HeroStat('This month', o.attendance.thisMonthVisits),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: MemberHeroButton(
-                        icon: Icons.credit_card_rounded,
-                        label: 'Renew',
-                        solid: urgent,
-                        onTap: onRenew,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: MemberHeroButton(
-                        icon: Icons.event_available_rounded,
-                        label: 'Book class',
-                        onTap: onBook,
-                      ),
-                    ),
-                    if (hasQr) ...[
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: MemberHeroButton(
-                          icon: Icons.qr_code_2_rounded,
-                          label: 'My QR',
-                          onTap: onQr,
-                        ),
-                      ),
+                if (showVisitStats) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      _HeroStat('Total visits', o.attendance.totalVisits),
+                      _HeroStat('Streak', o.attendance.currentStreakDays),
+                      _HeroStat('This month', o.attendance.thisMonthVisits),
                     ],
-                  ],
-                ),
+                  ),
+                ],
+                if (actions.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      for (var i = 0; i < actions.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 8),
+                        Expanded(child: actions[i]),
+                      ],
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

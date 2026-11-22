@@ -1,11 +1,14 @@
 import { BUSINESS_TIMEZONE } from '../../../core/utils/business-time';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
+import { getEnabledModules, type FlagModuleKey } from '../../tenants/utils/module-enabled.util';
 
 const DAY_MS = 86_400_000;
 
 interface ContextSection {
   /** The exact permission key that must be present for this section to be included — mirrors "Never expose unauthorized tenant data": a user without `finance:view` never sees revenue numbers in their own AI context, even indirectly via a summary. */
   permission: string;
+  /** The platform feature-flag module this section reports on. When the tenant has it switched off the section is omitted entirely (no attendance numbers for a gym without Attendance). Sections without a flag (members, staff, branches, memberships, settings) are core and always allowed. */
+  module?: FlagModuleKey;
   build: (db: ReturnType<typeof getTenantScopedClient>, tenantId: string) => Promise<string>;
 }
 
@@ -44,6 +47,7 @@ const SECTIONS: ContextSection[] = [
   },
   {
     permission: 'attendance:view',
+    module: 'attendance',
     build: async (db) => {
       const todayStart = new Date();
       todayStart.setUTCHours(0, 0, 0, 0);
@@ -53,6 +57,7 @@ const SECTIONS: ContextSection[] = [
   },
   {
     permission: 'workouts:view',
+    module: 'workout_plans',
     build: async (db) => {
       const [plans, assigned] = await Promise.all([db.workoutPlan.count({ where: { deletedAt: null } }), db.memberWorkoutPlan.count({ where: { endDate: null } })]);
       return `Workout: ${plans} workout plan(s) in the library, ${assigned} member(s) currently assigned one.`;
@@ -60,6 +65,7 @@ const SECTIONS: ContextSection[] = [
   },
   {
     permission: 'diets:view',
+    module: 'diet_plans',
     build: async (db) => {
       const [plans, assigned] = await Promise.all([db.dietPlan.count({ where: { deletedAt: null } }), db.memberDietPlan.count({ where: { endDate: null } })]);
       return `Diet: ${plans} diet plan(s) in the library, ${assigned} member(s) currently assigned one.`;
@@ -67,6 +73,7 @@ const SECTIONS: ContextSection[] = [
   },
   {
     permission: 'finance:view',
+    module: 'payments', // the snapshot is payments + invoices (income/expenses figures are not part of it)
     build: async (db) => {
       const monthStart = new Date();
       monthStart.setUTCDate(1);
@@ -80,6 +87,7 @@ const SECTIONS: ContextSection[] = [
   },
   {
     permission: 'reports:view',
+    module: 'reports',
     build: async (db) => {
       const scheduled = await db.scheduledReport.count({ where: { isActive: true } });
       return `Reports: ${scheduled} scheduled report(s) configured; on-demand reports (attendance, revenue, branch performance, member growth) are available via the Reports Center.`;
@@ -87,6 +95,7 @@ const SECTIONS: ContextSection[] = [
   },
   {
     permission: 'notifications:view',
+    module: 'notifications',
     build: async (db) => {
       const unread = await db.tenantNotification.count({ where: { readAt: null } });
       return `Notifications: ${unread} unread in the Notification Center.`;
@@ -106,15 +115,17 @@ const SECTIONS: ContextSection[] = [
  * system prompt — permission-gated per section so a role missing e.g.
  * `finance:view` never gets revenue figures surfaced through the AI either,
  * closing the same gap `requirePermission` closes for the REST API itself.
+ * Also gated per tenant feature flag (`section.module`): a module the gym has switched off contributes no snapshot line.
  * Read-only, best-effort: one section's query failing (a rare edge case,
  * not expected in practice) doesn't take down the whole context block.
  */
 export async function buildTenantContext(tenantId: string, tenantName: string, permissions: string[]): Promise<string> {
   const db = getTenantScopedClient(tenantId);
   const permissionSet = new Set(permissions);
+  const modules = await getEnabledModules(tenantId);
 
   const lines = await Promise.all(
-    SECTIONS.filter((section) => permissionSet.has(section.permission)).map(async (section) => {
+    SECTIONS.filter((section) => permissionSet.has(section.permission) && (!section.module || modules.has(section.module))).map(async (section) => {
       try {
         return await section.build(db, tenantId);
       } catch {

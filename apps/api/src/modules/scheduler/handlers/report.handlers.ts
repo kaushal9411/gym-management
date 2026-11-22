@@ -4,6 +4,7 @@ import { ScheduledReportRepository } from '../../reports/repositories/scheduled-
 import { ReportExportService } from '../../reports/services/report-export.service';
 import { computeNextRunAt } from '../../reports/services/scheduled-report.service';
 import { sendGatedEmail } from '../../tenant-notifications/services/channel-gate.service';
+import { moduleGate } from '../../tenants/utils/module-enabled.util';
 import type { JobHandler } from '../types';
 
 const DAY_MS = 86_400_000;
@@ -13,13 +14,23 @@ const DAY_MS = 86_400_000;
  * registration — identical `runDueReports`/`runOne` logic (including the
  * documented "no attachment support" plain-text-table limitation), now
  * triggered by this module's registry instead of its own `repeat`.
+ *
+ * Schedules of gyms with the `reports` module switched off are skipped per tenant and left untouched (`nextRunAt` is not
+ * advanced), so each runs once as soon as the module is switched back on.
  */
 export const tenantScheduledReportsDispatch: JobHandler = async () => {
   const due = await ScheduledReportRepository.findDueAcrossTenants(prisma, new Date());
+  const reportsEnabled = moduleGate('reports', 'tenant-scheduled-reports-dispatch');
   let succeeded = 0;
   let failed = 0;
+  let skipped = 0;
 
   for (const schedule of due) {
+    // eslint-disable-next-line no-await-in-loop -- memoised per tenant, one flag read per gym per run
+    if (!(await reportsEnabled(schedule.tenantId))) {
+      skipped += 1;
+      continue;
+    }
     try {
       // eslint-disable-next-line no-await-in-loop -- sequential across a small, infrequent (hourly) batch of due schedules; no throughput requirement justifies parallelizing
       await runOne(schedule);
@@ -28,7 +39,7 @@ export const tenantScheduledReportsDispatch: JobHandler = async () => {
       failed += 1;
     }
   }
-  return { scanned: due.length, succeeded, failed };
+  return { scanned: due.length, succeeded, failed, skipped };
 };
 
 async function runOne(schedule: Awaited<ReturnType<typeof ScheduledReportRepository.findDueAcrossTenants>>[number]): Promise<void> {

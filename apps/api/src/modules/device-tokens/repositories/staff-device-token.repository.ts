@@ -41,4 +41,11 @@ export class StaffDeviceTokenRepository {
     const rows = await this.db.staffDeviceToken.findMany({ where: { tenantId }, select: { token: true } });
     return rows.map((r) => r.token);
   }
+
+  /** Devices of specific staff users (HR module: per-person leave / payslip notifications). */
+  async listTokensForUsers(tenantId: string, userIds: string[]): Promise<string[]> {
+    if (userIds.length === 0) return [];
+    const rows = await this.db.staffDeviceToken.findMany({ where: { tenantId, userId: { in: userIds } }, select: { token: true } });
+    return rows.map((r) => r.token);
+  }
 }

@@ -30,12 +30,12 @@ export function useVerifyRenewalCheckout() {
   });
 }
 
-export function useMemberAttendance(page = 1, limit = 20) {
-  return useQuery({ queryKey: ['member-portal', 'attendance', page, limit], queryFn: () => memberPortalService.getAttendance(page, limit), placeholderData: keepPreviousData });
+export function useMemberAttendance(page = 1, limit = 20, enabled = true) {
+  return useQuery({ queryKey: ['member-portal', 'attendance', page, limit], queryFn: () => memberPortalService.getAttendance(page, limit), placeholderData: keepPreviousData, enabled });
 }
 
-export function useMemberWorkout() {
-  return useQuery({ queryKey: ['member-portal', 'workout'], queryFn: memberPortalService.getWorkout });
+export function useMemberWorkout(enabled = true) {
+  return useQuery({ queryKey: ['member-portal', 'workout'], queryFn: memberPortalService.getWorkout, enabled });
 }
 
 export function useMemberMeasurements() {
@@ -109,8 +109,8 @@ export function useResetWorkoutDay() {
   return useMutation({ mutationFn: (date: string) => memberPortalService.resetWorkoutDay(date), onSuccess: (r) => sync(r.workout) });
 }
 
-export function useMemberDiet() {
-  return useQuery({ queryKey: ['member-portal', 'diet'], queryFn: memberPortalService.getDiet });
+export function useMemberDiet(enabled = true) {
+  return useQuery({ queryKey: ['member-portal', 'diet'], queryFn: memberPortalService.getDiet, enabled });
 }
 
 export function useLogDiet() {
@@ -126,8 +126,8 @@ export function useLogDiet() {
   });
 }
 
-export function useMemberInvoices(page = 1, limit = 20) {
-  return useQuery({ queryKey: ['member-portal', 'invoices', page, limit], queryFn: () => memberPortalService.getInvoices(page, limit) });
+export function useMemberInvoices(page = 1, limit = 20, enabled = true) {
+  return useQuery({ queryKey: ['member-portal', 'invoices', page, limit], queryFn: () => memberPortalService.getInvoices(page, limit), enabled });
 }
 
 export function useMemberInvoice(id: string) {
@@ -157,8 +157,8 @@ export function useVerifyInvoicePaymentCheckout() {
   });
 }
 
-export function useMemberNotifications(params: { unreadOnly?: boolean; category?: MemberNotificationCategory; page?: number; limit?: number } = {}) {
-  return useQuery({ queryKey: ['member-portal', 'notifications', params], queryFn: () => memberPortalService.getNotifications(params), placeholderData: keepPreviousData });
+export function useMemberNotifications(params: { unreadOnly?: boolean; category?: MemberNotificationCategory; page?: number; limit?: number } = {}, enabled = true) {
+  return useQuery({ queryKey: ['member-portal', 'notifications', params], queryFn: () => memberPortalService.getNotifications(params), placeholderData: keepPreviousData, enabled });
 }
 
 export function useMarkMemberNotificationRead() {
@@ -181,8 +181,8 @@ export function useMemberClasses(dateFrom: string, dateTo: string) {
   return useQuery({ queryKey: ['member-portal', 'classes', dateFrom, dateTo], queryFn: () => memberPortalService.getUpcomingClasses(dateFrom, dateTo) });
 }
 
-export function useMemberBookings() {
-  return useQuery({ queryKey: ['member-portal', 'bookings'], queryFn: memberPortalService.getMyBookings });
+export function useMemberBookings(enabled = true) {
+  return useQuery({ queryKey: ['member-portal', 'bookings'], queryFn: memberPortalService.getMyBookings, enabled });
 }
 
 function useInvalidateMemberClasses() {
@@ -219,8 +219,8 @@ export function useGymInfo() {
 }
 
 /** Live unread count for the bell / nav badges (shares the notifications query family so mark-read invalidates it). */
-export function useMemberUnreadCount(): number {
-  const { data } = useMemberNotifications({ page: 1, limit: 1 });
+export function useMemberUnreadCount(enabled = true): number {
+  const { data } = useMemberNotifications({ page: 1, limit: 1 }, enabled);
   return data?.unreadCount ?? 0;
 }
 

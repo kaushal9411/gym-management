@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { DownloadAppButton } from '@/features/app-download/download-app-button';
 import { TenantLogo } from '@/features/tenant/components/tenant-logo';
 import { useTenant } from '@/features/tenant/tenant-provider';
+import { useFeatureEnabled } from '@/features/tenant/use-feature-flag';
 import { MEMBER_PORTAL_ROUTES } from '../../constants';
 import { initials } from '../../lib/format';
 import { NavBadge } from './nav-badge';
@@ -15,6 +16,7 @@ import { NavBadge } from './nav-badge';
 /** Slim sticky phone top bar (<md): tenant logo + name, bell with real unread badge, avatar menu (profile / logout). */
 export function TopBar({ name, memberId, photoUrl, unread, onLogout, loggingOut }: { name?: string; memberId?: string; photoUrl?: string | null; unread: number; onLogout: () => void; loggingOut: boolean }) {
   const tenant = useTenant();
+  const notificationsOn = useFeatureEnabled('notifications');
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b bg-background/90 px-4 pt-[env(safe-area-inset-top)] backdrop-blur-xl md:hidden">
       <Link href={MEMBER_PORTAL_ROUTES.dashboard} className="flex min-w-0 items-center gap-2.5">
@@ -23,10 +25,12 @@ export function TopBar({ name, memberId, photoUrl, unread, onLogout, loggingOut 
       </Link>
       <div className="flex items-center gap-0.5">
         <DownloadAppButton className="size-11" />
-        <Link href={MEMBER_PORTAL_ROUTES.notifications} aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'} className="relative grid size-11 place-items-center rounded-full text-muted-foreground transition active:bg-accent">
-          <Bell className="size-5" />
-          <NavBadge count={unread} className="absolute right-1 top-1" />
-        </Link>
+        {notificationsOn ? (
+          <Link href={MEMBER_PORTAL_ROUTES.notifications} aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'} className="relative grid size-11 place-items-center rounded-full text-muted-foreground transition active:bg-accent">
+            <Bell className="size-5" />
+            <NavBadge count={unread} className="absolute right-1 top-1" />
+          </Link>
+        ) : null}
         <DropdownMenu>
           <DropdownMenuTrigger aria-label="Account menu" className="grid size-11 place-items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <Avatar className="size-8">

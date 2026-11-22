@@ -87,6 +87,18 @@ gymDiscoveryRouter.post(
  *   post:
  *     tags: [Authentication]
  *     summary: Email a phone-login code without choosing a gym (no auth, no tenant)
+ *     description: |
+ *       `actorType` is optional (default `any`) — a phone number cannot say whether it is staff or a member, so `any` runs the request flow for BOTH planes in every matching login-eligible gym. `staff` / `member` still restrict it to one plane. Always the same generic 200 — never reveals whether an account exists.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [phone]
+ *             properties:
+ *               actorType: { type: string, enum: [any, staff, member], default: any }
+ *               phone: { type: string }
  *     responses:
  *       200: { description: Generic acknowledgement }
  */
@@ -103,7 +115,19 @@ gymDiscoveryRouter.post(
  *   post:
  *     tags: [Authentication]
  *     summary: Verify a phone-login code; the gym whose code it is signs the person in (no auth, no tenant)
- *     description: Returns that gym's normal login result plus `tenantSlug` so the app can load only that gym.
+ *     description: |
+ *       Returns that gym's normal login result plus `tenantSlug` and `actorType` (`staff` | `member`, the plane that matched) so the app can build the right session and load only that gym. `actorType` in the request is optional (default `any` = try the staff plane, then the member plane); `staff` / `member` restrict it to one plane. Wrong/unknown phone is a generic OTP_INVALID; a stale code OTP_EXPIRED.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [phone, code]
+ *             properties:
+ *               actorType: { type: string, enum: [any, staff, member], default: any }
+ *               phone: { type: string }
+ *               code: { type: string, example: "123456" }
  *     responses:
  *       200: { description: Login result (or a 2FA / MFA-setup challenge) with tenantSlug }
  *       401: { description: Incorrect or expired code }

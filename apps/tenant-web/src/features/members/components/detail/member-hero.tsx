@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { usePermissions } from '@/features/auth/hooks/use-permissions';
 import type { MemberDetail } from '@/features/members/types';
+import { useFeatureFlagSet } from '@/features/tenant/use-feature-flag';
 import { useCurrencySymbol } from '@/lib/currency';
 import { CountUp, ProgressBar, formatMoney } from './detail-ui';
 import { useMemberMoney } from './use-member-money';
@@ -40,7 +41,9 @@ export function MemberHero({ data, actions, canSendLink, onSendLink }: MemberHer
   const symbol = useCurrencySymbol();
   const { hasPermission } = usePermissions();
   // Communications messages only reach ACTIVE / FROZEN members (the audience API never lists the others).
-  const canMessage = hasPermission('notifications:send') && !data.deletedAt && (data.status === 'ACTIVE' || data.status === 'FROZEN');
+  const flags = useFeatureFlagSet();
+  const paymentsOn = flags.has('payments');
+  const canMessage = flags.has('notifications') && hasPermission('notifications:send') && !data.deletedAt && (data.status === 'ACTIVE' || data.status === 'FROZEN');
   const { totalPaid, due, totalBilled } = useMemberMoney(data.id, data.outstandingAmount);
   const initials = data.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
   const membership = data.currentMembership;
@@ -130,6 +133,7 @@ export function MemberHero({ data, actions, canSendLink, onSendLink }: MemberHer
         </div>
       </div>
 
+      {paymentsOn ? (
       <motion.aside
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
@@ -159,6 +163,7 @@ export function MemberHero({ data, actions, canSendLink, onSendLink }: MemberHer
           </Button>
         ) : null}
       </motion.aside>
+      ) : null}
     </motion.section>
   );
 }

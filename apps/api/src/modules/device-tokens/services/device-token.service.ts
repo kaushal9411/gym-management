@@ -33,6 +33,13 @@ export class DeviceTokenService {
     await enqueuePush({ tenantId, tokens, tokenOwner: 'STAFF', title, body, data });
   }
 
+  /** Push to specific staff users only (HR leave / payslip events — unlike `pushToStaff`, NOT tenant-wide). */
+  async pushToStaffUsers(tenantId: string, userIds: string[], title: string, body: string, data?: Record<string, string>): Promise<void> {
+    const repository = new StaffDeviceTokenRepository(getTenantScopedClient(tenantId));
+    const tokens = await repository.listTokensForUsers(tenantId, userIds);
+    await enqueuePush({ tenantId, tokens, tokenOwner: 'STAFF', title, body, data });
+  }
+
   async pushToMember(tenantId: string, memberId: string, title: string, body: string, data?: Record<string, string>): Promise<void> {
     const repository = new MemberDeviceTokenRepository(getTenantScopedClient(tenantId));
     const tokens = await repository.listTokensForMember(tenantId, memberId);

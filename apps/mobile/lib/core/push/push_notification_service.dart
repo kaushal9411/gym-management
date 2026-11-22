@@ -5,9 +5,12 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../models/tenant_branding.dart';
 import '../../repositories/device_token_repository.dart';
 import '../routing/app_routes.dart';
+import '../routing/hr_notification_routes.dart';
 import '../storage/secure_storage.dart';
+import '../utils/tenant_features.dart';
 import 'local_notifications.dart';
 
 /// FCM requires this handler be a top-level or static function (never a
@@ -32,10 +35,18 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// since there's nothing to register the token against yet and asking
 /// before the user has a reason tanks opt-in.
 class PushNotificationService {
-  PushNotificationService(this._deviceTokenRepository, this._storage);
+  PushNotificationService(
+    this._deviceTokenRepository,
+    this._storage, [
+    this._tenantProvider,
+  ]);
 
   final DeviceTokenRepository _deviceTokenRepository;
   final SecureStorage _storage;
+
+  /// The signed-in gym (for the `notifications` flag check on a tap); null when
+  /// unknown. Wired lazily in `service_locator.dart`.
+  final TenantBranding? Function()? _tenantProvider;
 
   GoRouter? _router;
   bool _listenersAttached = false;
@@ -46,6 +57,10 @@ class PushNotificationService {
     _router = router;
     _attachListenersOnce();
   }
+
+  /// Test seam: set the router without wiring the FCM listeners.
+  @visibleForTesting
+  void setRouterForTesting(GoRouter router) => _router = router;
 
   void _attachListenersOnce() {
     if (_listenersAttached) return;
@@ -58,7 +73,11 @@ class PushNotificationService {
     // it just lands on the normal start route rather than deep-linking
     // straight to Notifications — real extra scope, deliberately left for
     // later rather than attempted here.
-    unawaited(initLocalNotifications(onTap: (_) => _navigateFor()));
+    unawaited(
+      initLocalNotifications(
+        onTap: (response) => navigateForTap(response.payload),
+      ),
+    );
 
     // App open + foreground: Android never auto-shows a tray banner in this
     // state for ANY app (by design), so this is the one path that makes a
@@ -73,8 +92,28 @@ class PushNotificationService {
   /// to their own history (`MemberNotificationsScreen`, `/portal/notifications`
   /// on the backend — this used to fall through to the home shell before
   /// that endpoint/screen existed).
-  Future<void> _navigateFor() async {
+  ///
+  /// The `notifications` module gates both feeds: with it off the feed answers
+  /// 403, so a tap falls back to the home screen instead. HR pushes are NOT
+  /// gated by it (HR has no flag) and keep their deep links.
+  @visibleForTesting
+  Future<void> navigateForTap([String? payload]) async {
     final actorType = await _storage.readActorType();
+    // HR pushes (staff only) deep-link to the matching HR screen, with Home
+    // underneath so Back still works.
+    final hrRoute =
+        actorType == ActorType.staff ? routeForPushPayload(payload) : null;
+    if (hrRoute != null) {
+      _router
+        ?..go(AppRoutes.home)
+        ..push(hrRoute);
+      return;
+    }
+    final tenant = _tenantProvider?.call();
+    if (tenant != null && !tenantAllows(tenant, flag: Feature.notifications)) {
+      _router?.go(AppRoutes.home);
+      return;
+    }
     final destination = actorType == ActorType.staff
         ? AppRoutes.notifications
         : AppRoutes.memberNotifications;

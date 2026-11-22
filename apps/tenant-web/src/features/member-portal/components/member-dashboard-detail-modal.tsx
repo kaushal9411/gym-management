@@ -3,6 +3,7 @@
 import Link from 'next/link';
 
 import { Badge } from '@/components/ui/badge';
+import { useFeatureEnabled } from '@/features/tenant/use-feature-flag';
 import { EmptyState } from '@/components/ui/empty-state';
 import { MEMBER_PORTAL_ROUTES } from '../constants';
 import { usePortalMoney } from '../lib/format';
@@ -54,6 +55,7 @@ export function MemberDashboardDetailModal({ kind, onClose, membership, attendan
 }
 
 function MembershipDetail({ membership }: { membership: MemberPortalProfile['currentMembership'] }) {
+  const paymentsOn = useFeatureEnabled('payments'); // the renew page is a payments checkout
   if (!membership) {
     return <EmptyState title="No membership on file" description="Contact the front desk to get a membership plan set up." />;
   }
@@ -79,7 +81,7 @@ function MembershipDetail({ membership }: { membership: MemberPortalProfile['cur
           <span>{Math.abs(days)}</span>
         </div>
       </div>
-      {expired ? <ViewAllLink href={MEMBER_PORTAL_ROUTES.renew} /> : null}
+      {expired && paymentsOn ? <ViewAllLink href={MEMBER_PORTAL_ROUTES.renew} /> : null}
     </div>
   );
 }

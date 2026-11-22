@@ -5,6 +5,7 @@ import { validate } from '../../../core/middleware/validate.middleware';
 import { memberPreferenceRouter } from '../../communications/routes/member-preference.routes';
 import { memberAuthenticateMiddleware } from '../../member-auth/middlewares/member-authenticate.middleware';
 import { memberChangePasswordSchema } from '../../member-auth/validators/member-auth.validators';
+import { requireModuleEnabled } from '../../tenants/middleware/require-module-enabled.middleware';
 import { memberPortalController } from '../controllers/member-portal.controller';
 import {
   memberCreateMeasurementSchema,
@@ -68,6 +69,17 @@ const measurementWriteLimiter = () =>
 // permission-key catalog entries needed — the member auth plane has no RBAC.
 memberPortalRouter.use(memberAuthenticateMiddleware);
 
+// Module kill switch (plan-granted AND platform FeatureFlag.enabled) — same `requireModuleEnabled` the staff routers use;
+// `req.tenant.featureFlags` is set by the global `tenantMiddleware` (it runs before this router and the token's tenant is
+// checked against it above). Applied per route group, AFTER member auth (so an unauthenticated caller still gets 401) and
+// BEFORE validation/handlers. Profile, plan, gym, me, gdpr-export, measurements, change-password stay ungated (no flag owns them).
+const workoutGate = requireModuleEnabled('workout_plans');
+const dietGate = requireModuleEnabled('diet_plans');
+const classesGate = requireModuleEnabled('live_classes');
+const attendanceGate = requireModuleEnabled('attendance');
+const paymentsGate = requireModuleEnabled('payments');
+const notificationsGate = requireModuleEnabled('notifications');
+
 /**
  * @openapi
  * /portal/overview:
@@ -114,6 +126,7 @@ memberPortalRouter.get('/plan', asyncHandler(memberPortalController.plan.bind(me
 memberPortalRouter.get('/gym', asyncHandler(memberPortalController.gym.bind(memberPortalController)));
 memberPortalRouter.get(
   '/payments',
+  paymentsGate,
   validate({ query: memberPortalPaginationSchema }),
   asyncHandler(memberPortalController.payments.bind(memberPortalController)),
 );
@@ -127,34 +140,39 @@ memberPortalRouter.post(
 
 memberPortalRouter.post(
   '/membership/renew/checkout',
+  paymentsGate,
   asyncHandler(memberPortalController.startRenewalCheckout.bind(memberPortalController)),
 );
 memberPortalRouter.post(
   '/membership/renew/checkout/:paymentId/verify',
+  paymentsGate,
   validate({ params: memberRenewalPaymentParamSchema, body: memberVerifyRenewalCheckoutSchema }),
   asyncHandler(memberPortalController.verifyRenewalCheckout.bind(memberPortalController)),
 );
 
 memberPortalRouter.get(
   '/attendance',
+  attendanceGate,
   validate({ query: memberPortalPaginationSchema }),
   asyncHandler(memberPortalController.attendance.bind(memberPortalController)),
 );
 
-memberPortalRouter.get('/workout', asyncHandler(memberPortalController.workout.bind(memberPortalController)));
+memberPortalRouter.get('/workout', workoutGate, asyncHandler(memberPortalController.workout.bind(memberPortalController)));
 // Daily workout log (member self-tracking) - own file, see member-workout-log.routes.ts
-memberPortalRouter.use('/workout/log', memberWorkoutLogRouter);
+memberPortalRouter.use('/workout/log', workoutGate, memberWorkoutLogRouter);
 // Promotional opt-out per channel (Communications) - own file, see communications/routes/member-preference.routes.ts
-memberPortalRouter.use('/notification-preferences', memberPreferenceRouter);
+memberPortalRouter.use('/notification-preferences', notificationsGate, memberPreferenceRouter);
 memberPortalRouter.post(
   '/workout/:id/progress',
+  workoutGate,
   validate({ params: memberPortalIdParamSchema, body: memberWorkoutProgressSchema }),
   asyncHandler(memberPortalController.markWorkoutProgress.bind(memberPortalController)),
 );
 
-memberPortalRouter.get('/diet', asyncHandler(memberPortalController.diet.bind(memberPortalController)));
+memberPortalRouter.get('/diet', dietGate, asyncHandler(memberPortalController.diet.bind(memberPortalController)));
 memberPortalRouter.post(
   '/diet/:id/log',
+  dietGate,
   dietWriteLimiter(),
   validate({ params: memberPortalIdParamSchema, body: memberDietLogSchema }),
   asyncHandler(memberPortalController.logDiet.bind(memberPortalController)),
@@ -227,73 +245,89 @@ memberPortalRouter.delete(
 
 memberPortalRouter.get(
   '/invoices',
+  paymentsGate,
   validate({ query: memberPortalPaginationSchema }),
   asyncHandler(memberPortalController.invoices.bind(memberPortalController)),
 );
 memberPortalRouter.get(
   '/invoices/:id',
+  paymentsGate,
   validate({ params: memberPortalIdParamSchema }),
   asyncHandler(memberPortalController.invoiceDetail.bind(memberPortalController)),
 );
 memberPortalRouter.get(
   '/invoices/:id/download',
+  paymentsGate,
   validate({ params: memberPortalIdParamSchema }),
   asyncHandler(memberPortalController.downloadInvoice.bind(memberPortalController)),
 );
 memberPortalRouter.post(
   '/invoices/:id/pay/checkout',
+  paymentsGate,
   validate({ params: memberPortalIdParamSchema }),
   asyncHandler(memberPortalController.startInvoicePaymentCheckout.bind(memberPortalController)),
 );
 memberPortalRouter.post(
   '/invoices/:id/pay/checkout/:paymentId/verify',
+  paymentsGate,
   validate({ params: memberInvoicePaymentParamSchema, body: memberVerifyInvoicePaymentSchema }),
   asyncHandler(memberPortalController.verifyInvoicePaymentCheckout.bind(memberPortalController)),
 );
 
 memberPortalRouter.get(
   '/classes',
+  classesGate,
   validate({ query: memberPortalClassesQuerySchema }),
   asyncHandler(memberPortalController.classes.bind(memberPortalController)),
 );
-memberPortalRouter.get('/bookings', asyncHandler(memberPortalController.myBookings.bind(memberPortalController)));
+memberPortalRouter.get('/bookings', classesGate, asyncHandler(memberPortalController.myBookings.bind(memberPortalController)));
 memberPortalRouter.post(
   '/classes/:id/book',
+  classesGate,
   validate({ params: memberPortalIdParamSchema }),
   asyncHandler(memberPortalController.bookClass.bind(memberPortalController)),
 );
 memberPortalRouter.post(
   '/bookings/:id/cancel',
+  classesGate,
   validate({ params: memberPortalIdParamSchema }),
   asyncHandler(memberPortalController.cancelBooking.bind(memberPortalController)),
 );
 
+// Push tokens belong to the notifications module: with it off the token registration 403s like the rest (the apps treat
+// push registration as best-effort and swallow the error, so a disabled module never blocks login).
 memberPortalRouter.post(
   '/device-token',
+  notificationsGate,
   validate({ body: memberRegisterDeviceTokenSchema }),
   asyncHandler(memberPortalController.registerDeviceToken.bind(memberPortalController)),
 );
 memberPortalRouter.delete(
   '/device-token',
+  notificationsGate,
   validate({ body: memberUnregisterDeviceTokenSchema }),
   asyncHandler(memberPortalController.unregisterDeviceToken.bind(memberPortalController)),
 );
 
 memberPortalRouter.get(
   '/notifications',
+  notificationsGate,
   validate({ query: memberNotificationsQuerySchema }),
   asyncHandler(memberPortalController.notifications.bind(memberPortalController)),
 );
 memberPortalRouter.get(
   '/notifications/unread-count',
+  notificationsGate,
   asyncHandler(memberPortalController.unreadNotificationCount.bind(memberPortalController)),
 );
 memberPortalRouter.post(
   '/notifications/read-all',
+  notificationsGate,
   asyncHandler(memberPortalController.markAllNotificationsRead.bind(memberPortalController)),
 );
 memberPortalRouter.post(
   '/notifications/:id/read',
+  notificationsGate,
   validate({ params: memberPortalIdParamSchema }),
   asyncHandler(memberPortalController.markNotificationRead.bind(memberPortalController)),
 );

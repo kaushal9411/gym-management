@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/routing/app_routes.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/utils/tenant_features.dart';
+import '../../core/utils/tenant_features_context.dart';
 import '../../repositories/member_notification_repository.dart';
 import '../../repositories/tenant_notification_repository.dart';
 
@@ -18,6 +20,10 @@ import '../../repositories/tenant_notification_repository.dart';
 /// `useNotifications` `refetchInterval` — and also refreshes right after a
 /// visit to the notification list, so marking things read reflects back
 /// without waiting out the full interval.
+///
+/// Follows the gym's `notifications` module: while it is off the bell is not
+/// shown and the poll is stopped (the endpoints answer 403); it starts again
+/// when a flag refresh turns the module back on.
 class NotificationBellIcon extends StatefulWidget {
   const NotificationBellIcon({
     required this.isStaff,
@@ -35,12 +41,22 @@ class NotificationBellIcon extends StatefulWidget {
 class _NotificationBellIconState extends State<NotificationBellIcon> {
   int _unreadCount = 0;
   Timer? _timer;
+  bool _enabled = false;
 
   @override
-  void initState() {
-    super.initState();
-    _fetch();
-    _timer = Timer.periodic(const Duration(seconds: 60), (_) => _fetch());
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final enabled = context.featureOn(Feature.notifications);
+    if (enabled == _enabled && (_timer != null) == enabled) return;
+    _enabled = enabled;
+    _timer?.cancel();
+    _timer = null;
+    if (enabled) {
+      _fetch();
+      _timer = Timer.periodic(const Duration(seconds: 60), (_) => _fetch());
+    } else {
+      _unreadCount = 0;
+    }
   }
 
   @override
@@ -69,6 +85,7 @@ class _NotificationBellIconState extends State<NotificationBellIcon> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_enabled) return const SizedBox.shrink();
     return GestureDetector(
       onTap: _onTap,
       child: SizedBox(

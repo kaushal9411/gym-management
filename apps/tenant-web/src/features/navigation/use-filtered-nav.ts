@@ -26,6 +26,14 @@ export function useFilteredNav(): NavItem[] {
         }
         if (item.featureFlag && !tenant.featureFlags.includes(item.featureFlag)) return false;
         return true;
+      }).map((item) => {
+        if (!item.children) return item;
+        // Sub-links follow the same any-of permission rule; a child without its own `permission` inherits the parent's visibility.
+        const children = item.children.filter((child) => {
+          if (!child.permission) return true;
+          return Array.isArray(child.permission) ? hasAnyPermission(child.permission) : hasPermission(child.permission);
+        });
+        return { ...item, children };
       }),
     [hasPermission, hasAnyPermission, tenant.featureFlags],
   );

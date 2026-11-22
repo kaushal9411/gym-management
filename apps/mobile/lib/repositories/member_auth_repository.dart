@@ -38,38 +38,6 @@ class MemberAuthRepository {
     }
   }
 
-  // ── Phone-number login (OTP, delivered by email for now) ───────────────
-
-  /// `POST /public/auth/phone-login/verify-otp` (`actorType: member`) — no
-  /// gym is known yet; the server returns the member's `tenantSlug`
-  /// alongside the usual [MemberAuthSuccess]. The slug is saved BEFORE the
-  /// tokens so the Dio interceptor already sends `X-Tenant-Slug`. The code is
-  /// requested (and re-requested) via [PublicTenantRepository.requestPhoneOtp].
-  Future<({MemberAuthSuccess result, String tenantSlug})> verifyPublicPhoneOtp({
-    required String phone,
-    required String code,
-  }) async {
-    try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/public/auth/phone-login/verify-otp',
-        data: {'actorType': 'member', 'phone': phone, 'code': code},
-      );
-      final data = response.data!['data'] as Map<String, dynamic>;
-      final tenantSlug = data['tenantSlug'] as String;
-      final result = MemberAuthSuccess.fromJson(data);
-      await _storage.saveTenantSlug(tenantSlug);
-      await _storage.saveSession(
-        actorType: ActorType.member,
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-      );
-      await _storage.saveMemberProfile(result.member.toJson());
-      return (result: result, tenantSlug: tenantSlug);
-    } on DioException catch (e) {
-      throw _mapError(e);
-    }
-  }
-
   /// Cold-start restore — see [SecureStorage.saveMemberProfile] for why this
   /// reads a cache instead of calling an endpoint.
   Future<MemberProfile?> restoreCachedProfile() async {

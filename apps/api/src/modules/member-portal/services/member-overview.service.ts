@@ -30,6 +30,16 @@ import {
   weekStartMonday,
 } from '../utils/member-overview.util';
 
+/** Overview section -> owning platform module key (module off => section dropped, key listed in `disabledModules`). */
+const OVERVIEW_MODULES = [
+  'attendance',
+  'workout_plans',
+  'diet_plans',
+  'payments',
+  'live_classes',
+  'notifications',
+] as const;
+
 const m2 = (v: string | number): string => money(Number(v));
 const nonEmpty = (v: string | null | undefined): string | null => (v && v.trim() ? v : null);
 const allNull = (o: Record<string, unknown>): boolean => Object.values(o).every((v) => v === null);
@@ -53,8 +63,22 @@ export class MemberOverviewService {
     this.invoices = new MemberInvoiceService(tenantId);
   }
 
-  async getOverview(memberId: string, now: Date = new Date()): Promise<MemberOverviewDto> {
+  /**
+   * `enabledModules` = the tenant's resolved `featureFlags` (plan AND platform kill switch). When omitted every
+   * section is built (back-compat). A section whose module is off is not queried: nullable sections (workout, diet)
+   * come back `null`, the always-present ones (attendance, billing, classes, notifications) come back present but
+   * zeroed so older clients keep parsing, and the module key is listed in `disabledModules`.
+   */
+  async getOverview(
+    memberId: string,
+    now: Date = new Date(),
+    enabledModules?: readonly string[],
+  ): Promise<MemberOverviewDto> {
     const t = this.tenantId;
+    const on = (key: string): boolean => !enabledModules || enabledModules.includes(key);
+    const disabledModules = OVERVIEW_MODULES.filter((k) => !on(k));
+    const when = <V>(key: string, fn: () => Promise<V>, fallback: V): Promise<V> =>
+      on(key) ? fn() : Promise.resolve(fallback);
     const today = businessDate(now);
     const windowFrom = addDaysStr(today, -(DAILY_WINDOW_DAYS - 1));
     const paidSince = addDaysStr(today, -89);
@@ -74,15 +98,22 @@ export class MemberOverviewService {
     ] = await Promise.all([
       this.repo.findMember(t, memberId),
       this.repo.findCurrentMembership(t, memberId),
-      this.repo.visitDays(t, memberId),
-      this.repo.visitStats(t, memberId, windowFrom),
-      this.workouts.findActiveByMember(t, memberId),
-      this.diets.findActiveByMember(t, memberId),
-      this.repo.outstandingInvoices(t, memberId),
-      this.repo.paidSince(t, memberId, paidSince),
-      this.repo.upcomingBookings(t, memberId, today, 3),
-      this.repo.unreadNotifications(t, memberId),
-      this.repo.latestBodyWeight(t, memberId),
+      when('attendance', () => this.repo.visitDays(t, memberId), []),
+      when('attendance', () => this.repo.visitStats(t, memberId, windowFrom), {
+        lastVisitAt: null,
+        avgMinutes: null,
+      }),
+      when('workout_plans', () => this.workouts.findActiveByMember(t, memberId), null),
+      when('diet_plans', () => this.diets.findActiveByMember(t, memberId), null),
+      when('payments', () => this.repo.outstandingInvoices(t, memberId), {
+        value: 0,
+        count: 0,
+        nextDueDate: null,
+      }),
+      when('payments', () => this.repo.paidSince(t, memberId, paidSince), { value: 0, count: 0 }),
+      when('live_classes', () => this.repo.upcomingBookings(t, memberId, today, 3), []),
+      when('notifications', () => this.repo.unreadNotifications(t, memberId), 0),
+      when('diet_plans', () => this.repo.latestBodyWeight(t, memberId), null),
     ]);
     if (!member) throw new NotFoundError('Member not found.');
 
@@ -105,7 +136,9 @@ export class MemberOverviewService {
         expired,
         totalDays: membership.durationDays,
         price: money(price.finalPrice),
-        amountPaid: money(await this.repo.membershipAmountPaid(t, memberId, membership.id)),
+        amountPaid: on('payments')
+          ? money(await this.repo.membershipAmountPaid(t, memberId, membership.id))
+          : null,
       };
     }
 
@@ -197,6 +230,7 @@ export class MemberOverviewService {
         })),
       },
       notifications: { unread },
+      disabledModules,
     };
   }
 

@@ -8,6 +8,7 @@ import '../../../core/routing/app_routes.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/app_drawer.dart';
 import '../../../shared/widgets/menu_entry.dart';
+import '../../hr/presentation/hr_menu.dart';
 import '../../../shared/widgets/staff_logout_dialog.dart';
 
 /// Section names/order and each tile's placement mirror web's
@@ -64,6 +65,7 @@ Map<String, List<MenuEntry>> _sections(String appName) =>
           featureFlag: 'branches',
         ),
       ],
+      'HR': hrMenuEntries,
       'Programs': [
         MenuEntry(
           icon: Icons.card_membership_outlined,
@@ -170,6 +172,7 @@ Map<String, List<MenuEntry>> _sections(String appName) =>
           title: 'Notifications',
           subtitle: 'Unread alerts',
           route: AppRoutes.notifications,
+          featureFlag: 'notifications',
         ),
         MenuEntry(
           icon: Icons.forum_outlined,
@@ -213,6 +216,7 @@ Map<String, List<MenuEntry>> _sections(String appName) =>
           title: 'Notification Templates',
           subtitle: '10 system templates',
           route: AppRoutes.notificationTemplates,
+          featureFlag: 'notifications',
         ),
       ],
     };

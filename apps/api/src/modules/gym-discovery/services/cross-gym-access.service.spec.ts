@@ -136,4 +136,83 @@ describe('CrossGymAccessService — forgot password / phone login with no gym pi
     state.memberVerify.set('a', () => Promise.reject(new AppError(ErrorCode.OTP_EXPIRED, 'old', 401)));
     await expect(service.verifyPhoneOtp('9876500000', 'member', '123456', {})).rejects.toMatchObject({ code: ErrorCode.OTP_EXPIRED });
   });
+
+  it('verify: every response names the plane that matched (actorType)', async () => {
+    state.users = [{ tenant: tenant('a') }];
+    state.members = [{ tenant: tenant('m1') }];
+    state.staffVerify.set('a', () => ({ accessToken: 't' }));
+    state.memberVerify.set('m1', () => ({ accessToken: 'mt' }));
+    expect(await service.verifyPhoneOtp('9876500000', 'staff', '123456', {})).toMatchObject({ actorType: 'staff', tenantSlug: 'slug-a' });
+    expect(await service.verifyPhoneOtp('9876500000', 'member', '123456', {})).toMatchObject({ actorType: 'member', tenantSlug: 'slug-m1' });
+  });
+
+  describe("actorType 'any' — the phone number does not say staff or member", () => {
+    it('request: staff-only phone emails the staff gym and touches no member flow', async () => {
+      state.users = [{ tenant: tenant('a') }];
+      await service.requestPhoneOtp('9876500000', 'any');
+      expect(state.staffCalls).toEqual(['otp:a:9876500000']);
+      expect(state.memberCalls).toEqual([]);
+    });
+
+    it('request: member-only phone emails the member gym only', async () => {
+      state.members = [{ tenant: tenant('m1') }];
+      await service.requestPhoneOtp('9876500000', 'any');
+      expect(state.memberCalls).toEqual(['otp:m1:9876500000']);
+      expect(state.staffCalls).toEqual([]);
+    });
+
+    it('request: omitting actorType behaves as any and covers BOTH planes', async () => {
+      state.users = [{ tenant: tenant('a') }, { tenant: tenant('b') }];
+      state.members = [{ tenant: tenant('m1') }];
+      await service.requestPhoneOtp('9876500000');
+      expect(state.staffCalls).toEqual(['otp:a:9876500000', 'otp:b:9876500000']);
+      expect(state.memberCalls).toEqual(['otp:m1:9876500000']);
+    });
+
+    it('request: no account anywhere is a silent no-op (no existence leak)', async () => {
+      await expect(service.requestPhoneOtp('1112223333', 'any')).resolves.toBeUndefined();
+      expect(state.staffCalls).toEqual([]);
+      expect(state.memberCalls).toEqual([]);
+    });
+
+    it('verify: staff-only phone signs in as staff', async () => {
+      state.users = [{ tenant: tenant('a') }];
+      state.staffVerify.set('a', () => ({ accessToken: 't', user: { id: 'u' } }));
+      expect(await service.verifyPhoneOtp('9876500000', 'any', '123456', {})).toMatchObject({ actorType: 'staff', tenantSlug: 'slug-a', accessToken: 't' });
+    });
+
+    it('verify: member-only phone falls through the staff plane to the member', async () => {
+      state.members = [{ tenant: tenant('m1') }];
+      state.memberVerify.set('m1', () => ({ accessToken: 'mt', member: { id: 'm' } }));
+      expect(await service.verifyPhoneOtp('9876500000', 'any', '123456', {})).toMatchObject({ actorType: 'member', tenantSlug: 'slug-m1', accessToken: 'mt' });
+    });
+
+    it('verify: a phone on BOTH planes resolves to whichever plane the code belongs to', async () => {
+      state.users = [{ tenant: tenant('a') }];
+      state.members = [{ tenant: tenant('m1') }];
+      // Code was issued by the member plane only: staff rejects it, member accepts.
+      state.memberVerify.set('m1', () => ({ accessToken: 'mt' }));
+      expect(await service.verifyPhoneOtp('9876500000', 'any', '123456', {})).toMatchObject({ actorType: 'member', tenantSlug: 'slug-m1' });
+      // Both would accept: the staff plane is tried first.
+      state.staffVerify.set('a', () => ({ accessToken: 't' }));
+      expect(await service.verifyPhoneOtp('9876500000', 'any', '123456', {})).toMatchObject({ actorType: 'staff', tenantSlug: 'slug-a' });
+    });
+
+    it('verify: no matching account looks identical to a wrong code', async () => {
+      await expect(service.verifyPhoneOtp('1112223333', 'any', '123456', {})).rejects.toMatchObject({ code: ErrorCode.OTP_INVALID, httpStatus: 401 });
+    });
+
+    it('verify: wrong code on both planes is a generic OTP_INVALID', async () => {
+      state.users = [{ tenant: tenant('a') }];
+      state.members = [{ tenant: tenant('m1') }];
+      await expect(service.verifyPhoneOtp('9876500000', 'any', '000000', {})).rejects.toMatchObject({ code: ErrorCode.OTP_INVALID });
+    });
+
+    it('verify: an expired code on one plane is reported when nothing else succeeds', async () => {
+      state.users = [{ tenant: tenant('a') }];
+      state.members = [{ tenant: tenant('m1') }];
+      state.staffVerify.set('a', () => Promise.reject(new AppError(ErrorCode.OTP_EXPIRED, 'old', 401)));
+      await expect(service.verifyPhoneOtp('9876500000', 'any', '123456', {})).rejects.toMatchObject({ code: ErrorCode.OTP_EXPIRED });
+    });
+  });
 });

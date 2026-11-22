@@ -27,26 +27,29 @@ export function useDashboardSummary(branchId?: string) {
   });
 }
 
-export function useKpis(branchId?: string) {
+export function useKpis(branchId?: string, enabled = true) {
   return useQuery({
     queryKey: ['reports', 'dashboard', 'kpis', branchId ?? null],
     queryFn: () => reportsService.getKpis(branchId),
     staleTime: DASHBOARD_STALE_TIME_MS,
+    enabled,
   });
 }
 
-export function useRecentActivities(branchId?: string) {
+export function useRecentActivities(branchId?: string, enabled = true) {
   return useQuery({
     queryKey: ['reports', 'dashboard', 'recent-activities', branchId ?? null],
     queryFn: () => reportsService.getRecentActivities(branchId),
     staleTime: DASHBOARD_STALE_TIME_MS,
+    enabled,
   });
 }
 
-export function useReportData<T>(reportType: string, filters: ReportFilters) {
+export function useReportData<T>(reportType: string, filters: ReportFilters, enabled = true) {
   return useQuery({
     queryKey: ['reports', 'report', reportType, filters],
     queryFn: () => reportsService.getReport<T>(reportType, filters),
+    enabled,
   });
 }
 
@@ -74,35 +77,36 @@ export function isPaginated<T>(data: Paginated<T> | T[] | undefined): data is Pa
   return !!data && !Array.isArray(data);
 }
 
-export function useRevenueTrends(dateFrom?: string, dateTo?: string, branchId?: string) {
-  return useQuery({ queryKey: ['reports', 'analytics', 'revenue-trends', dateFrom, dateTo, branchId], queryFn: () => reportsService.revenueTrends(dateFrom, dateTo, branchId) });
+export function useRevenueTrends(dateFrom?: string, dateTo?: string, branchId?: string, enabled = true) {
+  return useQuery({ queryKey: ['reports', 'analytics', 'revenue-trends', dateFrom, dateTo, branchId], queryFn: () => reportsService.revenueTrends(dateFrom, dateTo, branchId), enabled });
 }
 
-export function useAttendanceTrends(dateFrom?: string, dateTo?: string, branchId?: string) {
-  return useQuery({ queryKey: ['reports', 'analytics', 'attendance-trends', dateFrom, dateTo, branchId], queryFn: () => reportsService.attendanceTrends(dateFrom, dateTo, branchId) });
+export function useAttendanceTrends(dateFrom?: string, dateTo?: string, branchId?: string, enabled = true) {
+  return useQuery({ queryKey: ['reports', 'analytics', 'attendance-trends', dateFrom, dateTo, branchId], queryFn: () => reportsService.attendanceTrends(dateFrom, dateTo, branchId), enabled });
 }
 
 export function useMembershipGrowth(dateFrom?: string, dateTo?: string, branchId?: string) {
   return useQuery({ queryKey: ['reports', 'analytics', 'membership-growth', dateFrom, dateTo, branchId], queryFn: () => reportsService.membershipGrowth(dateFrom, dateTo, branchId) });
 }
 
-export function useNewMemberGrowth(dateFrom?: string, dateTo?: string, branchId?: string) {
-  return useQuery({ queryKey: ['reports', 'analytics', 'new-member-growth', dateFrom, dateTo, branchId], queryFn: () => reportsService.newMemberGrowth(dateFrom, dateTo, branchId) });
+export function useNewMemberGrowth(dateFrom?: string, dateTo?: string, branchId?: string, enabled = true) {
+  return useQuery({ queryKey: ['reports', 'analytics', 'new-member-growth', dateFrom, dateTo, branchId], queryFn: () => reportsService.newMemberGrowth(dateFrom, dateTo, branchId), enabled });
 }
 
 export function useRetention(dateFrom?: string, dateTo?: string, branchId?: string) {
   return useQuery({ queryKey: ['reports', 'analytics', 'retention', dateFrom, dateTo, branchId], queryFn: () => reportsService.retention(dateFrom, dateTo, branchId) });
 }
 
-export function usePaymentCollection(dateFrom?: string, dateTo?: string, branchId?: string) {
-  return useQuery({ queryKey: ['reports', 'analytics', 'payment-collection', dateFrom, dateTo, branchId], queryFn: () => reportsService.paymentCollection(dateFrom, dateTo, branchId) });
+export function usePaymentCollection(dateFrom?: string, dateTo?: string, branchId?: string, enabled = true) {
+  return useQuery({ queryKey: ['reports', 'analytics', 'payment-collection', dateFrom, dateTo, branchId], queryFn: () => reportsService.paymentCollection(dateFrom, dateTo, branchId), enabled });
 }
 
-export function useBranchComparison(branchId?: string, dateFrom?: string, dateTo?: string) {
+export function useBranchComparison(branchId?: string, dateFrom?: string, dateTo?: string, enabled = true) {
   return useQuery({
     queryKey: ['reports', 'analytics', 'branch-comparison', branchId ?? null, dateFrom ?? null, dateTo ?? null],
     queryFn: () => reportsService.branchComparison(branchId, dateFrom, dateTo),
     placeholderData: keepPreviousData,
+    enabled,
   });
 }
 

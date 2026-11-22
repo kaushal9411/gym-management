@@ -24,6 +24,7 @@ import { signedOut } from '../store/auth-slice';
 import { getCurrentTenantSlug } from '../utils/tenant-detection';
 import { AUTH_ROUTES } from '../constants';
 import { AuthServiceError, type AuthErrorCode } from '../types';
+import { MODULE_UNAVAILABLE_MESSAGE, signalModuleUnavailable } from '@/features/tenant/module-unavailable-signal';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
 
@@ -191,6 +192,9 @@ apiClient.interceptors.response.use(
     }
 
     const authError = toAuthServiceError(error);
+
+    // A gated module answers 403 "This module is currently unavailable." -> the tenant's flags are stale; ask the portal to re-resolve them.
+    if (error.response?.status === 403 && authError.message === MODULE_UNAVAILABLE_MESSAGE) signalModuleUnavailable();
 
     // Tenant-wide failures can come back from ANY endpoint — handle them
     // globally so every call site doesn't need its own special case.

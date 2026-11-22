@@ -84,6 +84,22 @@ class AppRoutes {
   static const leadForm = '/leads/form';
   static const leadDetail = '/leads/detail';
   static const leadFollowUps = '/leads/follow-ups';
+  // HR (Prompt 182): self-service ("My HR") + the HR admin area. Every path is
+  // a pushed route; permission gating happens in the menus and in-screen.
+  static const hrMe = '/hr/me';
+  static const hrApplyLeave = '/hr/me/apply-leave';
+  static const hrMyLeaves = '/hr/me/leaves';
+  static const hrPayslips = '/hr/me/payslips';
+  static const hrPayslipDetail = '/hr/me/payslips/detail';
+  static const hrInbox = '/hr/me/inbox';
+  static const hrOverview = '/hr/overview';
+  static const hrApprovals = '/hr/approvals';
+  static const hrTeamAttendance = '/hr/attendance';
+  static const hrEmployees = '/hr/employees';
+  static const hrEmployeeDetail = '/hr/employees/detail';
+  static const hrPayroll = '/hr/payroll';
+  static const hrPayrollRun = '/hr/payroll/run';
+
   static const support = '/support';
   static const supportTicketForm = '/support/form';
   static const supportTicketDetail = '/support/detail';

@@ -3,6 +3,7 @@ import { prisma } from '../../../infrastructure/database/prisma';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import { sweepInvoiceDueSoon, sweepPaymentFailed, sweepPaymentOverdue } from '../../communications/services/automation-sweeps.service';
 import { MemberInvoiceRepository } from '../../finance/repositories/member-invoice.repository';
+import { moduleGate } from '../../tenants/utils/module-enabled.util';
 import type { JobHandler } from '../types';
 
 const DAY_MS = 86_400_000;
@@ -27,7 +28,7 @@ const INVOICE_RENEWAL_WINDOW_DAYS = 7;
  * already exist. Reuses `MemberInvoiceRepository`'s exact numbering/creation
  * logic (`finance` module) via a tenant-scoped client — same repository the
  * Finance UI's manual "Create Invoice" action uses, just triggered by a sweep
- * instead of a staff click.
+ * instead of a staff click. Gyms with the `payments` module switched off are skipped per tenant (no renewal invoice is created).
  */
 export const invoiceGeneration: JobHandler = async () => {
   const windowEnd = new Date(Date.now() + INVOICE_RENEWAL_WINDOW_DAYS * DAY_MS);
@@ -36,8 +37,11 @@ export const invoiceGeneration: JobHandler = async () => {
     include: { member: true, plan: true },
   });
 
+  const paymentsEnabled = moduleGate('payments', 'invoice-generation');
   let generated = 0;
   for (const membership of memberships) {
+    // eslint-disable-next-line no-await-in-loop -- memoised per tenant, one flag read per gym per run
+    if (!(await paymentsEnabled(membership.tenantId))) continue;
     const dedupeKey = `invoice-generated:${membership.id}:${membership.endDate.toISOString().slice(0, 10)}`;
     // eslint-disable-next-line no-await-in-loop -- sequential across a small, infrequent (daily) batch; no throughput requirement justifies parallelizing
     if (await cache.get(dedupeKey)) continue;

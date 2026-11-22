@@ -279,6 +279,7 @@ class MemberOverview {
     required this.billing,
     required this.upcomingClasses,
     required this.unreadNotifications,
+    this.disabledModules = const [],
   });
 
   final OverviewMember member;
@@ -289,6 +290,11 @@ class MemberOverview {
   final OverviewBilling billing;
   final List<OverviewClass> upcomingClasses;
   final int unreadNotifications;
+
+  /// Module keys the server left out of this overview because the gym has them
+  /// switched off (`disabledModules`; absent on older servers = none). Extra
+  /// evidence only — the tenant's `featureFlags` stay the source of truth.
+  final List<String> disabledModules;
 
   factory MemberOverview.fromJson(Map<String, dynamic> j) => MemberOverview(
         member: OverviewMember.fromJson(jsonMap(j['member'])),
@@ -307,5 +313,8 @@ class MemberOverview {
             .map(OverviewClass.fromJson)
             .toList(),
         unreadNotifications: jsonInt(jsonMap(j['notifications'])['unread']),
+        disabledModules: j['disabledModules'] is List
+            ? (j['disabledModules'] as List).whereType<String>().toList()
+            : const [],
       );
 }

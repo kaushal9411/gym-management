@@ -3,11 +3,12 @@
 import * as React from 'react';
 
 import { useAppDispatch } from '@/store/hooks';
-import type { Tenant } from '../types';
+import { useTenant } from '../tenant-provider';
 import { tenantSynced } from './tenant-slice';
 
-/** Hydrates the read-only Redux tenant mirror from the server-resolved context once on mount. */
-export function TenantStoreSync({ tenant }: { tenant: Tenant }) {
+/** Hydrates the read-only Redux tenant mirror from the tenant context (re-syncs when a refresh changes it). */
+export function TenantStoreSync() {
+  const tenant = useTenant();
   const dispatch = useAppDispatch();
 
   React.useEffect(() => {

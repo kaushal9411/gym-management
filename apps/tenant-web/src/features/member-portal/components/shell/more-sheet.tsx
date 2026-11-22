@@ -4,12 +4,13 @@ import Link from 'next/link';
 
 import { cn } from '@/lib/utils';
 import { SheetModal } from '../kit/sheet-modal';
-import { isNavActive, PORTAL_NAV, PORTAL_NAV_GROUPS } from '../../lib/nav';
+import { usePortalNav } from '../../hooks/use-portal-nav';
+import { isNavActive, PORTAL_NAV_GROUPS } from '../../lib/nav';
 import { NavBadge } from './nav-badge';
 
 /** "More" bottom sheet: every nav item that is not in the bottom bar, grouped. */
 export function MoreSheet({ open, onOpenChange, pathname, unread }: { open: boolean; onOpenChange: (o: boolean) => void; pathname: string; unread: number }) {
-  const items = PORTAL_NAV.filter((i) => !i.bar);
+  const items = usePortalNav().filter((i) => !i.bar);
   return (
     <SheetModal open={open} onOpenChange={onOpenChange} title="More" description="Everything else in your member portal">
       <div className="space-y-4">

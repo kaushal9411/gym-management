@@ -15,6 +15,9 @@ import 'core/storage/secure_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'features/maintenance/presentation/maintenance_host.dart';
 
+/// Minimum gap between two app-resume feature-flag refreshes.
+const kTenantRefreshInterval = Duration(seconds: 60);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
@@ -77,6 +80,9 @@ class _FitCloudAppState extends State<FitCloudApp> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed &&
         !getIt<MaintenanceCubit>().state.active) {
       widget.platformConfigCubit.load();
+      // Also re-read the gym's feature flags (a module may have been switched
+      // off or on meanwhile). Throttled; it only emits when something changed.
+      getIt<SessionCubit>().refreshTenant(minInterval: kTenantRefreshInterval);
     }
   }
 
