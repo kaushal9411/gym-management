@@ -95,7 +95,8 @@ class PushNotificationService {
   ///
   /// The `notifications` module gates both feeds: with it off the feed answers
   /// 403, so a tap falls back to the home screen instead. HR pushes are NOT
-  /// gated by it (HR has no flag) and keep their deep links.
+  /// gated by it; they have their own `hr` flag - with it off an HR push tap
+  /// also falls back to home (the HR screens would only answer 403).
   @visibleForTesting
   Future<void> navigateForTap([String? payload]) async {
     final actorType = await _storage.readActorType();
@@ -104,6 +105,11 @@ class PushNotificationService {
     final hrRoute =
         actorType == ActorType.staff ? routeForPushPayload(payload) : null;
     if (hrRoute != null) {
+      final hrTenant = _tenantProvider?.call();
+      if (hrTenant != null && !tenantAllows(hrTenant, flag: Feature.hr)) {
+        _router?.go(AppRoutes.home);
+        return;
+      }
       _router
         ?..go(AppRoutes.home)
         ..push(hrRoute);

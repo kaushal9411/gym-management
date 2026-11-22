@@ -99,6 +99,9 @@ class AppRoutes {
   static const hrEmployeeDetail = '/hr/employees/detail';
   static const hrPayroll = '/hr/payroll';
   static const hrPayrollRun = '/hr/payroll/run';
+  // Setup = shifts / holidays / leave types / policy tabs (hr:view to open,
+  // each tab edits with its own key).
+  static const hrSetup = '/hr/setup';
 
   static const support = '/support';
   static const supportTicketForm = '/support/form';

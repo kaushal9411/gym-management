@@ -369,7 +369,7 @@ interface PlanSeed {
 }
 
 /**
- * The full module/feature-flag catalog (Prompt 8) — same 25 keys across
+ * The full module/feature-flag catalog (Prompt 8) — same 26 keys across
  * every plan, `included` varies by tier. The four "Future Ready" entries
  * are architecture-only (no module exists yet behind them) and stay
  * `included: false` for every plan until they're actually built.
@@ -380,6 +380,7 @@ function featureChecklist(included: Partial<Record<string, boolean>>): PlanFeatu
     { key: 'members', label: 'Member management' },
     { key: 'staff', label: 'Staff management' },
     { key: 'branches', label: 'Branch management' },
+    { key: 'hr', label: 'HR management' },
     { key: 'attendance', label: 'Attendance tracking' },
     { key: 'workout_plans', label: 'Workout plans' },
     { key: 'diet_plans', label: 'Diet plans' },
@@ -420,6 +421,8 @@ const PROFESSIONAL_FEATURES = {
   // Class/Session Booking (Prompt 39) — same "coming soon" catalog entry
   // (`live_classes`), same flip-on-when-built pattern as ai_coach above.
   live_classes: true,
+  // HR Management (Prompt 182; a switchable module since Prompt 183): Professional and up, deliberately NOT in Starter.
+  hr: true,
 };
 const ENTERPRISE_FEATURES = {
   ...PROFESSIONAL_FEATURES,
@@ -577,6 +580,7 @@ const FEATURE_FLAGS: Array<{ key: string; label: string; category: string }> = [
   { key: 'workout_plans', label: 'Workout plans', category: 'operations' },
   { key: 'diet_plans', label: 'Diet plans', category: 'operations' },
   { key: 'live_classes', label: 'Group classes', category: 'operations' },
+  { key: 'hr', label: 'HR management', category: 'operations' },
   { key: 'payments', label: 'Payments & invoices', category: 'finance' },
   { key: 'income', label: 'Income tracking', category: 'finance' },
   { key: 'expenses', label: 'Expense tracking', category: 'finance' },

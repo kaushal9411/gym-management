@@ -183,6 +183,33 @@ void main() {
       ]);
     });
 
+    test('hr switched off / back on is picked up like any other module',
+        () async {
+      cubit.staffSignedIn(_user, _tenant(['hr', 'attendance']));
+      await settle();
+      emitted.clear();
+      when(() => public.resolve('gym'))
+          .thenAnswer((_) async => _tenant(['attendance']));
+
+      await cubit.refreshTenant();
+      await settle();
+
+      final off = emitted.single as SessionAuthenticatedStaff;
+      expect(off.user.id, 'u1');
+      expect(off.tenant.featureFlags, ['attendance']);
+      expect(off.tenant.featureFlags.contains('hr'), isFalse);
+
+      emitted.clear();
+      when(() => public.resolve('gym'))
+          .thenAnswer((_) async => _tenant(['attendance', 'hr']));
+      await cubit.refreshTenant();
+      await settle();
+      expect(
+        (emitted.single as SessionAuthenticatedStaff).tenant.featureFlags,
+        containsAll(['attendance', 'hr']),
+      );
+    });
+
     test('emits nothing when the gym is unchanged', () async {
       cubit.staffSignedIn(_user, _tenant(['attendance']));
       await settle();

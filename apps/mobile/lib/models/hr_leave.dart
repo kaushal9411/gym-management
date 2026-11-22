@@ -12,11 +12,21 @@ class HrLeaveType {
     required this.colorHex,
     this.yearlyQuota,
     this.isActive = true,
+    this.carryForward = false,
+    this.carryForwardMax,
+    this.sortOrder = 0,
   });
 
   final String id;
   final String name;
   final String code;
+
+  /// Unused days roll into the next leave year (capped by [carryForwardMax]).
+  final bool carryForward;
+
+  /// `null` = no cap.
+  final double? carryForwardMax;
+  final int sortOrder;
 
   /// `null` = unlimited.
   final double? yearlyQuota;
@@ -32,6 +42,9 @@ class HrLeaveType {
         isPaid: j['isPaid'] as bool? ?? true,
         colorHex: j['color'] as String? ?? '',
         isActive: j['isActive'] as bool? ?? true,
+        carryForward: j['carryForward'] as bool? ?? false,
+        carryForwardMax: hrNumOrNull(j['carryForwardMax']),
+        sortOrder: hrInt(j['sortOrder']),
       );
 }
 
@@ -300,6 +313,7 @@ class HrHoliday {
     required this.name,
     this.description,
     this.branchName,
+    this.branchId,
   });
 
   final String id;
@@ -309,6 +323,7 @@ class HrHoliday {
 
   /// `null` = every branch.
   final String? branchName;
+  final String? branchId;
 
   factory HrHoliday.fromJson(Map<String, dynamic> j) => HrHoliday(
         id: j['id'] as String? ?? '',
@@ -317,6 +332,9 @@ class HrHoliday {
         description: j['description'] as String?,
         branchName: (j['branch'] is Map<String, dynamic>)
             ? (j['branch'] as Map<String, dynamic>)['name'] as String?
+            : null,
+        branchId: (j['branch'] is Map<String, dynamic>)
+            ? (j['branch'] as Map<String, dynamic>)['id'] as String?
             : null,
       );
 }

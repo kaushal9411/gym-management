@@ -13,8 +13,8 @@ const EXTRA_ROUTE_FEATURES: { href: string; featureFlag: string }[] = [
  * Single source of truth for route -> feature-flag gating. Derived from `NAV_ITEMS`
  * (every item that declares a `featureFlag`) plus the extras above, so adding a gated nav
  * item automatically guards its route. Only keys the nav marks are gated: members, staff,
- * branches, membership_plans and the 11 platform flags. Routes without a flag (dashboard,
- * leads, HR, measurements, billing, gym settings, support, settings) are never blocked.
+ * branches, membership_plans and the 12 platform flags incl. `hr` (the `hr` entry's `/hr` href covers every nested `/hr/**` route by longest-prefix match). Routes without a flag (dashboard,
+ * leads, measurements, billing, gym settings, support, settings) are never blocked.
  */
 const ROUTE_FEATURES: { href: string; featureFlag: string }[] = [
   ...NAV_ITEMS.filter((item) => item.featureFlag).map((item) => ({ href: item.href, featureFlag: item.featureFlag as string })),

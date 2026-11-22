@@ -108,6 +108,7 @@ class HrPayslip {
     this.paidOn,
     this.paidBy,
     this.paidRemark,
+    this.expenseId,
   });
 
   final HrPayslipSummary summary;
@@ -142,6 +143,14 @@ class HrPayslip {
   final DateTime? paidOn;
   final HrUserRef? paidBy;
   final String? paidRemark;
+
+  /// The SALARY expense created when the payslip was paid (`null` before
+  /// that, and for a 0 net pay).
+  final String? expenseId;
+
+  /// Draft payslip lines HR added by hand (the editable set).
+  List<HrPayslipLine> get manualLines =>
+      lines.where((l) => l.source == 'MANUAL').toList();
 
   String get id => summary.id;
   String get month => summary.month;
@@ -184,6 +193,7 @@ class HrPayslip {
         paidOn: j['paidOn'] == null ? null : hrParseDate(j['paidOn']),
         paidBy: HrUserRef.tryParse(j['paidBy']),
         paidRemark: j['paidRemark'] as String?,
+        expenseId: j['expenseId'] as String?,
       );
 }
 
@@ -200,6 +210,9 @@ class HrPayrollRun {
     required this.paidCount,
     required this.paidAmount,
     this.notes,
+    this.createdByName,
+    this.approvedByName,
+    this.approvedAt,
   });
 
   final String id;
@@ -207,6 +220,9 @@ class HrPayrollRun {
   /// `YYYY-MM`.
   final String month;
   final PayrollRunStatus status;
+  final String? createdByName;
+  final String? approvedByName;
+  final DateTime? approvedAt;
   final int employeeCount;
   final double totalGross;
   final double totalDeductions;
@@ -232,6 +248,9 @@ class HrPayrollRun {
         paidCount: hrInt(j['paidCount']),
         paidAmount: hrNum(j['paidAmount']),
         notes: j['notes'] as String?,
+        createdByName: HrUserRef.tryParse(j['createdBy'])?.name,
+        approvedByName: HrUserRef.tryParse(j['approvedBy'])?.name,
+        approvedAt: hrParseInstant(j['approvedAt']),
       );
 }
 
@@ -291,8 +310,10 @@ class HrPayComponent {
     required this.isAllowance,
     required this.amount,
     this.isActive = true,
+    this.id,
   });
 
+  final String? id;
   final String name;
   final bool isAllowance;
   final double amount;
@@ -303,10 +324,19 @@ class HrPayComponent {
         isAllowance: j['type'] != 'DEDUCTION',
         amount: hrNum(j['amount']),
         isActive: j['isActive'] as bool? ?? true,
+        id: j['id'] as String?,
       );
+
+  /// Body entry of `PUT /hr/employees/:id/pay-structure`.
+  Map<String, dynamic> toJson() => {
+        'name': name.trim(),
+        'type': isAllowance ? 'ALLOWANCE' : 'DEDUCTION',
+        'amount': amount,
+        'isActive': isActive,
+      };
 }
 
-/// `PayStructure` (read-only on mobile).
+/// `PayStructure` (edited with `hr:payroll_manage`).
 class HrPayStructure {
   const HrPayStructure({
     required this.salaryType,
@@ -336,3 +366,86 @@ class HrPayStructure {
 
 /// Convenience alias for list pages of payslip summaries.
 typedef HrPayslipPage = PaginatedResult<HrPayslipSummary>;
+
+/// One manual payslip line (extra allowance / deduction) of
+/// `PATCH /hr/payroll/payslips/:id` -> `manualLines`. The set REPLACES the
+/// previous MANUAL lines (max 20, amount > 0).
+class HrManualLine {
+  const HrManualLine({
+    required this.name,
+    required this.isAllowance,
+    required this.amount,
+  });
+
+  final String name;
+  final bool isAllowance;
+  final double amount;
+
+  Map<String, dynamic> toJson() => {
+        'name': name.trim(),
+        'type': isAllowance ? 'ALLOWANCE' : 'DEDUCTION',
+        'amount': amount,
+      };
+}
+
+/// Body of `PATCH /hr/payroll/payslips/:id` (DRAFT payslip of a DRAFT run).
+class HrPayslipEdit {
+  const HrPayslipEdit({
+    this.bonus = 0,
+    this.advanceRecovery = 0,
+    this.manualLines = const [],
+    this.remark,
+  });
+
+  final double bonus;
+  final double advanceRecovery;
+  final List<HrManualLine> manualLines;
+  final String? remark;
+
+  Map<String, dynamic> toJson() => {
+        'bonus': bonus,
+        'advanceRecovery': advanceRecovery,
+        'manualLines': [for (final l in manualLines) l.toJson()],
+        if (remark != null && remark!.trim().isNotEmpty)
+          'remark': remark!.trim(),
+      };
+}
+
+/// Column totals of a run's salary sheet (what the web table footer shows).
+///
+/// `additions` = fixed allowances + extra allowances + bonus + overtime pay;
+/// `deductions` = attendance loss + every other deduction on the payslip
+/// (fixed, extra, late penalty, advance recovery).
+class HrRunTotals {
+  const HrRunTotals({
+    required this.base,
+    required this.additions,
+    required this.deductions,
+    required this.net,
+  });
+
+  final double base;
+  final double additions;
+  final double deductions;
+  final double net;
+
+  static double additionsOf(HrPayslip p) =>
+      p.fixedAllowances + p.extraAllowances + p.bonus + p.overtimePay;
+
+  static double deductionsOf(HrPayslip p) =>
+      p.attendanceDeduction + p.totalDeductions;
+
+  factory HrRunTotals.of(Iterable<HrPayslip> slips) {
+    var base = 0.0;
+    var add = 0.0;
+    var ded = 0.0;
+    var net = 0.0;
+    for (final p in slips) {
+      base += p.baseSalary;
+      add += additionsOf(p);
+      ded += deductionsOf(p);
+      net += p.netPay;
+    }
+    return HrRunTotals(base: base, additions: add, deductions: ded, net: net);
+  }
+}

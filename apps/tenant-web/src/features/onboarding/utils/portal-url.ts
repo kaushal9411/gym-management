@@ -15,7 +15,7 @@ interface HandoffTokens {
  * SECURITY TRADEOFF (documented, not accidental): tokens are passed via the
  * URL fragment, never the query string or path — fragments are not sent to
  * any server in the HTTP request line, so they never hit access logs. The
- * landing page at `/onboarding-complete` (see app/(auth)/onboarding-complete)
+ * landing page at `/onboarding-complete` (see app/onboarding-complete)
  * reads the fragment once, immediately calls `history.replaceState` to
  * scrub it, and exchanges it for a normal Redux/redux-persist session on
  * that origin. This mirrors the same accepted, documented risk posture as

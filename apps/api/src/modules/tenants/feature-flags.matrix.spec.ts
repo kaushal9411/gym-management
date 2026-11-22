@@ -72,7 +72,7 @@ import { AdminFeatureFlagService } from '../admin-feature-flags/services/admin-f
 import type { ResolvedTenantRecord, TenantRepositoryPort } from './interfaces/tenant.interface';
 import { invalidatePlatformFeatureFlagsCache, TenantService } from './service/tenant.service';
 
-/** The 11 platform kill-switch keys seeded in prisma/seed.ts FEATURE_FLAGS. */
+/** The 12 platform kill-switch keys seeded in prisma/seed.ts FEATURE_FLAGS. */
 const PLATFORM_FLAG_KEYS = [
   'ai_coach',
   'notifications',
@@ -85,6 +85,7 @@ const PLATFORM_FLAG_KEYS = [
   'diet_plans',
   'live_classes',
   'workout_plans',
+  'hr',
 ] as const;
 
 /** Modules with NO FeatureFlag row — foundational, never a kill switch. */
@@ -187,7 +188,7 @@ describe('toResolvedTenant — per-flag matrix (plan x platform)', () => {
     expect(await flagsFor(makeService(allPlanModules()))).toContain(key);
   });
 
-  it('disabling ALL 11 platform flags leaves only the non-switch modules', async () => {
+  it('disabling ALL 12 platform flags leaves only the non-switch modules', async () => {
     state.flagRows = state.flagRows.map((r) => ({ ...r, enabled: false }));
     const flags = await flagsFor(makeService(allPlanModules()));
     expect([...flags].sort()).toEqual([...NON_SWITCH_KEYS].sort());

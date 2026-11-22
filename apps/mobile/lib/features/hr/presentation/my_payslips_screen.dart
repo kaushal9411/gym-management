@@ -334,7 +334,7 @@ class _PayslipDetailScreenState extends State<PayslipDetailScreen> {
               ],
               if (p.status == PayslipStatus.paid) ...[
                 const SizedBox(height: 14),
-                _PaidBlock(p: p),
+                _PaidBlock(p: p, admin: widget.args.admin),
               ],
               const SizedBox(height: 18),
               if (widget.args.onPay != null && p.status == PayslipStatus.draft)
@@ -661,9 +661,12 @@ class _Row extends StatelessWidget {
 }
 
 class _PaidBlock extends StatelessWidget {
-  const _PaidBlock({required this.p});
+  const _PaidBlock({required this.p, this.admin = false});
 
   final HrPayslip p;
+
+  /// HR's view: also shows the SALARY expense the payment created.
+  final bool admin;
 
   @override
   Widget build(BuildContext context) {
@@ -697,6 +700,8 @@ class _PaidBlock extends StatelessWidget {
               value: p.paidRemark!,
               icon: Icons.notes_rounded,
             ),
+          if (admin && p.expenseId != null)
+            HrExpenseLink(key: const Key('payslip-expense')),
         ],
       ),
     );

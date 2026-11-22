@@ -59,6 +59,7 @@ import '../../features/hr/presentation/hr_overview_screen.dart';
 import '../../features/hr/presentation/payroll_screens.dart';
 import '../../features/hr/presentation/team_attendance_screen.dart';
 import '../../features/hr/presentation/my_hr_screen.dart';
+import '../../features/hr/presentation/setup/hr_setup_screen.dart';
 import '../../features/hr/presentation/my_leaves_screen.dart';
 import '../../features/hr/presentation/my_payslips_screen.dart';
 import '../../features/manager/presentation/member_detail_screen.dart';
@@ -618,11 +619,17 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
       ),
       GoRoute(
         path: AppRoutes.hrApprovals,
-        builder: (context, state) => const ApprovalsScreen(),
+        builder: (context, state) => ApprovalsScreen(
+          openCalendar: state.extra is HrLeavesArgs &&
+              (state.extra! as HrLeavesArgs).openCalendar,
+        ),
       ),
       GoRoute(
         path: AppRoutes.hrTeamAttendance,
-        builder: (context, state) => const TeamAttendanceScreen(),
+        builder: (context, state) => TeamAttendanceScreen(
+          monthGrid: state.extra is HrAttendanceArgs &&
+              (state.extra! as HrAttendanceArgs).monthGrid,
+        ),
       ),
       GoRoute(
         path: AppRoutes.hrEmployees,
@@ -641,6 +648,10 @@ GoRouter buildAppRouter(SessionCubit sessionCubit) {
         path: AppRoutes.hrPayrollRun,
         builder: (context, state) =>
             PayrollRunScreen(args: state.extra! as HrPayrollRunArgs),
+      ),
+      GoRoute(
+        path: AppRoutes.hrSetup,
+        builder: (context, state) => const HrSetupScreen(),
       ),
       GoRoute(
         path: AppRoutes.support,

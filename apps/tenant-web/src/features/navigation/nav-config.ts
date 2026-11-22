@@ -87,10 +87,11 @@ export const NAV_ITEMS: NavItem[] = [
     section: 'People',
   },
   {
-    // One top-level entry; sub-links are permission-filtered. Visible with ANY hr:* key (managers see the whole set, self-service staff only "My HR"). No featureFlag: HR is not a plan module.
+    // One top-level entry; sub-links are permission-filtered. Visible with ANY hr:* key (managers see the whole set, self-service staff only "My HR") AND the `hr` feature flag. The flag gates the whole group: `use-filtered-nav.ts` filters children only after the parent passes, and `route-features.ts` maps every `/hr/**` path to `hr` by segment-aware prefix match on this entry's href.
     key: 'hr',
     label: 'HR',
     href: '/hr',
+    featureFlag: 'hr',
     icon: BriefcaseBusiness,
     permission: ['hr:view', 'hr:attendance_manage', 'hr:leave_manage', 'hr:payroll_manage', 'hr:settings_manage', 'hr:self_attendance', 'hr:self_leave', 'hr:self_payslip'],
     section: 'People',

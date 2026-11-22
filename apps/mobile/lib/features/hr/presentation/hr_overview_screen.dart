@@ -9,6 +9,10 @@ import '../../../core/theme/app_radii.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../models/hr_admin.dart';
+import 'apply_leave_screen.dart';
+import 'approvals_screen.dart';
+import 'team_attendance_screen.dart';
+import 'widgets/hr_form_kit.dart';
 import '../../../repositories/hr_repository.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/list_hero.dart';
@@ -30,10 +34,12 @@ import 'widgets/hr_widgets.dart';
 /// without `hr:payroll_manage`), and the entry tiles are gated on the same
 /// keys.
 ///
-/// **Scope (mobile = web parity, design-only extras: none):** shifts, leave
-/// types, holidays, HR policy, pay-structure editing, payroll generation /
-/// recalculation / approval and payslip line editing are web-only - they are
-/// desk configuration, not day-to-day actions.
+/// **Quick actions** mirror the web overview: Mark attendance, Leaves, Apply
+/// on behalf and Team calendar (`hr:leave_manage`), Monthly attendance,
+/// Employees, Run payroll (`hr:payroll_manage`) and Shifts & holidays - each
+/// shown only when the user holds the key its destination needs. "Who is off
+/// soon" is a horizontal strip of the next 14 days (`hr:leave_manage`) and the
+/// upcoming holidays link to Setup.
 class HrOverviewScreen extends StatefulWidget {
   const HrOverviewScreen({super.key});
 
@@ -68,10 +74,88 @@ class _HrOverviewScreenState extends State<HrOverviewScreen> {
     }
   }
 
-  Future<void> _go(String route) async {
-    await context.push<void>(route);
+  Future<void> _go(String route, {Object? extra}) async {
+    await context.push<void>(route, extra: extra);
     if (mounted) _load(silent: true);
   }
+
+  Future<void> _applyOnBehalf() async {
+    final who = await showHrEmployeePicker(
+      context,
+      title: 'Apply leave for…',
+      excludeUserId: hrSelfId(context),
+    );
+    if (who == null || !mounted) return;
+    await context.push<bool>(
+      AppRoutes.hrApplyLeave,
+      extra: HrApplyLeaveArgs(onBehalfOf: who),
+    );
+    if (mounted) _load(silent: true);
+  }
+
+  /// The web overview's quick actions, each shown only when the user holds
+  /// the key the destination needs.
+  List<_Entry> _quickActions(HrOverview o, {required bool canLeave, required bool canPay}) => [
+        _Entry(
+          icon: Icons.event_available_rounded,
+          label: 'Mark attendance',
+          color: HrPalette.present,
+          onTap: () => _go(AppRoutes.hrTeamAttendance),
+        ),
+        if (canLeave)
+          _Entry(
+            icon: Icons.fact_check_rounded,
+            label: 'Leaves',
+            color: HrPalette.pending,
+            badge: o.pendingLeaves,
+            onTap: () => _go(AppRoutes.hrApprovals),
+          ),
+        if (canLeave)
+          _Entry(
+            icon: Icons.person_add_alt_1_rounded,
+            label: 'Apply on behalf',
+            color: HrPalette.onLeave,
+            onTap: _applyOnBehalf,
+          ),
+        if (canLeave)
+          _Entry(
+            icon: Icons.calendar_month_rounded,
+            label: 'Team calendar',
+            color: HrPalette.run,
+            onTap: () => _go(
+              AppRoutes.hrApprovals,
+              extra: const HrLeavesArgs(openCalendar: true),
+            ),
+          ),
+        _Entry(
+          icon: Icons.grid_view_rounded,
+          label: 'Monthly attendance',
+          color: HrPalette.late,
+          onTap: () => _go(
+            AppRoutes.hrTeamAttendance,
+            extra: const HrAttendanceArgs(monthGrid: true),
+          ),
+        ),
+        _Entry(
+          icon: Icons.badge_rounded,
+          label: 'Employees',
+          color: HrPalette.onLeave,
+          onTap: () => _go(AppRoutes.hrEmployees),
+        ),
+        if (canPay)
+          _Entry(
+            icon: Icons.payments_rounded,
+            label: 'Run payroll',
+            color: HrPalette.money,
+            onTap: () => _go(AppRoutes.hrPayroll),
+          ),
+        _Entry(
+          icon: Icons.tune_rounded,
+          label: 'Shifts & holidays',
+          color: HrPalette.holiday,
+          onTap: () => _go(AppRoutes.hrSetup),
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -128,11 +212,8 @@ class _HrOverviewScreenState extends State<HrOverviewScreen> {
               const SizedBox(height: 18),
               StaggeredCard(
                 index: i++,
-                child: _EntryRow(
-                  canLeave: canLeave,
-                  canPay: canPay,
-                  o: o,
-                  go: _go,
+                child: _QuickActions(
+                  items: _quickActions(o, canLeave: canLeave, canPay: canPay),
                 ),
               ),
               if (o.trend.isNotEmpty) ...[
@@ -154,41 +235,96 @@ class _HrOverviewScreenState extends State<HrOverviewScreen> {
                   ),
                 ),
               ],
-              if (o.upcomingLeaves.isNotEmpty) ...[
+              if (canLeave) ...[
                 const SizedBox(height: 18),
-                const HrSectionHeader(title: 'Off in the next 2 weeks'),
-                for (final l in o.upcomingLeaves) ...[
-                  StaggeredCard(
-                    index: i++,
-                    child: _UpcomingLeaveRow(
-                      leave: l,
-                      onTap: () => context.push(
-                        AppRoutes.hrEmployeeDetail,
-                        extra: HrEmployeeArgs(
-                          userId: l.employee.userId,
-                          name: l.employee.name,
+                HrSectionHeader(
+                  title: 'Who is off soon',
+                  trailing: 'Team calendar',
+                  onTrailingTap: () => _go(
+                    AppRoutes.hrApprovals,
+                    extra: const HrLeavesArgs(openCalendar: true),
+                  ),
+                ),
+                if (o.upcomingLeaves.isEmpty)
+                  Text(
+                    'Everyone is in - no approved leave in the next two '
+                    'weeks.',
+                    key: const Key('off-soon-empty'),
+                    style: AppText.body(color: AppColors.inkFaint),
+                  )
+                else
+                  SizedBox(
+                    key: const Key('off-soon-strip'),
+                    height: 112,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: o.upcomingLeaves.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      itemBuilder: (context, idx) {
+                        final l = o.upcomingLeaves[idx];
+                        return StaggeredCard(
+                          index: idx,
+                          child: _UpcomingLeaveCard(
+                            leave: l,
+                            onTap: () => context.push(
+                              AppRoutes.hrEmployeeDetail,
+                              extra: HrEmployeeArgs(
+                                userId: l.employee.userId,
+                                name: l.employee.name,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+              if (o.upcomingHolidays.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                HrSectionHeader(
+                  title: 'Upcoming holidays',
+                  trailing: 'Setup',
+                  onTrailingTap: () => _go(AppRoutes.hrSetup),
+                ),
+                for (final h in o.upcomingHolidays) ...[
+                  HrCard(
+                    key: Key('holiday-${h.id}'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.celebration_rounded,
+                          size: 18,
+                          color: HrPalette.holiday,
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            h.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppText.body(
+                              size: 13.5,
+                              weight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          hrDateWd(h.date),
+                          style: AppText.body(
+                            size: 12,
+                            weight: FontWeight.w700,
+                            color: AppColors.inkFaint,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 8),
                 ],
-              ],
-              if (o.upcomingHolidays.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                const HrSectionHeader(title: 'Upcoming holidays'),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final h in o.upcomingHolidays)
-                      HrChip(
-                        label: '${hrDate(h.date)} · ${h.name}',
-                        icon: Icons.celebration_rounded,
-                        color: HrPalette.holiday,
-                      ),
-                  ],
-                ),
               ],
             ],
           ),
@@ -366,51 +502,15 @@ class _TodayGrid extends StatelessWidget {
   }
 }
 
-class _EntryRow extends StatelessWidget {
-  const _EntryRow({
-    required this.canLeave,
-    required this.canPay,
-    required this.o,
-    required this.go,
-  });
+class _QuickActions extends StatelessWidget {
+  const _QuickActions({required this.items});
 
-  final bool canLeave;
-  final bool canPay;
-  final HrOverview o;
-  final Future<void> Function(String route) go;
+  final List<_Entry> items;
 
   @override
   Widget build(BuildContext context) {
-    final items = <Widget>[
-      if (canLeave)
-        _Entry(
-          icon: Icons.fact_check_rounded,
-          label: 'Approvals',
-          color: HrPalette.pending,
-          badge: o.pendingLeaves,
-          onTap: () => go(AppRoutes.hrApprovals),
-        ),
-      _Entry(
-        icon: Icons.event_available_rounded,
-        label: 'Team attendance',
-        color: HrPalette.present,
-        onTap: () => go(AppRoutes.hrTeamAttendance),
-      ),
-      _Entry(
-        icon: Icons.badge_rounded,
-        label: 'Employees',
-        color: HrPalette.onLeave,
-        onTap: () => go(AppRoutes.hrEmployees),
-      ),
-      if (canPay)
-        _Entry(
-          icon: Icons.payments_rounded,
-          label: 'Payroll',
-          color: HrPalette.money,
-          onTap: () => go(AppRoutes.hrPayroll),
-        ),
-    ];
     return Wrap(
+      key: const Key('quick-actions'),
       spacing: 10,
       runSpacing: 10,
       children: [
@@ -553,7 +653,7 @@ class _PayrollCard extends StatelessWidget {
                 ),
                 Text(
                   p.notGenerated
-                      ? 'Generate this month\'s payroll on the web'
+                      ? 'Not generated yet - open Payroll to generate it'
                       : '${p.unpaidPayslips ?? 0} payslip'
                           '${p.unpaidPayslips == 1 ? '' : 's'} unpaid',
                   style: AppText.body(
@@ -583,8 +683,8 @@ class _PayrollCard extends StatelessWidget {
   }
 }
 
-class _UpcomingLeaveRow extends StatelessWidget {
-  const _UpcomingLeaveRow({required this.leave, required this.onTap});
+class _UpcomingLeaveCard extends StatelessWidget {
+  const _UpcomingLeaveCard({required this.leave, required this.onTap});
 
   final HrUpcomingLeave leave;
   final VoidCallback onTap;
@@ -595,40 +695,69 @@ class _UpcomingLeaveRow extends StatelessWidget {
     final dates = leave.startDate == leave.endDate
         ? hrDateWd(leave.startDate)
         : '${hrDate(leave.startDate)} – ${hrDate(leave.endDate)}';
-    return HrCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(10),
-      child: Row(
-        children: [
-          HrAvatar(employee: leave.employee, size: 36),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  leave.employee.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.body(size: 13.5, weight: FontWeight.w800),
-                ),
-                Text(
-                  dates,
-                  style: AppText.body(
-                    size: 11.5,
-                    weight: FontWeight.w600,
-                    color: AppColors.inkFaint,
+    return Semantics(
+      button: true,
+      label: '${leave.employee.name}, ${leave.leaveType.name}, $dates, '
+          '${hrDays(leave.days)} days',
+      excludeSemantics: true,
+      child: SizedBox(
+        width: 210,
+        child: HrCard(
+          accent: hue,
+          onTap: onTap,
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  HrAvatar(employee: leave.employee, size: 32),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          leave.employee.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.body(
+                            size: 13,
+                            weight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          leave.leaveType.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppText.body(
+                            size: 11,
+                            weight: FontWeight.w600,
+                            color: AppColors.inkFaint,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                ],
+              ),
+              Text(
+                dates,
+                style: AppText.body(size: 12, weight: FontWeight.w800),
+              ),
+              Text(
+                '${hrDays(leave.days)} day${leave.days == 1 ? '' : 's'}'
+                '${leave.dayPart.isHalf ? ' · ${leave.dayPart.label}' : ''}',
+                style: AppText.body(
+                  size: 11,
+                  weight: FontWeight.w600,
+                  color: AppColors.inkFaint,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          HrChip(
-            label: '${leave.leaveType.name} · ${hrDays(leave.days)}d',
-            color: hue,
-            dense: true,
-          ),
-        ],
+        ),
       ),
     );
   }

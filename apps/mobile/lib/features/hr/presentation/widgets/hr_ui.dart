@@ -6,9 +6,11 @@ import '../../../../bloc/common/paginated_list_cubit.dart';
 import '../../../../bloc/common/paginated_list_state.dart';
 import '../../../../bloc/session/session_cubit.dart';
 import '../../../../bloc/session/session_state.dart';
+import '../../../../core/routing/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_radii.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/tenant_features.dart';
 import '../../../../models/hr_attendance.dart';
 import '../../../../models/hr_enums.dart';
 import '../../../../models/hr_leave.dart';
@@ -745,6 +747,73 @@ class HrInfoRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Can the signed-in user open the Expenses list (`finance:view` + the
+/// `expenses` module)? Paying a payslip records a SALARY expense there.
+bool hrCanOpenExpenses(BuildContext context) {
+  final s = context.read<SessionCubit>().state;
+  return s is SessionAuthenticatedStaff &&
+      s.user.hasPermission('finance:view') &&
+      tenantAllows(s.tenant, flag: 'expenses');
+}
+
+/// "Salary expense recorded" indicator on a paid payslip. Opens the Expenses
+/// list when the user may see it, otherwise it is just the indicator.
+class HrExpenseLink extends StatelessWidget {
+  const HrExpenseLink({super.key, this.compact = false});
+
+  /// A one-line tag for list rows instead of the detail row.
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final canOpen = hrCanOpenExpenses(context);
+    final body = Row(
+      mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+      children: [
+        Icon(
+          Icons.receipt_long_rounded,
+          size: compact ? 13 : 16,
+          color: HrPalette.money,
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            compact ? 'Expense recorded' : 'Salary expense recorded',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppText.body(
+              size: compact ? 11 : 13,
+              weight: FontWeight.w800,
+              color: HrPalette.money,
+            ),
+          ),
+        ),
+        if (canOpen) ...[
+          const SizedBox(width: 2),
+          const Icon(
+            Icons.chevron_right_rounded,
+            size: 16,
+            color: HrPalette.money,
+          ),
+        ],
+      ],
+    );
+    return Semantics(
+      button: canOpen,
+      label: 'Salary expense recorded${canOpen ? ', open expenses' : ''}',
+      excludeSemantics: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: canOpen ? () => context.push(AppRoutes.expenses) : null,
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: compact ? 2 : 8),
+          child: body,
+        ),
       ),
     );
   }

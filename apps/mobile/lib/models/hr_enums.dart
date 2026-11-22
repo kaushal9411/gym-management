@@ -166,3 +166,41 @@ DateTime hrParseDate(Object? v) {
 /// ISO instant → [DateTime] (UTC), `null` when absent/unparseable.
 DateTime? hrParseInstant(Object? v) =>
     v is String ? DateTime.tryParse(v) : null;
+
+/// Weekday of the HR API (`MONDAY` ... `SUNDAY`, upper-case). Monday-first.
+enum HrWeekday {
+  monday('MONDAY', 'Mon'),
+  tuesday('TUESDAY', 'Tue'),
+  wednesday('WEDNESDAY', 'Wed'),
+  thursday('THURSDAY', 'Thu'),
+  friday('FRIDAY', 'Fri'),
+  saturday('SATURDAY', 'Sat'),
+  sunday('SUNDAY', 'Sun');
+
+  const HrWeekday(this.api, this.short);
+
+  final String api;
+  final String short;
+
+  static HrWeekday? tryParse(Object? v) {
+    for (final e in HrWeekday.values) {
+      if (e.api == v) return e;
+    }
+    return null;
+  }
+
+  /// A weekday list sorted Monday-first with unknown values dropped.
+  static List<String> normalise(Iterable<String> days) => [
+        for (final d in HrWeekday.values)
+          if (days.contains(d.api)) d.api,
+      ];
+
+  /// `["SATURDAY","SUNDAY"]` -> `Sat, Sun` (`None` when empty).
+  static String shortList(Iterable<String> days) {
+    final list = [
+      for (final d in HrWeekday.values)
+        if (days.contains(d.api)) d.short,
+    ];
+    return list.isEmpty ? 'None' : list.join(', ');
+  }
+}

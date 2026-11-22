@@ -103,6 +103,18 @@ class HrPalette {
     return v == null ? fallback : Color(0xFF000000 | v);
   }
 
+  /// The swatches HR can pick for a leave type (same set as the web form).
+  static const leaveTypeChoices = <(String, String)>[
+    ('#6366f1', 'Indigo'),
+    ('#ef4444', 'Red'),
+    ('#10b981', 'Emerald'),
+    ('#64748b', 'Slate'),
+    ('#f59e0b', 'Amber'),
+    ('#ec4899', 'Pink'),
+    ('#14b8a6', 'Teal'),
+    ('#8b5cf6', 'Violet'),
+  ];
+
   static IconData dayPart(DayPart p) => switch (p) {
         DayPart.fullDay => Icons.wb_sunny_rounded,
         DayPart.halfMorning => Icons.wb_twilight_rounded,

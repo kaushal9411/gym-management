@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { useDelayedLoading } from '@/hooks/use-delayed-loading';
@@ -57,7 +58,10 @@ function useAsymptoticProgress(active: boolean): number {
  * mode entirely.
  */
 export function GlobalLoader() {
-  const isLoading = useAppSelector((state) => state.ui.pendingRequests > 0 || state.ui.navigationPending);
+  // `/onboarding-complete` IS a loading screen (animated steps) — a dimming overlay on top of it would just hide it.
+  const ownsLoading = usePathname()?.startsWith('/onboarding-complete') ?? false;
+  const isLoadingRaw = useAppSelector((state) => state.ui.pendingRequests > 0 || state.ui.navigationPending);
+  const isLoading = isLoadingRaw && !ownsLoading;
   // offDelayMs wider than the hook's own default: confirmed live that the
   // gap between "navigationPending clears (route/pathname committed)" and
   // "the new page's own first data fetch actually registers as pending"

@@ -340,3 +340,205 @@ const hrOverviewJson = {
     },
   ],
 };
+
+// ── setup / payroll / grid payloads (shapes verified against the live API) ──
+
+const hrShiftJson = {
+  'id': 'sh-general',
+  'name': 'General',
+  'startTime': '06:00',
+  'endTime': '21:00',
+  'graceMinutes': 10,
+  'weeklyOffDays': ['SUNDAY'],
+  'isDefault': true,
+  'isActive': true,
+  'employeeCount': 3,
+};
+
+const hrShiftMorningJson = {
+  'id': 'sh-morning',
+  'name': 'Morning',
+  'startTime': '06:00',
+  'endTime': '14:00',
+  'graceMinutes': 5,
+  'weeklyOffDays': ['SATURDAY', 'SUNDAY'],
+  'isDefault': false,
+  'isActive': true,
+  'employeeCount': 0,
+};
+
+const hrPolicyJson = {
+  'leaveYearStartMonth': 4,
+  'defaultWeeklyOff': ['SUNDAY'],
+  'lateGraceMinutes': 10,
+  'halfDayThresholdHours': 4,
+  'standardDayHours': 8,
+  'latePenaltyEnabled': false,
+  'latePenaltyLatesPerUnit': 3,
+  'latePenaltyDays': 0.5,
+  'overtimeEnabled': false,
+  'overtimeMultiplier': 1.5,
+  'backdateLeaveDays': 30,
+  'workingDaysBasis': 'CALENDAR_MINUS_WEEKLY_OFFS',
+};
+
+const hrLeaveTypeFullCasual = {
+  'id': 'lt-casual',
+  'name': 'Casual Leave',
+  'code': 'CASUAL',
+  'color': '#6366f1',
+  'isPaid': true,
+  'yearlyQuota': 12,
+  'carryForward': false,
+  'carryForwardMax': null,
+  'isActive': true,
+  'sortOrder': 1,
+};
+
+const hrLeaveTypeFullPaid = {
+  'id': 'lt-paid',
+  'name': 'Paid Leave',
+  'code': 'PAID',
+  'color': '#10b981',
+  'isPaid': true,
+  'yearlyQuota': 15,
+  'carryForward': true,
+  'carryForwardMax': 15,
+  'isActive': true,
+  'sortOrder': 3,
+};
+
+const hrLeaveTypeFullUnpaid = {
+  'id': 'lt-unpaid',
+  'name': 'Unpaid Leave',
+  'code': 'UNPAID',
+  'color': '#64748b',
+  'isPaid': false,
+  'yearlyQuota': null,
+  'carryForward': false,
+  'carryForwardMax': null,
+  'isActive': true,
+  'sortOrder': 4,
+};
+
+const hrHolidayJson = {
+  'id': 'h-diwali',
+  'date': '2026-11-08',
+  'name': 'Diwali (Lakshmi Puja)',
+  'description': 'Sample date - verify against your local calendar',
+  'branch': null,
+};
+
+const hrHolidayBranchJson = {
+  'id': 'h-branch',
+  'date': '2026-11-24',
+  'name': 'Guru Nanak Jayanti',
+  'description': null,
+  'branch': {'id': 'b-1', 'name': 'Main'},
+};
+
+/// Two employees x three days (the real endpoint returns every day of the
+/// month; three is enough for rendering tests).
+const hrMonthlyGridJson = {
+  'month': '2026-11',
+  'days': ['2026-11-20', '2026-11-21', '2026-11-22'],
+  'employees': [
+    {
+      'employee': hrEmployeeRefJson,
+      'cells': ['PRESENT', 'LATE', 'NOT_MARKED'],
+      'stats': {
+        'present': 1,
+        'late': 1,
+        'halfDay': 0,
+        'onLeave': 0,
+        'absent': 0,
+        'weeklyOff': 0,
+        'holiday': 0,
+        'notMarked': 1,
+        'workedMinutes': 0,
+        'lateCount': 1,
+        'overtimeMinutes': 0,
+      },
+    },
+    {
+      'employee': {
+        'userId': 'u-asha',
+        'employeeId': 'EMP-0003',
+        'name': 'Asha Desk',
+        'avatarUrl': null,
+        'role': 'RECEPTIONIST',
+      },
+      'cells': ['ABSENT', 'WEEKLY_OFF', 'HOLIDAY'],
+      'stats': {
+        'present': 0,
+        'late': 0,
+        'halfDay': 0,
+        'onLeave': 0,
+        'absent': 1,
+        'weeklyOff': 1,
+        'holiday': 1,
+        'notMarked': 0,
+        'workedMinutes': 0,
+        'lateCount': 0,
+        'overtimeMinutes': 0,
+      },
+    },
+  ],
+};
+
+const hrPayStructureJson = {
+  'userId': 'u-vikram',
+  'salaryType': 'MONTHLY',
+  'baseSalary': 18000,
+  'components': [
+    {
+      'id': 'c1',
+      'name': 'Travel allowance',
+      'type': 'ALLOWANCE',
+      'amount': 1500,
+      'isActive': true,
+    },
+    {
+      'id': 'c2',
+      'name': 'Provident fund',
+      'type': 'DEDUCTION',
+      'amount': 500,
+      'isActive': true,
+    },
+  ],
+  'monthlyGross': 19500,
+  'fixedDeductions': 500,
+};
+
+/// A DRAFT payslip that already has one MANUAL line (an incentive).
+Map<String, dynamic> hrPayslipWithManualLineJson() {
+  final base = Map<String, dynamic>.from(hrPayslipJson());
+  base['lines'] = [
+    ...(base['lines'] as List),
+    {
+      'id': 'l3',
+      'name': 'Incentive',
+      'type': 'ALLOWANCE',
+      'amount': 750,
+      'source': 'MANUAL',
+    },
+  ];
+  base['extraAllowances'] = 750;
+  base['bonus'] = 200;
+  return base;
+}
+
+const hrBalanceAdjustedJson = {
+  'leaveType': hrLeaveTypeCasual,
+  'leaveYear': 2026,
+  'leaveYearLabel': '2026-27',
+  'periodStart': '2026-04-01',
+  'periodEnd': '2027-03-31',
+  'quota': 12,
+  'carriedForward': 0,
+  'adjustment': 2,
+  'entitled': 14,
+  'used': 0,
+  'pending': 0,
+  'available': 14,
+};

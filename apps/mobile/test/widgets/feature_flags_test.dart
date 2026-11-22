@@ -2,8 +2,10 @@
 // modules ANDed with the platform `FeatureFlag.enabled` kill switch, delivered
 // by `GET /public/tenants/resolve`) — per-flag behaviour on the phone.
 //
-// One group per flag (the 11 platform keys): menu tile present when the flag is
-// on, absent when it is off; graceful error when the API 403s. Further groups
+// One group per flag (the 12 platform keys, `hr` included - it has its own
+// group "flag: hr" because its tiles collide by title with other modules'):
+// menu tile present when the flag is on, absent when it is off; graceful error
+// when the API 403s. Further groups
 // cover the places that used to ignore the flags (the "GAP" list in
 // docs/FEATURE-FLAGS-AUDIT.md "Mobile", all fixed): any-of menu gates, the
 // member menu, every role shell's bottom nav, the router guard, push-tap
@@ -27,6 +29,7 @@ import 'package:gym_saas_mobile/core/routing/app_router.dart';
 import 'package:gym_saas_mobile/core/routing/app_routes.dart';
 import 'package:gym_saas_mobile/core/routing/route_feature_rules.dart';
 import 'package:gym_saas_mobile/core/storage/secure_storage.dart';
+import 'package:gym_saas_mobile/core/utils/tenant_features.dart';
 import 'package:gym_saas_mobile/features/attendance/presentation/attendance_access.dart';
 import 'package:gym_saas_mobile/features/manager/presentation/manager_menu_screen.dart';
 import 'package:gym_saas_mobile/features/manager/presentation/manager_shell.dart';
@@ -103,8 +106,9 @@ class _CounterState extends State<_Counter> {
       );
 }
 
-/// The 11 platform feature-flag keys (seed.ts `FEATURE_FLAGS`).
+/// The 12 platform feature-flag keys (seed.ts `FEATURE_FLAGS`).
 const kPlatformFlags = <String>[
+  'hr',
   'ai_coach',
   'notifications',
   'support_tickets',
@@ -155,7 +159,7 @@ TenantBranding _tenant(Iterable<String> flags) => TenantBranding(
       featureFlags: flags.toList(),
     );
 
-UserProfile _staff(String role) => UserProfile(
+UserProfile _staff(String role, [List<String> perms = _perms]) => UserProfile(
       id: 'u',
       tenantId: 't',
       name: 'Staff U',
@@ -163,7 +167,7 @@ UserProfile _staff(String role) => UserProfile(
       phone: null,
       status: 'ACTIVE',
       roles: [role],
-      permissions: _perms,
+      permissions: perms,
     );
 
 const _member = MemberProfile(
@@ -232,6 +236,34 @@ const _menus = <_MenuCase>[
   }),
 ];
 
+/// Every `AppRoutes.hr*` route (keep in step with app_routes.dart).
+const _hrRoutes = <String>[
+  AppRoutes.hrMe,
+  AppRoutes.hrApplyLeave,
+  AppRoutes.hrMyLeaves,
+  AppRoutes.hrPayslips,
+  AppRoutes.hrPayslipDetail,
+  AppRoutes.hrInbox,
+  AppRoutes.hrOverview,
+  AppRoutes.hrApprovals,
+  AppRoutes.hrTeamAttendance,
+  AppRoutes.hrEmployees,
+  AppRoutes.hrEmployeeDetail,
+  AppRoutes.hrPayroll,
+  AppRoutes.hrPayrollRun,
+  AppRoutes.hrSetup,
+];
+
+/// Every HR permission a menu tile asks for (superset, owner-like).
+const _hrPerms = <String>[
+  'hr:view',
+  'hr:leave_manage',
+  'hr:payroll_manage',
+  'hr:self_attendance',
+  'hr:self_leave',
+  'hr:self_payslip',
+];
+
 class _PortalRepo extends Fake implements MemberPortalRepository {
   ApiException? error;
 
@@ -257,14 +289,15 @@ void main() {
   Future<void> pumpStaffMenu(
     WidgetTester t,
     _MenuCase c,
-    Iterable<String> flags,
-  ) async {
+    Iterable<String> flags, {
+    List<String> perms = _perms,
+  }) async {
     t.view.physicalSize = const Size(360 * 2, 6000 * 2);
     t.view.devicePixelRatio = 2;
     addTearDown(t.view.reset);
     final session = _Session();
     when(() => session.state).thenReturn(
-      SessionAuthenticatedStaff(_staff(c.roleKey), _tenant(flags)),
+      SessionAuthenticatedStaff(_staff(c.roleKey, perms), _tenant(flags)),
     );
     final platform = _Platform();
     when(() => platform.state)
@@ -455,6 +488,51 @@ void main() {
       );
       expect(AttendanceAccess(u, _tenant(const [])).showHistoryOnTab, isFalse);
     });
+  });
+
+  // HR tile titles collide with other modules' ("Attendance"), so this group
+  // pumps each staff menu with HR permissions only and probes unique titles.
+  group('flag: hr', () {
+    for (final c in _menus) {
+      testWidgets('${c.role} menu: HR section needs permission AND the hr flag',
+          (t) async {
+        // flag on + permission -> the whole section
+        await pumpStaffMenu(t, c, [Feature.hr], perms: _hrPerms);
+        for (final title in ['Employees', 'Leaves', 'Payroll', 'My HR']) {
+          expect(find.text(title), findsOneWidget, reason: '${c.role}: $title');
+        }
+        // flag off + permission -> nothing
+        await pumpStaffMenu(t, c, _without('hr'), perms: _hrPerms);
+        for (final title in ['Employees', 'Leaves', 'Payroll', 'My HR']) {
+          expect(find.text(title), findsNothing, reason: '${c.role}: $title');
+        }
+        // flag on, permission missing -> nothing (self keys only -> My HR)
+        await pumpStaffMenu(t, c, _allKeys, perms: const []);
+        expect(find.text('My HR'), findsNothing);
+        await pumpStaffMenu(
+          t,
+          c,
+          _allKeys,
+          perms: const ['hr:self_leave'],
+        );
+        expect(find.text('My HR'), findsOneWidget);
+        expect(find.text('Employees'), findsNothing);
+      });
+
+      testWidgets('${c.role} menu: hr off leaves every other module alone',
+          (t) async {
+        await pumpStaffMenu(t, c, _without('hr'));
+        for (final other in c.tiles.entries) {
+          for (final title in other.value) {
+            expect(
+              find.text(title),
+              findsOneWidget,
+              reason: '${c.role}: "$title" must survive hr off',
+            );
+          }
+        }
+      });
+    }
   });
 
   group('flag: support_tickets', () {
@@ -888,18 +966,37 @@ void main() {
       expect(blocked(AppRoutes.receptionistReports, 'reports'), isFalse);
     });
 
-    test('HR, profile, support and unlisted routes are never blocked', () {
+    test('every HR route is blocked without hr and open with it', () {
+      for (final route in _hrRoutes) {
+        expect(
+          routeBlockedByFeatures(route, _tenant(_without('hr'))),
+          isTrue,
+          reason: '$route needs hr',
+        );
+        expect(
+          routeBlockedByFeatures(route, _tenant(_allKeys)),
+          isFalse,
+          reason: '$route opens with hr on',
+        );
+        // no other flag stands in for it, and it unblocks nothing else
+        expect(
+          routeBlockedByFeatures(
+            route,
+            _tenant(_allKeys.where((k) => k != 'hr')),
+          ),
+          isTrue,
+        );
+        expect(kRouteFeatureRules[route]?.flag, Feature.hr, reason: route);
+      }
+      expect(
+        routeBlockedByFeatures(AppRoutes.dietPlans, _tenant(_without('hr'))),
+        isFalse,
+        reason: 'turning hr off must not block another module',
+      );
+    });
+
+    test('profile, support and unlisted routes are never blocked', () {
       for (final route in [
-        AppRoutes.hrMe,
-        AppRoutes.hrApplyLeave,
-        AppRoutes.hrMyLeaves,
-        AppRoutes.hrPayslips,
-        AppRoutes.hrInbox,
-        AppRoutes.hrOverview,
-        AppRoutes.hrApprovals,
-        AppRoutes.hrTeamAttendance,
-        AppRoutes.hrEmployees,
-        AppRoutes.hrPayroll,
         AppRoutes.home,
         AppRoutes.myProfile,
         AppRoutes.support,
@@ -915,6 +1012,32 @@ void main() {
         );
       }
     });
+
+    for (final route in _hrRoutes) {
+      testWidgets('the real router sends $route home when hr is off',
+          (t) async {
+        final session = _FakeSession(
+          SessionAuthenticatedStaff(_staff('VIEWER'), _tenant(_without('hr'))),
+        );
+        final router = buildAppRouter(session);
+        await t.pumpWidget(
+          BlocProvider<SessionCubit>.value(
+            value: session,
+            child: MaterialApp.router(routerConfig: router),
+          ),
+        );
+        await t.pump();
+        await t.pump();
+        router.go(route);
+        await t.pump();
+        await t.pump();
+        expect(
+          router.routerDelegate.currentConfiguration.last.matchedLocation,
+          AppRoutes.home,
+        );
+        expect(t.takeException(), isNull);
+      });
+    }
 
     testWidgets('the real router sends a disabled route home', (t) async {
       // A role no shell claims lands on the light SignedInStubScreen at /home.
@@ -1016,7 +1139,7 @@ void main() {
       expect(loc(), AppRoutes.home);
     });
 
-    testWidgets('HR pushes are NOT gated by notifications', (t) async {
+    testWidgets('HR pushes are NOT gated by notifications (hr on)', (t) async {
       final svc = await pumpPush(
         t,
         actor: ActorType.staff,
@@ -1025,6 +1148,37 @@ void main() {
       await svc.navigateForTap('hr:LEAVE_APPLIED');
       await t.pumpAndSettle();
       expect(loc(), AppRoutes.hrApprovals);
+    });
+
+    for (final payload in [
+      'hr:LEAVE_APPLIED',
+      'hr:LEAVE_APPROVED',
+      'hr:PAYSLIP_PAID',
+    ]) {
+      testWidgets('$payload with hr OFF -> home, not a blocked HR screen',
+          (t) async {
+        // notifications stays ON: only the hr flag decides.
+        final svc = await pumpPush(
+          t,
+          actor: ActorType.staff,
+          flags: _without('hr'),
+        );
+        await svc.navigateForTap(payload);
+        await t.pumpAndSettle();
+        expect(loc(), AppRoutes.home);
+      });
+    }
+
+    testWidgets('hr OFF does not change the plain notification tap',
+        (t) async {
+      final svc = await pumpPush(
+        t,
+        actor: ActorType.staff,
+        flags: _without('hr'),
+      );
+      await svc.navigateForTap(null);
+      await t.pumpAndSettle();
+      expect(loc(), AppRoutes.notifications);
     });
 
     testWidgets('no tenant known -> the old behaviour (feed)', (t) async {

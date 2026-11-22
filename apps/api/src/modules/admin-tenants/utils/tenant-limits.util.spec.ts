@@ -10,6 +10,7 @@ import {
 } from './tenant-limits.util';
 import {
   GUARDED_MODULE_KEYS,
+  isGuardedModule,
   isModuleOverridden,
   moduleLabel,
   moduleToggleError,
@@ -93,5 +94,8 @@ describe('module toggle guard', () => {
   it('labels', () => {
     expect(moduleLabel('workout_plans')).toBe('Workout Plans');
     expect(moduleLabel('x', 'Custom')).toBe('Custom');
+    expect(moduleLabel('hr')).toBe('HR');
+    expect(isGuardedModule('hr')).toBe(false);
+    expect(moduleToggleError('hr', false)).toBeNull();
   });
 });

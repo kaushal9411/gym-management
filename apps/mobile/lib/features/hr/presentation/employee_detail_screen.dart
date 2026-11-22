@@ -20,6 +20,7 @@ import 'apply_leave_screen.dart';
 import 'hr_palette.dart';
 import 'my_leaves_screen.dart';
 import 'my_payslips_screen.dart';
+import 'widgets/employee_forms.dart';
 import 'widgets/hr_calendar_card.dart';
 import 'widgets/hr_sheets.dart';
 import 'widgets/hr_ui.dart';
@@ -41,8 +42,10 @@ class HrEmployeeArgs {
 /// sheet offers the manual mark / edit), leave balances, and - with
 /// `hr:leave_manage` - the leave history (tap to decide a pending request) plus
 /// **Apply leave on behalf**. With `hr:payroll_manage` the API also returns the
-/// pay structure and recent payslips; they are shown read-only (editing the
-/// structure is web-only). Without those keys the API sends `payStructure:
+/// pay structure and recent payslips; the structure is editable there (base +
+/// allowance / deduction lines). Shift + weekly off are editable with
+/// `hr:settings_manage`, leave balances can be credited / debited (remark
+/// required) with `hr:leave_manage`. Without those keys the API sends `payStructure:
 /// null` / `payslips: []` / `leaves: []`, and the blocks simply do not render.
 class EmployeeDetailScreen extends StatefulWidget {
   const EmployeeDetailScreen({super.key, required this.args});
@@ -94,6 +97,37 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     if (changed && mounted) _load(silent: true);
   }
 
+  Future<void> _editWorkSetup() async {
+    final d = _d;
+    if (d == null) return;
+    final changed = await showWorkSetupSheet(context, employee: d.employee);
+    if (changed && mounted) _load(silent: true);
+  }
+
+  Future<void> _editPay() async {
+    final d = _d;
+    if (d == null) return;
+    final changed = await showPayStructureSheet(
+      context,
+      userId: d.employee.userId,
+      name: d.employee.name,
+      current: d.payStructure,
+    );
+    if (changed && mounted) _load(silent: true);
+  }
+
+  Future<void> _adjustBalance() async {
+    final d = _d;
+    if (d == null) return;
+    final changed = await showBalanceAdjustSheet(
+      context,
+      userId: d.employee.userId,
+      name: d.employee.name,
+      balances: d.balances,
+    );
+    if (changed && mounted) _load(silent: true);
+  }
+
   Future<void> _applyFor() async {
     final d = _d;
     if (d == null) return;
@@ -128,6 +162,8 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     final e = d?.employee;
     final canMark = hrCan(context, HrPerm.attendanceManage);
     final canLeave = hrCan(context, HrPerm.leaveManage);
+    final canSettings = hrCan(context, HrPerm.settingsManage);
+    final canPay = hrCan(context, HrPerm.payrollManage);
     final self = hrSelfId(context);
     return HrPage(
       title: e?.name ?? widget.args.name ?? 'Employee',
@@ -187,6 +223,11 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                 ),
                 const SizedBox(height: 16),
               ],
+              HrSectionHeader(
+                title: 'Work setup',
+                trailing: canSettings ? 'Edit shift & off days' : null,
+                onTrailingTap: canSettings ? _editWorkSetup : null,
+              ),
               _WorkSetup(e: d.employee),
               const SizedBox(height: 16),
               const HrSectionHeader(title: 'Attendance'),
@@ -202,7 +243,11 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
               ),
               if (d.balances.isNotEmpty) ...[
                 const SizedBox(height: 18),
-                const HrSectionHeader(title: 'Leave balance'),
+                HrSectionHeader(
+                  title: 'Leave balance',
+                  trailing: canLeave ? 'Adjust' : null,
+                  onTrailingTap: canLeave ? _adjustBalance : null,
+                ),
                 HrCard(
                   padding:
                       const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
@@ -237,10 +282,15 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                   const SizedBox(height: 10),
                 ],
               ],
-              if (d.payStructure != null) ...[
+              if (d.payStructure != null || canPay) ...[
                 const SizedBox(height: 8),
-                const HrSectionHeader(title: 'Pay structure'),
-                _PayStructureCard(s: d.payStructure!),
+                HrSectionHeader(
+                  title: 'Pay structure',
+                  trailing: canPay ? 'Edit' : null,
+                  onTrailingTap: canPay ? _editPay : null,
+                ),
+                if (d.payStructure != null)
+                  _PayStructureCard(s: d.payStructure!),
               ],
               if (d.payslips.isNotEmpty) ...[
                 const SizedBox(height: 18),

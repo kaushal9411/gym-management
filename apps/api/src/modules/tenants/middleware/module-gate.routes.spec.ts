@@ -77,6 +77,7 @@ import { financeDashboardRouter } from '../../finance/routes/finance-dashboard.r
 import { incomeRouter } from '../../finance/routes/income.routes';
 import { memberInvoiceRouter } from '../../finance/routes/member-invoice.routes';
 import { memberPaymentRouter } from '../../finance/routes/member-payment.routes';
+import { hrRouter } from '../../hr/routes/hr.routes';
 import { memberPortalRouter } from '../../member-portal/routes/member-portal.routes';
 import { analyticsRouter } from '../../reports/routes/analytics.routes';
 import { dashboardRouter } from '../../reports/routes/dashboard.routes';
@@ -104,6 +105,7 @@ const ALL_KEYS = [
   'diet_plans',
   'live_classes',
   'workout_plans',
+  'hr',
 ] as const;
 type FlagKey = (typeof ALL_KEYS)[number];
 
@@ -119,6 +121,7 @@ interface Surface {
 
 const get = (path: string): Probe => ({ method: 'get', path });
 const post = (path: string): Probe => ({ method: 'post', path });
+const put = (path: string): Probe => ({ method: 'put', path });
 
 /** flag -> every tenant-facing router it gates (mount paths mirror api/v1/router.ts), with one read + one write probe each. */
 const SURFACES: Record<FlagKey, Surface[]> = {
@@ -161,6 +164,25 @@ const SURFACES: Record<FlagKey, Surface[]> = {
   workout_plans: [
     { mount: '/workout-plans', router: workoutPlanRouter, probes: [get('/assignable')] },
     { mount: '/exercises', router: exerciseRouter, probes: [get('/'), post('/')] },
+  ],
+  // The WHOLE /hr mount is gated (admin, payroll AND self-service /hr/me/*): reads + writes from each of the three sub-routers.
+  hr: [
+    {
+      mount: '/hr',
+      router: hrRouter,
+      probes: [
+        get('/overview'),
+        get('/employees'),
+        get('/leaves'),
+        put('/policy'),
+        get('/me/summary'),
+        get('/me/payslips'),
+        post('/me/attendance/check-in'),
+        post('/me/leaves'),
+        get('/payroll/runs'),
+        post('/payroll/runs'),
+      ],
+    },
   ],
 };
 

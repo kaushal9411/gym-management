@@ -40,6 +40,7 @@ abstract final class Feature {
   static const reports = 'reports';
   static const notifications = 'notifications';
   static const aiCoach = 'ai_coach';
+  static const hr = 'hr';
 
   /// Finance is on when ANY of its three modules is.
   static const finance = [payments, income, expenses];

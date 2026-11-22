@@ -4,9 +4,13 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { PLATFORM_FLAGS, flagsWithout, type PlatformFlag } from './helpers';
 
 // Owner-like user: every permission granted, so ONLY the feature-flag half of `useFilteredNav` is under test.
-const state = vi.hoisted(() => ({ flags: [] as string[] }));
+// `perms: null` = every permission; otherwise only the listed keys.
+const state = vi.hoisted(() => ({ flags: [] as string[], perms: null as string[] | null }));
 vi.mock('@/features/auth/hooks/use-permissions', () => ({
-  usePermissions: () => ({ hasPermission: () => true, hasAnyPermission: () => true }),
+  usePermissions: () => ({
+    hasPermission: (k: string) => state.perms === null || state.perms.includes(k),
+    hasAnyPermission: (ks: string[]) => state.perms === null || ks.some((k) => state.perms!.includes(k)),
+  }),
 }));
 vi.mock('@/features/tenant/tenant-provider', () => ({
   useTenant: () => ({ featureFlags: state.flags }),
@@ -14,6 +18,19 @@ vi.mock('@/features/tenant/tenant-provider', () => ({
 
 import { useFilteredNav } from '@/features/navigation/use-filtered-nav';
 import { QuickActionsMenu } from '@/components/layout/quick-actions-menu';
+
+function visibleNav(flags: string[], perms: string[] | null = null) {
+  state.flags = flags;
+  state.perms = perms;
+  let items: ReturnType<typeof useFilteredNav> = [];
+  function Probe() {
+    items = useFilteredNav();
+    return null;
+  }
+  renderToStaticMarkup(React.createElement(Probe));
+  state.perms = null;
+  return items;
+}
 
 function visibleNavKeys(flags: string[]): string[] {
   state.flags = flags;
@@ -39,6 +56,7 @@ const NAV_KEYS_BY_FLAG: Record<PlatformFlag, string[]> = {
   diet_plans: ['diet-plans'],
   live_classes: ['classes'],
   workout_plans: ['workout-plans'],
+  hr: ['hr'],
 };
 
 describe('sidebar nav: platform feature flag ENABLED vs DISABLED', () => {
@@ -91,10 +109,41 @@ describe('quick-add menu derives from the filtered sidebar (attendance / payment
     expect(renderQuickAdd(['reports'])).toBe('');
   });
 
+  it('hr is not a Quick Add shortcut: with only the hr flag the trigger does not render', () => {
+    expect(renderQuickAdd(['hr'])).toBe('');
+  });
+
   for (const flag of ['attendance', 'payments', 'expenses']) {
     it(`${flag}: enabled alone -> Quick Add trigger renders; disabled -> gone`, () => {
       expect(renderQuickAdd([flag])).toContain('Quick Add');
       expect(renderQuickAdd([])).toBe('');
     });
   }
+});
+
+describe('HR sidebar group: needs the `hr` flag AND an hr:* permission', () => {
+  const HR_CHILDREN = ['hr-overview', 'hr-employees', 'hr-attendance', 'hr-leaves', 'hr-payroll', 'hr-setup', 'hr-me'];
+  const hrItem = (flags: string[], perms: string[] | null) => visibleNav(flags, perms).find((i) => i.key === 'hr');
+
+  it('flag ON + hr permission -> group visible with its permitted children', () => {
+    const all = hrItem(flagsWithout(), null);
+    expect(all?.children?.map((c) => c.key)).toEqual(HR_CHILDREN);
+    expect(hrItem(flagsWithout(), ['hr:view'])?.children?.map((c) => c.key)).toEqual(['hr-overview', 'hr-employees', 'hr-attendance', 'hr-setup']);
+    expect(hrItem(flagsWithout(), ['hr:self_leave'])?.children?.map((c) => c.key)).toEqual(['hr-me']);
+  });
+
+  it('flag ON + no hr:* permission -> group hidden', () => {
+    expect(hrItem(flagsWithout(), ['members:view'])).toBeUndefined();
+  });
+
+  it('flag OFF -> the whole group (parent and every child) is hidden, even for a user with every permission', () => {
+    const keys = visibleNav(flagsWithout('hr'), null).flatMap((i) => [i.key, ...(i.children ?? []).map((c) => c.key)]);
+    expect(keys).not.toContain('hr');
+    for (const k of HR_CHILDREN) expect(keys).not.toContain(k);
+    expect(keys).toContain('leads');
+  });
+
+  it('flag OFF + hr permission only -> still hidden', () => {
+    expect(hrItem(flagsWithout('hr'), ['hr:view'])).toBeUndefined();
+  });
 });

@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-/** The 11 platform flags (Super Admin > Feature Flags), see apps/api prisma/seed.ts FEATURE_FLAGS. */
+/** The 12 platform flags (Super Admin > Feature Flags; 11 seeded + `hr`), see apps/api prisma/seed.ts FEATURE_FLAGS. */
 export const PLATFORM_FLAGS = [
   'ai_coach',
   'notifications',
@@ -14,6 +14,7 @@ export const PLATFORM_FLAGS = [
   'diet_plans',
   'live_classes',
   'workout_plans',
+  'hr',
 ] as const;
 export type PlatformFlag = (typeof PLATFORM_FLAGS)[number];
 

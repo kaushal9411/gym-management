@@ -24,9 +24,9 @@ const _income = RouteFeatureRule(flag: Feature.income);
 const _expenses = RouteFeatureRule(flag: Feature.expenses);
 const _reports = RouteFeatureRule(flag: Feature.reports);
 const _notifications = RouteFeatureRule(flag: Feature.notifications);
+const _hr = RouteFeatureRule(flag: Feature.hr);
 
-/// Exact path -> rule. HR routes are deliberately absent (HR has no flag), as
-/// are routes shared by several modules (assign plan, client progress, the
+/// Exact path -> rule. Routes shared by several modules are absent (assign plan, client progress, the
 /// Support screens, which gate themselves).
 const Map<String, RouteFeatureRule> kRouteFeatureRules = {
   // attendance
@@ -101,7 +101,7 @@ const Map<String, RouteFeatureRule> kRouteFeatureRules = {
   AppRoutes.receptionistReports:
       RouteFeatureRule(anyOf: [Feature.reports, Feature.attendance]),
   // notifications (the staff feed, templates, log, communications,
-  // announcements and the member feed; HR notifications are NOT here)
+  // announcements and the member feed; HR notifications are gated by `hr`)
   AppRoutes.notifications: _notifications,
   AppRoutes.notificationTemplates: _notifications,
   AppRoutes.editNotificationTemplate: _notifications,
@@ -115,6 +115,22 @@ const Map<String, RouteFeatureRule> kRouteFeatureRules = {
   AppRoutes.announcementForm: _notifications,
   AppRoutes.scheduleAnnouncement: _notifications,
   AppRoutes.memberNotifications: _notifications,
+  // HR: every /hr/* API route answers 403 when the module is off, and the HR
+  // push deep links land on these routes too.
+  AppRoutes.hrMe: _hr,
+  AppRoutes.hrApplyLeave: _hr,
+  AppRoutes.hrMyLeaves: _hr,
+  AppRoutes.hrPayslips: _hr,
+  AppRoutes.hrPayslipDetail: _hr,
+  AppRoutes.hrInbox: _hr,
+  AppRoutes.hrOverview: _hr,
+  AppRoutes.hrApprovals: _hr,
+  AppRoutes.hrTeamAttendance: _hr,
+  AppRoutes.hrEmployees: _hr,
+  AppRoutes.hrEmployeeDetail: _hr,
+  AppRoutes.hrPayroll: _hr,
+  AppRoutes.hrPayrollRun: _hr,
+  AppRoutes.hrSetup: _hr,
   // AI assistant
   AppRoutes.aiSettings: RouteFeatureRule(flag: Feature.aiCoach),
 };

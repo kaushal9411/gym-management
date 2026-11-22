@@ -32,6 +32,7 @@ const ROUTES_BY_FLAG: Record<PlatformFlag, string[]> = {
   diet_plans: ['/diet-plans', '/diet-plans/new', '/diet-plans/foods', '/diet-plans/smart', '/diet-plans/abc'],
   live_classes: ['/classes', '/classes/new', '/classes/calendar', '/classes/abc'],
   workout_plans: ['/workout-plans', '/workout-plans/new', '/workout-plans/exercises', '/workout-plans/abc'],
+  hr: ['/hr', '/hr/me', '/hr/leaves', '/hr/attendance', '/hr/employees', '/hr/employees/u1', '/hr/payroll', '/hr/payroll/run1', '/hr/setup'],
 };
 
 function renderRoute(pathname: string, flags: string[]): string {
@@ -69,10 +70,17 @@ describe('route-level guard: direct URL visit', () => {
   });
 
   it('un-flagged routes are never blocked', () => {
-    for (const route of ['/dashboard', '/leads', '/hr', '/hr/payroll', '/measurements', '/billing', '/billing/invoices', '/gym-settings/profile', '/support', '/settings', '/profile', '/roles']) {
+    for (const route of ['/dashboard', '/leads', '/measurements', '/billing', '/billing/invoices', '/gym-settings/profile', '/support', '/settings', '/profile', '/roles']) {
       expect(getRouteFeature(route)).toBeUndefined();
       expect(renderRoute(route, [])).toContain('PAGE');
     }
+  });
+
+  it('hr: a user without the flag sees the unavailable state on every /hr/** route; nested ids and unknown subpaths included', () => {
+    for (const route of ['/hr', '/hr/me', '/hr/leaves', '/hr/attendance', '/hr/employees/abc', '/hr/payroll/abc', '/hr/setup', '/hr/whatever']) {
+      expect(getRouteFeature(route)).toBe('hr');
+    }
+    expect(getRouteFeature('/hrx')).toBeUndefined(); // segment-aware
   });
 
   it('matching is segment-aware (/attendance-devices is not under /attendance; /invoicesX is not /invoices)', () => {

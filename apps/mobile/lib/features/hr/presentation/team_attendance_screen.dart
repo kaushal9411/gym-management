@@ -9,13 +9,16 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/app_clock.dart';
 import '../../../models/hr_attendance.dart';
 import '../../../models/hr_enums.dart';
+import '../../../models/hr_setup.dart';
 import '../../../repositories/hr_repository.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/list_hero.dart';
 import '../../team/presentation/widgets/team_ui.dart';
 import 'hr_palette.dart';
+import 'widgets/attendance_bulk_sheet.dart';
 import 'widgets/hr_calendar_card.dart';
 import 'widgets/hr_sheets.dart';
+import 'widgets/monthly_grid_view.dart';
 import 'widgets/hr_ui.dart';
 import 'widgets/hr_widgets.dart';
 
@@ -29,11 +32,35 @@ import 'widgets/hr_widgets.dart';
 /// and shown to the employee); a recorded day can also be removed. Without it
 /// the tap shows the read-only day detail.
 ///
-/// Dropped vs web: the monthly grid (`/hr/attendance/monthly`), bulk "mark
-/// everyone" (`/hr/attendance/bulk`) and the branch filter - desk-bound
-/// reconciliation tools; per-person month views live on the employee detail.
+/// **Month grid** (second view, same screen like the web tabs): employee x day
+/// with a status colour + glyph per cell and P / A totals; tapping a cell opens
+/// the same manual-mark form (`hr:attendance_manage`) or the read-only day
+/// sheet. **Mark all present** (day view, `hr:attendance_manage`) bulk-marks
+/// everyone without a record with one shared, required remark.
+///
+/// Not on mobile: the branch filter of the web board (the API scopes the
+/// roster to the user's branches already).
+enum _AttView {
+  day('Day view'),
+  month('Month grid');
+
+  const _AttView(this.label);
+
+  final String label;
+}
+
+/// Route argument of the attendance screen (`AppRoutes.hrTeamAttendance`).
+class HrAttendanceArgs {
+  const HrAttendanceArgs({this.monthGrid = false});
+
+  /// Open on the monthly grid instead of the day roster.
+  final bool monthGrid;
+}
+
 class TeamAttendanceScreen extends StatefulWidget {
-  const TeamAttendanceScreen({super.key});
+  const TeamAttendanceScreen({super.key, this.monthGrid = false});
+
+  final bool monthGrid;
 
   @override
   State<TeamAttendanceScreen> createState() => _TeamAttendanceScreenState();
@@ -47,11 +74,14 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
   String _search = '';
   DayStatus? _filter;
   int _req = 0;
+  late _AttView _view = widget.monthGrid ? _AttView.month : _AttView.day;
+  int _gridKey = 0;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    // The month grid loads its own data; the day roster only when shown.
+    if (_view == _AttView.day) _load();
   }
 
   Future<void> _load({bool silent = false}) async {
@@ -111,6 +141,41 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
     _load();
   }
 
+  Future<void> _bulk() async {
+    final b = _board;
+    if (b == null) return;
+    final changed = await showBulkMarkSheet(context, date: _date, rows: b.rows);
+    if (changed && mounted) _load(silent: true);
+  }
+
+  /// A grid cell only knows its status, so read that day's board to get the
+  /// full record (punches, source, remark) before opening the form.
+  Future<void> _openCell(HrGridRow row, DateTime date) async {
+    final canMark = hrCan(context, HrPerm.attendanceManage);
+    HrAttendanceDay? existing;
+    try {
+      final board = await getIt<HrRepository>().dayBoard(date: hrIso(date));
+      for (final r in board.rows) {
+        if (r.employee.userId == row.employee.userId) existing = r.attendance;
+      }
+    } on ApiException catch (e) {
+      if (mounted) hrSnack(context, e.message, error: true);
+      return;
+    }
+    if (!mounted) return;
+    if (canMark && !date.isAfter(AppClock.today())) {
+      final changed = await showMarkAttendanceSheet(
+        context,
+        employee: row.employee,
+        date: date,
+        existing: existing,
+      );
+      if (changed && mounted) setState(() => _gridKey++);
+    } else if (existing != null) {
+      await showHrDaySheet(context, existing, subject: row.employee.name);
+    }
+  }
+
   Future<void> _open(HrBoardRow row) async {
     if (hrCan(context, HrPerm.attendanceManage)) {
       final changed = await showMarkAttendanceSheet(
@@ -160,64 +225,116 @@ class _TeamAttendanceScreenState extends State<TeamAttendanceScreen> {
       ],
       slivers: [
         SliverToBoxAdapter(
-          child: _DayStepper(
-            date: _date,
-            isToday: _isToday,
-            onPrev: () => _step(-1),
-            onNext: _isToday ? null : () => _step(1),
-            onPick: _pickDate,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Row(
+              children: [
+                for (final v in _AttView.values)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Semantics(
+                      button: true,
+                      selected: _view == v,
+                      label: '${v.label} view',
+                      excludeSemantics: true,
+                      child: TeamFilterChip(
+                        key: Key('att-view-${v.name}'),
+                        label: v.label,
+                        selected: _view == v,
+                        color: HrPalette.present,
+                        onTap: () {
+                          setState(() => _view = v);
+                          if (v == _AttView.day && _board == null) _load();
+                        },
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
-        const SliverToBoxAdapter(child: SizedBox(height: 12)),
-        SliverToBoxAdapter(
-          child: TeamSearchField(
-            hint: 'Search employees',
-            onSearch: (v) {
-              _search = v;
-              _load(silent: true);
-            },
-          ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: 12)),
-        if (b != null)
+        if (_view == _AttView.month)
           SliverToBoxAdapter(
-            child: _SummaryChips(
-              summary: b.summary,
-              selected: _filter,
-              onPick: (s) => setState(() => _filter = s == _filter ? null : s),
-            ),
-          ),
-        const SliverToBoxAdapter(child: SizedBox(height: 12)),
-        if (_loading && b == null)
-          const SliverToBoxAdapter(child: HrSkeletonList(count: 5, height: 74))
-        else if (_error != null && b == null)
-          SliverToBoxAdapter(
-            child: AppErrorView(message: _error!, onRetry: _load),
-          )
-        else if (rows.isEmpty)
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.only(top: 30),
-              child: AppEmptyState(
-                title: 'No employees to show',
-                message: 'Nobody matches this filter for the day.',
-                icon: Icons.groups_outlined,
-              ),
+            child: HrMonthlyGridView(
+              reloadKey: _gridKey,
+              onCell: _openCell,
             ),
           )
-        else
-          SliverList.separated(
-            itemCount: rows.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
-            itemBuilder: (context, i) => StaggeredCard(
-              index: i,
-              child: _AttendanceRow(
-                row: rows[i],
-                canMark: canMark,
-                onTap: () => _open(rows[i]),
-              ),
+        else ...[
+          SliverToBoxAdapter(
+            child: _DayStepper(
+              date: _date,
+              isToday: _isToday,
+              onPrev: () => _step(-1),
+              onNext: _isToday ? null : () => _step(1),
+              onPick: _pickDate,
             ),
           ),
+          if (canMark && b != null && !_date.isAfter(AppClock.today())) ...[
+            const SliverToBoxAdapter(child: SizedBox(height: 12)),
+            SliverToBoxAdapter(
+              child: TeamOutlineButton(
+                key: const Key('mark-all-present'),
+                label: 'Mark all present',
+                icon: Icons.how_to_reg_rounded,
+                onTap: _bulk,
+              ),
+            ),
+          ],
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
+          SliverToBoxAdapter(
+            child: TeamSearchField(
+              hint: 'Search employees',
+              onSearch: (v) {
+                _search = v;
+                _load(silent: true);
+              },
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
+          if (b != null)
+            SliverToBoxAdapter(
+              child: _SummaryChips(
+                summary: b.summary,
+                selected: _filter,
+                onPick: (s) =>
+                    setState(() => _filter = s == _filter ? null : s),
+              ),
+            ),
+          const SliverToBoxAdapter(child: SizedBox(height: 12)),
+          if (_loading && b == null)
+            const SliverToBoxAdapter(
+              child: HrSkeletonList(count: 5, height: 74),
+            )
+          else if (_error != null && b == null)
+            SliverToBoxAdapter(
+              child: AppErrorView(message: _error!, onRetry: _load),
+            )
+          else if (rows.isEmpty)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.only(top: 30),
+                child: AppEmptyState(
+                  title: 'No employees to show',
+                  message: 'Nobody matches this filter for the day.',
+                  icon: Icons.groups_outlined,
+                ),
+              ),
+            )
+          else
+            SliverList.separated(
+              itemCount: rows.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, i) => StaggeredCard(
+                index: i,
+                child: _AttendanceRow(
+                  row: rows[i],
+                  canMark: canMark,
+                  onTap: () => _open(rows[i]),
+                ),
+              ),
+            ),
+        ],
       ],
     );
   }

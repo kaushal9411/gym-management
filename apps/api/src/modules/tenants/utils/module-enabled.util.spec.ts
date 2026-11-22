@@ -43,6 +43,13 @@ describe('isModuleEnabled / getEnabledModules', () => {
     expect(await isModuleEnabled('off', 'reports')).toBe(true);
   });
 
+  it('accepts the hr key (FlagModuleKey) and answers per tenant', async () => {
+    state.flags = { with: ['hr'], without: ['payments'] };
+    expect(await isModuleEnabled('with', 'hr')).toBe(true);
+    expect(await isModuleEnabled('without', 'hr')).toBe(false);
+    expect(await moduleGate('hr', 'hr-job')('without')).toBe(false);
+  });
+
   it('getEnabledModules answers several keys from ONE resolve', async () => {
     const modules = await getEnabledModules('on');
     expect(modules.resolved).toBe(true);

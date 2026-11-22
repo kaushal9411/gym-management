@@ -9,6 +9,7 @@ import '../models/hr_attendance.dart';
 import '../models/hr_enums.dart';
 import '../models/hr_leave.dart';
 import '../models/hr_payroll.dart';
+import '../models/hr_setup.dart';
 import '../models/hr_summary.dart';
 import '../models/paginated_result.dart';
 import '../models/report_export.dart';
@@ -343,6 +344,9 @@ class HrRepository {
     int limit = 20,
     LeaveStatus? status,
     String? userId,
+    String? leaveTypeId,
+    DateTime? from,
+    DateTime? to,
   }) =>
       _run(() async {
         final r = await _dio.get<Map<String, dynamic>>(
@@ -352,6 +356,9 @@ class HrRepository {
             'limit': limit,
             if (status != null) 'status': status.api,
             if (userId != null) 'userId': userId,
+            if (leaveTypeId != null) 'leaveTypeId': leaveTypeId,
+            if (from != null) 'from': _iso(from),
+            if (to != null) 'to': _iso(to),
           },
         );
         return HrLeavePage.fromJson(_data(r));
@@ -395,8 +402,12 @@ class HrRepository {
         return HrLeaveRequest.fromJson(_data(r));
       });
 
-  Future<List<HrLeaveType>> leaveTypes() => _run(() async {
-        final r = await _dio.get<Map<String, dynamic>>('/hr/leave-types');
+  Future<List<HrLeaveType>> leaveTypes({bool includeInactive = false}) =>
+      _run(() async {
+        final r = await _dio.get<Map<String, dynamic>>(
+          '/hr/leave-types',
+          queryParameters: {if (includeInactive) 'includeInactive': true},
+        );
         return _list(r, HrLeaveType.fromJson);
       });
 
@@ -445,7 +456,7 @@ class HrRepository {
         return HrLeaveRequest.fromJson(_data(r));
       });
 
-  // ── admin: payroll (read + pay actions only) ──────────────────────────────
+  // ── admin: payroll ────────────────────────────────────────────────────────
 
   Future<PaginatedResult<HrPayrollRun>> payrollRuns({
     int page = 1,
@@ -505,6 +516,278 @@ class HrRepository {
           data: _payBody(mode, paidOn, remark),
         );
         return HrPayAllResult.fromJson(_data(r));
+      });
+
+  /// `POST /hr/payroll/runs` - one DRAFT payslip per eligible employee.
+  /// 409 `CONFLICT` when the month already has a run; 422 for a future month.
+  Future<HrPayrollRunDetail> generatePayroll(
+    String month, {
+    String? notes,
+  }) =>
+      _run(() async {
+        final r = await _dio.post<Map<String, dynamic>>(
+          '/hr/payroll/runs',
+          data: {
+            'month': month,
+            if (notes != null && notes.trim().isNotEmpty)
+              'notes': notes.trim(),
+          },
+        );
+        return HrPayrollRunDetail.fromJson(_data(r));
+      });
+
+  /// DRAFT only: recomputes every draft payslip (manual lines, bonus and
+  /// advance recovery are kept).
+  Future<HrPayrollRunDetail> recalculateRun(String id) => _run(() async {
+        final r = await _dio.post<Map<String, dynamic>>(
+          '/hr/payroll/runs/$id/recalculate',
+          data: <String, dynamic>{},
+        );
+        return HrPayrollRunDetail.fromJson(_data(r));
+      });
+
+  /// DRAFT only (409 `INVALID_STATE` otherwise).
+  Future<void> deleteRun(String id) => _run(() async {
+        await _dio.delete<Map<String, dynamic>>('/hr/payroll/runs/$id');
+      });
+
+  /// DRAFT -> APPROVED; locks the run and makes payslips visible to staff.
+  Future<HrPayrollRun> approveRun(String id) => _run(() async {
+        final r = await _dio.post<Map<String, dynamic>>(
+          '/hr/payroll/runs/$id/approve',
+          data: <String, dynamic>{},
+        );
+        return HrPayrollRun.fromJson(_data(r));
+      });
+
+  /// Bonus / advance recovery / manual lines of a DRAFT payslip; the server
+  /// answers with the payslip recomputed.
+  Future<HrPayslip> patchPayslip(String id, HrPayslipEdit edit) =>
+      _run(() async {
+        final r = await _dio.patch<Map<String, dynamic>>(
+          '/hr/payroll/payslips/$id',
+          data: edit.toJson(),
+        );
+        return HrPayslip.fromJson(_data(r));
+      });
+
+  // ── admin: employee setup ─────────────────────────────────────────────────
+
+  /// `hr:payroll_manage`.
+  Future<HrPayStructure> payStructure(String userId) => _run(() async {
+        final r = await _dio.get<Map<String, dynamic>>(
+          '/hr/employees/$userId/pay-structure',
+        );
+        return HrPayStructure.fromJson(_data(r));
+      });
+
+  /// `components` replaces the whole set (max 20). Applies to the NEXT
+  /// payroll generation / recalculation.
+  Future<HrPayStructure> savePayStructure(
+    String userId, {
+    double? baseSalary,
+    required List<HrPayComponent> components,
+  }) =>
+      _run(() async {
+        final r = await _dio.put<Map<String, dynamic>>(
+          '/hr/employees/$userId/pay-structure',
+          data: {
+            if (baseSalary != null) 'baseSalary': baseSalary,
+            'components': [for (final c in components) c.toJson()],
+          },
+        );
+        return HrPayStructure.fromJson(_data(r));
+      });
+
+  /// `shiftId == null` = the gym default shift; `weeklyOff == null` = inherit
+  /// from the shift / policy.
+  Future<HrWorkSetup> setWorkSetup(
+    String userId, {
+    String? shiftId,
+    List<String>? weeklyOff,
+  }) =>
+      _run(() async {
+        final r = await _dio.put<Map<String, dynamic>>(
+          '/hr/employees/$userId/work-setup',
+          data: {
+            'shiftId': shiftId,
+            'weeklyOff':
+                weeklyOff == null ? null : HrWeekday.normalise(weeklyOff),
+          },
+        );
+        return HrWorkSetup.fromJson(_data(r));
+      });
+
+  /// Credit (positive) / debit (negative) a leave balance. [remark] is
+  /// REQUIRED (3-300). 409 on an unlimited type; 422 if entitlement would
+  /// drop below used + pending.
+  Future<HrLeaveBalance> adjustLeaveBalance({
+    required String userId,
+    required String leaveTypeId,
+    required double days,
+    required String remark,
+    int? leaveYear,
+  }) =>
+      _run(() async {
+        final r = await _dio.post<Map<String, dynamic>>(
+          '/hr/leave-balances/adjust',
+          data: {
+            'userId': userId,
+            'leaveTypeId': leaveTypeId,
+            if (leaveYear != null) 'leaveYear': leaveYear,
+            'days': days,
+            'remark': remark.trim(),
+          },
+        );
+        return HrLeaveBalance.fromJson(_data(r));
+      });
+
+  // ── admin: attendance grid + bulk ─────────────────────────────────────────
+
+  Future<HrMonthlyGrid> monthlyGrid(String month, {String? branchId}) =>
+      _run(() async {
+        final r = await _dio.get<Map<String, dynamic>>(
+          '/hr/attendance/monthly',
+          queryParameters: {
+            'month': month,
+            if (branchId != null) 'branchId': branchId,
+          },
+        );
+        return HrMonthlyGrid.fromJson(_data(r));
+      });
+
+  /// Marks every id in [userIds] PRESENT for [date] with one shared REQUIRED
+  /// [remark] (1-200 entries); [checkInTime] (`HH:mm`) is optional.
+  Future<HrBulkResult> bulkMarkPresent({
+    required String date,
+    required String remark,
+    required List<String> userIds,
+    String? checkInTime,
+  }) =>
+      _run(() async {
+        final r = await _dio.post<Map<String, dynamic>>(
+          '/hr/attendance/bulk',
+          data: {
+            'date': date,
+            'remark': remark.trim(),
+            'entries': [
+              for (final id in userIds)
+                {
+                  'userId': id,
+                  'status': DayStatus.present.api,
+                  if (checkInTime != null) 'checkInTime': checkInTime,
+                },
+            ],
+          },
+        );
+        return HrBulkResult.fromJson(_data(r));
+      });
+
+  // ── admin: setup (shifts, holidays, leave types, policy) ──────────────────
+
+  Future<List<HrShift>> shifts() => _run(() async {
+        final r = await _dio.get<Map<String, dynamic>>('/hr/shifts');
+        return _list(r, HrShift.fromJson);
+      });
+
+  Future<HrShift> createShift(HrShiftInput input) => _run(() async {
+        final r = await _dio.post<Map<String, dynamic>>(
+          '/hr/shifts',
+          data: input.toJson(),
+        );
+        return HrShift.fromJson(_data(r));
+      });
+
+  Future<HrShift> updateShift(String id, HrShiftInput input) =>
+      _run(() async {
+        final r = await _dio.patch<Map<String, dynamic>>(
+          '/hr/shifts/$id',
+          data: input.toJson(),
+        );
+        return HrShift.fromJson(_data(r));
+      });
+
+  /// 409 `INVALID_STATE` for the default shift or one with employees.
+  Future<void> deleteShift(String id) => _run(() async {
+        await _dio.delete<Map<String, dynamic>>('/hr/shifts/$id');
+      });
+
+  Future<List<HrHoliday>> holidays({required int year}) => _run(() async {
+        final r = await _dio.get<Map<String, dynamic>>(
+          '/hr/holidays',
+          queryParameters: {'year': year},
+        );
+        return _list(r, HrHoliday.fromJson);
+      });
+
+  /// Holidays in an inclusive date range (the team calendar).
+  Future<List<HrHoliday>> holidaysBetween(DateTime from, DateTime to) =>
+      _run(() async {
+        final r = await _dio.get<Map<String, dynamic>>(
+          '/hr/holidays',
+          queryParameters: {'from': _iso(from), 'to': _iso(to)},
+        );
+        return _list(r, HrHoliday.fromJson);
+      });
+
+  /// 409 `CONFLICT` for a second holiday on the same date + branch scope.
+  Future<HrHoliday> createHoliday({
+    required DateTime date,
+    required String name,
+    String? description,
+  }) =>
+      _run(() async {
+        final r = await _dio.post<Map<String, dynamic>>(
+          '/hr/holidays',
+          data: {
+            'date': _iso(date),
+            'name': name.trim(),
+            if (description != null && description.trim().isNotEmpty)
+              'description': description.trim(),
+          },
+        );
+        return HrHoliday.fromJson(_data(r));
+      });
+
+  Future<void> deleteHoliday(String id) => _run(() async {
+        await _dio.delete<Map<String, dynamic>>('/hr/holidays/$id');
+      });
+
+  Future<HrLeaveType> createLeaveType(HrLeaveTypeInput input) =>
+      _run(() async {
+        final r = await _dio.post<Map<String, dynamic>>(
+          '/hr/leave-types',
+          data: input.toJson(),
+        );
+        return HrLeaveType.fromJson(_data(r));
+      });
+
+  Future<HrLeaveType> updateLeaveType(String id, HrLeaveTypeInput input) =>
+      _run(() async {
+        final r = await _dio.patch<Map<String, dynamic>>(
+          '/hr/leave-types/$id',
+          data: input.toJson(),
+        );
+        return HrLeaveType.fromJson(_data(r));
+      });
+
+  /// 409 `INVALID_STATE` when a request / balance uses the type (deactivate
+  /// it instead).
+  Future<void> deleteLeaveType(String id) => _run(() async {
+        await _dio.delete<Map<String, dynamic>>('/hr/leave-types/$id');
+      });
+
+  Future<HrPolicy> policy() => _run(() async {
+        final r = await _dio.get<Map<String, dynamic>>('/hr/policy');
+        return HrPolicy.fromJson(_data(r));
+      });
+
+  Future<HrPolicy> savePolicy(HrPolicy policy) => _run(() async {
+        final r = await _dio.put<Map<String, dynamic>>(
+          '/hr/policy',
+          data: policy.toJson(),
+        );
+        return HrPolicy.fromJson(_data(r));
       });
 
   // ── helpers ───────────────────────────────────────────────────────────────

@@ -40,6 +40,7 @@ const _tenant = TenantBranding(
   status: 'ACTIVE',
   maintenanceMode: false,
   primaryColor: '',
+  featureFlags: ['hr'],
 );
 
 const _selfPerms = [
@@ -719,7 +720,8 @@ void main() {
         find.textContaining('3 leave requests need a decision'),
         findsOneWidget,
       );
-      expect(find.text('Approvals'), findsWidgets);
+      expect(find.text('Leaves'), findsWidgets);
+      expect(find.text('Run payroll'), findsWidgets);
       expect(find.text('Payroll'), findsWidgets);
       await t.scrollUntilVisible(
         find.text('Last 7 days'),
@@ -743,8 +745,11 @@ void main() {
       await pumpApp(t, const HrOverviewScreen(), perms: const ['hr:view']);
       await settle(t);
       expect(find.textContaining('need a decision'), findsNothing);
-      expect(find.text('Approvals'), findsNothing);
-      expect(find.text('Team attendance'), findsWidgets);
+      expect(find.text('Leaves'), findsNothing);
+      expect(find.text('Apply on behalf'), findsNothing);
+      expect(find.text('Mark attendance'), findsWidgets);
+      expect(find.text('Shifts & holidays'), findsWidgets);
+      expect(find.text('Run payroll'), findsNothing);
       expect(find.text('Payroll'), findsNothing);
       await dispose(t);
     });
@@ -815,7 +820,7 @@ void main() {
       await dispose(t);
     });
 
-    testWidgets('a draft run is read-only with a pointer to the web',
+    testWidgets('a draft run offers edit / recalculate / approve, not pay',
         (t) async {
       when(() => repo.payrollRun(any())).thenAnswer(
         (_) async => HrPayrollRunDetail.fromJson({
@@ -831,7 +836,10 @@ void main() {
         perms: _adminPerms,
       );
       await settle(t);
-      expect(find.textContaining('still a draft'), findsOneWidget);
+      expect(find.byKey(const Key('run-approve')), findsOneWidget);
+      expect(find.byKey(const Key('run-recalculate')), findsOneWidget);
+      expect(find.byKey(const Key('run-delete')), findsOneWidget);
+      expect(find.byKey(const Key('edit-ps-2')), findsOneWidget);
       expect(find.byKey(const Key('pay-ps-2')), findsNothing);
       await dispose(t);
     });

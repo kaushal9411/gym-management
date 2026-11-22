@@ -15,7 +15,8 @@ export function moduleLabel(key: string, planLabel?: string | null): string {
   if (planLabel) return planLabel;
   return key
     .split('_')
-    .map((w) => (w ? w[0]!.toUpperCase() + w.slice(1) : w))
+    // `hr` is an acronym, not a word (plan features normally supply their own label; this is the fallback).
+    .map((w) => (w === 'hr' ? 'HR' : w ? w[0]!.toUpperCase() + w.slice(1) : w))
     .join(' ');
 }
 

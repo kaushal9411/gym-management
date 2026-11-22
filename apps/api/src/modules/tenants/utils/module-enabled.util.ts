@@ -2,7 +2,7 @@ import { logger } from '../../../core/logging/logger';
 import { tenantService } from '../service/tenant.service';
 
 /**
- * The 11 platform-toggleable module keys (`FeatureFlag` seed). Plan-only keys (`members`, `staff`, ...) are NOT switches and
+ * The 12 platform-toggleable module keys (`FeatureFlag` seed). Plan-only keys (`members`, `staff`, ...) are NOT switches and
  * are deliberately not listed — nothing outside the HTTP gate should key off them.
  */
 export type FlagModuleKey =
@@ -16,7 +16,8 @@ export type FlagModuleKey =
   | 'attendance'
   | 'diet_plans'
   | 'live_classes'
-  | 'workout_plans';
+  | 'workout_plans'
+  | 'hr';
 
 /**
  * One tenant's enabled-module view. `resolved: false` means the flags could not be read (resolve threw, or the tenant row

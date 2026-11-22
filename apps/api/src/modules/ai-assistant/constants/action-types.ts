@@ -42,6 +42,7 @@ export const MODULE_LABELS: Record<FlagModuleKey, string> = {
   diet_plans: 'Diet plans',
   live_classes: 'Live classes',
   workout_plans: 'Workout plans',
+  hr: 'HR management',
 };
 
 /** The action types still usable given the modules a tenant has enabled (pure — takes the `has` predicate of `getEnabledModules`). */
