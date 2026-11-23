@@ -3,18 +3,18 @@ import { ErrorCode } from '../../../core/errors/error-codes';
 import { businessDate } from '../../../core/utils/business-time';
 import { getTenantScopedClient } from '../../../infrastructure/database/tenant-scoped-client';
 import type { IamActor } from '../../authentication/utils/actor.util';
-import type { LeaveBalanceDto, LeaveRequestDto, Paginated } from '../dto/hr.dto';
+import type { LeaveBalanceDto, LeaveCalendarDto, LeaveRequestDto, Paginated } from '../dto/hr.dto';
 import type { LeaveTypeRow, PolicyRow } from '../repositories/hr-config.repository';
 import { HrEmployeeRepository, type EmployeeRow } from '../repositories/hr-employee.repository';
 import { HrLeaveRepository, type LeaveRow } from '../repositories/hr-leave.repository';
-import { addDays, eachDate, fromDateCol, leaveYearBounds, leaveYearLabel, leaveYearOf, toDateCol } from '../utils/hr-dates.util';
+import { addDays, eachDate, formatDateRange, formatHumanDate, fromDateCol, leaveYearBounds, leaveYearLabel, leaveYearOf, toDateCol } from '../utils/hr-dates.util';
 import { balanceFigures, carryForwardAmount, computeLeaveDays, leaveSpansOverlap, type DayPart, type ExcludedDay } from '../utils/leave.util';
 
 import { HrAccess } from './hr-access.service';
 import { HrAttendanceService } from './hr-attendance.service';
 import { HrAudit } from './hr-audit.service';
 import { toEmployeeRef, toLeaveTypeRef, type EmployeeCtx } from './hr-calendar.service';
-import { HrConfigService } from './hr-config.service';
+import { HrConfigService, toHolidayDto } from './hr-config.service';
 import { HrNotificationService } from './hr-notification.service';
 
 export interface LeaveInput {
@@ -31,10 +31,18 @@ export interface LeavePreview {
   sufficient: boolean;
 }
 
+/**
+ * Nobody approves their own leave — EXCEPT the OWNER, who is the top approver
+ * (otherwise a gym whose only approver is the owner could never approve
+ * anything). Managers and everyone else stay blocked; the audit row of an
+ * owner's self-approval carries `selfApproved: true`.
+ */
+export const mayDecideOwnLeave = (actor: IamActor): boolean => actor.role === 'OWNER';
+
 const MAX_RANGE_DAYS = 120;
 const MAX_AHEAD_DAYS = 366;
 const dayPartLabel = (p: DayPart): string => (p === 'HALF_DAY_MORNING' ? ' (morning half)' : p === 'HALF_DAY_EVENING' ? ' (evening half)' : '');
-const fmtRange = (s: string, e: string): string => (s === e ? s : `${s} to ${e}`);
+const fmtRange = formatDateRange;
 
 export class HrLeaveService {
   readonly repo: HrLeaveRepository;
@@ -171,7 +179,7 @@ export class HrLeaveService {
     if (endDate < startDate) fail('endDate', 'End date cannot be before the start date.');
     if (input.dayPart !== 'FULL_DAY' && startDate !== endDate) fail('dayPart', 'A half-day leave must be a single day (start date = end date).');
     if (eachDate(startDate, endDate).length > MAX_RANGE_DAYS) fail('endDate', `A leave request can cover at most ${MAX_RANGE_DAYS} days.`);
-    if (startDate < ctx.joiningDate) fail('startDate', `Leave cannot start before the joining date (${ctx.joiningDate}).`);
+    if (startDate < ctx.joiningDate) fail('startDate', `Leave cannot start before the joining date (${formatHumanDate(ctx.joiningDate)}).`);
     if (!opts.onBehalf && startDate < addDays(today, -policy.backdateLeaveDays)) {
       fail('startDate', `Leave can be applied for at most ${policy.backdateLeaveDays} days in the past.`);
     }
@@ -210,7 +218,7 @@ export class HrLeaveService {
     if (!v.sufficient) {
       throw new AppError(ErrorCode.INSUFFICIENT_LEAVE_BALANCE, `Only ${v.available} day(s) of ${v.type.name} are available, but ${v.calc.days} requested.`, 422);
     }
-    if (opts.autoApprove && emp.id === actor.userId) throw new ForbiddenError('You cannot approve your own leave request.');
+    if (opts.autoApprove && emp.id === actor.userId && !mayDecideOwnLeave(actor)) throw new ForbiddenError('You cannot approve your own leave request.');
     const created = await this.repo.create({
       tenantId: this.tenantId,
       userId: emp.id,
@@ -264,7 +272,7 @@ export class HrLeaveService {
 
   async approve(id: string, remark: string | undefined, actor: IamActor): Promise<LeaveRequestDto> {
     const row = await this.mustFindRow(id, actor.userId, true);
-    if (row.userId === actor.userId) throw new ForbiddenError('You cannot decide your own leave request.');
+    if (row.userId === actor.userId && !mayDecideOwnLeave(actor)) throw new ForbiddenError('You cannot decide your own leave request.');
     const approved = await this.approveRow(row, actor, remark);
     return (await this.toDtos([approved], actor.userId))[0]!;
   }
@@ -291,7 +299,7 @@ export class HrLeaveService {
     const ok = await this.repo.transition(this.tenantId, row.id, ['PENDING'], { status: 'APPROVED', decidedBy: actor.userId, decidedAt: new Date(), decisionRemark: remark ?? null, days: calc.days });
     if (!ok) throw new ConflictError(ErrorCode.INVALID_STATE, 'This request was already decided.');
     await this.attendance.writeLeaveRows({ userId: row.userId, leaveRequestId: row.id, dates: calc.workingDates, dayPart: row.dayPart, ctx, approverUserId: actor.userId });
-    await this.audit.record(actor, 'hr.leave_approved', 'hr_leave_request', row.id, { userId: row.userId, days: calc.days, remark: remark ?? null, daysRecounted: Number(row.days) !== calc.days });
+    await this.audit.record(actor, 'hr.leave_approved', 'hr_leave_request', row.id, { userId: row.userId, days: calc.days, remark: remark ?? null, daysRecounted: Number(row.days) !== calc.days, ...(row.userId === actor.userId ? { selfApproved: true } : {}) });
     await this.notifications.notify([row.userId], {
       type: 'LEAVE_APPROVED',
       title: 'Leave approved',
@@ -388,6 +396,39 @@ export class HrLeaveService {
       .map((o) => ({ employee: refs.get(o.userId)!, leaveRequestId: o.id, startDate: fromDateCol(o.startDate), endDate: fromDateCol(o.endDate) }))
       .filter((c) => c.employee);
     return { ...dto!, balance, conflicts };
+  }
+
+  /**
+   * Team leave calendar: every PENDING/APPROVED request overlapping [from, to]
+   * for the employees the actor may see (same branch scoping as `list`/`detail`),
+   * WITHOUT pagination, plus the holidays in the window. The caller (validator)
+   * caps the window at 62 days, which bounds the result.
+   */
+  async calendar(from: string, to: string, actorUserId: string): Promise<LeaveCalendarDto> {
+    const scope = await this.access.scope(actorUserId);
+    const { items: emps } = await this.employees.list(this.tenantId, { restrictToBranchIds: scope });
+    const ids = emps.map((e) => e.id);
+    const [rows, holidayRows] = await Promise.all([
+      ids.length ? this.repo.openOverlapping(this.tenantId, ids, from, to) : Promise.resolve([] as LeaveRow[]),
+      this.config.repo.listHolidays(this.tenantId, from, to),
+    ]);
+    const names = new Map(emps.map((e) => [e.id, e.name]));
+    const items = rows
+      .map((r) => ({
+        id: r.id,
+        userId: r.userId,
+        employeeName: names.get(r.userId) ?? 'Unknown',
+        leaveType: toLeaveTypeRef(r.leaveType),
+        startDate: fromDateCol(r.startDate),
+        endDate: fromDateCol(r.endDate),
+        dayPart: r.dayPart,
+        days: Number(r.days),
+        status: r.status as 'PENDING' | 'APPROVED',
+      }))
+      .sort((a, b) => a.startDate.localeCompare(b.startDate) || a.employeeName.localeCompare(b.employeeName) || a.id.localeCompare(b.id));
+    // branch-restricted actors only see holidays that apply to one of their branches (or to all branches)
+    const holidays = holidayRows.filter((h) => !scope || h.branchId === null || scope.includes(h.branchId)).map(toHolidayDto);
+    return { from, to, items, holidays };
   }
 
   async upcoming(from: string, to: string, userIds?: string[]): Promise<LeaveRow[]> {

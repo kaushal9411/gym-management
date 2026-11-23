@@ -686,18 +686,35 @@ class HrAvatar extends StatelessWidget {
 
 /// Status dot + label chip for a day status.
 class HrDayStatusChip extends StatelessWidget {
-  const HrDayStatusChip({super.key, required this.status, this.dense = true});
+  const HrDayStatusChip({
+    super.key,
+    required this.status,
+    this.dense = true,
+    this.auto = false,
+  });
 
   final DayStatus status;
   final bool dense;
 
+  /// A derived (unrecorded) ABSENT: the label reads "Absent · auto" and
+  /// screen readers hear "No check-in recorded".
+  final bool auto;
+
   @override
-  Widget build(BuildContext context) => HrChip(
-        label: status.label,
-        color: HrPalette.status(status),
-        icon: HrPalette.glyph(status),
-        dense: dense,
-      );
+  Widget build(BuildContext context) {
+    final chip = HrChip(
+      label: auto ? '${status.label} · auto' : status.label,
+      color: HrPalette.status(status),
+      icon: HrPalette.glyph(status),
+      dense: dense,
+    );
+    if (!auto) return chip;
+    return Semantics(
+      label: '${status.label}, No check-in recorded',
+      excludeSemantics: true,
+      child: chip,
+    );
+  }
 }
 
 /// One info row (label left, value right) used by detail sheets.

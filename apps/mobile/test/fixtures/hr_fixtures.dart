@@ -282,16 +282,19 @@ Map<String, dynamic> hrRunJson({String status = 'APPROVED'}) => {
 const hrOverviewJson = {
   'date': '2026-11-22',
   'headcount': 4,
+  // v1.2: buckets sum to the headcount (4); `absent` can be > 0 for today
+  // (after shift end) and `yetToCheckIn` equals `notMarked`.
   'today': {
     'present': 1,
-    'late': 1,
+    'late': 0,
     'halfDay': 0,
     'onLeave': 1,
-    'absent': 0,
+    'absent': 1,
     'weeklyOff': 0,
     'holiday': 0,
     'notMarked': 1,
-    'checkedInNow': 2,
+    'yetToCheckIn': 1,
+    'checkedInNow': 1,
   },
   'pendingLeaves': 3,
   'payroll': {
@@ -542,3 +545,46 @@ const hrBalanceAdjustedJson = {
   'pending': 0,
   'available': 14,
 };
+
+// ── v1.2: leave calendar + derived absent (shapes verified on the live API) ─
+
+/// `GET /hr/leaves/calendar` item (slim row, the request's OWN dates).
+Map<String, dynamic> hrCalendarItemJson({
+  String id = 'lr-1',
+  String userId = 'u-vikram',
+  String name = 'Vikram Coach',
+  String start = '2026-11-25',
+  String end = '2026-11-26',
+  String status = 'APPROVED',
+  String dayPart = 'FULL_DAY',
+  double days = 2,
+}) =>
+    {
+      'id': id,
+      'userId': userId,
+      'employeeName': name,
+      'leaveType': hrLeaveTypeCasual,
+      'startDate': start,
+      'endDate': end,
+      'dayPart': dayPart,
+      'days': days,
+      'status': status,
+    };
+
+Map<String, dynamic> hrLeaveCalendarJson({
+  String from = '2026-11-01',
+  String to = '2026-11-30',
+  List<Map<String, dynamic>> items = const [],
+  List<Map<String, dynamic>> holidays = const [],
+}) =>
+    {'from': from, 'to': to, 'items': items, 'holidays': holidays};
+
+/// An unrecorded ABSENT (derived by the server after the shift ended).
+Map<String, dynamic> hrAutoAbsentDayJson({String date = '2026-11-22'}) =>
+    hrAttendanceDayJson(
+      date: date,
+      status: 'ABSENT',
+      recorded: false,
+      checkInTime: null,
+      source: null,
+    );

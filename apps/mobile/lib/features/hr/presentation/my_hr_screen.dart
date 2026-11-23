@@ -13,6 +13,7 @@ import '../../../models/hr_summary.dart';
 import '../../../repositories/hr_repository.dart';
 import '../../../shared/widgets/app_state_views.dart';
 import '../../../shared/widgets/list_hero.dart';
+import '../../../shared/widgets/motion.dart';
 import '../../../models/hr_leave.dart';
 import '../../team/presentation/widgets/team_ui.dart';
 import 'hr_palette.dart';
@@ -36,8 +37,11 @@ import 'widgets/hr_widgets.dart';
 /// `hr:self_leave`; the payslip tile needs `hr:self_payslip`. A role holding
 /// only the leave / payslip keys gets the links without the clock.
 ///
-/// The OWNER has no StaffProfile today, so the API answers 403
-/// `NOT_AN_EMPLOYEE`; that is shown as an explanation, not an error.
+/// The OWNER has no StaffProfile, so the API answers 403 `NOT_AN_EMPLOYEE`.
+/// That is not an error: with `hr:self_attendance` or `hr:self_leave` the
+/// screen offers an opt-in card ("Add me as an employee",
+/// `POST /hr/me/enroll`, via [HrMeCubit.enroll]); on success the normal My HR
+/// appears. Without those keys it is a plain "not available" note.
 ///
 /// **Dropped vs the brief**: nothing - every element is backed by an endpoint.
 /// Mutations are never optimistic: the button shows a spinner and the screen
@@ -75,6 +79,13 @@ class _MyHrViewState extends State<_MyHrView> {
       listener: (context, state) {
         if (state is! HrMeLoaded) return;
         final cubit = context.read<HrMeCubit>();
+        if (state.welcome) {
+          HapticFeedback.mediumImpact();
+          const msg = 'You are on the employee roster. Welcome!';
+          hrSnack(context, msg);
+          hrAnnounce(context, msg);
+          cubit.welcomed();
+        }
         if (state.notice != null) {
           HapticFeedback.heavyImpact();
           hrSnack(context, state.notice!, error: true);
@@ -94,9 +105,22 @@ class _MyHrViewState extends State<_MyHrView> {
       builder: (context, state) {
         return switch (state) {
           HrMeLoading() => const _Frame(child: _LoadingBody()),
-          HrMeError(:final notAnEmployee, :final message) => _Frame(
+          HrMeError(
+            :final notAnEmployee,
+            :final message,
+            :final enrolling,
+            :final enrollError,
+          ) =>
+            _Frame(
               child: notAnEmployee
-                  ? const _NotAnEmployee()
+                  ? (hrCan(context, HrPerm.selfAttendance) ||
+                          hrCan(context, HrPerm.selfLeave)
+                      ? _EnrollCard(
+                          enrolling: enrolling,
+                          error: enrollError,
+                          onEnroll: () => context.read<HrMeCubit>().enroll(),
+                        )
+                      : const _NotAvailable())
                   : Padding(
                       padding: const EdgeInsets.only(top: 80),
                       child: AppErrorView(
@@ -179,12 +203,15 @@ class _LoadingBody extends StatelessWidget {
   }
 }
 
-class _NotAnEmployee extends StatelessWidget {
-  const _NotAnEmployee();
+/// Plain note for an account that is not an employee and cannot enrol (no
+/// `hr:self_attendance` / `hr:self_leave`).
+class _NotAvailable extends StatelessWidget {
+  const _NotAvailable();
 
   @override
   Widget build(BuildContext context) {
     return Padding(
+      key: const Key('my-hr-not-available'),
       padding: const EdgeInsets.only(top: 40),
       child: Column(
         children: [
@@ -202,19 +229,117 @@ class _NotAnEmployee extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Text(
-            'No employee profile',
-            style: AppText.display(size: 18),
-          ),
+          Text('My HR is not available', style: AppText.display(size: 18)),
           const SizedBox(height: 6),
           Text(
-            'Your account is not set up as an employee, so there is no '
-            'personal attendance, leave or payslip to show. If you manage '
-            'the team, open HR from the menu.',
+            'Your account is not on the employee roster, so there is no '
+            'personal attendance, leave or payslip to show. If you manage the '
+            'team, open HR from the menu.',
             textAlign: TextAlign.center,
             style: AppText.body(color: AppColors.inkFaint, size: 13),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The opt-in card of an owner without an employee profile: a gradient hero
+/// panel in the clock-card hues, what enrolling does, and one primary button.
+/// Fades / rises in once (instant under reduce-motion).
+class _EnrollCard extends StatelessWidget {
+  const _EnrollCard({
+    required this.enrolling,
+    required this.error,
+    required this.onEnroll,
+  });
+
+  final bool enrolling;
+  final String? error;
+  final VoidCallback onEnroll;
+
+  @override
+  Widget build(BuildContext context) {
+    return StaggeredReveal(
+      child: Container(
+        key: const Key('enroll-card'),
+        margin: const EdgeInsets.only(top: 24),
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: HrPalette.clockCard,
+          ),
+          borderRadius: BorderRadius.circular(AppRadii.card),
+          boxShadow: [
+            BoxShadow(
+              color: HrPalette.clockCard.last.withValues(alpha: 0.35),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.16),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.how_to_reg_rounded,
+                color: Colors.white,
+                size: 26,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Semantics(
+              header: true,
+              child: Text(
+                'You are not on the employee roster',
+                style: AppText.display(size: 20, color: Colors.white),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'As the owner you can manage HR without being an employee. Add '
+              'yourself to check in, apply for leave and get payslips - you '
+              'will then count in HR attendance and absent numbers.',
+              style: AppText.body(
+                size: 13,
+                color: Colors.white.withValues(alpha: 0.88),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              "You can't undo this from the app.",
+              style: AppText.body(
+                size: 12.5,
+                weight: FontWeight.w800,
+                color: Colors.white.withValues(alpha: 0.88),
+              ),
+            ),
+            if (error != null) ...[
+              const SizedBox(height: 12),
+              FormAlert(message: error!),
+            ],
+            const SizedBox(height: 16),
+            TeamGradientButton(
+              key: const Key('enroll-button'),
+              label: error != null ? 'Try again' : 'Add me as an employee',
+              icon: Icons.person_add_alt_1_rounded,
+              loading: enrolling,
+              gradient: const LinearGradient(
+                colors: [HrPalette.paid, HrPalette.money],
+              ),
+              onTap: enrolling ? null : onEnroll,
+            ),
+          ],
+        ),
       ),
     );
   }

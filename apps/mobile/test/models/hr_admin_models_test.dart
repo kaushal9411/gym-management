@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gym_saas_mobile/features/hr/presentation/widgets/team_leave_calendar.dart';
+import 'package:gym_saas_mobile/models/hr_admin.dart';
+import 'package:gym_saas_mobile/models/hr_attendance.dart';
 import 'package:gym_saas_mobile/models/hr_enums.dart';
 import 'package:gym_saas_mobile/models/hr_leave.dart';
 import 'package:gym_saas_mobile/models/hr_payroll.dart';
@@ -239,25 +241,54 @@ void main() {
     });
   });
 
-  group('team calendar math', () {
-    HrLeaveRequest leave(
+  group('team calendar (GET /hr/leaves/calendar)', () {
+    HrCalendarLeave leave(
       String id,
       String start,
       String end, {
       String status = 'APPROVED',
     }) =>
-        HrLeaveRequest.fromJson(
-          hrLeaveRequestJson(id: id, status: status, start: start, end: end),
+        HrCalendarLeave.fromJson(
+          hrCalendarItemJson(id: id, start: start, end: end, status: status),
         );
 
-    test('a request is spread over every day it covers, clipped to the '
-        'month', () {
-      final m = hrLeavesByDay([
-        leave('a', '2026-11-25', '2026-11-27'),
-        leave('b', '2026-10-30', '2026-11-02'),
-        leave('c', '2026-11-26', '2026-12-03'),
-      ],
-      '2026-11',
+    test('parses the slim item + holidays of the envelope data', () {
+      final c = HrLeaveCalendar.fromJson(
+        hrLeaveCalendarJson(
+          from: '2026-11-01',
+          to: '2026-12-31',
+          items: [hrCalendarItemJson(dayPart: 'HALF_DAY_MORNING', days: 0.5)],
+          holidays: [hrHolidayJson],
+        ),
+      );
+      expect(c.from, DateTime(2026, 11, 1));
+      expect(c.to, DateTime(2026, 12, 31));
+      final i = c.items.single;
+      expect(i.employeeName, 'Vikram Coach');
+      expect(i.userId, 'u-vikram');
+      expect(i.leaveType.code, 'CASUAL');
+      expect(i.dayPart, DayPart.halfMorning);
+      expect(i.days, 0.5);
+      expect(i.status, LeaveStatus.approved);
+      expect(i.employee.name, 'Vikram Coach');
+      expect(c.holidays.single.name, 'Diwali (Lakshmi Puja)');
+    });
+
+    test('tolerates a bare payload (older / empty)', () {
+      final c = HrLeaveCalendar.fromJson(const {});
+      expect(c.items, isEmpty);
+      expect(c.holidays, isEmpty);
+    });
+
+    test('a request is spread over every day it covers, CLIPPED to the '
+        'displayed month', () {
+      final m = hrLeavesByDay(
+        [
+          leave('a', '2026-11-25', '2026-11-27'),
+          leave('b', '2026-10-30', '2026-11-02'),
+          leave('c', '2026-11-26', '2026-12-03'),
+        ],
+        '2026-11',
       );
       expect(m[25]!.map((l) => l.id), ['a']);
       expect(m[26]!.map((l) => l.id), ['a', 'c']);
@@ -265,17 +296,54 @@ void main() {
       expect(m[2]!.map((l) => l.id), ['b']);
       expect(m[3], isNull);
       expect(m[30]!.map((l) => l.id), ['c']);
+      // Nothing leaks into days outside the month (no key 0 / 31).
+      expect(m.keys.every((d) => d >= 1 && d <= 30), isTrue);
     });
 
-    test('rejected / cancelled requests never show on the calendar', () {
-      final m = hrLeavesByDay([
-        leave('r', '2026-11-10', '2026-11-10', status: 'REJECTED'),
-        leave('x', '2026-11-11', '2026-11-11', status: 'CANCELLED'),
-        leave('p', '2026-11-12', '2026-11-12', status: 'PENDING'),
-      ],
-      '2026-11',
+    test('a rejected / cancelled row (never sent by the API) is ignored', () {
+      final m = hrLeavesByDay(
+        [
+          leave('r', '2026-11-10', '2026-11-10', status: 'REJECTED'),
+          leave('x', '2026-11-11', '2026-11-11', status: 'CANCELLED'),
+          leave('p', '2026-11-12', '2026-11-12', status: 'PENDING'),
+        ],
+        '2026-11',
       );
       expect(m.keys, [12]);
+    });
+  });
+
+  group('v1.2 absent / yet-to-check-in', () {
+    test('yetToCheckIn is parsed; older servers default it to notMarked', () {
+      final v12 = HrTodayBuckets.fromJson({
+        'present': 1,
+        'absent': 2,
+        'notMarked': 3,
+        'yetToCheckIn': 3,
+      });
+      expect(v12.absent, 2);
+      expect(v12.yetToCheckIn, 3);
+      final old = HrTodayBuckets.fromJson({'present': 1, 'notMarked': 4});
+      expect(old.yetToCheckIn, 4);
+      expect(old.absent, 0);
+      expect(const HrTodayBuckets(notMarked: 2).yetToCheckIn, 2);
+    });
+
+    test('an unrecorded ABSENT is "auto"; a marked one is not', () {
+      final auto = HrAttendanceDay.fromJson(hrAutoAbsentDayJson());
+      expect(auto.status, DayStatus.absent);
+      expect(auto.recorded, isFalse);
+      expect(auto.isAutoAbsent, isTrue);
+      final marked = HrAttendanceDay.fromJson(
+        hrAttendanceDayJson(status: 'ABSENT', source: 'MANUAL'),
+      );
+      expect(marked.isAutoAbsent, isFalse);
+      // A day with no status of absent is never auto-absent.
+      expect(
+        HrAttendanceDay.fromJson(hrAttendanceDayJson(recorded: false))
+            .isAutoAbsent,
+        isFalse,
+      );
     });
   });
 }

@@ -8,7 +8,7 @@ import { HrAttendanceRepository, type AttendanceRow } from '../repositories/hr-a
 import type { PolicyRow } from '../repositories/hr-config.repository';
 import { HrEmployeeRepository, type EmployeeRow } from '../repositories/hr-employee.repository';
 import { checkInStatus, evaluateCheckOut, lateMinutesFor, summarizeDays, type AttendanceStats, type StoredStatus } from '../utils/attendance.util';
-import { addDays, currentMonth, eachDate, fromDateCol, istInstant, monthEnd, monthStart, parseHm } from '../utils/hr-dates.util';
+import { addDays, currentMonth, eachDate, formatHumanDate, fromDateCol, istInstant, monthEnd, monthStart, parseHm } from '../utils/hr-dates.util';
 
 import { HrAccess } from './hr-access.service';
 import { HrAudit } from './hr-audit.service';
@@ -289,7 +289,7 @@ export class HrAttendanceService {
     const fields: Array<{ field: string; message: string }> = [];
     const today = businessDate();
     if (input.date > today) fields.push({ field: 'date', message: 'Attendance cannot be marked for a future date.' });
-    if (input.date < ctx.joiningDate) fields.push({ field: 'date', message: `The employee joined on ${ctx.joiningDate}.` });
+    if (input.date < ctx.joiningDate) fields.push({ field: 'date', message: `The employee joined on ${formatHumanDate(ctx.joiningDate)}.` });
     const timed = TIMED_STATUSES.includes(input.status);
     if (!timed && (input.checkInTime || input.checkOutTime)) fields.push({ field: 'checkInTime', message: 'Times are only allowed with PRESENT, LATE or HALF_DAY.' });
     if (input.checkOutTime && !input.checkInTime) fields.push({ field: 'checkOutTime', message: 'checkInTime is required when checkOutTime is given.' });

@@ -6,11 +6,11 @@ import { Hourglass, Star, Sunrise, Sunset } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { useMotionSafe } from '@/features/reports/lib/motion';
-import { currentMonth, eachDate, formatDay, formatRange, monthDates, monthEnd, monthStart, todayYmd, weekdayIndex, WEEKDAYS_SHORT } from '../../lib/dates';
+import { currentMonth, formatDay, formatMonth, formatRange, monthDates, monthEnd, monthStart, todayYmd, weekdayIndex, WEEKDAYS_SHORT } from '../../lib/dates';
 import { leaveTypeColor, mix } from '../../lib/hr-palette';
 import { DAY_PART_SHORT } from '../../lib/status';
-import { useHolidays, useLeaves } from '../../hooks/use-hr';
-import type { LeaveRequest } from '../../types';
+import { groupLeavesByDay } from '../../lib/derive';
+import { toHrError, useLeaveCalendar } from '../../hooks/use-hr';
 import { HrAvatar, HrEmpty, HrError, HrPanel, MonthStepper, RowsSkeleton } from '../ui/hr-ui';
 
 /** "Who is off when": a month grid; each cell lists avatars of employees on approved (solid) or pending (dashed) leave, with holidays marked. */
@@ -20,20 +20,9 @@ export function TeamLeaveCalendar() {
   const [picked, setPicked] = React.useState<string>(todayYmd());
   const from = monthStart(month);
   const to = monthEnd(month);
-  const leaves = useLeaves({ from, to, limit: 100 });
-  const holidays = useHolidays({ from, to });
-
-  const live = React.useMemo(() => (leaves.data?.items ?? []).filter((l) => l.status === 'PENDING' || l.status === 'APPROVED'), [leaves.data]);
-  const byDay = React.useMemo(() => {
-    const map = new Map<string, LeaveRequest[]>();
-    for (const l of live) {
-      for (const d of eachDate(l.startDate < from ? from : l.startDate, l.endDate > to ? to : l.endDate)) {
-        map.set(d, [...(map.get(d) ?? []), l]);
-      }
-    }
-    return map;
-  }, [live, from, to]);
-  const holidayByDay = React.useMemo(() => new Map((holidays.data ?? []).map((h) => [h.date, h])), [holidays.data]);
+  const q = useLeaveCalendar(from, to);
+  const byDay = React.useMemo(() => groupLeavesByDay(q.data?.items ?? [], from, to), [q.data, from, to]);
+  const holidayByDay = React.useMemo(() => new Map((q.data?.holidays ?? []).map((h) => [h.date, h])), [q.data]);
   const dates = monthDates(month);
   const lead = weekdayIndex(from);
   const today = todayYmd();
@@ -42,13 +31,14 @@ export function TeamLeaveCalendar() {
 
   return (
     <div className="grid items-start gap-3.5 xl:grid-cols-[minmax(0,1fr)_340px]">
-      <HrPanel title="Team leave calendar" subtitle="Solid = approved, dashed = pending" icon={Hourglass} tone="var(--chart-7)" action={<MonthStepper value={month} onChange={setMonth} />}>
-        {leaves.isPending ? (
+      <HrPanel title="Team leave calendar" subtitle="Solid = approved, dashed = pending" icon={Hourglass} tone="var(--chart-7)" action={<MonthStepper value={month} onChange={(next) => { setMonth(next); setPicked(next === currentMonth() ? todayYmd() : `${next}-01`); }} />}>
+        {q.isPending ? (
           <RowsSkeleton rows={1} height={380} />
-        ) : leaves.isError ? (
-          <HrError onRetry={() => void leaves.refetch()} />
+        ) : q.isError ? (
+          <HrError message={toHrError(q.error).message} onRetry={() => void q.refetch()} />
         ) : (
           <>
+            {q.data && q.data.items.length === 0 ? <p className="mb-2 rounded-lg border border-dashed px-3 py-1.5 text-center text-xs text-muted-foreground">No approved or pending leave in {formatMonth(month)}{q.data.holidays.length ? '' : ' and no holidays'}.</p> : null}
             <div className="mb-1.5 grid grid-cols-7 gap-1 sm:gap-1.5" aria-hidden>
               {WEEKDAYS_SHORT.map((w) => (
                 <div key={w} className="text-center text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -95,7 +85,7 @@ export function TeamLeaveCalendar() {
                             className="relative inline-flex"
                             style={{ borderRadius: 999, outline: `2px ${l.status === 'PENDING' ? 'dashed' : 'solid'} ${c}`, outlineOffset: 1 }}
                           >
-                            <HrAvatar name={l.employee.name} size={20} />
+                            <HrAvatar name={l.employeeName} size={20} />
                           </span>
                         );
                       })}
@@ -119,9 +109,9 @@ export function TeamLeaveCalendar() {
               const half = l.dayPart !== 'FULL_DAY';
               return (
                 <li key={l.id} className="flex items-center gap-2.5 rounded-xl border px-3 py-2" style={{ boxShadow: `inset 3px 0 0 ${c}`, borderStyle: l.status === 'PENDING' ? 'dashed' : 'solid' }}>
-                  <HrAvatar name={l.employee.name} size={32} />
+                  <HrAvatar name={l.employeeName} size={32} />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-extrabold">{l.employee.name}</p>
+                    <p className="truncate text-[13px] font-extrabold">{l.employeeName}</p>
                     <p className="text-[11.5px] text-muted-foreground">
                       <span style={{ color: c }} className="font-bold">
                         {l.leaveType.name}

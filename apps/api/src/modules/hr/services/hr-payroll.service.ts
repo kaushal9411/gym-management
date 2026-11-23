@@ -32,6 +32,13 @@ interface ManualInputs {
 const linesOf = (row: Pick<PayslipRow, 'lines'>): PayslipLineDto[] => (Array.isArray(row.lines) ? (row.lines as unknown as PayslipLineDto[]) : []);
 const notesOf = (row: Pick<PayslipRow, 'notes'>): string[] => (Array.isArray(row.notes) ? (row.notes as unknown as string[]) : []);
 
+/** An employee is payable only when a salary amount (> 0) is set; otherwise no payslip is generated. */
+export const hasPay = (e: Pick<EmployeeRow, 'staffProfile'>): boolean => Number(e.staffProfile.salaryAmount ?? 0) > 0;
+
+export function splitByPay<T extends Pick<EmployeeRow, 'staffProfile'>>(employees: T[]): { payable: T[]; skippedNoPay: T[] } {
+  return { payable: employees.filter(hasPay), skippedNoPay: employees.filter((e) => !hasPay(e)) };
+}
+
 export class HrPayrollService {
   readonly repo: HrPayrollRepository;
   private readonly db: ReturnType<typeof getTenantScopedClient>;
@@ -162,7 +169,7 @@ export class HrPayrollService {
   }
 
   // ── generation ──────────────────────────────────────────────────────────
-  async generate(input: { month: string; notes?: string }, actor: IamActor): Promise<{ run: PayrollRunDto; payslips: PayslipDto[] }> {
+  async generate(input: { month: string; notes?: string }, actor: IamActor): Promise<{ run: PayrollRunDto; payslips: PayslipDto[]; skippedNoPay: number }> {
     if (input.month > currentMonth()) throw new ValidationError('Validation failed', { fields: [{ field: 'month', message: 'Payroll cannot be generated for a future month.' }] });
     if (await this.repo.findRunByMonth(this.tenantId, input.month)) throw new ConflictError(ErrorCode.CONFLICT, `A payroll run for ${monthLabel(input.month)} already exists.`);
     let run: RunRow;
@@ -171,20 +178,22 @@ export class HrPayrollService {
     } catch {
       throw new ConflictError(ErrorCode.CONFLICT, `A payroll run for ${monthLabel(input.month)} already exists.`);
     }
-    const employees = await this.eligibleEmployees(input.month);
+    const { payable: employees, skippedNoPay } = splitByPay(await this.eligibleEmployees(input.month));
     const figures = await this.computeFor(employees, input.month, new Map());
     for (const e of employees) await this.insertPayslip(run, e, figures.get(e.id)!);
     await this.refreshTotals(run.id);
-    await this.audit.record(actor, 'hr.payroll_generated', 'hr_payroll_run', run.id, { month: input.month, employees: employees.length });
-    return this.runDetail(run.id);
+    await this.audit.record(actor, 'hr.payroll_generated', 'hr_payroll_run', run.id, { month: input.month, employees: employees.length, skippedNoPay: skippedNoPay.length });
+    return { ...(await this.runDetail(run.id)), skippedNoPay: skippedNoPay.length };
   }
 
-  async recalculate(id: string, actor: IamActor): Promise<{ run: PayrollRunDto; payslips: PayslipDto[] }> {
+  async recalculate(id: string, actor: IamActor): Promise<{ run: PayrollRunDto; payslips: PayslipDto[]; skippedNoPay: number }> {
     const run = await this.mustFindRun(id);
     if (run.status !== 'DRAFT') throw new ConflictError(ErrorCode.INVALID_STATE, 'Only a draft payroll run can be recalculated.');
     const existing = await this.repo.listByRun(this.tenantId, id);
     const byUser = new Map(existing.map((p) => [p.userId, p]));
-    const employees = await this.eligibleEmployees(run.month);
+    // employees with no pay set get no payslip; one that already has a (draft) payslip keeps being recalculated
+    const { payable, skippedNoPay } = splitByPay(await this.eligibleEmployees(run.month));
+    const employees = [...payable, ...skippedNoPay.filter((e) => byUser.has(e.id))];
     const manual = new Map<string, ManualInputs>();
     for (const p of existing) manual.set(p.userId, { bonus: Number(p.bonus), advanceRecovery: Number(p.advanceRecovery), manualLines: linesOf(p).filter((l) => l.source === 'MANUAL') });
     const figures = await this.computeFor(employees, run.month, manual);
@@ -196,7 +205,7 @@ export class HrPayrollService {
     }
     await this.refreshTotals(id);
     await this.audit.record(actor, 'hr.payroll_recalculated', 'hr_payroll_run', id, { month: run.month });
-    return this.runDetail(id);
+    return { ...(await this.runDetail(id)), skippedNoPay: skippedNoPay.filter((e) => !byUser.has(e.id)).length };
   }
 
   async deleteRun(id: string, actor: IamActor): Promise<void> {

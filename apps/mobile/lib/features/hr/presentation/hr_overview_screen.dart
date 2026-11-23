@@ -209,6 +209,11 @@ class _HrOverviewScreenState extends State<HrOverviewScreen> {
                 onTrailingTap: () => _go(AppRoutes.hrTeamAttendance),
               ),
               _TodayGrid(o: o, onTap: () => _go(AppRoutes.hrTeamAttendance)),
+              const SizedBox(height: 12),
+              StaggeredCard(
+                index: i++,
+                child: HrCard(child: HrTodayBar(today: o.today)),
+              ),
               const SizedBox(height: 18),
               StaggeredCard(
                 index: i++,
@@ -470,12 +475,20 @@ class _TodayGrid extends StatelessWidget {
         index: 3,
       ),
       HrStatTile(
-        label: 'Not marked yet',
-        value: t.notMarked,
+        label: 'Absent',
+        value: t.absent,
+        color: HrPalette.absent,
+        icon: Icons.close_rounded,
+        onTap: onTap,
+        index: 4,
+      ),
+      HrStatTile(
+        label: 'Yet to check in',
+        value: t.yetToCheckIn,
         color: HrPalette.notMarked,
         icon: Icons.more_horiz_rounded,
         onTap: onTap,
-        index: 4,
+        index: 5,
       ),
       HrStatTile(
         label: 'In now',
@@ -483,7 +496,7 @@ class _TodayGrid extends StatelessWidget {
         color: HrPalette.money,
         icon: Icons.login_rounded,
         onTap: onTap,
-        index: 5,
+        index: 6,
       ),
     ];
     return LayoutBuilder(
@@ -491,7 +504,7 @@ class _TodayGrid extends StatelessWidget {
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: c.maxWidth >= 700 ? 6 : 3,
+          crossAxisCount: c.maxWidth >= 700 ? 7 : 3,
           mainAxisSpacing: 10,
           crossAxisSpacing: 10,
           mainAxisExtent: 112,
@@ -891,6 +904,119 @@ class _HrTrendBarsState extends State<HrTrendBars> {
                 ),
         ),
       ],
+    );
+  }
+}
+
+/// One slice of [HrTodayBar].
+class HrTodaySegment {
+  const HrTodaySegment(this.label, this.value, this.color);
+
+  final String label;
+  final int value;
+  final Color color;
+}
+
+/// "Today at a glance": one stacked bar split into the mutually exclusive
+/// buckets (present, late, half day, on leave, absent, weekly off, holiday,
+/// yet to check in) - together they add up to the headcount - with a legend
+/// of the non-empty ones.
+class HrTodayBar extends StatelessWidget {
+  const HrTodayBar({super.key, required this.today});
+
+  final HrTodayBuckets today;
+
+  /// The slices, in display order (zero ones included).
+  static List<HrTodaySegment> segments(HrTodayBuckets t) => [
+        HrTodaySegment('Present', t.present, HrPalette.present),
+        HrTodaySegment('Late', t.late, HrPalette.late),
+        HrTodaySegment('Half day', t.halfDay, HrPalette.halfDay),
+        HrTodaySegment('On leave', t.onLeave, HrPalette.onLeave),
+        HrTodaySegment('Absent', t.absent, HrPalette.absent),
+        HrTodaySegment('Weekly off', t.weeklyOff, HrPalette.weeklyOff),
+        HrTodaySegment('Holiday', t.holiday, HrPalette.holiday),
+        HrTodaySegment('Yet to check in', t.yetToCheckIn, HrPalette.notMarked),
+      ];
+
+  @override
+  Widget build(BuildContext context) {
+    final segs = segments(today).where((x) => x.value > 0).toList();
+    final total = segs.fold<int>(0, (a, x) => a + x.value);
+    final reduce = reduceMotion(context);
+    return Semantics(
+      container: true,
+      label: 'Today: ${segs.map((x) => '${x.value} ${x.label.toLowerCase()}').join(', ')}',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('TODAY AT A GLANCE', style: AppText.eyebrow()),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+              key: const Key('today-bar'),
+              height: 14,
+              child: total == 0
+                  ? Container(color: AppColors.surface3)
+                  : TweenAnimationBuilder<double>(
+                      tween: Tween(begin: reduce ? 1 : 0, end: 1),
+                      duration: reduce
+                          ? Duration.zero
+                          : const Duration(milliseconds: 700),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, t, child) => Align(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: 1,
+                        child: FractionallySizedBox(
+                          widthFactor: t,
+                          alignment: Alignment.centerLeft,
+                          child: child,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          for (final x in segs)
+                            Expanded(
+                              flex: x.value,
+                              child: Container(color: x.color),
+                            ),
+                        ],
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 12,
+            runSpacing: 6,
+            children: [
+              for (final x in segs)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 9,
+                      height: 9,
+                      decoration: BoxDecoration(
+                        color: x.color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      '${x.label} ${x.value}',
+                      style: AppText.body(
+                        size: 11.5,
+                        weight: FontWeight.w700,
+                        color: AppColors.inkSoft,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

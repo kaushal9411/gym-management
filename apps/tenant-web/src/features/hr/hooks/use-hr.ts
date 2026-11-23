@@ -41,6 +41,7 @@ export const hrKeys = {
   dayAttendance: (date: string, params: object) => ['hr', 'attendance', 'day', date, params] as const,
   grid: (month: string, branchId?: string) => ['hr', 'attendance', 'grid', month, branchId ?? ''] as const,
   leaves: (params: object) => ['hr', 'leaves', params] as const,
+  leaveCalendar: (from: string, to: string) => ['hr', 'leaves', 'calendar', from, to] as const,
   leave: (id: string) => ['hr', 'leave', id] as const,
   balances: (params: object) => ['hr', 'balances', params] as const,
   leaveTypes: (inactive: boolean) => ['hr', 'setup', 'leave-types', inactive] as const,
@@ -123,6 +124,12 @@ function useInvalidateHr() {
   return () => void qc.invalidateQueries({ queryKey: hrKeys.all });
 }
 
+/** Opt-in enrolment. Fired from a click only (never a mount effect). Refreshes every HR query: the summary now succeeds and the headcount changes. */
+export function useEnrollMe() {
+  const invalidate = useInvalidateHr();
+  return useMutation({ mutationFn: () => hrService.me.enroll(), onSuccess: invalidate });
+}
+
 export function useCheckIn() {
   const invalidate = useInvalidateHr();
   return useMutation({ mutationFn: (note?: string) => hrService.me.checkIn(note), onSuccess: invalidate });
@@ -172,6 +179,10 @@ export function useMonthlyGrid(month: string, branchId?: string, opts?: Enabled)
 
 export function useLeaves(params: ListLeavesParams, opts?: Enabled) {
   return useQuery({ queryKey: hrKeys.leaves(params), queryFn: () => hrService.leaves(params), enabled: opts?.enabled ?? true, placeholderData: keepPreviousData });
+}
+
+export function useLeaveCalendar(from: string, to: string, opts?: Enabled) {
+  return useQuery({ queryKey: hrKeys.leaveCalendar(from, to), queryFn: () => hrService.leaveCalendar(from, to), enabled: opts?.enabled ?? true, placeholderData: keepPreviousData, retry: false });
 }
 
 export function useLeaveDetail(id: string | null) {

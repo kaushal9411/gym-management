@@ -374,10 +374,31 @@ export interface TodayBuckets {
   notMarked: number;
 }
 
+export interface LeaveCalendarItem {
+  id: string;
+  userId: string;
+  employeeName: string;
+  leaveType: LeaveTypeRef;
+  startDate: string;
+  endDate: string;
+  dayPart: DayPart;
+  days: number;
+  status: 'PENDING' | 'APPROVED';
+}
+
+/** `GET /hr/leaves/calendar` — item dates are the request's own and may extend outside the window (clip client-side). */
+export interface LeaveCalendarResponse {
+  from: string;
+  to: string;
+  items: LeaveCalendarItem[];
+  holidays: Holiday[];
+}
+
 export interface HrOverview {
   date: string;
   headcount: number;
-  today: TodayBuckets & { checkedInNow: number };
+  /** `absent` for today is derived after the employee's shift end (v1.2); `yetToCheckIn` === `notMarked`. */
+  today: TodayBuckets & { checkedInNow: number; yetToCheckIn: number };
   pendingLeaves: number;
   payroll: {
     month: string;
@@ -541,3 +562,6 @@ export interface PayAllResult {
   failed: { payslipId: string; message: string }[];
   run: PayrollRun;
 }
+
+/** `POST /hr/me/enroll` returns the same shape as `GET /hr/me/summary`. */
+export type EnrollResult = MeSummary;

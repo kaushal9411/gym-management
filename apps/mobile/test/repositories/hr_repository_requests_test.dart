@@ -70,6 +70,45 @@ void main() {
 
   Map<String, dynamic> run() => hrRunJson(status: 'DRAFT');
 
+  group('enrolment (POST /hr/me/enroll)', () {
+    test('POST, no body, parses the summary shape', () async {
+      answer(hrSummaryJson());
+      final s = await repo.enrollMe();
+      expect(adapter.last!.method, 'POST');
+      expect(adapter.last!.path, '/hr/me/enroll');
+      expect(adapter.body, isNull);
+      expect(s.employee.ref.employeeId, 'EMP-0002');
+      expect(s.today.canCheckIn, isTrue);
+    });
+
+    test('409 ALREADY_EMPLOYEE is recognised, other errors are not', () async {
+      answer(
+        null,
+        status: 409,
+        errors: [
+          {'code': 'ALREADY_EMPLOYEE', 'message': 'You are already on the roster'},
+        ],
+      );
+      final e = await repo.enrollMe().then<Object>((_) => 'ok').catchError(
+            (Object e) => e,
+          );
+      expect(HrRepository.isAlreadyEmployee(e), isTrue);
+      expect(HrRepository.isNotAnEmployee(e), isFalse);
+      answer(
+        null,
+        status: 403,
+        errors: [
+          {'code': 'NOT_AN_EMPLOYEE', 'message': 'No profile'},
+        ],
+      );
+      final f = await repo.meSummary().then<Object>((_) => 'ok').catchError(
+            (Object e) => e,
+          );
+      expect(HrRepository.isNotAnEmployee(f), isTrue);
+      expect(HrRepository.isAlreadyEmployee(f), isFalse);
+    });
+  });
+
   group('payroll requests', () {
     test('generate: POST /hr/payroll/runs { month, notes }', () async {
       answer({'run': run(), 'payslips': [hrPayslipJson()]});
@@ -273,6 +312,51 @@ void main() {
       });
       await repo.leaves(limit: 100);
       expect(adapter.last!.queryParameters, {'page': 1, 'limit': 100});
+    });
+
+    test('team calendar: GET /hr/leaves/calendar?from&to (ISO dates)',
+        () async {
+      answer(
+        hrLeaveCalendarJson(
+          items: [hrCalendarItemJson()],
+          holidays: [hrHolidayJson],
+        ),
+      );
+      final c = await repo.leaveCalendar(
+        DateTime(2026, 11, 1),
+        DateTime(2026, 11, 30),
+      );
+      expect(adapter.last!.method, 'GET');
+      expect(adapter.last!.path, '/hr/leaves/calendar');
+      expect(adapter.last!.queryParameters, {
+        'from': '2026-11-01',
+        'to': '2026-11-30',
+      });
+      expect(c.items.single.employeeName, 'Vikram Coach');
+      expect(c.holidays.length, 1);
+    });
+
+    test('team calendar: a window over 62 days is a 422 with the field',
+        () async {
+      answer(
+        null,
+        status: 422,
+        errors: [
+          {
+            'field': 'to',
+            'code': 'VALIDATION_ERROR',
+            'message': 'The range can cover at most 62 days',
+          },
+        ],
+      );
+      await expectLater(
+        repo.leaveCalendar(DateTime(2026, 1, 1), DateTime(2026, 12, 31)),
+        throwsA(
+          isA<ApiException>()
+              .having((e) => e.statusCode, 'status', 422)
+              .having((e) => e.errorFor('to'), 'to', contains('62 days')),
+        ),
+      );
     });
 
     test('manager cancel sends the remark', () async {

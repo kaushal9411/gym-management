@@ -20,6 +20,11 @@ const permissionSetKey = (userId: string, permVer: number) => `perm:${userId}:${
  * ...) will import. See authorize.middleware.spec.ts for direct coverage.
  */
 export function requirePermission(permissionKey: string) {
+  return requireAnyPermission(permissionKey);
+}
+
+/** Passes when the caller holds AT LEAST ONE of `permissionKeys` (same cached permission set as `requirePermission`). */
+export function requireAnyPermission(...permissionKeys: string[]) {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {
       if (!req.auth || !req.tenant) throw new UnauthenticatedError();
@@ -33,8 +38,8 @@ export function requirePermission(permissionKey: string) {
         await cache.set(cacheKey, permissions, PERMISSION_CACHE_TTL_SECONDS);
       }
 
-      if (!permissions.includes(permissionKey)) {
-        throw new ForbiddenError(`Missing required permission: ${permissionKey}`);
+      if (!permissionKeys.some((key) => permissions!.includes(key))) {
+        throw new ForbiddenError(`Missing required permission: ${permissionKeys.join(' or ')}`);
       }
 
       next();

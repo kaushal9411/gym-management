@@ -16,9 +16,21 @@ class HrMeLoading extends HrMeState {
 }
 
 class HrMeError extends HrMeState {
-  const HrMeError(this.message, {this.notAnEmployee = false});
+  const HrMeError(
+    this.message, {
+    this.notAnEmployee = false,
+    this.enrolling = false,
+    this.enrollError,
+  });
 
   final String message;
+
+  /// Opt-in enrolment in flight (the card's button shows a spinner).
+  final bool enrolling;
+
+  /// The server's message for a failed enrolment (the card shows it with a
+  /// retry).
+  final String? enrollError;
 
   /// 403 `NOT_AN_EMPLOYEE` - the account has no StaffProfile (the owner), so
   /// there is no personal HR to show. Rendered as an explanation, not an error.
@@ -26,7 +38,16 @@ class HrMeError extends HrMeState {
 }
 
 class HrMeLoaded extends HrMeState {
-  const HrMeLoaded(this.summary, {this.punching, this.notice, this.celebrate});
+  const HrMeLoaded(
+    this.summary, {
+    this.punching,
+    this.notice,
+    this.celebrate,
+    this.welcome = false,
+  });
+
+  /// Set right after a successful enrolment so the UI can say so once.
+  final bool welcome;
 
   final HrMeSummary summary;
 
@@ -47,12 +68,14 @@ class HrMeLoaded extends HrMeState {
     bool clearNotice = false,
     HrPunch? celebrate,
     bool clearCelebrate = false,
+    bool? welcome,
   }) =>
       HrMeLoaded(
         summary ?? this.summary,
         punching: clearPunching ? null : (punching ?? this.punching),
         notice: clearNotice ? null : (notice ?? this.notice),
         celebrate: clearCelebrate ? null : (celebrate ?? this.celebrate),
+        welcome: welcome ?? this.welcome,
       );
 }
 
@@ -87,6 +110,48 @@ class HrMeCubit extends Cubit<HrMeState> {
         ),
       );
     }
+  }
+
+  /// Opt-in enrolment for an account without a StaffProfile (the owner), from
+  /// the 403 `NOT_AN_EMPLOYEE` card. Success shows the normal screen (the
+  /// response is the summary) and then re-reads it; 409 `ALREADY_EMPLOYEE`
+  /// just reloads; any other failure keeps the card with the server's message
+  /// so the user can retry. Ignored while a request is in flight.
+  Future<void> enroll() async {
+    final cur = state;
+    if (cur is! HrMeError || !cur.notAnEmployee || cur.enrolling) return;
+    emit(
+      HrMeError(
+        cur.message,
+        notAnEmployee: true,
+        enrolling: true,
+      ),
+    );
+    try {
+      final summary = await _repo.enrollMe();
+      if (isClosed) return;
+      emit(HrMeLoaded(summary, welcome: true));
+      await load(silent: true);
+    } on ApiException catch (e) {
+      if (isClosed) return;
+      if (HrRepository.isAlreadyEmployee(e)) {
+        await load();
+        return;
+      }
+      emit(
+        HrMeError(
+          cur.message,
+          notAnEmployee: true,
+          enrollError: e.message,
+        ),
+      );
+    }
+  }
+
+  /// The UI calls this once it has shown the welcome message.
+  void welcomed() {
+    final cur = state;
+    if (cur is HrMeLoaded && cur.welcome) emit(cur.copyWith(welcome: false));
   }
 
   Future<void> checkIn() => _punch(HrPunch.checkIn);

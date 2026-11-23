@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { useMotionSafe } from '@/features/reports/lib/motion';
 import { formatDay, formatMinutes, formatTime, monthDates, monthStart, todayYmd, weekdayIndex, WEEKDAYS_SHORT } from '../../lib/dates';
 import { mix, TONES, type HrTone } from '../../lib/hr-palette';
+import { AUTO_ABSENT_HINT, isAutoAbsent } from '../../lib/derive';
 import { DAY_STATUS_LABEL, DAY_STATUS_TONE, DAY_PART_SHORT } from '../../lib/status';
 import type { AttendanceDay, DayStatus } from '../../types';
 import { ToneChip } from './hr-ui';
@@ -39,6 +40,7 @@ export function StatusLegend({ tones = ['present', 'late', 'half', 'leave', 'abs
 
 function cellLabel(d: AttendanceDay): string {
   const parts = [formatDay(d.date, 'weekday'), DAY_STATUS_LABEL[d.status]];
+  if (isAutoAbsent(d)) parts.push(AUTO_ABSENT_HINT);
   if (d.holidayName) parts.push(d.holidayName);
   if (d.leaveType) parts.push(d.leaveType.name);
   if (d.checkInTime) parts.push(`in ${d.checkInTime}${d.checkOutTime ? ` out ${d.checkOutTime}` : ''}`);
@@ -91,12 +93,14 @@ export function AttendanceCalendar({
           const isSel = selected === date;
           const future = date > today;
           const clickable = !!onSelect && !!d;
+          const auto = isAutoAbsent(d);
           return (
             <motion.button
               key={`${month}-${date}`}
               type="button"
               disabled={!clickable}
               aria-label={d ? cellLabel(d) : formatDay(date, 'weekday')}
+              title={auto ? AUTO_ABSENT_HINT : undefined}
               aria-pressed={onSelect ? isSel : undefined}
               onClick={() => d && onSelect?.(d)}
               initial={m.reduce ? false : { opacity: 0, scale: 0.8 }}
@@ -106,7 +110,7 @@ export function AttendanceCalendar({
               className={cn(
                 'relative flex aspect-square min-w-0 flex-col items-center justify-between overflow-hidden rounded-lg border p-1 text-left transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:rounded-xl sm:p-1.5',
                 compact ? 'sm:aspect-[5/4]' : 'sm:aspect-[6/5]',
-                status === 'NOT_MARKED' && 'border-dashed',
+                (status === 'NOT_MARKED' || auto) && 'border-dashed',
                 isToday && 'ring-2 ring-primary ring-offset-1 ring-offset-background',
                 isSel && 'shadow-md ring-2 ring-foreground/70',
                 future && 'opacity-80',
@@ -122,7 +126,7 @@ export function AttendanceCalendar({
                 <Icon className="size-3.5 sm:size-4" aria-hidden strokeWidth={2.6} />
               </motion.span>
               <span className="hidden w-full truncate text-center text-[9.5px] font-bold leading-none sm:block" style={{ color: meta.color }}>
-                {d?.checkInTime && !compact ? d.checkInTime : meta.glyph}
+                {d?.checkInTime && !compact ? d.checkInTime : auto ? 'auto' : meta.glyph}
               </span>
             </motion.button>
           );
@@ -183,7 +187,7 @@ export function DayDetail({ day, actions }: { day: AttendanceDay; actions?: Reac
         ) : null}
         {day.markedBy ? <Row label="Marked by">{day.markedBy.name}</Row> : null}
         {day.remark ? <Row label="Remark">{day.remark}</Row> : null}
-        {!day.recorded ? <Row label="Record">{day.status === 'NOT_MARKED' ? 'Nothing recorded yet' : 'Computed from the roster'}</Row> : null}
+        {!day.recorded ? <Row label="Record">{day.status === 'NOT_MARKED' ? 'Nothing recorded yet' : isAutoAbsent(day) ? `${AUTO_ABSENT_HINT} (auto)` : 'Computed from the roster'}</Row> : null}
       </dl>
       {actions ? <div className="mt-2.5 flex flex-wrap gap-2">{actions}</div> : null}
     </div>

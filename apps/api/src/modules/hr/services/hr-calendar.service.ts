@@ -103,14 +103,17 @@ export class HrCalendarService {
     row: AttendanceRow | null;
     holidays: Map<string, string>;
     today?: string;
+    /** Clock used to derive TODAY's absence after shift end (default: the real now). */
+    now?: Date;
     names: Map<string, string>;
   }): AttendanceDayDto {
     const { date, ctx, row, holidays, names } = args;
-    const today = args.today ?? businessDate();
+    const now = args.now ?? new Date();
+    const today = args.today ?? businessDate(now);
     const holidayName = holidays.get(date) ?? null;
     const shiftSnap = row?.shiftName ? { name: row.shiftName, startTime: row.shiftStart ?? '', endTime: row.shiftEnd ?? '' } : ctx.shift ? { name: ctx.shift.name, startTime: ctx.shift.startTime, endTime: ctx.shift.endTime } : null;
     if (!row) {
-      const status: DayStatus = computedStatus({ date, today, joiningDate: ctx.joiningDate, weeklyOff: ctx.weeklyOff, holidayName });
+      const status: DayStatus = computedStatus({ date, today, joiningDate: ctx.joiningDate, weeklyOff: ctx.weeklyOff, holidayName, shiftEndTime: ctx.shift?.endTime ?? null, now });
       return {
         date,
         userId: ctx.userId,

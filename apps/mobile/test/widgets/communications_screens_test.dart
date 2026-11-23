@@ -446,6 +446,13 @@ void main() {
       await openFlow(t);
       await toMessage(t);
       expect(find.text('What do you want to say?'), findsOneWidget);
+      // A fresh flow opens prefilled with the first template (so Next works
+      // straight away); the required-field rules apply once the text is cleared.
+      expect(t.widget<TextField>(find.byType(TextField).first).controller!.text, isNotEmpty);
+      expect(t.widget<TextField>(find.byType(TextField).at(1)).controller!.text, isNotEmpty);
+      await t.enterText(find.byType(TextField).first, '');
+      await t.enterText(find.byType(TextField).at(1), '');
+      await t.pump();
       await t.tap(find.text('Next: Channels'));
       await t.pump();
       expect(find.text('Add a title.'), findsOneWidget);
@@ -465,15 +472,24 @@ void main() {
     testWidgets('message step: placeholder chip inserts at the cursor, preview fills it', (t) async {
       await openFlow(t);
       await toMessage(t);
-      await show(t, find.byType(TextField).first);
-      await t.tap(find.byType(TextField).first);
+      // The fields open prefilled with the first template; start from a known
+      // title and put the caret in the middle of it.
+      final title = find.byType(TextField).first;
+      await show(t, title);
+      await t.enterText(title, 'Hi , welcome');
+      await t.pump();
+      final controller = t.widget<TextField>(title).controller!;
+      controller.selection = const TextSelection.collapsed(offset: 3);
       await t.pump();
       await show(t, find.text('{{firstName}}'));
       await t.tap(find.text('{{firstName}}'));
       await t.pump();
-      expect((t.widget<TextField>(find.byType(TextField).first).controller!.text), '{{firstName}}');
+      // Inserted AT the caret (not appended), and the caret moves past it.
+      expect(controller.text, 'Hi {{firstName}}, welcome');
+      expect(controller.selection.baseOffset, 3 + '{{firstName}}'.length);
       await show(t, find.text('PREVIEW'));
-      expect(find.text('Aarav'), findsOneWidget); // first real sample member
+      // Preview fills the placeholder with the first real sample member.
+      expect(find.text('Hi Aarav, welcome'), findsOneWidget);
     });
 
     testWidgets('message step: title over 200 characters is refused', (t) async {

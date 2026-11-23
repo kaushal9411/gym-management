@@ -105,11 +105,14 @@ describe('HrLeaveService decisions', () => {
     expect(state.notified).toHaveLength(1);
     expect(state.notified[0]).toMatchObject({ ids: ['emp-1'], type: 'LEAVE_REJECTED' });
     expect(String(state.notified[0]!.body)).toContain('Peak week');
+    expect(String(state.notified[0]!.body)).toContain('10 Dec 2026'); // human IST date, not 2026-12-10
+    expect(String(state.notified[0]!.body)).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   });
 
   it('an employee may cancel a pending request, notifying approvers (not themselves)', async () => {
     await service.cancel('leave-1', undefined, employeeActor, 'self').catch(() => undefined);
     expect(state.notified[0]).toMatchObject({ ids: ['approver-1'], type: 'LEAVE_CANCELLED' });
+    expect(String(state.notified[0]!.body)).toContain('on 10 Dec 2026.');
     expect(state.calls).not.toContain('remove-rows');
   });
 

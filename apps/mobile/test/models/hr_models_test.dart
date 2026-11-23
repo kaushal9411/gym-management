@@ -298,7 +298,11 @@ void main() {
     test('overview', () {
       final o = HrOverview.fromJson(hrOverviewJson);
       expect(o.headcount, 4);
-      expect(o.today.checkedInNow, 2);
+      expect(o.today.checkedInNow, 1);
+      expect(o.today.absent, 1);
+      expect(o.today.yetToCheckIn, 1);
+      // The buckets add up to the headcount.
+      expect(o.today.bucketTotal, o.headcount);
       expect(o.pendingLeaves, 3);
       expect(o.payroll!.status, 'APPROVED');
       expect(o.payroll!.unpaidPayslips, 3);

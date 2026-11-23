@@ -20,38 +20,38 @@ import 'hr_widgets.dart';
 class HrTeamMonth {
   const HrTeamMonth({required this.leaves, required this.holidays});
 
-  /// PENDING + APPROVED requests overlapping the month.
-  final List<HrLeaveRequest> leaves;
+  /// PENDING + APPROVED requests overlapping the month (their own dates, so
+  /// some extend outside it - [hrLeavesByDay] clips).
+  final List<HrCalendarLeave> leaves;
   final List<HrHoliday> holidays;
 }
 
 /// Day-of-month -> the requests covering it, for [month] (`YYYY-MM`). A
 /// request that starts before / ends after the month is clipped to it.
-Map<int, List<HrLeaveRequest>> hrLeavesByDay(
-  List<HrLeaveRequest> leaves,
+Map<int, List<HrCalendarLeave>> hrLeavesByDay(
+  List<HrCalendarLeave> leaves,
   String month,
 ) {
   final p = month.split('-');
   final y = int.parse(p[0]);
   final m = int.parse(p[1]);
   final last = DateTime(y, m + 1, 0).day;
-  final out = <int, List<HrLeaveRequest>>{};
+  final out = <int, List<HrCalendarLeave>>{};
   for (final l in leaves) {
     if (l.status != LeaveStatus.pending && l.status != LeaveStatus.approved) {
       continue;
     }
     for (var d = 1; d <= last; d++) {
-      final date = DateTime(y, m, d);
-      if (!date.isBefore(l.startDate) && !date.isAfter(l.endDate)) {
-        (out[d] ??= []).add(l);
-      }
+      if (l.coversDay(DateTime(y, m, d))) (out[d] ??= []).add(l);
     }
   }
   return out;
 }
 
-/// **Team leave calendar** - who is off when (`GET /hr/leaves?from&to`,
-/// `hr:leave_manage`, plus the month's holidays). The month grid tints each day
+/// **Team leave calendar** - who is off when (`GET /hr/leaves/calendar`,
+/// `hr:leave_manage`: the month's PENDING / APPROVED requests plus its
+/// holidays in ONE call; items keep their own dates so they are clipped to
+/// the displayed month here). The month grid tints each day
 /// with the leave type's hue (holidays in fuchsia), pending days carry an
 /// hourglass instead of a tick, and tapping a day lists the people off with
 /// type, dates, part of day and status.
@@ -78,21 +78,13 @@ class _HrTeamLeaveCalendarState extends State<HrTeamLeaveCalendar> {
     final p = _month.split('-');
     final y = int.parse(p[0]);
     final m = int.parse(p[1]);
-    final from = DateTime(y, m, 1);
-    final to = DateTime(y, m + 1, 0);
-    final repo = getIt<HrRepository>();
-    final r = await repo.leaves(limit: 100, from: from, to: to);
-    final h = await repo.holidaysBetween(from, to);
-    return HrTeamMonth(
-      leaves: r.page.items
-          .where(
-            (l) =>
-                l.status == LeaveStatus.pending ||
-                l.status == LeaveStatus.approved,
-          )
-          .toList(),
-      holidays: h,
+    // First -> last day of the displayed month (28-31 days, inside the
+    // endpoint's 1-62 day window).
+    final c = await getIt<HrRepository>().leaveCalendar(
+      DateTime(y, m, 1),
+      DateTime(y, m + 1, 0),
     );
+    return HrTeamMonth(leaves: c.items, holidays: c.holidays);
   }
 
   @override
@@ -149,7 +141,7 @@ class _HrTeamLeaveCalendarState extends State<HrTeamLeaveCalendar> {
     final today = AppClock.today();
     final cells = <int, HrCalendarCell>{};
     for (var d = 1; d <= HrMonthCalendar.daysInMonth(first); d++) {
-      final list = byDay[d] ?? const <HrLeaveRequest>[];
+      final list = byDay[d] ?? const <HrCalendarLeave>[];
       final holiday = holidays[d];
       if (holiday == null && list.isEmpty) continue;
       final date = DateTime(first.year, first.month, d);
@@ -169,7 +161,7 @@ class _HrTeamLeaveCalendarState extends State<HrTeamLeaveCalendar> {
             ', ${list.length} on leave',
       );
     }
-    final dayList = byDay[_picked] ?? const <HrLeaveRequest>[];
+    final dayList = byDay[_picked] ?? const <HrCalendarLeave>[];
     final holiday = holidays[_picked];
     final pickedDate = DateTime(first.year, first.month, _picked);
     return Column(
@@ -225,7 +217,7 @@ class _HrTeamLeaveCalendarState extends State<HrTeamLeaveCalendar> {
 class _DayLeaveRow extends StatelessWidget {
   const _DayLeaveRow({required this.leave});
 
-  final HrLeaveRequest leave;
+  final HrCalendarLeave leave;
 
   @override
   Widget build(BuildContext context) {
@@ -237,7 +229,7 @@ class _DayLeaveRow extends StatelessWidget {
         : '${hrDate(l.startDate)} – ${hrDate(l.endDate)}';
     return Semantics(
       container: true,
-      label: '${l.employee.name}, ${l.leaveType.name}, $dates, '
+      label: '${l.employeeName}, ${l.leaveType.name}, $dates, '
           '${l.dayPart.label}, ${l.status.label}',
       child: HrCard(
         accent: hue,
@@ -251,7 +243,7 @@ class _DayLeaveRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    l.employee.name,
+                    l.employeeName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppText.body(size: 13.5, weight: FontWeight.w800),

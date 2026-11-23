@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import { sendSuccess } from '../../../core/http/response';
 import { actorFrom } from '../../authentication/utils/actor.util';
 import { HrAttendanceService } from '../services/hr-attendance.service';
+import { HrEnrollmentService } from '../services/hr-enrollment.service';
 import { HrLeaveService, type LeaveInput } from '../services/hr-leave.service';
 import { HrNotificationService } from '../services/hr-notification.service';
 import { HrPayrollService } from '../services/hr-payroll.service';
@@ -17,6 +18,11 @@ const me = (req: Request): string => req.auth!.sub;
 export class HrSelfController {
   async summary(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await new HrSelfService(tenantId(req)).summary(me(req)));
+  }
+
+  async enroll(req: Request, res: Response): Promise<void> {
+    const { shiftId } = req.body as { shiftId?: string };
+    sendSuccess(res, await new HrEnrollmentService(tenantId(req)).enroll(me(req), { shiftId }, actorFrom(req)), 'You are now an employee.', 201);
   }
 
   async checkIn(req: Request, res: Response): Promise<void> {

@@ -592,7 +592,7 @@ class _AttendanceRow extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    HrDayStatusChip(status: a.status),
+                    HrDayStatusChip(status: a.status, auto: a.isAutoAbsent),
                     if (a.lateMinutes > 0)
                       Padding(
                         padding: const EdgeInsets.only(top: 4),

@@ -12,7 +12,9 @@ import type {
   Holiday,
   HolidayPayload,
   HrNotificationsResponse,
+  EnrollResult,
   HrOverview,
+  LeaveCalendarResponse,
   LeaveBalance,
   LeaveBalancesResponse,
   LeaveListResponse,
@@ -63,6 +65,8 @@ class HrService {
   // ── Self service ──
   me = {
     summary: async () => unwrap(await apiClient.get<Envelope<MeSummary>>('/hr/me/summary')),
+    /** Opt-in: puts a user without an employee profile (e.g. the owner) on the roster. 409 `ALREADY_EMPLOYEE` when they already are. */
+    enroll: async () => unwrap(await apiClient.post<Envelope<EnrollResult>>('/hr/me/enroll', {})),
     checkIn: async (note?: string) => unwrap(await apiClient.post<Envelope<AttendanceDay>>('/hr/me/attendance/check-in', note ? { note } : {})),
     checkOut: async () => unwrap(await apiClient.post<Envelope<AttendanceDay>>('/hr/me/attendance/check-out', {})),
     attendance: async (month: string) => unwrap(await apiClient.get<Envelope<MonthAttendance>>('/hr/me/attendance', { params: { month } })),
@@ -104,6 +108,7 @@ class HrService {
 
   // ── Leaves ──
   leaves = async (params: ListLeavesParams) => unwrap(await apiClient.get<Envelope<LeaveListResponse>>('/hr/leaves', { params }));
+  leaveCalendar = async (from: string, to: string) => unwrap(await apiClient.get<Envelope<LeaveCalendarResponse>>('/hr/leaves/calendar', { params: { from, to } }));
   leave = async (id: string) => unwrap(await apiClient.get<Envelope<LeaveRequestDetail>>(`/hr/leaves/${id}`));
   previewLeave = async (p: LeavePreviewPayload) => unwrap(await apiClient.post<Envelope<LeavePreview>>('/hr/leaves/preview', p, { silent: true }));
   applyOnBehalf = async (p: ApplyOnBehalfPayload) => unwrap(await apiClient.post<Envelope<LeaveRequest>>('/hr/leaves', p));

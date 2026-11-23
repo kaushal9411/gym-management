@@ -6,6 +6,7 @@ import {
   bulkAttendanceBodySchema,
   createLeaveTypeBodySchema,
   createShiftBodySchema,
+  listRunsQuerySchema,
   markAttendanceBodySchema,
   patchPayslipBodySchema,
   payBodySchema,
@@ -77,5 +78,23 @@ describe('settings / payroll validators', () => {
   it('paying needs a known payment mode', () => {
     expect(payBodySchema.safeParse({ paymentMode: 'BITCOIN' }).success).toBe(false);
     expect(payBodySchema.safeParse({ paymentMode: 'UPI', paidOn: '2026-12-01' }).success).toBe(true);
+  });
+});
+
+describe('payroll runs list query (page size is honoured, not capped at 12)', () => {
+  it('defaults to page 1 / limit 12 when omitted (the "last 12 months" default)', () => {
+    expect(listRunsQuerySchema.parse({})).toEqual({ page: 1, limit: 12 });
+  });
+
+  it('honours an explicit limit up to 100 (string query values are coerced)', () => {
+    expect(listRunsQuerySchema.parse({ limit: '5' }).limit).toBe(5);
+    expect(listRunsQuerySchema.parse({ limit: '20' }).limit).toBe(20);
+    expect(listRunsQuerySchema.parse({ limit: '100', page: '2' })).toEqual({ page: 2, limit: 100 });
+  });
+
+  it('rejects limits outside 1..100', () => {
+    expect(listRunsQuerySchema.safeParse({ limit: '0' }).success).toBe(false);
+    expect(listRunsQuerySchema.safeParse({ limit: '101' }).success).toBe(false);
+    expect(listRunsQuerySchema.safeParse({ limit: 'abc' }).success).toBe(false);
   });
 });

@@ -5,6 +5,8 @@ import {
   addMonths,
   daysInMonth,
   eachDate,
+  formatDateRange,
+  formatHumanDate,
   istInstant,
   istMinuteOfDay,
   istTimeOf,
@@ -71,5 +73,19 @@ describe('hr dates (IST business dates)', () => {
   it('rounds money to 2 decimals', () => {
     expect(round2(1.005)).toBe(1.01);
     expect(round2(780 * 1.5)).toBe(1170);
+  });
+});
+
+describe('human date formatting for notification texts', () => {
+  it('formats a single date as "26 Nov 2026" (no leading zero)', () => {
+    expect(formatHumanDate('2026-11-26')).toBe('26 Nov 2026');
+    expect(formatHumanDate('2026-01-05')).toBe('5 Jan 2026');
+  });
+
+  it('formats ranges compactly', () => {
+    expect(formatDateRange('2026-11-26', '2026-11-26')).toBe('26 Nov 2026');
+    expect(formatDateRange('2026-11-26', '2026-11-28')).toBe('26–28 Nov 2026');
+    expect(formatDateRange('2026-11-26', '2026-12-02')).toBe('26 Nov – 2 Dec 2026');
+    expect(formatDateRange('2026-12-28', '2027-01-02')).toBe('28 Dec 2026 – 2 Jan 2027');
   });
 });

@@ -36,7 +36,22 @@ class HrRepository {
   static bool isNotAnEmployee(Object e) =>
       e is ApiException && e.statusCode == 403 && e.code == 'NOT_AN_EMPLOYEE';
 
+  /// `true` for the 409 `ALREADY_EMPLOYEE` of [enrollMe] (a StaffProfile
+  /// already exists - just reload).
+  static bool isAlreadyEmployee(Object e) =>
+      e is ApiException && e.statusCode == 409 && e.code == 'ALREADY_EMPLOYEE';
+
   // ── self: attendance ──────────────────────────────────────────────────────
+
+  /// Opt-in enrolment (`POST /hr/me/enroll`, no body; needs
+  /// `hr:self_attendance` or `hr:self_leave`): gives an account that has no
+  /// StaffProfile - the OWNER - an employee profile. 201 returns the same
+  /// shape as [meSummary]; 409 `ALREADY_EMPLOYEE` when one exists
+  /// ([isAlreadyEmployee]). Not undoable from the app.
+  Future<HrMeSummary> enrollMe() => _run(() async {
+        final r = await _dio.post<Map<String, dynamic>>('/hr/me/enroll');
+        return HrMeSummary.fromJson(_data(r));
+      });
 
   Future<HrMeSummary> meSummary() => _run(() async {
         final r = await _dio.get<Map<String, dynamic>>('/hr/me/summary');
@@ -362,6 +377,17 @@ class HrRepository {
           },
         );
         return HrLeavePage.fromJson(_data(r));
+      });
+
+  /// "Who is off when" for the team calendar (`GET /hr/leaves/calendar`,
+  /// `hr:leave_manage`). The window must be 1-62 days (422 otherwise).
+  Future<HrLeaveCalendar> leaveCalendar(DateTime from, DateTime to) =>
+      _run(() async {
+        final r = await _dio.get<Map<String, dynamic>>(
+          '/hr/leaves/calendar',
+          queryParameters: {'from': _iso(from), 'to': _iso(to)},
+        );
+        return HrLeaveCalendar.fromJson(_data(r));
       });
 
   Future<HrLeaveDetail> leaveDetail(String id) => _run(() async {
@@ -716,16 +742,6 @@ class HrRepository {
         final r = await _dio.get<Map<String, dynamic>>(
           '/hr/holidays',
           queryParameters: {'year': year},
-        );
-        return _list(r, HrHoliday.fromJson);
-      });
-
-  /// Holidays in an inclusive date range (the team calendar).
-  Future<List<HrHoliday>> holidaysBetween(DateTime from, DateTime to) =>
-      _run(() async {
-        final r = await _dio.get<Map<String, dynamic>>(
-          '/hr/holidays',
-          queryParameters: {'from': _iso(from), 'to': _iso(to)},
         );
         return _list(r, HrHoliday.fromJson);
       });

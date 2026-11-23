@@ -339,6 +339,98 @@ class HrHoliday {
       );
 }
 
+/// One request of `GET /hr/leaves/calendar` (v1.2): the slim "who is off
+/// when" row. Its dates are the request's own and may extend outside the
+/// window asked for - clip with [coversDay].
+class HrCalendarLeave {
+  const HrCalendarLeave({
+    required this.id,
+    required this.userId,
+    required this.employeeName,
+    required this.leaveType,
+    required this.startDate,
+    required this.endDate,
+    required this.dayPart,
+    required this.days,
+    required this.status,
+  });
+
+  final String id;
+  final String userId;
+  final String employeeName;
+  final HrLeaveTypeRef leaveType;
+  final DateTime startDate;
+  final DateTime endDate;
+  final DayPart dayPart;
+  final double days;
+
+  /// Only `PENDING` or `APPROVED` (the endpoint never returns the others).
+  final LeaveStatus status;
+
+  bool get isPending => status == LeaveStatus.pending;
+
+  bool get isSingleDay =>
+      startDate.year == endDate.year &&
+      startDate.month == endDate.month &&
+      startDate.day == endDate.day;
+
+  bool coversDay(DateTime d) {
+    final x = DateTime(d.year, d.month, d.day);
+    return !x.isBefore(startDate) && !x.isAfter(endDate);
+  }
+
+  /// For the avatar (the calendar row carries no employee id / avatar).
+  HrEmployeeRef get employee => HrEmployeeRef(
+        userId: userId,
+        employeeId: '',
+        name: employeeName,
+      );
+
+  factory HrCalendarLeave.fromJson(Map<String, dynamic> j) => HrCalendarLeave(
+        id: j['id'] as String? ?? '',
+        userId: j['userId'] as String? ?? '',
+        employeeName: j['employeeName'] as String? ?? '',
+        leaveType: HrLeaveTypeRef.fromJson(
+          j['leaveType'] as Map<String, dynamic>? ?? const {},
+        ),
+        startDate: hrParseDate(j['startDate']),
+        endDate: hrParseDate(j['endDate']),
+        dayPart: DayPart.parse(j['dayPart']),
+        days: hrNum(j['days']),
+        status: LeaveStatus.parse(j['status']),
+      );
+}
+
+/// `GET /hr/leaves/calendar?from&to` (`hr:leave_manage`, window 1-62 days
+/// else 422): every PENDING / APPROVED request overlapping the window plus
+/// the holidays inside it.
+class HrLeaveCalendar {
+  const HrLeaveCalendar({
+    required this.from,
+    required this.to,
+    this.items = const [],
+    this.holidays = const [],
+  });
+
+  final DateTime from;
+  final DateTime to;
+  final List<HrCalendarLeave> items;
+  final List<HrHoliday> holidays;
+
+  factory HrLeaveCalendar.fromJson(Map<String, dynamic> j) => HrLeaveCalendar(
+        from: hrParseDate(j['from']),
+        to: hrParseDate(j['to']),
+        items: (j['items'] as List? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(HrCalendarLeave.fromJson)
+            .toList(),
+        holidays: (j['holidays'] as List? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(HrHoliday.fromJson)
+            .toList(),
+      );
+}
+
 /// `GET /hr/me/notifications` item.
 class HrNotification {
   const HrNotification({

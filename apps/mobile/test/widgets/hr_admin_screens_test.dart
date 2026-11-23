@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -9,6 +11,8 @@ import 'package:gym_saas_mobile/bloc/session/session_cubit.dart';
 import 'package:gym_saas_mobile/bloc/session/session_state.dart';
 import 'package:gym_saas_mobile/core/network/api_exception.dart';
 import 'package:gym_saas_mobile/core/routing/app_routes.dart';
+import 'package:gym_saas_mobile/features/hr/presentation/widgets/hr_calendar_card.dart';
+import 'package:gym_saas_mobile/features/hr/presentation/widgets/hr_widgets.dart';
 import 'package:gym_saas_mobile/core/utils/app_clock.dart';
 import 'package:gym_saas_mobile/core/utils/tenant_features.dart';
 import 'package:gym_saas_mobile/features/hr/presentation/approvals_screen.dart';
@@ -1217,44 +1221,66 @@ void main() {
       await dispose(t);
     });
 
-    testWidgets('team calendar: who is off when, built from leaves + '
-        'holidays of the month', (t) async {
+    testWidgets('team calendar: loads from GET /hr/leaves/calendar for the '
+        'displayed month and CLIPS items to it', (t) async {
       final today = AppClock.today();
       final key = HrMonthStepper.currentKey();
-      stubList([
-        HrLeaveRequest.fromJson(
-          hrLeaveRequestJson(
-            status: 'APPROVED',
-            start: '$key-10',
-            end: '$key-11',
+      final prev = HrMonthStepper.shift(key, -1);
+      stubList(const []);
+      when(() => repo.leaveCalendar(any(), any())).thenAnswer(
+        (_) async => HrLeaveCalendar.fromJson(
+          hrLeaveCalendarJson(
+            items: [
+              hrCalendarItemJson(start: '$key-10', end: '$key-11'),
+              // Started last month, ends on the 2nd of this one.
+              hrCalendarItemJson(
+                id: 'lr-2',
+                userId: 'u-asha',
+                name: 'Asha Desk',
+                start: '$prev-28',
+                end: '$key-02',
+                status: 'PENDING',
+              ),
+            ],
+            holidays: [
+              {...hrHolidayJson, 'date': '$key-12'},
+            ],
           ),
         ),
-      ]);
-      when(() => repo.holidaysBetween(any(), any())).thenAnswer(
-        (_) async => [
-          HrHoliday.fromJson({...hrHolidayJson, 'date': '$key-12'}),
-        ],
       );
       await pumpApp(t, const ApprovalsScreen(openCalendar: true));
       await settle(t);
       expect(find.byKey(const Key('team-calendar')), findsOneWidget);
+      // ONE call: first -> last day of the displayed month.
       verify(
+        () => repo.leaveCalendar(
+          DateTime(today.year, today.month, 1),
+          DateTime(today.year, today.month + 1, 0),
+        ),
+      ).called(1);
+      // The old workaround (the paged list with a 100-row cap) is gone.
+      verifyNever(
         () => repo.leaves(
           page: any(named: 'page'),
           limit: 100,
           status: any(named: 'status'),
           userId: any(named: 'userId'),
           leaveTypeId: any(named: 'leaveTypeId'),
-          from: DateTime(today.year, today.month, 1),
-          to: DateTime(today.year, today.month + 1, 0),
+          from: any(named: 'from'),
+          to: any(named: 'to'),
         ),
-      ).called(1);
-      // Tap day 10 -> the person off is listed with their type.
+      );
+      // Day 10: the approved person off, with their type.
       await t.tap(find.byKey(ValueKey('${today.year}-${today.month}-10')));
       await t.pump(const Duration(milliseconds: 300));
       expect(find.text('Vikram Coach'), findsOneWidget);
       expect(find.textContaining('Casual Leave'), findsWidgets);
-      // Tap the holiday day.
+      // Day 2: the request that began last month shows (clipped), pending.
+      await t.tap(find.byKey(ValueKey('${today.year}-${today.month}-2')));
+      await t.pump(const Duration(milliseconds: 300));
+      expect(find.text('Asha Desk'), findsOneWidget);
+      expect(find.text('Pending'), findsWidgets);
+      // The holiday day.
       await t.tap(find.byKey(ValueKey('${today.year}-${today.month}-12')));
       await t.pump(const Duration(milliseconds: 300));
       expect(find.textContaining('Holiday: Diwali'), findsOneWidget);
@@ -1265,11 +1291,55 @@ void main() {
       await dispose(t);
     });
 
+    testWidgets('team calendar: loading skeleton, then an empty month',
+        (t) async {
+      stubList(const []);
+      final gate = Completer<HrLeaveCalendar>();
+      when(() => repo.leaveCalendar(any(), any()))
+          .thenAnswer((_) => gate.future);
+      await pumpApp(t, const ApprovalsScreen(openCalendar: true));
+      await t.pump();
+      await t.pump(const Duration(milliseconds: 100));
+      expect(find.byKey(const Key('team-calendar')), findsNothing);
+      expect(find.byType(HrShimmerBox), findsWidgets);
+      gate.complete(HrLeaveCalendar.fromJson(hrLeaveCalendarJson()));
+      await settle(t);
+      expect(find.byKey(const Key('team-calendar')), findsOneWidget);
+      expect(find.byKey(const Key('calendar-empty')), findsOneWidget);
+      await dispose(t);
+    });
+
+    testWidgets('team calendar: a 422 / error shows a message with Retry, '
+        'and Retry re-requests', (t) async {
+      stubList(const []);
+      var calls = 0;
+      when(() => repo.leaveCalendar(any(), any())).thenAnswer((_) async {
+        calls++;
+        if (calls == 1) {
+          throw const ApiException(
+            message: 'The range can cover at most 62 days',
+            statusCode: 422,
+          );
+        }
+        return HrLeaveCalendar.fromJson(hrLeaveCalendarJson());
+      });
+      await pumpApp(t, const ApprovalsScreen(openCalendar: true));
+      await settle(t);
+      expect(find.text('The range can cover at most 62 days'), findsOneWidget);
+      expect(find.byKey(const Key('team-calendar')), findsNothing);
+      await t.tap(find.text('Try again'));
+      await settle(t);
+      expect(calls, 2);
+      expect(find.byKey(const Key('team-calendar')), findsOneWidget);
+      await dispose(t);
+    });
+
     testWidgets('the view chips switch between requests and calendar',
         (t) async {
       stubList([HrLeaveRequest.fromJson(hrLeaveRequestJson())]);
-      when(() => repo.holidaysBetween(any(), any()))
-          .thenAnswer((_) async => <HrHoliday>[]);
+      when(() => repo.leaveCalendar(any(), any())).thenAnswer(
+        (_) async => HrLeaveCalendar.fromJson(hrLeaveCalendarJson()),
+      );
       await pumpApp(t, const ApprovalsScreen());
       await settle(t);
       expect(find.byKey(const Key('team-calendar')), findsNothing);
@@ -1526,6 +1596,252 @@ void main() {
       expect(find.text('Run payroll'), findsNothing);
       expect(find.text('Monthly attendance'), findsWidgets);
       expect(find.byKey(const Key('off-soon-strip')), findsNothing);
+      await dispose(t);
+    });
+  });
+
+  // ── v1.2: absent + yet to check in, derived absent ────────────────────────
+
+  group('Absent / yet to check in (v1.2)', () {
+    testWidgets('overview shows a real Absent tile AND Yet to check in, and '
+        'the today bar adds up to the headcount', (t) async {
+      when(() => repo.overview()).thenAnswer(
+        (_) async => HrOverview.fromJson({
+          ...hrOverviewJson,
+          'today': {
+            'present': 1,
+            'late': 0,
+            'halfDay': 0,
+            'onLeave': 0,
+            'absent': 2,
+            'weeklyOff': 0,
+            'holiday': 0,
+            'notMarked': 1,
+            'yetToCheckIn': 1,
+            'checkedInNow': 1,
+          },
+        }),
+      );
+      await pumpApp(t, const HrOverviewScreen());
+      await settle(t);
+      expect(find.text('Absent'), findsWidgets);
+      expect(find.text('Yet to check in'), findsWidgets);
+      expect(find.byKey(const Key('today-bar')), findsOneWidget);
+      // Legend entries of the stacked bar.
+      expect(find.text('Absent 2'), findsOneWidget);
+      expect(find.text('Yet to check in 1'), findsOneWidget);
+      expect(find.text('Present 1'), findsOneWidget);
+      final o = HrOverview.fromJson(hrOverviewJson);
+      expect(
+        HrTodayBar.segments(o.today).fold<int>(0, (s, x) => s + x.value),
+        o.headcount,
+      );
+      await dispose(t);
+    });
+
+    testWidgets('an older server without yetToCheckIn still shows it '
+        '(= notMarked)', (t) async {
+      when(() => repo.overview()).thenAnswer(
+        (_) async => HrOverview.fromJson({
+          ...hrOverviewJson,
+          'today': {
+            'present': 1,
+            'late': 0,
+            'halfDay': 0,
+            'onLeave': 0,
+            'absent': 0,
+            'weeklyOff': 0,
+            'holiday': 0,
+            'notMarked': 3,
+            'checkedInNow': 1,
+          },
+        }),
+      );
+      await pumpApp(t, const HrOverviewScreen());
+      await settle(t);
+      expect(find.text('Yet to check in 3'), findsOneWidget);
+      await dispose(t);
+    });
+
+    HrDayBoard board() => HrDayBoard.fromJson({
+          'date': '2026-11-22',
+          'summary': {'present': 0, 'absent': 2},
+          'items': [
+            {
+              'employee': hrEmployeeRefJson,
+              'shift': null,
+              'attendance': hrAutoAbsentDayJson(),
+            },
+            {
+              'employee': {
+                'userId': 'u-asha',
+                'employeeId': 'EMP-0003',
+                'name': 'Asha Desk',
+                'avatarUrl': null,
+                'role': 'RECEPTIONIST',
+              },
+              'shift': null,
+              'attendance': hrAttendanceDayJson(
+                status: 'ABSENT',
+                source: 'MANUAL',
+                checkInTime: null,
+                remark: 'On site visit',
+              ),
+            },
+          ],
+        });
+
+    testWidgets('roster: a derived absent is marked "auto" and spoken as '
+        '"No check-in recorded"; a manual absent is not', (t) async {
+      when(
+        () => repo.dayBoard(
+          date: any(named: 'date'),
+          search: any(named: 'search'),
+          branchId: any(named: 'branchId'),
+        ),
+      ).thenAnswer((_) async => board());
+      await pumpApp(t, const TeamAttendanceScreen());
+      await settle(t);
+      expect(find.text('Absent · auto'), findsOneWidget);
+      expect(find.text('Absent'), findsWidgets);
+      expect(
+        find.bySemanticsLabel(RegExp('Vikram Coach, .*No check-in recorded')),
+        findsOneWidget,
+      );
+      await dispose(t);
+    });
+
+    testWidgets('mark sheet over a derived absent: no "Remove record" '
+        '(nothing stored), starts on Present, still markable', (t) async {
+      when(
+        () => repo.dayBoard(
+          date: any(named: 'date'),
+          search: any(named: 'search'),
+          branchId: any(named: 'branchId'),
+        ),
+      ).thenAnswer((_) async => board());
+      when(
+        () => repo.markAttendance(
+          userId: any(named: 'userId'),
+          date: any(named: 'date'),
+          status: any(named: 'status'),
+          remark: any(named: 'remark'),
+          checkInTime: any(named: 'checkInTime'),
+          checkOutTime: any(named: 'checkOutTime'),
+        ),
+      ).thenAnswer(
+        (_) async => HrAttendanceDay.fromJson(hrAttendanceDayJson()),
+      );
+      await pumpApp(t, const TeamAttendanceScreen());
+      await settle(t);
+      await t.tap(find.text('Vikram Coach'));
+      await _anim(t);
+      expect(find.text('Mark attendance'), findsOneWidget);
+      expect(find.text('Remove record'), findsNothing);
+      await t.enterText(find.byKey(const Key('hr-mark-remark')), 'Was on site');
+      await _tapVisible(t, find.text('Save attendance'));
+      await _anim(t);
+      verify(
+        () => repo.markAttendance(
+          userId: 'u-vikram',
+          date: any(named: 'date'),
+          status: DayStatus.present,
+          remark: 'Was on site',
+          checkInTime: any(named: 'checkInTime'),
+          checkOutTime: any(named: 'checkOutTime'),
+        ),
+      ).called(1);
+      await dispose(t);
+    });
+
+    testWidgets('mark sheet over a manually marked absent keeps '
+        '"Remove record"', (t) async {
+      when(
+        () => repo.dayBoard(
+          date: any(named: 'date'),
+          search: any(named: 'search'),
+          branchId: any(named: 'branchId'),
+        ),
+      ).thenAnswer((_) async => board());
+      await pumpApp(t, const TeamAttendanceScreen());
+      await settle(t);
+      await t.tap(find.text('Asha Desk'));
+      await _anim(t);
+      expect(find.text('Edit attendance'), findsOneWidget);
+      expect(find.text('Remove record'), findsOneWidget);
+      await dispose(t);
+    });
+
+    test('heatmap cell + summary carry the auto marker / spoken label', () {
+      final auto = hrCellFor(HrAttendanceDay.fromJson(hrAutoAbsentDayJson()));
+      expect(auto.auto, isTrue);
+      expect(auto.semantics, contains(hrNoCheckInLabel));
+      final manual = hrCellFor(
+        HrAttendanceDay.fromJson(
+          hrAttendanceDayJson(status: 'ABSENT', source: 'MANUAL'),
+        ),
+      );
+      expect(manual.auto, isFalse);
+      expect(manual.semantics, isNot(contains(hrNoCheckInLabel)));
+    });
+
+    testWidgets('month heatmap draws the auto marker only on derived '
+        'absences', (t) async {
+      await pumpApp(
+        t,
+        Scaffold(
+          body: SingleChildScrollView(
+            child: HrMonthCalendar(
+              month: DateTime(2026, 11),
+              cells: {
+                20: hrCellFor(
+                  HrAttendanceDay.fromJson(hrAutoAbsentDayJson(date: '2026-11-20')),
+                ),
+                21: hrCellFor(
+                  HrAttendanceDay.fromJson(
+                    hrAttendanceDayJson(
+                      date: '2026-11-21',
+                      status: 'ABSENT',
+                      source: 'MANUAL',
+                    ),
+                  ),
+                ),
+              },
+              onDayTap: (_) {},
+            ),
+          ),
+        ),
+      );
+      await t.pump(const Duration(seconds: 1));
+      expect(find.byKey(const Key('auto-absent-marker')), findsOneWidget);
+      expect(
+        find.bySemanticsLabel(RegExp('Day 20.*No check-in recorded')),
+        findsOneWidget,
+      );
+      await dispose(t);
+    });
+
+    testWidgets('day sheet of a derived absent explains there is nothing to '
+        'remove', (t) async {
+      await pumpApp(
+        t,
+        Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => showHrDaySheet(
+                context,
+                HrAttendanceDay.fromJson(hrAutoAbsentDayJson()),
+                subject: 'Vikram Coach',
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      );
+      await t.tap(find.text('open'));
+      await _anim(t);
+      expect(find.byKey(const Key('auto-absent-note')), findsOneWidget);
+      expect(find.text('Absent · auto'), findsOneWidget);
       await dispose(t);
     });
   });

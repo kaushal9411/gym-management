@@ -58,6 +58,10 @@ export class HrAdminController {
   async listLeaves(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await new HrLeaveService(tenantId(req)).list(req.query as never, actorId(req)));
   }
+  async leaveCalendar(req: Request, res: Response): Promise<void> {
+    const q = req.query as unknown as { from: string; to: string };
+    sendSuccess(res, await new HrLeaveService(tenantId(req)).calendar(q.from, q.to, actorId(req)));
+  }
   async leaveDetail(req: Request, res: Response): Promise<void> {
     sendSuccess(res, await new HrLeaveService(tenantId(req)).detail(req.params.id!, actorId(req)));
   }

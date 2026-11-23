@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 
 import { useMotionSafe } from '@/features/reports/lib/motion';
 import { formatDay, todayYmd, WEEKDAYS_SHORT, weekdayIndex } from '../../lib/dates';
+import { todaySegments } from '../../lib/derive';
 import { mix, TONES, type HrTone } from '../../lib/hr-palette';
 import type { HrOverview } from '../../types';
 
@@ -94,22 +95,14 @@ export function TrendBars({ trend }: { trend: HrOverview['trend'] }) {
   );
 }
 
-/** One-line proportional bar of today's buckets. */
+/** One-line proportional bar of today's buckets (segments add up to the headcount). */
 export function TodayBar({ today }: { today: HrOverview['today'] }) {
   const m = useMotionSafe();
-  const parts: { tone: HrTone; value: number }[] = [
-    { tone: 'present', value: today.present },
-    { tone: 'late', value: today.late },
-    { tone: 'half', value: today.halfDay },
-    { tone: 'leave', value: today.onLeave },
-    { tone: 'absent', value: today.absent },
-    { tone: 'off', value: today.weeklyOff + today.holiday },
-    { tone: 'none', value: today.notMarked },
-  ];
+  const parts = todaySegments(today);
   const total = parts.reduce((s, p) => s + p.value, 0) || 1;
   return (
     <div>
-      <div className="flex h-3.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={parts.map((p) => `${TONES[p.tone].label} ${p.value}`).join(', ')}>
+      <div className="flex h-3.5 overflow-hidden rounded-full bg-muted" role="img" aria-label={parts.map((p) => `${p.label} ${p.value}`).join(', ')}>
         {parts.map((p, i) =>
           p.value ? (
             <motion.div key={p.tone} initial={m.reduce ? false : { width: 0 }} animate={{ width: `${(p.value / total) * 100}%` }} transition={{ duration: 0.8, delay: i * 0.05 }} style={{ backgroundColor: TONES[p.tone].color, opacity: p.tone === 'none' ? 0.35 : 1 }} />
@@ -126,7 +119,7 @@ export function TodayBar({ today }: { today: HrOverview['today'] }) {
               <li key={p.tone} className="inline-flex items-center gap-1.5 text-xs font-semibold">
                 <Icon className="size-3.5" style={{ color: meta.color }} aria-hidden />
                 <span className="tabular-nums">{p.value}</span>
-                <span className="text-muted-foreground">{p.tone === 'off' ? 'Off / holiday' : p.tone === 'none' ? 'Yet to check in' : meta.label}</span>
+                <span className="text-muted-foreground">{p.label}</span>
               </li>
             );
           })}

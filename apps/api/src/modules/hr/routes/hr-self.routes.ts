@@ -1,12 +1,13 @@
 import { Router } from 'express';
 
 import { validate } from '../../../core/middleware/validate.middleware';
-import { requirePermission } from '../../authentication/middlewares/authorize.middleware';
+import { requireAnyPermission, requirePermission } from '../../authentication/middlewares/authorize.middleware';
 import { hrSelfController } from '../controllers/hr-self.controller';
 import {
   applyLeaveBodySchema,
   cancelLeaveBodySchema,
   checkInBodySchema,
+  enrollBodySchema,
   idParamSchema,
   leavePreviewBodySchema,
   leaveYearQuerySchema,
@@ -29,6 +30,9 @@ const c = hrSelfController;
 
 /** @openapi { "/hr/me/summary": { get: { tags: [HR], summary: "My HR home: today attendance state, month stats, leave balances, pending leaves, holidays (hr:self_attendance)", security: [{bearerAuth: []}], responses: { 200: { description: OK }, 403: { description: Forbidden }, 409: { description: Conflict }, 422: { description: Validation failed } } } } } */
 hrSelfRouter.get('/me/summary', requirePermission('hr:self_attendance'), asyncHandler(c.summary.bind(c)));
+
+/** @openapi { "/hr/me/enroll": { post: { tags: [HR], summary: "Opt-in: create my own employee profile (e.g. the owner); 201 = /hr/me/summary, 409 ALREADY_EMPLOYEE (hr:self_attendance or hr:self_leave)", security: [{bearerAuth: []}], responses: { 201: { description: Created }, 403: { description: Forbidden }, 409: { description: Conflict }, 422: { description: Validation failed } } } } } */
+hrSelfRouter.post('/me/enroll', requireAnyPermission('hr:self_attendance', 'hr:self_leave'), validate({ body: enrollBodySchema }), asyncHandler(c.enroll.bind(c)));
 
 /** @openapi { "/hr/me/attendance/check-in": { post: { tags: [HR], summary: "Check in for today (409 ALREADY_CHECKED_IN) (hr:self_attendance)", security: [{bearerAuth: []}], responses: { 200: { description: OK }, 403: { description: Forbidden }, 409: { description: Conflict }, 422: { description: Validation failed } } } } } */
 hrSelfRouter.post('/me/attendance/check-in', requirePermission('hr:self_attendance'), validate({ body: checkInBodySchema }), asyncHandler(c.checkIn.bind(c)));

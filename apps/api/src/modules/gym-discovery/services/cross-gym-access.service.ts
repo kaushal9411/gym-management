@@ -1,10 +1,13 @@
+import { Prisma } from '@prisma/client';
+
 import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
 import { authLogger } from '../../../core/logging/logger';
+import { indianNational10, phoneDigits, phonesMatch } from '../../../core/utils/phone-match.util';
 import { prisma } from '../../../infrastructure/database/prisma';
 import { buildAuthModule } from '../../authentication/utils/auth-module.factory';
 import { MemberAuthService } from '../../member-auth/services/member-auth.service';
-import { hashPhone } from '../../members/utils/member-pii.util';
+import { phoneHashCandidates } from '../../members/utils/member-pii.util';
 import type { Actor, PhoneActor } from '../validators/gym-discovery.validators';
 
 /** Same statuses `TenantRepository.listActive` / `discoverGyms` treat as "a login could succeed here". */
@@ -113,9 +116,32 @@ export class CrossGymAccessService {
     return rows.map((r) => r.tenant).filter(eligible);
   }
 
+  /**
+   * Format-insensitive: a stored "+91 98765 00000" matches a typed "9876500000"
+   * (and vice versa, plus "09876500000" / "919876500000"). SQL narrows to rows
+   * whose digits-only phone equals the typed digits OR whose last 10 digits equal
+   * the typed Indian national number; `phonesMatch` then applies the exact rule
+   * (so e.g. a foreign number that merely shares 10 trailing digits is dropped).
+   * `users` holds staff only (a few rows per gym) and the platform plane has no
+   * phone index, so this is a bounded scan (LIMIT) of a small table on a
+   * rate-limited public endpoint; exact-format rows are still found by the same
+   * predicate.
+   */
   private async staffTenantsByPhone(phone: string): Promise<TenantLite[]> {
-    const rows = await prisma.user.findMany({ where: { phone, deletedAt: null }, select: { tenant: { select: TENANT_SELECT } }, take: MAX_TENANTS });
-    return rows.map((r) => r.tenant).filter(eligible);
+    const digits = phoneDigits(phone);
+    if (digits.length < 7) return [];
+    const national = indianNational10(digits);
+    const digitsOnly = Prisma.sql`regexp_replace(phone, '[^0-9]', '', 'g')`;
+    const match = national
+      ? Prisma.sql`(${digitsOnly} = ${digits} OR right(${digitsOnly}, 10) = ${national})`
+      : Prisma.sql`${digitsOnly} = ${digits}`;
+    const rows = await prisma.$queryRaw<Array<{ tenant_id: string; phone: string }>>(
+      Prisma.sql`SELECT tenant_id, phone FROM users WHERE deleted_at IS NULL AND phone IS NOT NULL AND ${match} ORDER BY tenant_id LIMIT 50`,
+    );
+    const tenantIds = [...new Set(rows.filter((r) => phonesMatch(r.phone, phone)).map((r) => r.tenant_id))].slice(0, MAX_TENANTS);
+    if (tenantIds.length === 0) return [];
+    const tenants = await prisma.tenant.findMany({ where: { id: { in: tenantIds } }, select: TENANT_SELECT });
+    return tenants.filter(eligible);
   }
 
   private async memberTenantsByCode(memberCode: string): Promise<TenantLite[]> {
@@ -124,7 +150,7 @@ export class CrossGymAccessService {
   }
 
   private async memberTenantsByPhone(phone: string): Promise<TenantLite[]> {
-    const rows = await prisma.member.findMany({ where: { phoneHash: hashPhone(phone), deletedAt: null }, select: { tenant: { select: TENANT_SELECT } }, take: MAX_TENANTS });
+    const rows = await prisma.member.findMany({ where: { phoneHash: { in: phoneHashCandidates(phone) }, deletedAt: null }, select: { tenant: { select: TENANT_SELECT } }, take: MAX_TENANTS });
     return rows.map((r) => r.tenant).filter(eligible);
   }
 }

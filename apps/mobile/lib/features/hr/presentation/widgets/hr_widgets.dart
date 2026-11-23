@@ -758,6 +758,7 @@ class HrCalendarCell {
     this.glyph,
     this.semantics,
     this.muted = false,
+    this.auto = false,
   });
 
   final Color color;
@@ -768,6 +769,10 @@ class HrCalendarCell {
 
   /// Greyed (future day, no data).
   final bool muted;
+
+  /// Worked out by the server, nothing stored (a derived ABSENT): a tiny
+  /// "auto" marker is drawn in the corner.
+  final bool auto;
 }
 
 /// Month grid, Monday-first. Each cell is tinted with its status colour and
@@ -912,21 +917,38 @@ class _DayCell extends StatelessWidget {
               ]
             : null,
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Stack(
         children: [
-          Text(
-            '$day',
-            style: AppText.tabular(
-              size: 12.5,
-              weight: FontWeight.w800,
-              color: muted ? AppColors.inkFaint : AppColors.ink,
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '$day',
+                  style: AppText.tabular(
+                    size: 12.5,
+                    weight: FontWeight.w800,
+                    color: muted ? AppColors.inkFaint : AppColors.ink,
+                  ),
+                ),
+                if (c?.glyph != null)
+                  Icon(c!.glyph, size: 11, color: color)
+                else
+                  const SizedBox(height: 11),
+              ],
             ),
           ),
-          if (c?.glyph != null)
-            Icon(c!.glyph, size: 11, color: color)
-          else
-            const SizedBox(height: 11),
+          if (c?.auto == true)
+            Positioned(
+              top: 3,
+              right: 4,
+              child: Icon(
+                Icons.auto_awesome_rounded,
+                key: const Key('auto-absent-marker'),
+                size: 8,
+                color: color,
+              ),
+            ),
         ],
       ),
     );

@@ -92,6 +92,26 @@ export interface AttendanceDayDto {
   shift: { name: string; startTime: string; endTime: string } | null;
 }
 
+/** One row of the team leave calendar (`GET /hr/leaves/calendar`). */
+export interface LeaveCalendarItemDto {
+  id: string;
+  userId: string;
+  employeeName: string;
+  leaveType: LeaveTypeRefDto;
+  startDate: string;
+  endDate: string;
+  dayPart: DayPart;
+  days: number;
+  status: 'PENDING' | 'APPROVED';
+}
+
+export interface LeaveCalendarDto {
+  from: string;
+  to: string;
+  items: LeaveCalendarItemDto[];
+  holidays: HolidayDto[];
+}
+
 export interface LeaveRequestDto {
   id: string;
   employee: EmployeeRefDto;

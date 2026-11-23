@@ -14,8 +14,9 @@ class HrTodayBuckets {
     this.weeklyOff = 0,
     this.holiday = 0,
     this.notMarked = 0,
+    int? yetToCheckIn,
     this.checkedInNow = 0,
-  });
+  }) : yetToCheckIn = yetToCheckIn ?? notMarked;
 
   final int present;
   final int late;
@@ -25,7 +26,22 @@ class HrTodayBuckets {
   final int weeklyOff;
   final int holiday;
   final int notMarked;
+
+  /// Still expected today, shift not over yet (v1.2; equals [notMarked] -
+  /// older servers omit it and the default makes it so).
+  final int yetToCheckIn;
   final int checkedInNow;
+
+  /// Every bucket; they are mutually exclusive and add up to the headcount.
+  int get bucketTotal =>
+      present +
+      late +
+      halfDay +
+      onLeave +
+      absent +
+      weeklyOff +
+      holiday +
+      notMarked;
 
   factory HrTodayBuckets.fromJson(Map<String, dynamic> j) => HrTodayBuckets(
         present: hrInt(j['present']),
@@ -36,6 +52,8 @@ class HrTodayBuckets {
         weeklyOff: hrInt(j['weeklyOff']),
         holiday: hrInt(j['holiday']),
         notMarked: hrInt(j['notMarked']),
+        yetToCheckIn:
+            j['yetToCheckIn'] == null ? null : hrInt(j['yetToCheckIn']),
         checkedInNow: hrInt(j['checkedInNow']),
       );
 }

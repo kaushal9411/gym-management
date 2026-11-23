@@ -61,7 +61,7 @@ describe('route gating', () => {
   const routeLines = (src: string) => src.split('\n').filter((l) => /^hr(Self|Admin|Payroll)Router\.(get|post|put|patch|delete)\(/.test(l));
 
   it('every route declares a permission', () => {
-    for (const l of [...routeLines(selfRoutes), ...routeLines(adminRoutes), ...routeLines(payrollRoutes)]) expect(l).toMatch(/requirePermission\('hr:[a-z_]+'\)/);
+    for (const l of [...routeLines(selfRoutes), ...routeLines(adminRoutes), ...routeLines(payrollRoutes)]) expect(l).toMatch(/require(Any)?Permission\('hr:[a-z_]+'/);
   });
 
   it('every /hr/me route is gated by a self permission and nothing else', () => {
@@ -69,7 +69,7 @@ describe('route gating', () => {
     expect(lines.length).toBeGreaterThan(10);
     for (const l of lines) {
       expect(l).toContain("'/me/");
-      expect(l).toMatch(/requirePermission\('hr:self_(attendance|leave|payslip)'\)/);
+      expect(l).toMatch(/require(Any)?Permission\('hr:self_(attendance|leave|payslip)'(, 'hr:self_(attendance|leave|payslip)')*\)/);
     }
   });
 

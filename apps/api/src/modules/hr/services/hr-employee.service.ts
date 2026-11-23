@@ -93,7 +93,7 @@ export class HrEmployeeService {
     return {
       date: today,
       headcount: items.length,
-      today: { ...todayBuckets, checkedInNow },
+      today: { ...todayBuckets, yetToCheckIn: todayBuckets.notMarked, checkedInNow },
       pendingLeaves: await this.leaves.repo.countPending(this.tenantId, ids),
       payroll: canPayroll ? await this.payroll.statusFor(currentMonth()) : null,
       upcomingLeaves,

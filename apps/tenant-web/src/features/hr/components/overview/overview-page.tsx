@@ -80,7 +80,8 @@ export function OverviewPage() {
             <HrKpi label="Late" value={d?.today.late ?? 0} icon={Clock} color={TONES.late.color} loading={loading} hint="Checked in late" href="/hr/attendance" />
             <HrKpi label="Half day" value={d?.today.halfDay ?? 0} icon={TONES.half.icon} color={TONES.half.color} loading={loading} hint="Short days" href="/hr/attendance" />
             <HrKpi label="On leave" value={d?.today.onLeave ?? 0} icon={Plane} color={TONES.leave.color} loading={loading} hint="Approved leave" href={access.leaveManage ? '/hr/leaves' : undefined} />
-            <HrKpi label="Yet to check in" value={d?.today.notMarked ?? 0} icon={Fingerprint} color="var(--muted-foreground)" loading={loading} hint="Not marked today" href="/hr/attendance" />
+            <HrKpi label="Absent" value={d?.today.absent ?? 0} icon={TONES.absent.icon} color={TONES.absent.color} loading={loading} hint="Shift over, no check-in" href="/hr/attendance" pulse={(d?.today.absent ?? 0) > 0} />
+            <HrKpi label="Yet to check in" value={d?.today.yetToCheckIn ?? d?.today.notMarked ?? 0} icon={Fingerprint} color="var(--muted-foreground)" loading={loading} hint="Shift not over yet" href="/hr/attendance" />
             <HrKpi label="Pending approvals" value={d?.pendingLeaves ?? 0} icon={Hourglass} color={TONES.pending.color} loading={loading} hint="Leave requests" pulse={(d?.pendingLeaves ?? 0) > 0} href={access.leaveManage ? '/hr/leaves' : undefined} />
             {payroll ? (
               <HrKpi

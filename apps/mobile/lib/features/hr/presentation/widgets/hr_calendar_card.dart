@@ -15,12 +15,16 @@ import 'hr_widgets.dart';
 /// One-line spoken/visible summary of a day ("In 9:05 AM · Out 5:30 PM").
 String hrDaySummary(HrAttendanceDay d) {
   final parts = <String>[d.status.label];
+  if (d.isAutoAbsent) parts.add(hrNoCheckInLabel);
   if (d.holidayName != null) parts.add(d.holidayName!);
   if (d.leaveType != null) parts.add(d.leaveType!.name);
   if (d.checkInTime != null) parts.add('in ${_t12(d.checkInTime!)}');
   if (d.checkOutTime != null) parts.add('out ${_t12(d.checkOutTime!)}');
   return parts.join(', ');
 }
+
+/// Spoken / written explanation of a derived (unrecorded) ABSENT.
+const hrNoCheckInLabel = 'No check-in recorded';
 
 /// `15:30` -> `3:30 PM` (the API's IST `HH:mm`).
 String _t12(String hm) {
@@ -42,6 +46,7 @@ HrCalendarCell hrCellFor(HrAttendanceDay d) {
     color: HrPalette.status(d.status),
     glyph: HrPalette.glyph(d.status),
     muted: muted,
+    auto: d.isAutoAbsent,
     semantics: hrDaySummary(d),
   );
 }
@@ -337,7 +342,11 @@ Future<void> showHrDaySheet(
         children: [
           Row(
             children: [
-              HrDayStatusChip(status: d.status, dense: false),
+              HrDayStatusChip(
+                status: d.status,
+                dense: false,
+                auto: d.isAutoAbsent,
+              ),
               if (d.leaveDayPart != null && d.leaveDayPart!.isHalf) ...[
                 const SizedBox(width: 8),
                 HrChip(
@@ -414,8 +423,13 @@ Future<void> showHrDaySheet(
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(
-                'No attendance record - this day is worked out from the '
-                'calendar.',
+                d.isAutoAbsent
+                    ? 'No check-in recorded - shown as absent automatically. '
+                        'Nothing is stored, so there is nothing to remove; '
+                        'mark attendance to correct it.'
+                    : 'No attendance record - this day is worked out from '
+                        'the calendar.',
+                key: d.isAutoAbsent ? const Key('auto-absent-note') : null,
                 style: AppText.body(
                   size: 12,
                   color: AppColors.inkFaint,

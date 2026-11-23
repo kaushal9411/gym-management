@@ -2,10 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AppError } from '../../../core/errors/app-error';
 import { ErrorCode } from '../../../core/errors/error-codes';
+import { phoneStorageVariants } from '../../../core/utils/phone-match.util';
 
 const state = vi.hoisted(() => ({
-  users: [] as Array<{ tenant: Record<string, unknown> }>,
-  members: [] as Array<{ tenant: Record<string, unknown> }>,
+  /** `phone` = the phone as stored for that staff user (defaults to 9876500000). */
+  users: [] as Array<{ tenant: Record<string, unknown>; phone?: string }>,
+  /** `phone` = the phone as it was typed when the member was created (hashed as-is). */
+  members: [] as Array<{ tenant: Record<string, unknown>; phone?: string }>,
   staffCalls: [] as string[],
   memberCalls: [] as string[],
   staffVerify: new Map<string, () => unknown>(),
@@ -16,10 +19,18 @@ const state = vi.hoisted(() => ({
 vi.mock('../../../infrastructure/database/prisma', () => ({
   prisma: {
     user: { findMany: vi.fn(async () => state.users) },
-    member: { findMany: vi.fn(async () => state.members) },
+    // phone lookups run raw SQL: the mock plays "SQL returned every staff row"; the service's own phonesMatch must do the matching
+    $queryRaw: vi.fn(async () => state.users.map((u) => ({ tenant_id: (u.tenant as { id: string }).id, phone: u.phone ?? '9876500000' }))),
+    tenant: { findMany: vi.fn(async ({ where }: { where: { id: { in: string[] } } }) => state.users.map((u) => u.tenant).filter((t) => where.id.in.includes((t as { id: string }).id))) },
+    member: {
+      findMany: vi.fn(async (args?: { where?: { phoneHash?: { in: string[] } } }) => {
+        const wanted = args?.where?.phoneHash?.in;
+        return wanted ? state.members.filter((m) => wanted.includes(`hash:${m.phone ?? '9876500000'}`)) : state.members;
+      }),
+    },
   },
 }));
-vi.mock('../../members/utils/member-pii.util', () => ({ hashPhone: (p: string) => `hash:${p}` }));
+vi.mock('../../members/utils/member-pii.util', () => ({ phoneHashCandidates: (p: string) => phoneStorageVariants(p).map((v) => `hash:${v}`) }));
 vi.mock('../../authentication/utils/auth-module.factory', () => ({
   buildAuthModule: (tenantId: string) => ({
     forgotPassword: async (email: string) => {
@@ -144,6 +155,79 @@ describe('CrossGymAccessService — forgot password / phone login with no gym pi
     state.memberVerify.set('m1', () => ({ accessToken: 'mt' }));
     expect(await service.verifyPhoneOtp('9876500000', 'staff', '123456', {})).toMatchObject({ actorType: 'staff', tenantSlug: 'slug-a' });
     expect(await service.verifyPhoneOtp('9876500000', 'member', '123456', {})).toMatchObject({ actorType: 'member', tenantSlug: 'slug-m1' });
+  });
+
+  describe('phone matching ignores country code, spaces, dashes and a leading 0', () => {
+    const typedVariants = ['9876500000', '+91 98765 00000', '+919876500000', '91 98765-00000', '09876500000', ' 98765 00000 ', '+91-9876500000'];
+
+    it.each(typedVariants)('staff stored as "+91 98765 00000" matches typed "%s"', async (typed) => {
+      state.users = [{ tenant: tenant('a'), phone: '+91 98765 00000' }];
+      await service.requestPhoneOtp(typed, 'staff');
+      expect(state.staffCalls).toEqual([`otp:a:${typed}`]);
+    });
+
+    it.each(['+91 98765 00000', '+919876500000', '09876500000', '98765-00000'])('staff stored as plain 9876500000 matches typed "%s"', async (typed) => {
+      state.users = [{ tenant: tenant('a'), phone: '9876500000' }];
+      await service.requestPhoneOtp(typed, 'staff');
+      expect(state.staffCalls).toEqual([`otp:a:${typed}`]);
+    });
+
+    it('staff: a different number, a too-short number and a foreign number sharing 10 trailing digits do NOT match', async () => {
+      state.users = [{ tenant: tenant('a'), phone: '+91 98765 00000' }];
+      for (const typed of ['9876500001', '+91 98765 0000', '12345', '+1 9876500000 ']) await service.requestPhoneOtp(typed, 'staff');
+      expect(state.staffCalls).toEqual([]);
+      state.users = [{ tenant: tenant('a'), phone: '+44 7911 123456' }];
+      await service.requestPhoneOtp('7911123456', 'staff'); // UK stored; Indian-shaped typed 10 digits must not match
+      expect(state.staffCalls).toEqual([]);
+    });
+
+    it('staff: non-Indian numbers match on identical digits regardless of formatting', async () => {
+      state.users = [{ tenant: tenant('a'), phone: '+44 7911 123456' }];
+      await service.requestPhoneOtp('+447911123456', 'staff');
+      expect(state.staffCalls).toEqual(['otp:a:+447911123456']);
+    });
+
+    it('staff: matches in several gyms, ignoring gyms whose number differs', async () => {
+      state.users = [
+        { tenant: tenant('a'), phone: '+91 98765 00000' },
+        { tenant: tenant('b'), phone: '9876500000' },
+        { tenant: tenant('c'), phone: '9876511111' },
+      ];
+      await service.requestPhoneOtp('+91 9876500000', 'staff');
+      expect(state.staffCalls).toEqual(['otp:a:+91 9876500000', 'otp:b:+91 9876500000']);
+    });
+
+    it('verify: a typed +91 number logs in to the gym that stored it with spaces', async () => {
+      state.users = [{ tenant: tenant('a'), phone: '+91 98765 00000' }];
+      state.staffVerify.set('a', () => ({ accessToken: 't' }));
+      expect(await service.verifyPhoneOtp('9876500000', 'staff', '123456', {})).toMatchObject({ actorType: 'staff', tenantSlug: 'slug-a', accessToken: 't' });
+    });
+
+    it.each(['9876500000', '+91 98765 00000', '+919876500000', '09876500000', '98765-00000'])('member stored as "+91 98765 00000" matches typed "%s" (hash of the stored variant is tried)', async (typed) => {
+      state.members = [{ tenant: tenant('m1'), phone: '+91 98765 00000' }];
+      await service.requestPhoneOtp(typed, 'member');
+      expect(state.memberCalls).toEqual([`otp:m1:${typed}`]);
+    });
+
+    it('member stored as plain 9876500000 matches typed "+91 98765 00000"', async () => {
+      state.members = [{ tenant: tenant('m1'), phone: '9876500000' }];
+      await service.requestPhoneOtp('+91 98765 00000', 'member');
+      expect(state.memberCalls).toEqual(['otp:m1:+91 98765 00000']);
+    });
+
+    it('member: a different number does not match', async () => {
+      state.members = [{ tenant: tenant('m1'), phone: '9876500001' }];
+      await service.requestPhoneOtp('+91 98765 00000', 'member');
+      expect(state.memberCalls).toEqual([]);
+    });
+
+    it('a non-matching typed number is still a silent no-op on the any plane', async () => {
+      state.users = [{ tenant: tenant('a'), phone: '+91 98765 00000' }];
+      state.members = [{ tenant: tenant('m1'), phone: '9876500001' }];
+      await expect(service.requestPhoneOtp('9000000000', 'any')).resolves.toBeUndefined();
+      expect(state.staffCalls).toEqual([]);
+      expect(state.memberCalls).toEqual([]);
+    });
   });
 
   describe("actorType 'any' — the phone number does not say staff or member", () => {

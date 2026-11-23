@@ -2,7 +2,7 @@
  * Pure attendance logic (no I/O): lateness, half-day thresholds, computed day
  * status and stats.
  */
-import { istMinuteOfDay, parseHm, weekdayOf } from './hr-dates.util';
+import { istInstant, istMinuteOfDay, parseHm, weekdayOf } from './hr-dates.util';
 
 export type StoredStatus = 'PRESENT' | 'ABSENT' | 'HALF_DAY' | 'LATE' | 'ON_LEAVE' | 'WEEKLY_OFF' | 'HOLIDAY';
 export type DayStatus = StoredStatus | 'NOT_MARKED' | 'NOT_JOINED';
@@ -48,17 +48,32 @@ export interface ComputedDayInput {
   joiningDate: string;
   weeklyOff: ReadonlySet<string>;
   holidayName: string | null;
+  /** The employee's effective shift end (`HH:mm`, IST); null/undefined = no shift. Only used for TODAY. */
+  shiftEndTime?: string | null;
+  /** The current instant. Only used for TODAY together with `shiftEndTime`. */
+  now?: Date;
+}
+
+/** True once `now` is strictly after the IST wall-clock `endTime` of business date `date` (exactly at the end is NOT past). */
+export function isPastShiftEnd(now: Date, date: string, endTime: string): boolean {
+  return now.getTime() > istInstant(date, endTime).getTime();
 }
 
 /**
- * Status of a day with NO attendance row. Absent is computed on read: a
- * working day strictly before today with no row is ABSENT.
+ * Status of a day with NO attendance row. Absent is computed on read (never
+ * stored): a working day strictly before today with no row is ABSENT. TODAY
+ * is NOT_MARKED ("yet to check in") until the employee's shift end has
+ * passed (strictly), after which it is ABSENT too; with no shift, today is
+ * always NOT_MARKED. Leave / half-day leave / manual marks are real rows, so
+ * they never reach this function.
  */
 export function computedStatus(i: ComputedDayInput): DayStatus {
   if (i.date < i.joiningDate) return 'NOT_JOINED';
   if (i.weeklyOff.has(weekdayOf(i.date))) return 'WEEKLY_OFF';
   if (i.holidayName !== null) return 'HOLIDAY';
-  return i.date < i.today ? 'ABSENT' : 'NOT_MARKED';
+  if (i.date < i.today) return 'ABSENT';
+  if (i.date === i.today && i.now && i.shiftEndTime && isPastShiftEnd(i.now, i.date, i.shiftEndTime)) return 'ABSENT';
+  return 'NOT_MARKED';
 }
 
 export interface AttendanceStats {

@@ -188,6 +188,11 @@ class HrAttendanceDay {
   final HrShiftRef? shift;
 
   bool get isManual => source == 'MANUAL';
+
+  /// ABSENT worked out by the server (no row stored): a past working day, or
+  /// today after the shift ended, without any check-in. Nothing to remove -
+  /// HR can still mark over it.
+  bool get isAutoAbsent => status == DayStatus.absent && !recorded;
   bool get hasCheckedIn => checkInAt != null || checkInTime != null;
   bool get hasCheckedOut => checkOutAt != null || checkOutTime != null;
 

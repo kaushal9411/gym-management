@@ -10,7 +10,7 @@ import { assertPasswordPolicy, passwordService } from '../../../core/security/pa
 import { generateNumericOtp, generateOpaqueToken, hashToken } from '../../../core/security/token.util';
 import { getTenantScopedClient, type TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import { AuditLogRepository } from '../../authentication/repositories/audit-log.repository';
-import { decryptMemberContactNullable, hashPhone } from '../../members/utils/member-pii.util';
+import { decryptMemberContactNullable, hashPhone, phoneHashCandidates } from '../../members/utils/member-pii.util';
 import { MemberCredentialRepository } from '../repositories/member-credential.repository';
 import { MemberOtpRepository } from '../repositories/member-otp.repository';
 import { MemberSessionRepository } from '../repositories/member-session.repository';
@@ -434,12 +434,20 @@ export class MemberAuthService {
 
   // ── internals ───────────────────────────────────────────────────────────
 
+  /**
+   * Format-insensitive: "+91 98765 00000", "09876500000" and "9876500000" find the
+   * same member (stored hashes are of the phone as originally typed, so every
+   * common stored variant is tried — see `phoneHashCandidates`). An exact stored
+   * match wins if several variants exist in one gym.
+   */
   private async findMemberByPhone(phone: string) {
-    return decryptMemberContactNullable(
-      await this.db.member.findFirst({
-        where: { tenantId: this.tenantId, phoneHash: hashPhone(phone), deletedAt: null },
-      }),
-    );
+    const rows = await this.db.member.findMany({
+      where: { tenantId: this.tenantId, phoneHash: { in: phoneHashCandidates(phone) }, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+      take: 5,
+    });
+    const exact = hashPhone(phone);
+    return decryptMemberContactNullable(rows.find((r) => r.phoneHash === exact) ?? rows[0] ?? null);
   }
 
   private async issueOtp(memberId: string, email: string, name: string, phone: string | null): Promise<void> {

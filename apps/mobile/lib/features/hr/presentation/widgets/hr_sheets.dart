@@ -73,9 +73,12 @@ class _MarkFormState extends State<_MarkForm> {
   void initState() {
     super.initState();
     final e = widget.existing;
-    _status = e != null && DayStatus.markable.contains(e.status)
-        ? e.status
-        : DayStatus.present;
+    // A computed day (nothing stored - incl. a derived ABSENT) starts on
+    // "Present": marking over it is the usual correction.
+    _status =
+        e != null && e.recorded && DayStatus.markable.contains(e.status)
+            ? e.status
+            : DayStatus.present;
     _in = _parse(e?.checkInTime);
     _out = _parse(e?.checkOutTime);
   }

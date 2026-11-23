@@ -14,6 +14,7 @@ import { useMotionSafe } from '@/features/reports/lib/motion';
 import { cn } from '@/lib/utils';
 import { addDays, currentMonth, formatDay, formatMinutes, formatMonth, formatTime, monthOf, todayYmd } from '../../lib/dates';
 import { mix, TONES } from '../../lib/hr-palette';
+import { AUTO_ABSENT_HINT, isAutoAbsent } from '../../lib/derive';
 import { DAY_STATUS_LABEL, DAY_STATUS_TONE, roleLabel, useHrAccess } from '../../lib/status';
 import { toHrError, useBulkAttendance, useDayAttendance, useMonthlyGrid } from '../../hooks/use-hr';
 import type { DayAttendanceResponse, DayStatus } from '../../types';
@@ -231,7 +232,7 @@ function DayView({ date, setDate, canMark }: { date: string; setDate: (d: string
                     </div>
                     <div className="w-[118px]">
                       <ToneChip tone={tone} label={DAY_STATUS_LABEL[a.status]} />
-                      {a.leaveType ? <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{a.leaveType.name}</p> : a.holidayName ? <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{a.holidayName}</p> : null}
+                      {isAutoAbsent(a) ? <p className="mt-0.5 truncate text-[11px] text-muted-foreground" title="Computed - nothing is stored for this day">{AUTO_ABSENT_HINT} (auto)</p> : a.leaveType ? <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{a.leaveType.name}</p> : a.holidayName ? <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{a.holidayName}</p> : null}
                     </div>
                     <dl className="grid grid-cols-3 gap-3 text-center text-xs">
                       <div>
@@ -341,6 +342,7 @@ function MonthGrid({ month, setMonth, onPick }: { month: string; setMonth: (m: s
             </table>
           </div>
           <StatusLegend className="mt-3" />
+          <p className="mt-2 text-[11.5px] text-muted-foreground">Absent includes days with no check-in recorded (computed, nothing stored); open the day to see whether HR marked it.</p>
         </>
       )}
     </HrPanel>

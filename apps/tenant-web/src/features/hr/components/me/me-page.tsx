@@ -7,9 +7,11 @@ import { CalendarCheck, Plane, ReceiptIndianRupee, UserRound, Wallet } from 'luc
 import { SegmentedTabs } from '@/features/reports/components/ui';
 import { formatDay } from '../../lib/dates';
 import { inr } from '../../lib/money';
-import { hrErrorCode, useMeSummary } from '../../hooks/use-hr';
+import { hrErrorCode, useMeBalances, useMeSummary } from '../../hooks/use-hr';
+import { shouldShowEnrollCard } from '../../lib/enroll';
 import { roleLabel, useHrAccess } from '../../lib/status';
 import { HrEmpty, HrHero } from '../ui/hr-ui';
+import { EnrollCard } from './enroll-card';
 import { MyLeavesTab } from './my-leaves-tab';
 import { MyPayslipsTab } from './my-payslips-tab';
 import { MyTodayTab } from './my-today-tab';
@@ -21,6 +23,8 @@ export function MePage() {
   const router = useRouter();
   const params = useSearchParams();
   const summary = useMeSummary({ enabled: access.selfAttendance });
+  // Leave-only users cannot read the summary, so their balances call is the probe for "not on the roster".
+  const probe = useMeBalances({ enabled: !access.selfAttendance && access.selfLeave });
 
   const tabs = [
     access.selfAttendance ? { value: 'today' as const, label: 'Today', icon: CalendarCheck } : null,
@@ -33,7 +37,8 @@ export function MePage() {
 
   const setTab = (t: TabKey) => router.replace(t === tabs[0]?.value ? '/hr/me' : `/hr/me?tab=${t}`, { scroll: false });
 
-  const notEmployee = summary.isError && hrErrorCode(summary.error) === 'NOT_AN_EMPLOYEE';
+  const notEmployee = (summary.isError && hrErrorCode(summary.error) === 'NOT_AN_EMPLOYEE') || (probe.isError && hrErrorCode(probe.error) === 'NOT_AN_EMPLOYEE');
+  const offerEnroll = shouldShowEnrollCard(access.selfAttendance || access.selfLeave, notEmployee ? 'NOT_AN_EMPLOYEE' : undefined);
   const emp = summary.data?.employee;
   const stats = summary.data?.month.stats;
   const totalAvail = summary.data?.leaveBalances.reduce((s, b) => s + (b.available ?? 0), 0) ?? 0;
@@ -57,7 +62,11 @@ export function MePage() {
       />
 
       {notEmployee ? (
-        <HrEmpty icon={UserRound} title="No employee profile on your account" description="My HR works for staff members who have an employee profile (created through Staff). Owners without one can manage HR from the other tabs." />
+        offerEnroll ? (
+          <EnrollCard />
+        ) : (
+          <HrEmpty icon={UserRound} title="My HR is not available" description="Your account is not on the employee roster, so self-service HR is not available." />
+        )
       ) : tabs.length === 0 ? (
         <HrEmpty icon={UserRound} title="Nothing here yet" description="Your role has no self-service HR access." />
       ) : (

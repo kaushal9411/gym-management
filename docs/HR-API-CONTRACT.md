@@ -203,6 +203,12 @@ All return 403 `NOT_AN_EMPLOYEE` when the caller has no StaffProfile.
 }
 ```
 
+### `POST /hr/me/enroll` — "Add me as an employee" (v1.3, additive) — `hr:self_attendance` OR `hr:self_leave`
+Opt-in self-enrolment for a user who has no StaffProfile (in practice the **OWNER**, who is created without one). It is the ONLY `/hr/me/*` route that does not run the `NOT_AN_EMPLOYEE` check. Body optional: `{}` (an optional `{ "shiftId": "uuid" }` is accepted; absent = tenant default shift; an unknown/inactive shift is 404/409).
+Creates the caller's own StaffProfile in the caller's tenant: `employeeId` from the normal generator (`EMP-0001`…), first/last name split from the user's name, `joiningDate` = today (IST), `employmentType FULL_TIME`, `salaryType MONTHLY`, **`salaryAmount null` (no pay set)**, shift = the chosen/default shift (`shiftId` + legacy `shift` text, like Work setup), `weeklyOff` stored **null = inherits** the shift/policy weekly off (the effective list is returned in `employee.weeklyOff`), `workStatus WORKING`. The user's branches / roles / permissions are not touched. Audit `hr.employee_enrolled` (`{ employeeId, shift }`).
+→ **201** — the SAME object `GET /hr/me/summary` returns (§3), so the UI can render it directly or just re-fetch the summary. Errors: **409 `ALREADY_EMPLOYEE`** (caller already has a profile — also on a concurrent double call), 403 `FORBIDDEN` (no self key). Nothing is backfilled: gyms/owners that never call this are unchanged; once enrolled the owner is a normal employee (overview headcount, roster, absent counts, leave, payslips).
+A profile-less user calling any other `/hr/me/*` route still gets **403** with the envelope `{ "success": false, "message": "...", "data": null, "errors": [ { "code": "NOT_AN_EMPLOYEE", "message": "You do not have an employee profile, so HR self-service is not available." } ] }` — UIs key the "Add me as an employee" button off `errors[0].code === "NOT_AN_EMPLOYEE"`.
+
 ### `POST /hr/me/attendance/check-in` — `hr:self_attendance` — body `{}` (optional `{ "note": "string ≤200" }` stored as remark)
 Creates today's row with `checkInAt = now`, `source = SELF`, `status = LATE` if check-in is later than shift start + grace (else `PRESENT`; employees without an assigned shift use the tenant default shift; with no shift at all nobody is ever late), `lateMinutes` = minutes after shift start + shift grace (see §9). → **201** `AttendanceDay`.
 Errors: 409 `ALREADY_CHECKED_IN`; 409 `INVALID_STATE` if today is a full-day approved leave ("You are on approved leave today") or HR already marked today ("Attendance for today was already marked by HR"). Working on a weekly off / holiday is allowed (status PRESENT/LATE).
@@ -262,11 +268,11 @@ Push (FCM, staff devices of the target user): `data = { "type": "hr", "hrType": 
   "date": "2026-11-22",
   "headcount": 4,
   "today": { "present": 1, "late": 1, "halfDay": 0, "onLeave": 1, "absent": 0, "weeklyOff": 0, "holiday": 0, "notMarked": 1,
-             "checkedInNow": 2 },              // buckets are mutually exclusive and sum to headcount; "absent" is only ever > 0 for past days (never for today)
+             "yetToCheckIn": 1, "checkedInNow": 2 },   // buckets (present..notMarked) are mutually exclusive and sum to the number of employees who have joined; since v1.2 "absent" for TODAY = expected but no attendance row AND the employee's shift end has passed (see §9); "yetToCheckIn" (v1.2, additive) === "notMarked" = still expected, shift not over yet (or no shift)
   "pendingLeaves": 3,
   "payroll": { "month": "2026-11", "runId": "uuid|null", "status": "NOT_GENERATED|DRAFT|APPROVED|PAID", "totalNet": 78000, "unpaidPayslips": 4 },   // totalNet/unpaidPayslips null when NOT_GENERATED; hidden (payroll: null) without hr:payroll_manage
   "upcomingLeaves": [ { "id": "uuid", "employee": { EmployeeRef }, "leaveType": { LeaveTypeRef }, "startDate": "...", "endDate": "...", "dayPart": "FULL_DAY", "days": 2 } ],   // APPROVED, overlapping the next 14 days; [] without hr:leave_manage
-  "trend": [ { "date": "2026-11-16", "present": 3, "late": 1, "halfDay": 0, "onLeave": 0, "absent": 0 } ],   // last 7 days incl. today, oldest first (absent computed for past days)
+  "trend": [ { "date": "2026-11-16", "present": 3, "late": 1, "halfDay": 0, "onLeave": 0, "absent": 0 } ],   // last 7 days incl. today, oldest first (absent computed for past days; today's entry uses the same shift-end rule as `today`)
   "upcomingHolidays": [ { Holiday } ]            // next 30 days
 }
 ```
@@ -302,6 +308,7 @@ Body `{ "baseSalary"?: number >= 0, "components": [ { "name": "Travel allowance"
 ## 5. Attendance management
 
 ### `GET /hr/attendance?date=YYYY-MM-DD&branchId=&search=` — `hr:view` (date default today; not in the future… future dates allowed for read, returns computed rows)
+For TODAY an employee with no row whose shift end has passed comes back `status: "ABSENT", recorded: false` (derived, never stored — same rule as every other read, §9). Before the shift end (or with no shift) it stays `NOT_MARKED`. `summary.absent` / `summary.notMarked` follow the same split.
 ```jsonc
 { "date": "2026-11-22",
   "summary": { "present": 1, "late": 1, "halfDay": 0, "onLeave": 1, "absent": 0, "weeklyOff": 0, "holiday": 0, "notMarked": 1 },
@@ -327,6 +334,19 @@ Removes the recorded row (the day falls back to computed status). `remark` requi
 
 ### `GET /hr/leaves?status=&userId=&leaveTypeId=&from=&to=&page=&limit=` — `hr:leave_manage`
 `from`/`to` = date-range overlap filter. Sorted PENDING first, then newest. Paginated `LeaveRequest` + `counts` (over the same filters except `status`): `{ "items": [...], "total": 9, "page": 1, "limit": 20, "totalPages": 1, "counts": { "pending": 3, "approved": 4, "rejected": 1, "cancelled": 1 } }`.
+### `GET /hr/leaves/calendar?from=YYYY-MM-DD&to=YYYY-MM-DD` — `hr:leave_manage` (v1.2, additive) — "who is off when"
+Both bounds required (IST dates, inclusive). Range `from..to` must be 1–62 days, else **422** `VALIDATION_ERROR` (`errors[0].field = "to"`; also for `to < from`, a missing bound or a bad date). Not paginated and NOT capped at 100 rows: every PENDING or APPROVED request that overlaps the window (REJECTED/CANCELLED are never included). Same branch scoping as `GET /hr/leaves`: only employees the caller may see (a user without "all branches" sees employees sharing one of their branches); holidays of branches outside the caller's scope are hidden, all-branch holidays always shown. Registered before `/hr/leaves/:id` (the literal path wins).
+```jsonc
+{ "from": "2026-11-01", "to": "2026-12-31",
+  "items": [   // sorted by startDate, then employeeName
+    { "id": "uuid", "userId": "uuid", "employeeName": "Vikram Coach",
+      "leaveType": { LeaveTypeRef },                       // {id,name,code,color,isPaid}
+      "startDate": "2026-11-25", "endDate": "2026-11-26",  // the request's own dates (may extend outside the window: clip client-side)
+      "dayPart": "FULL_DAY", "days": 2, "status": "PENDING|APPROVED" } ],
+  "holidays": [ { Holiday } ] }                            // holidays inside the window, sorted by date
+```
+Weekly offs are NOT included (per-employee weekly off is on `GET /hr/employees` → `weeklyOff`).
+
 ### `GET /hr/leaves/:id` — `hr:leave_manage` → `LeaveRequest` plus `"balance": LeaveBalance` (the applicant's balance for that type/year) and `"conflicts": [ { "employee": EmployeeRef, "leaveRequestId": "uuid", "startDate": "...", "endDate": "..." } ]` (other APPROVED/PENDING leaves overlapping the same dates — "who else is off")
 ### `POST /hr/leaves/preview` — `hr:leave_manage` — same as the self preview + `"userId"` in the body.
 ### `POST /hr/leaves` — apply on behalf — `hr:leave_manage`
@@ -363,8 +383,8 @@ Status transitions: `PENDING → APPROVED | REJECTED | CANCELLED`, `APPROVED →
 
 ## 8. Payroll (all `hr:payroll_manage`)
 
-- `GET /hr/payroll/runs?page=&limit=` → paginated `PayrollRun` (newest month first).
-- `POST /hr/payroll/runs` — body `{ "month": "2026-11", "notes"?: "" }` → **201** `{ "run": PayrollRun, "payslips": [ Payslip ] }`. `month` ≤ current IST month (422 otherwise; the current month is *provisional*: days after today count as paid). One run per month (409 `CONFLICT`). Generates a DRAFT payslip for every employee whose `joiningDate` ≤ month end and `workStatus != TERMINATED`.
+- `GET /hr/payroll/runs?page=&limit=` → paginated `PayrollRun` (newest month first). `limit` is honoured: integer 1–100, **default 12 when omitted** (a year of monthly runs); the response echoes the `limit` actually used (`?limit=5` → `limit: 5`, `?limit=20` → `limit: 20`, `?limit=100` → `limit: 100`). Out of range / non-numeric (`0`, `101`, `abc`) → 422 `VALIDATION_ERROR`. There is NO 12-row cap: only the *default* is 12 (a client that sees `limit: 12` did not send `limit`).
+- `POST /hr/payroll/runs` — body `{ "month": "2026-11", "notes"?: "" }` → **201** `{ "run": PayrollRun, "payslips": [ Payslip ] }`. `month` ≤ current IST month (422 otherwise; the current month is *provisional*: days after today count as paid). One run per month (409 `CONFLICT`). Generates a DRAFT payslip for every employee whose `joiningDate` ≤ month end, `workStatus != TERMINATED` **and who has a salary set (`salaryAmount` > 0) — v1.3**: employees with no pay (null/0, e.g. an owner who just enrolled) are skipped, no zero payslip is created. The response gains `skippedNoPay` (number of skipped employees): `{ run, payslips, skippedNoPay }`. `recalculate` returns the same extra field and keeps recalculating a DRAFT payslip that already exists for an employee whose pay was later cleared (it is never deleted).
 - `GET /hr/payroll/runs/:id` → `{ "run": PayrollRun, "payslips": [ Payslip ] }`.
 - `POST /hr/payroll/runs/:id/recalculate` — only while run is `DRAFT`: recomputes every DRAFT payslip from current attendance/leave/pay-structure/policy (manual lines, bonus & advance recovery are kept) and adds payslips for employees who appeared since → `{ run, payslips }`. 409 `INVALID_STATE` otherwise.
 - `DELETE /hr/payroll/runs/:id` — only `DRAFT` → `null`.
@@ -383,7 +403,7 @@ Status transitions: `PENDING → APPROVED | REJECTED | CANCELLED`, `APPROVED →
 
 **Attendance status on check-in/out**: shift start `S`, grace `g` (the shift's `graceMinutes`). `lateMinutes = max(0, checkInMinuteOfDayIST − (S + g))` → if > 0 then `LATE`. On check-out `worked = out − in` (minutes): `worked < halfDayThresholdHours × 60` ⇒ `HALF_DAY` (late minutes kept); `overtimeMinutes = max(0, worked − standardDayHours × 60)`.
 
-**Absent is computed on read** (no scheduler writes it): a working day (not weekly off, not holiday, on/after joining date, **strictly before today**) with no attendance row is `ABSENT`. Today/future without a row = `NOT_MARKED`.
+**Absent is computed on read** (no scheduler writes it): a working day (not weekly off, not holiday, on/after joining date) with no attendance row is `ABSENT` when it is **strictly before today**. Future days without a row = `NOT_MARKED`. **TODAY (v1.2)**: a working day with no row is `NOT_MARKED` ("yet to check in") until the current IST time is **strictly after the employee's shift end time** (the assigned shift, else the tenant default shift), and `ABSENT` after it (derived — nothing is written; a late check-in or an HR mark afterwards simply creates a row and the status changes). With no shift at all, today is always `NOT_MARKED`. Exactly at the shift end (e.g. 21:00:00) is still `NOT_MARKED`. Employees who joined today are expected to work; weekly off and holidays are never absent; an approved full-day leave (`ON_LEAVE` row) or half-day leave (`HALF_DAY` row) and any manual/self mark are real rows, so they never become absent. The rule lives in one place (`computedStatus` in `utils/attendance.util.ts`, applied by `HrCalendarService.dayDto`) so it is identical in `/hr/overview` (incl. the trend's last point), `/hr/attendance?date=today`, `/hr/attendance/monthly`, `/hr/employees` (`today.status`), employee month views and `/hr/me/attendance` / `/hr/me/summary` (own month stats). It does NOT change payroll (payroll treats today as not-yet-absent) and does not block check-in: `canCheckIn` stays true until the employee punches in, even after shift end.
 
 **Payroll month** = calendar month. Per employee:
 - `workingDays` = calendar days − weekly-off days (holidays are **paid** and stay in the count).
@@ -402,6 +422,8 @@ Status transitions: `PENDING → APPROVED | REJECTED | CANCELLED`, `APPROVED →
 
 In-app inbox = `hr_notifications` (per user; `/hr/me/notifications`) + FCM push to that user's staff devices. Triggers: leave applied (→ all `hr:leave_manage` holders except the applicant), leave approved/rejected/cancelled by HR (→ applicant, includes the remark), employee cancelled (→ approvers), payslip paid (→ employee). The tenant-wide staff Notification Center feed is NOT used (it is shared by all staff and would leak leave/salary data).
 
+**Dates in texts (v1.2)**: titles/bodies (in-app rows AND the push body, which is the same string) use human IST dates — `26 Nov 2026`, ranges `26–28 Nov 2026` (same month), `26 Nov – 2 Dec 2026` (same year), `28 Dec 2026 – 2 Jan 2027` (across years) — never ISO `2026-11-26`. Rows created before v1.2 keep their old text. The same formatter humanises dates inside the leave overlap (`LEAVE_OVERLAP`) and joining-date validation messages.
+
 ## 11. Error codes (additions to `ErrorCode`)
 
 | HTTP | code | when |
@@ -412,6 +434,7 @@ In-app inbox = `hr_notifications` (per user; `/hr/me/notifications`) + FCM push 
 | 409 | `ALREADY_CHECKED_IN`, `NOT_CHECKED_IN`, `ALREADY_CHECKED_OUT` | attendance punch rules |
 | 409 | `LEAVE_OVERLAP` | overlapping PENDING/APPROVED leave |
 | 409 | `ALREADY_PAID` | payslip already paid |
+| 409 | `ALREADY_EMPLOYEE` | `POST /hr/me/enroll` by a user who already has an employee profile (v1.3) |
 | 409 | `INVALID_STATE` | status transition not allowed |
 | 409 | `CONFLICT` | duplicates (leave type code, holiday date, run month, shift name) |
 | 422 | `VALIDATION_ERROR` | body/query invalid, date rules |
@@ -419,7 +442,7 @@ In-app inbox = `hr_notifications` (per user; `/hr/me/notifications`) + FCM push 
 
 ## 12. Audit actions
 
-`hr.attendance_marked`, `hr.attendance_bulk_marked`, `hr.attendance_cleared`, `hr.attendance_checkin`, `hr.attendance_checkout`, `hr.leave_applied`, `hr.leave_approved`, `hr.leave_rejected`, `hr.leave_cancelled`, `hr.leave_balance_adjusted`, `hr.leave_type_created|updated|deleted`, `hr.holiday_created|updated|deleted`, `hr.shift_created|updated|deleted`, `hr.work_setup_updated`, `hr.policy_updated`, `hr.pay_structure_updated`, `hr.payroll_generated`, `hr.payroll_recalculated`, `hr.payroll_deleted`, `hr.payroll_approved`, `hr.payslip_updated`, `hr.payslip_paid` (entityType `hr_*`; `after` JSON carries `{ before, after }` where relevant).
+`hr.attendance_marked`, `hr.attendance_bulk_marked`, `hr.attendance_cleared`, `hr.attendance_checkin`, `hr.attendance_checkout`, `hr.employee_enrolled` (v1.3, entityType `hr_employee`, `after: { employeeId, shift, selfEnrolled: true }`), `hr.leave_applied`, `hr.leave_approved`, `hr.leave_rejected`, `hr.leave_cancelled`, `hr.leave_balance_adjusted`, `hr.leave_type_created|updated|deleted`, `hr.holiday_created|updated|deleted`, `hr.shift_created|updated|deleted`, `hr.work_setup_updated`, `hr.policy_updated`, `hr.pay_structure_updated`, `hr.payroll_generated`, `hr.payroll_recalculated`, `hr.payroll_deleted`, `hr.payroll_approved`, `hr.payslip_updated`, `hr.payslip_paid` (entityType `hr_*`; `after` JSON carries `{ before, after }` where relevant).
 
 ## 13. Seed defaults (every tenant; new tenants at provisioning, existing via migration)
 
@@ -431,7 +454,7 @@ Leave types: **Casual Leave** (`CASUAL`, 12, paid, `#6366f1`), **Sick Leave** (`
 - **Employees in the list are branch-scoped**: a user without "all branches" only sees/acts on employees who share one of their branches (same rule as Members/Finance). Owner = all branches.
 - **Validation messages**: a missing/short `remark` on reject/cancel/manual-mark/clear/adjust is a 422 `VALIDATION_ERROR` with `errors[0].field = "remark"`.
 - **Approve re-counts days**: at approval the covered dates are recomputed against the *current* weekly offs/holidays. If the count changed the request's `days` is updated (audit `daysRecounted: true`); if nothing is left to take leave from -> 422 `NO_WORKING_DAYS` (reject or cancel it instead).
-- **Self-decision rule** applies to approve, reject, `autoApprove` and HR-cancel of a request whose `employee.userId` is the caller -> 403 `FORBIDDEN` (the owner, who has no StaffProfile, can always decide).
+- **Self-decision rule** applies to approve, reject, `autoApprove` and HR-cancel of a request whose `employee.userId` is the caller -> 403 `FORBIDDEN`. **v1.3 exception: the OWNER (role `OWNER`) may approve their OWN leave request** (`POST /hr/leaves/:id/approve`, or `autoApprove: true` when applying on their own behalf) — the top approver, so a sole-owner gym is never stuck. The audit row `hr.leave_approved` then carries `selfApproved: true`. Managers and every other role are still blocked from approving their own; reject / HR-cancel of one's own request stays forbidden for everyone, owner included (an enrolled owner cancels their own via `/hr/me/leaves/:id/cancel`). The owner can only have a leave request after enrolling (`POST /hr/me/enroll`). Nothing changes when another approver exists.
 - **Shift rules**: the default shift cannot be un-defaulted, deactivated or deleted (make another shift default first); a shift with assigned employees cannot be deleted (409 `INVALID_STATE`); renaming a shift renames `StaffProfile.shift` text for its employees.
 - **Leave balance adjust** on an unlimited type (no quota) -> 409 `INVALID_STATE`; an adjustment that would drop entitlement below used + pending -> 422.
 - **Leave-year start month** cannot change once any leave request exists (409 `INVALID_STATE`).
@@ -444,4 +467,6 @@ Leave types: **Casual Leave** (`CASUAL`, 12, paid, `#6366f1`), **Sick Leave** (`
 
 ## Changelog
 - v1 (initial contract, pre-implementation).
+- v1.3: `POST /hr/me/enroll` (opt-in self-enrolment, 201 = `/hr/me/summary` shape, 409 `ALREADY_EMPLOYEE`); payroll skips employees with no pay set (`skippedNoPay`); the OWNER may approve their own leave request (audit `selfApproved: true`), managers/others still cannot.
+- v1.2: added `GET /hr/leaves/calendar`; `/hr/overview` `today.yetToCheckIn` and derived TODAY `absent` after shift end (roster, monthly grid, employee/month views follow the same rule); human dates in HR notification texts; payroll runs `limit` documented (default 12, max 100, honoured). All changes are additive/backward compatible.
 - v1.1 (as built): added section 14; `lateGraceMinutes` is the default grace for new shifts only (lateness uses the shift's grace); owner/non-employee behaviour clarified; swagger paths `/hr/*` registered (49).

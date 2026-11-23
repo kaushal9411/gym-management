@@ -107,3 +107,24 @@ export const round1 = (n: number): number => Math.round((n + Number.EPSILON) * 1
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 /** "2026-11" -> "Nov 2026". */
 export const monthLabel = (month: string): string => `${MONTH_NAMES[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
+
+const SHORT_MONTHS = MONTH_NAMES;
+/** "2026-11-26" -> "26 Nov 2026" (pure string maths: the input is already an IST business date). */
+export function formatHumanDate(day: string): string {
+  const [y, m, d] = day.split('-').map(Number) as [number, number, number];
+  return `${d} ${SHORT_MONTHS[m - 1]} ${y}`;
+}
+
+/**
+ * Human date range for notification texts (en dash):
+ * same day -> "26 Nov 2026"; same month -> "26–28 Nov 2026";
+ * same year -> "26 Nov – 2 Dec 2026"; across years -> "28 Dec 2026 – 2 Jan 2027".
+ */
+export function formatDateRange(start: string, end: string): string {
+  if (start === end) return formatHumanDate(start);
+  const [sy, sm, sd] = start.split('-').map(Number) as [number, number, number];
+  const [ey, em, ed] = end.split('-').map(Number) as [number, number, number];
+  if (sy !== ey) return `${formatHumanDate(start)} – ${formatHumanDate(end)}`;
+  if (sm === em) return `${sd}–${ed} ${SHORT_MONTHS[em - 1]} ${ey}`;
+  return `${sd} ${SHORT_MONTHS[sm - 1]} – ${ed} ${SHORT_MONTHS[em - 1]} ${ey}`;
+}

@@ -339,19 +339,113 @@ void main() {
       await dispose(t);
     });
 
-    testWidgets('an owner without a staff profile gets an explanation',
+    const notEmployee = ApiException(
+      message: 'You do not have an employee profile',
+      statusCode: 403,
+      code: 'NOT_AN_EMPLOYEE',
+    );
+
+    testWidgets('an owner without a staff profile gets the opt-in card',
         (t) async {
-      when(() => repo.meSummary()).thenThrow(
-        const ApiException(
-          message: 'You do not have an employee profile',
-          statusCode: 403,
-          code: 'NOT_AN_EMPLOYEE',
-        ),
+      when(() => repo.meSummary()).thenThrow(notEmployee);
+      await pumpApp(t, const MyHrScreen());
+      await settle(t);
+      expect(find.text('You are not on the employee roster'), findsOneWidget);
+      expect(find.byKey(const Key('enroll-button')), findsOneWidget);
+      expect(find.text('Add me as an employee'), findsOneWidget);
+      expect(find.textContaining("can't undo"), findsOneWidget);
+      expect(find.text('Try again'), findsNothing);
+      verifyNever(() => repo.enrollMe());
+      await dispose(t);
+    });
+
+    testWidgets('without hr:self_attendance / hr:self_leave there is only a '
+        'plain not-available note (no enrol button)', (t) async {
+      when(() => repo.meSummary()).thenThrow(notEmployee);
+      await pumpApp(t, const MyHrScreen(), perms: const ['hr:self_payslip']);
+      await settle(t);
+      expect(find.byKey(const Key('my-hr-not-available')), findsOneWidget);
+      expect(find.byKey(const Key('enroll-button')), findsNothing);
+      expect(find.text('Add me as an employee'), findsNothing);
+      await dispose(t);
+    });
+
+    testWidgets('the card also shows with only hr:self_leave', (t) async {
+      when(() => repo.meSummary()).thenThrow(notEmployee);
+      await pumpApp(t, const MyHrScreen(), perms: const ['hr:self_leave']);
+      await settle(t);
+      expect(find.byKey(const Key('enroll-button')), findsOneWidget);
+      await dispose(t);
+    });
+
+    testWidgets('tapping enrol calls the API once and shows the normal '
+        'screen with a welcome snackbar', (t) async {
+      var enrolled = false;
+      when(() => repo.meSummary()).thenAnswer((_) async {
+        if (!enrolled) throw notEmployee;
+        return _summary();
+      });
+      when(() => repo.myAttendance(month: any(named: 'month')))
+          .thenAnswer((_) async => _month());
+      when(() => repo.enrollMe()).thenAnswer((_) async {
+        enrolled = true;
+        return _summary();
+      });
+      await pumpApp(t, const MyHrScreen());
+      await settle(t);
+      await t.tap(find.byKey(const Key('enroll-button')));
+      await settle(t);
+      verify(() => repo.enrollMe()).called(1);
+      expect(find.byKey(const Key('enroll-card')), findsNothing);
+      expect(find.text('Check in'), findsWidgets);
+      expect(
+        find.text('You are on the employee roster. Welcome!'),
+        findsOneWidget,
+      );
+      await dispose(t);
+    });
+
+    testWidgets('409 ALREADY_EMPLOYEE just reloads into the normal screen',
+        (t) async {
+      var enrolled = false;
+      when(() => repo.meSummary()).thenAnswer((_) async {
+        if (!enrolled) throw notEmployee;
+        return _summary();
+      });
+      when(() => repo.myAttendance(month: any(named: 'month')))
+          .thenAnswer((_) async => _month());
+      when(() => repo.enrollMe()).thenAnswer((_) async {
+        enrolled = true;
+        throw const ApiException(
+          message: 'Already on the roster',
+          statusCode: 409,
+          code: 'ALREADY_EMPLOYEE',
+        );
+      });
+      await pumpApp(t, const MyHrScreen());
+      await settle(t);
+      await t.tap(find.byKey(const Key('enroll-button')));
+      await settle(t);
+      expect(find.byKey(const Key('enroll-card')), findsNothing);
+      expect(find.text('Check in'), findsWidgets);
+      expect(find.text('Already on the roster'), findsNothing);
+      await dispose(t);
+    });
+
+    testWidgets('another failure shows the message and a retry', (t) async {
+      when(() => repo.meSummary()).thenThrow(notEmployee);
+      when(() => repo.enrollMe()).thenThrow(
+        const ApiException(message: 'Server hiccup', statusCode: 500),
       );
       await pumpApp(t, const MyHrScreen());
       await settle(t);
-      expect(find.text('No employee profile'), findsOneWidget);
-      expect(find.text('Try again'), findsNothing);
+      await t.tap(find.byKey(const Key('enroll-button')));
+      await settle(t);
+      expect(find.text('Server hiccup'), findsOneWidget);
+      expect(find.text('Try again'), findsOneWidget);
+      await t.tap(find.byKey(const Key('enroll-button')));
+      await settle(t);
+      verify(() => repo.enrollMe()).called(2);
       await dispose(t);
     });
 
@@ -715,7 +809,8 @@ void main() {
       await pumpApp(t, const HrOverviewScreen(), perms: _adminPerms);
       await settle(t);
       expect(find.text('Present'), findsWidgets);
-      expect(find.text('Not marked yet'), findsOneWidget);
+      expect(find.text('Yet to check in'), findsWidgets);
+      expect(find.text('Absent'), findsWidgets);
       expect(
         find.textContaining('3 leave requests need a decision'),
         findsOneWidget,

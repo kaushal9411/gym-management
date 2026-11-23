@@ -19,6 +19,7 @@ import {
   hrLeavePreviewBodySchema,
   idParamSchema,
   leaveBalancesQuerySchema,
+  leaveCalendarQuerySchema,
   listEmployeesQuerySchema,
   listHolidaysQuerySchema,
   listLeaveTypesQuerySchema,
@@ -83,6 +84,9 @@ hrAdminRouter.delete('/attendance', requirePermission('hr:attendance_manage'), v
 
 /** @openapi { "/hr/leaves": { get: { tags: [HR], summary: "All leave requests with filters and status counts (hr:leave_manage)", security: [{bearerAuth: []}], responses: { 200: { description: OK }, 403: { description: Forbidden }, 409: { description: Conflict }, 422: { description: Validation failed } } } } } */
 hrAdminRouter.get('/leaves', requirePermission('hr:leave_manage'), validate({ query: listLeavesQuerySchema }), asyncHandler(c.listLeaves.bind(c)));
+
+/** @openapi { "/hr/leaves/calendar": { get: { tags: [HR], summary: "Team leave calendar: PENDING/APPROVED leaves overlapping from..to (max 62 days, uncapped) plus holidays (hr:leave_manage)", security: [{bearerAuth: []}], parameters: [{in: query, name: from, required: true, schema: {type: string}}, {in: query, name: to, required: true, schema: {type: string}}], responses: { 200: { description: OK }, 403: { description: Forbidden }, 422: { description: Validation failed } } } } } */
+hrAdminRouter.get('/leaves/calendar', requirePermission('hr:leave_manage'), validate({ query: leaveCalendarQuerySchema }), asyncHandler(c.leaveCalendar.bind(c)));
 
 /** @openapi { "/hr/leaves/preview": { post: { tags: [HR], summary: "Preview leave days for an employee (hr:leave_manage)", security: [{bearerAuth: []}], responses: { 200: { description: OK }, 403: { description: Forbidden }, 409: { description: Conflict }, 422: { description: Validation failed } } } } } */
 hrAdminRouter.post('/leaves/preview', requirePermission('hr:leave_manage'), validate({ body: hrLeavePreviewBodySchema }), asyncHandler(c.previewLeave.bind(c)));

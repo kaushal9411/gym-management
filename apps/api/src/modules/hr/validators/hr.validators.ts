@@ -23,6 +23,7 @@ export const userIdParamSchema = z.object({ userId: uuid });
 
 // ── self-service ──────────────────────────────────────────────────────────
 export const checkInBodySchema = z.object({ note: z.string().trim().max(200).optional() }).default({});
+export const enrollBodySchema = z.object({ shiftId: uuid.optional() }).default({});
 export const monthQuerySchema = z.object({ month: month.optional() });
 export const yearQuerySchema = z.object({ year: z.coerce.number().int().min(2000).max(2100).optional() });
 export const leaveYearQuerySchema = z.object({ leaveYear: z.coerce.number().int().min(2000).max(2100).optional() });
@@ -93,6 +94,15 @@ export const listLeavesQuerySchema = z.object({
   page,
   limit: limit(100),
 });
+/** Team leave calendar window: both bounds required, from <= to, at most 62 days (inclusive). */
+export const MAX_CALENDAR_DAYS = 62;
+export const leaveCalendarQuerySchema = z
+  .object({ from: date, to: date })
+  .superRefine((v, ctx) => {
+    const span = (Date.parse(`${v.to}T00:00:00Z`) - Date.parse(`${v.from}T00:00:00Z`)) / 86_400_000 + 1;
+    if (span < 1) ctx.addIssue({ code: 'custom', path: ['to'], message: 'to must not be before from' });
+    else if (span > MAX_CALENDAR_DAYS) ctx.addIssue({ code: 'custom', path: ['to'], message: `The range can cover at most ${MAX_CALENDAR_DAYS} days` });
+  });
 export const hrLeavePreviewBodySchema = z.object({ userId: uuid, ...leaveFields });
 export const hrApplyLeaveBodySchema = z.object({
   userId: uuid,

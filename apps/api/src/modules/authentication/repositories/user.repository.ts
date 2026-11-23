@@ -1,5 +1,6 @@
 import type { User, UserStatus } from '@prisma/client';
 
+import { phonesMatch } from '../../../core/utils/phone-match.util';
 import type { TenantScopedPrisma } from '../../../infrastructure/database/tenant-scoped-client';
 import type { CreateUserInput, IUserRepository } from '../interfaces/repositories.interface';
 
@@ -10,8 +11,22 @@ export class UserRepository implements IUserRepository {
     return this.db.user.findFirst({ where: { tenantId, email, deletedAt: null } });
   }
 
+  /**
+   * Phone-login lookup, format-insensitive ("+91 98765 00000" == "9876500000" ==
+   * "09876500000"; see `phonesMatch`). An exact string match (indexed by tenant,
+   * cheap) wins; otherwise the gym's own staff with a phone on file are compared
+   * in memory — one gym has a handful of staff, so the `take` cap is only a
+   * safety net, and this never scans across tenants.
+   */
   async findByPhone(tenantId: string, phone: string): Promise<User | null> {
-    return this.db.user.findFirst({ where: { tenantId, phone, deletedAt: null } });
+    const exact = await this.db.user.findFirst({ where: { tenantId, phone, deletedAt: null } });
+    if (exact) return exact;
+    const candidates = await this.db.user.findMany({
+      where: { tenantId, deletedAt: null, phone: { not: null } },
+      orderBy: { createdAt: 'asc' },
+      take: 500,
+    });
+    return candidates.find((u) => phonesMatch(u.phone, phone)) ?? null;
   }
 
   async findById(tenantId: string, userId: string): Promise<User | null> {

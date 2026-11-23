@@ -11,46 +11,31 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
-import { NAV_ITEMS } from '@/features/navigation/nav-config';
+import { buildBreadcrumbTrail } from '@/features/navigation/breadcrumb-trail';
+import { useTenant } from '@/features/tenant/tenant-provider';
 
-function labelFor(segment: string): string {
-  const match = NAV_ITEMS.find((item) => item.href === `/${segment}`);
-  if (match) return match.label;
-  return segment
-    .split('-')
-    .map((word) => word[0]?.toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
-/** Auto-derived from the URL path — plugs in for any route without per-page wiring. */
+/**
+ * Auto-derived from the URL path — plugs in for any route without per-page wiring. Feature-flag aware:
+ * a route blocked by a flag collapses to Dashboard > Unavailable (see `buildBreadcrumbTrail`).
+ */
 export function PortalBreadcrumbs() {
   const pathname = usePathname();
-  const segments = pathname.split('/').filter(Boolean);
+  const tenant = useTenant();
+  const trail = buildBreadcrumbTrail(pathname ?? '', tenant.featureFlags, tenant.id === 'platform');
 
-  if (segments.length === 0) return null;
+  if (trail.length === 0) return null;
 
   return (
     <Breadcrumb className="hidden sm:block">
       <BreadcrumbList>
-        <BreadcrumbItem>
-          <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-        </BreadcrumbItem>
-        {segments.map((segment, index) => {
-          const href = `/${segments.slice(0, index + 1).join('/')}`;
-          const isLast = index === segments.length - 1;
-          return (
-            <React.Fragment key={href}>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                {isLast ? (
-                  <BreadcrumbPage>{labelFor(segment)}</BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink href={href}>{labelFor(segment)}</BreadcrumbLink>
-                )}
-              </BreadcrumbItem>
-            </React.Fragment>
-          );
-        })}
+        {trail.map((crumb, index) => (
+          <React.Fragment key={`${index}-${crumb.label}`}>
+            {index > 0 && <BreadcrumbSeparator />}
+            <BreadcrumbItem>
+              {crumb.href ? <BreadcrumbLink href={crumb.href}>{crumb.label}</BreadcrumbLink> : <BreadcrumbPage>{crumb.label}</BreadcrumbPage>}
+            </BreadcrumbItem>
+          </React.Fragment>
+        ))}
       </BreadcrumbList>
     </Breadcrumb>
   );

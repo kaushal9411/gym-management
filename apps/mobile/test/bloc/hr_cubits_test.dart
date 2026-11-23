@@ -70,6 +70,111 @@ void main() {
       ],
     );
 
+    group('opt-in enrolment (owner without a staff profile)', () {
+      const notEmployee = ApiException(
+        message: 'No staff profile',
+        statusCode: 403,
+        code: 'NOT_AN_EMPLOYEE',
+      );
+
+      Future<HrMeCubit> onTheCard() async {
+        when(() => repo.meSummary()).thenThrow(notEmployee);
+        final c = HrMeCubit(repo);
+        await c.load();
+        expect((c.state as HrMeError).notAnEmployee, isTrue);
+        return c;
+      }
+
+      test('success: spinner, then the normal screen (welcome once), then '
+          'a silent reload', () async {
+        final c = await onTheCard();
+        when(() => repo.enrollMe()).thenAnswer((_) async => _summary());
+        // After enrolling the summary endpoint works.
+        when(() => repo.meSummary()).thenAnswer((_) async => _summary());
+        final seen = <HrMeState>[];
+        final sub = c.stream.listen(seen.add);
+        await c.enroll();
+        await sub.cancel();
+        expect(seen.first, isA<HrMeError>().having((e) => e.enrolling, 'enrolling', true));
+        expect(seen[1], isA<HrMeLoaded>().having((s) => s.welcome, 'welcome', true));
+        expect(c.state, isA<HrMeLoaded>());
+        verify(() => repo.enrollMe()).called(1);
+        c.welcomed();
+        expect((c.state as HrMeLoaded).welcome, isFalse);
+        await c.close();
+      });
+
+      test('409 ALREADY_EMPLOYEE just reloads', () async {
+        final c = await onTheCard();
+        when(() => repo.enrollMe()).thenThrow(
+          const ApiException(
+            message: 'Already on the roster',
+            statusCode: 409,
+            code: 'ALREADY_EMPLOYEE',
+          ),
+        );
+        when(() => repo.meSummary()).thenAnswer((_) async => _summary());
+        await c.enroll();
+        expect(c.state, isA<HrMeLoaded>());
+        expect((c.state as HrMeLoaded).welcome, isFalse);
+        await c.close();
+      });
+
+      test('another error keeps the card with the message; a retry works',
+          () async {
+        final c = await onTheCard();
+        when(() => repo.enrollMe()).thenThrow(
+          const ApiException(message: 'Server hiccup', statusCode: 500),
+        );
+        await c.enroll();
+        final s = c.state as HrMeError;
+        expect(s.notAnEmployee, isTrue);
+        expect(s.enrolling, isFalse);
+        expect(s.enrollError, 'Server hiccup');
+        when(() => repo.enrollMe()).thenAnswer((_) async => _summary());
+        when(() => repo.meSummary()).thenAnswer((_) async => _summary());
+        await c.enroll();
+        expect(c.state, isA<HrMeLoaded>());
+        verify(() => repo.enrollMe()).called(2);
+        await c.close();
+      });
+
+      test('ignored while enrolling and outside the not-an-employee card',
+          () async {
+        // Loaded -> no-op.
+        when(() => repo.meSummary()).thenAnswer((_) async => _summary());
+        final loaded = HrMeCubit(repo);
+        await loaded.load();
+        await loaded.enroll();
+        verifyNever(() => repo.enrollMe());
+        await loaded.close();
+
+        // A second tap while the first is in flight -> one request.
+        final c = await onTheCard();
+        when(() => repo.enrollMe()).thenAnswer((_) async {
+          await Future<void>.delayed(const Duration(milliseconds: 30));
+          return _summary();
+        });
+        when(() => repo.meSummary()).thenAnswer((_) async => _summary());
+        final a = c.enroll();
+        final b = c.enroll();
+        await Future.wait([a, b]);
+        verify(() => repo.enrollMe()).called(1);
+        await c.close();
+      });
+
+      test('a generic (non-403) load error is not the enrolment card', () async {
+        when(() => repo.meSummary()).thenThrow(
+          const ApiException(message: 'boom', statusCode: 500),
+        );
+        final c = HrMeCubit(repo);
+        await c.load();
+        await c.enroll();
+        verifyNever(() => repo.enrollMe());
+        await c.close();
+      });
+    });
+
     test('check in: spinner, then the response becomes today, then resync',
         () async {
       var calls = 0;

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../bloc/maintenance/maintenance_cubit.dart';
@@ -19,10 +20,45 @@ import 'maintenance_screen.dart';
 ///
 /// On the way out, if the session was still being restored when maintenance
 /// hit (cold start), restore is re-run; otherwise there is nothing to redo.
-class MaintenanceHost extends StatelessWidget {
+///
+/// **Android Back while the overlay is up** minimises the app
+/// (`SystemNavigator.pop`) like any home-screen app and is swallowed so it can
+/// never pop the Navigator route hidden underneath. The host sits *above* the
+/// `Router`, so `PopScope` / `BackButtonListener` (which need a route / Router
+/// ancestor) can't be used; instead the host is a [WidgetsBindingObserver]
+/// registered in `initState`. `WidgetsBinding.handlePopRoute` asks observers in
+/// registration order and this one registers before the Router's
+/// `RootBackButtonDispatcher` (a descendant), so it gets the first say. When
+/// the overlay is not active it returns `false` and Back behaves as normal.
+class MaintenanceHost extends StatefulWidget {
   const MaintenanceHost({super.key, required this.child});
 
   final Widget child;
+
+  @override
+  State<MaintenanceHost> createState() => _MaintenanceHostState();
+}
+
+class _MaintenanceHostState extends State<MaintenanceHost>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  Future<bool> didPopRoute() async {
+    if (!context.read<MaintenanceCubit>().state.active) return false;
+    await SystemNavigator.pop();
+    return true;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +86,10 @@ class MaintenanceHost extends StatelessWidget {
               ignoring: state.active,
               child: ExcludeSemantics(
                 excluding: state.active,
-                child: ExcludeFocus(excluding: state.active, child: child),
+                child: ExcludeFocus(
+                  excluding: state.active,
+                  child: widget.child,
+                ),
               ),
             ),
             if (state.active)
